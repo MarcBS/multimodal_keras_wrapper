@@ -1,0 +1,6 @@
+{
+  "name": "Staged Keras Wrapper",
+  "tagline": "Wrapper for Keras with support to easy data loading and handling and the creation of staged networks.",
+  "body": "# Staged Keras Wrapper\r\nWrapper for Keras with support to easy data loading and handling and the creation of staged networks.\r\n",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}
