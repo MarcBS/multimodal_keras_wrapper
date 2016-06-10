@@ -4,7 +4,7 @@ Wrapper for Keras with support to easy data loading and handling and the creatio
 
 ## Documentation
 
-You can access the initial documentation version in doc/build/html/index.html
+You can access the initial documentation version in [doc/build/html/index.html](https://github.com/MarcBS/staged_keras_wrapper/tree/master/doc/build/html)
 
 
 
