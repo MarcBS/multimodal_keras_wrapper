@@ -2,6 +2,12 @@
 Wrapper for Keras with support to easy data loading and handling and the creation of staged networks.
 
 
+## Documentation
+
+You can access the initial documentation version in doc/build/html/index.html
+
+
+
 ## Installation
 
 In order to install the library you just have to follow these steps:

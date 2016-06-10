@@ -3,50 +3,53 @@ Documentation for the Code
 
 Documentation for the keras_wrapper module.
 
-Dataset.py
+See examples in test.py
+
+
+dataset.py
 =========================
 
-.. automodule:: Dataset
+.. automodule:: keras_wrapper.dataset
    :members:
 
 
-CNN_Model.py
+cnn_model.py
 =========================
 
-.. automodule:: CNN_Model
+.. automodule:: keras_wrapper.cnn_model
    :members:
 
 
-Staged_Network.py
+staged_network.py
 =========================
 
-.. automodule:: Staged_Network
+.. automodule:: keras_wrapper.staged_network
    :members:
 
 
-Stage.py
+stage.py
 =========================
 
-.. automodule:: Stage
+.. automodule:: keras_wrapper.stage
    :members:
 
 
-ECOC_Classifier.py
+ecoc_classifier.py
 =========================
 
-.. automodule:: ECOC_Classifier
+.. automodule:: keras_wrapper.ecoc_classifier
    :members:
 
 
-Utils.py
+utils.py
 =========================
 
-.. automodule:: Utils
+.. automodule:: keras_wrapper.utils
    :members:
 
 
-ThreadLoader.py
+thread_loader.py
 =========================
 
-.. automodule:: ThreadLoader
+.. automodule:: keras_wrapper.thread_loader
    :members:
