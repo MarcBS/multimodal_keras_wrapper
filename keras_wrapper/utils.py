@@ -1,10 +1,8 @@
-from Dataset import Dataset, saveDataset, loadDataset
-from CNN_Model import CNN_Model, loadModel, saveModel
-from ECOC_Classifier import ECOC_Classifier
-from Stage import Stage
-from Staged_Network import Staged_Network, saveStagedModel, loadStagedModel
-
-#from Food101 import Food101Dataset, loadFood101
+from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
+from keras_wrapper.cnn_model import CNN_Model, loadModel, saveModel
+from keras_wrapper.ecoc_classifier import ECOC_Classifier
+from keras_wrapper.stage import Stage
+from keras_wrapper.staged_network import Staged_Network, saveStagedModel, loadStagedModel
 
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D

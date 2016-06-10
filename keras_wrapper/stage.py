@@ -1,7 +1,7 @@
-from CNN_Model import CNN_Model, saveModel, loadModel
-from ECOC_Classifier import ECOC_Classifier
-from ThreadLoader import ThreadDataLoader, retrieveXY
-from Dataset import Dataset
+from keras_wrapper.cnn_model import CNN_Model, saveModel, loadModel
+from keras_wrapper.ecoc_classifier import ECOC_Classifier
+from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
+from keras_wrapper.dataset import Dataset
 
 from keras.models import Sequential, Graph, model_from_json
 from keras.layers.core import Dense, Dropout, Activation, Flatten

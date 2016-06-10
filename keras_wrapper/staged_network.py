@@ -1,8 +1,8 @@
-from ThreadLoader import ThreadDataLoader, retrieveXY, ThreadModelLoader, retrieveModel
-from CNN_Model import CNN_Model, saveModel, loadModel
-from ECOC_Classifier import ECOC_Classifier
-from Stage import Stage
-from Dataset import Dataset, saveDataset, loadDataset
+from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY, ThreadModelLoader, retrieveModel
+from keras_wrapper.cnn_model import CNN_Model, saveModel, loadModel
+from keras_wrapper.ecoc_classifier import ECOC_Classifier
+from keras_wrapper.stage import Stage
+from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
 
 from keras.models import Sequential, Graph, model_from_json
 from keras.utils import np_utils

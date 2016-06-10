@@ -1,7 +1,7 @@
-from ThreadLoader import ThreadDataLoader, retrieveXY
-from Dataset import Dataset, Data_Batch_Generator
-from ECOC_Classifier import ECOC_Classifier
-from Callbacks_keras_wrapper import *
+from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
+from keras_wrapper.dataset import Dataset, Data_Batch_Generator
+from keras_wrapper.ecoc_classifier import ECOC_Classifier
+from keras_wrapper.callbacks_keras_wrapper import *
 
 from keras.models import Sequential, Graph, model_from_json
 #from keras.layers.core import Dense, Dropout, Activation, Flatten

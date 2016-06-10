@@ -1,4 +1,4 @@
-from Dataset import Dataset
+from keras_wrapper.dataset import Dataset
 
 from keras.models import Sequential, Graph, model_from_json
 
