@@ -18,6 +18,8 @@ import itertools
 import time
 import logging
 
+
+
 def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ecoc_version=2):
     
     n_classes = len(ds.classes)
@@ -180,6 +182,112 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
 
 
 
+def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, ds, ecoc_version=3, pairs=None, functional_api=False):
+
+    n_classes = len(ds.classes)
+    if(pairs is None): # generate any possible combination of two classes
+        pairs = tuple(itertools.combinations(range(n_classes), 2))
+    
+    outputs_list = list()
+    n_pairs = len(pairs)
+    ecoc_table = np.zeros((n_classes, n_pairs, 2))
+    
+    
+    logging.info("Building " + str(n_pairs) +" OneVsOne structures...")
+    
+    for i, c in enumerate(pairs):
+        t = time.time()
+        
+        # Insert 1s in the corresponding positions of the ecoc table
+        ecoc_table[c[0], i, 0] = 1
+        ecoc_table[c[1], i, 1] = 1
+        
+        # Create each one_vs_one classifier of the intermediate stage
+        if(functional_api==False):
+            if(ecoc_version == 1):
+                output_name = net.add_One_vs_One_Inception(input, input_shape, i, nOutput=2)
+            elif(ecoc_version == 2):
+                output_name = net.add_One_vs_One_Inception_v2(input, input_shape, i, nOutput=2)
+            else:
+                raise NotImplementedError
+        else:
+            if(ecoc_version == 1):
+                output_name = net.add_One_vs_One_Inception_Functional(input, input_shape, i, nOutput=2)
+            elif(ecoc_version == 2):
+                raise NotImplementedError()
+            elif(ecoc_version == 3 or ecoc_version == 4 or ecoc_version == 5 or ecoc_version == 6):
+                if ecoc_version == 3:
+                    nkernels = 16
+                elif ecoc_version == 4:
+                    nkernels = 64
+                elif ecoc_version == 5:
+                    nkernels = 128
+                elif ecoc_version == 6:
+                    nkernels = 256
+                else:
+                    raise NotImplementedError()
+                if(i==0):
+                    in_node = net.model.get_layer(input).output
+                    padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')   (in_node)
+                output_name = net.add_One_vs_One_3x3_Functional(padding_node, input_shape, i, nkernels, nOutput=2)
+            elif(ecoc_version == 7):
+                if(i==0):
+                    in_node = net.model.get_layer(input).output
+                    padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')   (in_node)
+                output_name = net.add_One_vs_One_3x3_double_Functional(padding_node, input_shape, i, nOutput=2)
+            else:
+                raise NotImplementedError()
+        outputs_list.append(output_name)
+        
+        #logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.'%(str(i+1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time()-t)))
+          
+    ecoc_table = np.reshape(ecoc_table, [n_classes, 2*n_pairs])
+    
+    
+    # Build final Softmax layer
+    if(functional_api==False):
+        output_names = net.add_One_vs_One_Merge(outputs_list, n_classes)
+    else:
+        output_names = net.add_One_vs_One_Merge_Functional(outputs_list, n_classes)
+    logging.info('Built ECOC merge layers.')
+    
+    return [ecoc_table, output_names]
+
+
+def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits=['train', 'val', 'test']):
+    
+    # Insert ecoc_table in net
+    if(not 'additional_data' in net.__dict__.keys()):
+        net.additional_data = dict()
+    net.additional_data['ecoc_table'] = ecoc_table
+    
+    # Retrieve labels' id and images' id in dataset
+    id_labels = ds.ids_outputs[ds.types_outputs.index('categorical')]
+    id_labels_ecoc = 'labels_ecoc'
+    
+    # Insert ecoc-loss labels for each data split
+    for s in splits:
+        labels_ecoc = []
+        exec('labels = ds.Y_'+s+'[id_labels]')
+        n = len(labels)
+        for i in range(n):
+            labels_ecoc.append(ecoc_table[labels[i]])
+        ds.setOutput(labels_ecoc, s, type='binary', id=id_labels_ecoc)
+
+    # Set input and output mappings from dataset to network
+    pos_images = ds.types_inputs.index('image')
+    pos_labels = ds.types_outputs.index('categorical')
+    pos_labels_ecoc = ds.types_outputs.index('binary')
+    
+    #inputMapping = {input_name: pos_images}
+    inputMapping = {0: pos_images}
+    net.setInputsMapping(inputMapping)
+    
+    #outputMapping = {output_names[0]: pos_labels_ecoc, output_names[1]: pos_labels}
+    outputMapping = {0: pos_labels_ecoc, 1: pos_labels}
+    net.setOutputsMapping(outputMapping, acc_output=output_names[1])
+
+
 def loadGoogleNetForFood101(nClasses=101, load_path='/media/HDD_2TB/CNN_MODELS/GoogleNet'):
     
     logging.info('Loading GoogLeNet...')
@@ -202,6 +310,28 @@ def prepareGoogleNet_Food101(model_wrapper):
                         'loss1/relu_fc', 'loss1/drop_fc', 'loss1/classifier', 'output_loss1/loss']
     model_wrapper.removeLayers(layers_to_delete)
     model_wrapper.removeOutputs(['loss1/loss', 'loss2/loss'])
+
+
+def prepareGoogleNet_Food101_ECOC_loss(model_wrapper):
+    """    Prepares the GoogleNet model for inserting an ECOC structure after removing the last part of the net    """
+    
+    # Remove all last layers (from 'inception_5a' included)
+    layers_to_delete = ['inception_5a/1x1','inception_5a/relu_1x1','inception_5a/3x3_reduce','inception_5a/relu_3x3_reduce',
+                    'inception_5a/3x3_zeropadding','inception_5a/3x3','inception_5a/relu_3x3','inception_5a/5x5_reduce',
+                    'inception_5a/relu_5x5_reduce','inception_5a/5x5_zeropadding','inception_5a/5x5','inception_5a/relu_5x5',
+                    'inception_5a/pool_zeropadding','inception_5a/pool','inception_5a/pool_proj','inception_5a/relu_pool_proj', 'inception_5a/output','inception_5b/1x1','inception_5b/relu_1x1','inception_5b/3x3_reduce','inception_5b/relu_3x3_reduce',
+                    'inception_5b/3x3_zeropadding','inception_5b/3x3','inception_5b/relu_3x3','inception_5b/5x5_reduce',
+                    'inception_5b/relu_5x5_reduce','inception_5b/5x5_zeropadding','inception_5b/5x5','inception_5b/relu_5x5',
+                    'inception_5b/pool_zeropadding','inception_5b/pool','inception_5b/pool_proj','inception_5b/relu_pool_proj',
+                    'inception_5b/output','pool5/7x7_s1','pool5/drop_7x7_s1','loss3/classifier_foodrecognition_flatten',
+                    'loss3/classifier_foodrecognition']
+    [layers, params] = model_wrapper.removeLayers(copy.copy(layers_to_delete))
+    # Remove softmax output
+    model_wrapper.removeOutputs(['loss3/loss3'])
+
+    return ['pool4/3x3_s2', [832,7,7]] # returns the name of the last layer and its output shape
+    # Adds a new output after the layer 'pool4/3x3_s2'
+    #model_wrapper.model.add_output(name='pool4', input='pool4/3x3_s2')
 
 
 def prepareGoogleNet_Food101_Stage1(model_wrapper):
@@ -267,35 +397,29 @@ def simplifyDataset(ds, n_classes=50):
     logging.info("Simplifying %s from %d to %d classes." % (str(ds.name), len(ds.classes), n_classes))
     ds.classes = ds.classes[:n_classes]
     
-    # reduce training
-    kept_Y = list()
-    kept_X = list()
-    for i, y in enumerate(ds.Y_train):
-        if(y < n_classes):
-            kept_Y.append(y)
-            kept_X.append(ds.X_train[i])
-    ds.X_train = copy.copy(kept_X)
-    ds.Y_train = copy.copy(kept_Y)
-    ds.len_train = len(kept_X)
+    id_labels = ds.ids_outputs[ds.types_outputs.index('categorical')]
     
-    # reduce validation
-    kept_Y = list()
-    kept_X = list()
-    for i, y in enumerate(ds.Y_val):
-        if(y < n_classes):
-            kept_Y.append(y)
-            kept_X.append(ds.X_val[i])
-    ds.X_val = copy.copy(kept_X)
-    ds.Y_val = copy.copy(kept_Y)
-    ds.len_val = len(kept_X)
-    
-    # reduce test
-    kept_Y = list()
-    kept_X = list()
-    for i, y in enumerate(ds.Y_test):
-        if(y < n_classes):
-            kept_Y.append(y)
-            kept_X.append(ds.X_test[i])
-    ds.X_test = copy.copy(kept_X)
-    ds.Y_test = copy.copy(kept_Y)
-    ds.len_test = len(kept_X)
+    # reduce each data split
+    for s in ['train', 'val', 'test']:
+        kept_Y = dict()
+        kept_X = dict()
+        exec('labels_set = ds.Y_'+s+'[id_labels]')
+        for i, y in enumerate(labels_set):
+            if(y < n_classes):
+                for id_out in ds.ids_outputs:
+                    exec('sample = ds.Y_'+s+'[id_out][i]')
+                    try:
+                        kept_Y[id_out].append(sample)
+                    except:
+                        kept_Y[id_out] = []
+                        kept_Y[id_out].append(sample)
+                for id_in in ds.ids_inputs:
+                    exec('sample = ds.X_'+s+'[id_in][i]')
+                    try:
+                        kept_X[id_in].append(sample)
+                    except:
+                        kept_X[id_in] = []
+                        kept_X[id_in].append(sample)
+        exec('ds.X_'+s+' = copy.copy(kept_X)')
+        exec('ds.Y_'+s+' = copy.copy(kept_Y)')
+        exec('ds.len_'+s+' = len(kept_Y[id_labels])')

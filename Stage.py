@@ -10,7 +10,7 @@ from keras.layers.advanced_activations import PReLU
 from keras.optimizers import SGD
 from keras.utils import np_utils
 
-from keras.caffe.extra_layers import LRN2D
+#from keras.caffe.extra_layers import LRN2D
 
 import numpy as np
 

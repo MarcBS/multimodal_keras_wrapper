@@ -47,7 +47,54 @@ def loadDataset(dataset_path):
     logging.info("<<< Dataset instance loaded >>>")
     return dataset
 
+# ------------------------------------------------------- #
+#       DATA BATCH GENERATOR CLASS
+# ------------------------------------------------------- #
+class Data_Batch_Generator(object):
+    
+    def __init__(self, set_split, net, dataset, num_iterations,
+                 batch_size=50, 
+                 normalize_images=False, 
+                 data_augmentation=True, 
+                 mean_substraction=True):
+        
+        self.set_split = set_split
+        self.dataset = dataset
+        self.net = net
+        # Several parameters
+        self.params = {'batch_size': batch_size, 
+                       'data_augmentation': data_augmentation,
+                       'mean_substraction': mean_substraction,
+                       'normalize_images': normalize_images,
+                       'num_iterations': num_iterations}
+    
+    def generator(self):
+            
+        if(self.set_split == 'train'):
+            data_augmentation = self.params['data_augmentation']
+        else:
+            data_augmentation = False
 
+        it = 0
+        while 1:
+
+            if(self.set_split == 'train' and it%self.params['num_iterations']==0):
+                self.dataset.shuffleTraining()
+            elif(it%self.params['num_iterations']==0):
+                self.dataset.resetCounters(set_name=self.set_split)
+            it += 1
+            
+            # Recovers a batch of data
+            X_batch, Y_batch = self.dataset.getXY(self.set_split, self.params['batch_size'], 
+                                             normalization=self.params['normalize_images'],
+                                             meanSubstraction=self.params['mean_substraction'],
+                                             dataAugmentation=data_augmentation)
+            
+            data = self.net.prepareData(X_batch, Y_batch)
+            
+            yield(data)
+
+            
 # ------------------------------------------------------- #
 #       MAIN CLASS
 # ------------------------------------------------------- #
@@ -58,6 +105,7 @@ class Dataset(object):
     """
     
     def __init__(self, name, path, silence=False, size=[256, 256, 3], size_crop=[227, 227, 3]):
+        
         # Dataset name
         self.name = name
         # Path to the folder where the images are stored
@@ -65,6 +113,12 @@ class Dataset(object):
         
         # If silence = False, some informative sentences will be printed while using the "Dataset" object instance
         self.silence = silence
+        
+        
+        
+        ############################ Data loading parameters
+        # Lock for threads synchronization
+        self.__lock_read = threading.Lock()
         
         # Indicators for knowing if the data [X, Y] has been loaded for each data split
         self.loaded_train = [False, False]
@@ -74,15 +128,43 @@ class Dataset(object):
         self.len_val = 0
         self.len_test = 0
         
+        # Initlize dictionaries of samples
+        self.X_train = dict()
+        self.X_val = dict()
+        self.X_test = dict()
+        self.Y_train = dict()
+        self.Y_val = dict()
+        self.Y_test = dict()
+        #################################################
+        
+        
+        ############################ Parameters for managing all the inputs and outputs
+        # List of identifiers for the inputs and outputs and their respective types (which will define the preprocessing applied)
+        self.ids_inputs = []
+        # TODO: include 'video' type
+        self.types_inputs = [] # see accepted types in self.__accepted_types_inputs
+        self.ids_outputs = []
+        # TODO: include 'text' type
+        self.types_outputs = [] # see accepted types in self.__accepted_types_outputs
+        
+        # List of implemented input and output data types
+        self.__accepted_types_inputs = ['image', 'features', 'text']
+        self.__accepted_types_outputs = ['categorical', 'binary', 'text']
+        #################################################
+        
+        
+        ############################ Parameters used for inputs of type 'text'
+        self.vocabulary = dict()
+        #################################################
+        
+        
+        ############################ Parameters used for inputs of type 'image'
         # Image resize dimensions used for all the returned images
         self.img_size = size
-        
         # Image crop dimensions for the returned images
         self.img_size_crop = size_crop
-        
         # Set training mean to NaN (not calculated yet)
         self.train_mean = []
-        
         # Tries to load a train_mean file from the dataset folder if exists
         mean_file_path = self.path+'/train_mean'
         for s in range(len(self.img_size)):
@@ -90,11 +172,9 @@ class Dataset(object):
         mean_file_path += '.jpg'
         if(os.path.isfile(mean_file_path)):
             self.setTrainMean(mean_file_path)
+        #################################################
         
-        # Lock for threads synchronization
-        self.__lock_read = threading.Lock()
-        
-        
+        # Reset counters to start loading data in batches
         self.resetCounters()
         
     
@@ -105,28 +185,24 @@ class Dataset(object):
         if(not self.silence):
             logging.info("Shuffling training samples.")
         
-        # Get current samples
-        samples = self.X_train
-        labels = self.Y_train
-        num = self.len_train
-        
         # Shuffle
+        num = self.len_train
         shuffled_order = random.sample([i for i in range(num)], num)
-        samples = []
-        labels = []
-        for s in shuffled_order:
-            samples.append(self.X_train[s])
-            labels.append(self.Y_train[s])
         
-        # Insert samples again
-        silence = self.silence
-        self.setSilence(True)
-        self.__setList(samples, 'train')
-        self.__setLabels(labels, 'train')
-        self.setSilence(silence)
+        # Process each input sample
+        for id in self.X_train.keys():
+            self.X_train[id] = [self.X_train[id][s] for s in shuffled_order]
+        # Process each output sample
+        for id in self.Y_train.keys():
+            self.Y_train[id] = [self.Y_train[id][s] for s in shuffled_order]
+            
+        if(not self.silence):
+            logging.info("Shuffling training done.")
+    
+    
     
     # ------------------------------------------------------- #
-    #       SETTERS
+    #       GENERAL SETTERS
     #           classes list, train, val and test set, etc.
     # ------------------------------------------------------- #
     
@@ -141,22 +217,7 @@ class Dataset(object):
         else:
             self.__checkSetName(set_name)
             exec('self.last_'+set_name+'=0')
-        
-        
-    def setImageSize(self, size):
-        """
-            Changes the default image return size.
-        """
-        self.img_size = size
-        
-    
-    def setImageSizeCrop(self, size_crop):
-        """
-            Changes the default image return size.
-        """
-        self.img_size_crop = size_crop
-        
-        
+            
     def setSilence(self, silence):
         """
             Changes the silence mode of the 'Dataset' instance.
@@ -183,13 +244,23 @@ class Dataset(object):
             logging.info('Loaded classes list with ' + str(len(self.classes)) + " different labels.")
         
         
-    def setListGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True):
+        
+    def setListGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='image', id='image'):
+        """
+            Deprecated
+        """
+        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInputGeneral() instead.")
+        self.setInputGeneral(path_list, split, shuffle, type, id)
+    
+    def setInputGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='image', id='image'):
         """ 
-            Loads a single list of images from which train/val/test divisions will be applied. 
+            Loads a single list of samples from which train/val/test divisions will be applied. 
             
             :param path_list: path to the .txt file with the list of images.
             :param split: percentage of images used for [training, validation, test].
-            :param shuffle: wether we are randomly shuffling the input samples or not.
+            :param shuffle: whether we are randomly shuffling the input samples or not.
+            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
+            :param id: identifier of the input data loaded
         """
         if(sum(split) != 1):
             raise Exception('"split" values must sum 1.')
@@ -208,6 +279,15 @@ class Dataset(object):
         if(shuffle):
             set_num = random.sample(set_num, nSamples)
         
+        # Insert type and id of input data
+        if(id not in self.ids_inputs):
+            self.ids_inputs.append(id)
+            if(type not in self.__accepted_types_inputs):
+                raise NotImplementedException('The input type '+type+' is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
+            self.types_inputs.append(type)
+        else:
+            raise Exception('An input with id '+id+' is already loaded into the Database instance.')
+        
         offset = 0
         order = ['train', 'val', 'test']
         set_split = []
@@ -218,46 +298,121 @@ class Dataset(object):
             
             # Insert into the corresponding list
             if(len(set_split[i]) > 0):
-                self.__setList([set[elem] for elem in set_split[i]], order[i])
+                self.__setInput([set[elem] for elem in set_split[i]], order[i], id=id)
         
-        
-    def setList(self, path_list, set_name):
+    
+    
+    def setList(self, path_list, set_name, type='image', id='image'):
         """
-            Loads a list of images which can contain all samples from the 'train', 'val', or
+            Deprecated
+        """
+        logging.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
+        self.setInput(path_list, set_name, type, id)
+    
+    
+    def setInput(self, path_list, set_name, type='image', id='image', tokenization='tokenize_basic', build_vocabulary=False):
+        """
+            Loads a list of samples which can contain all samples from the 'train', 'val', or
             'test' sets (specified by set_name).
-            'path_list' can either be a path to a .txt file containing the paths to the images or a python list of paths
+            
+            :param path_list: can either be a path to a .txt file containing the paths to the images or a python list of paths
+            :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
+            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
+            :param id: identifier of the input data loaded
+            :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
+            :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
         """
         self.__checkSetName(set_name)
         
-        if(isinstance(path_list, str) and os.path.isfile(path_list)):
-            set = []
-            with open(path_list, 'r') as list_:
-                for line in list_:
-                    set.append(line.rstrip('\n'))
-        elif(isinstance(path_list, list)):
-            set = path_list
-        else:
-            raise Exception('Wrong type for "path_list". It must be a path to a .txt with the labels or an instance of the class list.')
-        self.__setList(set, set_name)
+        # Insert type and id of input data
+        keys_X_set = eval('self.X_'+set_name+'.keys()')
+        if(id not in self.ids_inputs):
+            self.ids_inputs.append(id)
+            if(type not in self.__accepted_types_inputs):
+                raise NotImplementedException('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
+            self.types_inputs.append(type)
+        elif id in keys_X_set:
+            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+        
+        # Proprocess the input data depending on its type
+        if(type == 'image'):
+            data = self.preprocessImages(path_list)
+        elif(type == 'text'):
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary)
+        elif(type == 'features'):
+            data = self.preprocessFeatures(path_list)
+        
+        self.__setInput(data, set_name, type, id)
         
     
-    def __setList(self, set, set_name):
-        exec('self.X_'+set_name+' = set')
+    def __setInput(self, set, set_name, type, id):
+        exec('self.X_'+set_name+'[id] = set')
         exec('self.loaded_'+set_name+'[0] = True')
         exec('self.len_'+set_name+' = len(set)')
         
         self.__checkLengthSet(set_name)
         
         if(not self.silence):
-            logging.info('Loaded "' + set_name + '" set samples with '+ str(eval('self.len_'+set_name)) + ' samples.')
+            logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
         
-                
-    def setLabels(self, labels_list, set_name):
+    
+    
+    def setLabels(self, labels_list, set_name, type='categorical', id='label'):
         """
-            Loads a set of int labels referencing values in self.classes (starting from 0)
-            'labels_list' can either be a path to a .txt file containing the labels or a python list of labels
+            Deprecated
+        """
+        logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
+        self.setOutput(self, labels_list, set_name, type, id)
+    
+    def setOutput(self, path_list, set_name, type='categorical', id='label', tokenization='tokenize_basic', build_vocabulary=False):
+        """
+            Loads a set of output data, usually referencing values in self.classes (starting from 0)
+            
+            :param path_list: can either be a path to a .txt file containing the labels or a python list of labels
+            :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
+            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs)
+            :param id: identifier of the input data loaded
+            :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
+            :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
         """
         self.__checkSetName(set_name)
+        
+        # Insert type and id of output data
+        keys_Y_set = eval('self.Y_'+set_name+'.keys()')
+        if(id not in self.ids_outputs):
+            self.ids_outputs.append(id)
+            if(type not in self.__accepted_types_outputs):
+                raise NotImplementedException('The output type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_outputs))
+            self.types_outputs.append(type)
+        elif id in keys_Y_set:
+            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+
+        # Proprocess the output data depending on its type
+        if(type == 'categorical'):
+            data = self.preprocessCategorical(path_list)
+        elif(type == 'text'):
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary)
+        elif(type == 'binary'):
+            data = self.preprocessBinary(path_list)
+            
+        self.__setOutput(data, set_name, type, id)
+    
+    
+    def __setOutput(self, labels, set_name, type, id):
+        exec('self.Y_'+set_name+'[id] = labels')
+        exec('self.loaded_'+set_name+'[1] = True')
+    
+        self.__checkLengthSet(set_name)
+        
+        if(not self.silence):
+            logging.info('Loaded "' + set_name + '" set outputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
+           
+        
+    # ------------------------------------------------------- #
+    #       TYPE 'categorical' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+    
+    def preprocessCategorical(self, labels_list):
         
         if(isinstance(labels_list, str) and os.path.isfile(labels_list)):
             labels = []
@@ -267,19 +422,227 @@ class Dataset(object):
         elif(isinstance(labels_list, list)):
             labels = labels_list
         else:
-            raise Exception('Wrong type for "labels_list". It must be a path to a .txt with the labels or an instance of the class list.')
-        self.__setLabels(labels, set_name)
-    
-    
-    def __setLabels(self, labels, set_name):
-        exec('self.Y_'+set_name+' = labels')
-        exec('self.loaded_'+set_name+'[1] = True')
-    
-        self.__checkLengthSet(set_name)
+            raise Exception('Wrong type for "path_list". It must be a path to a .txt with the labels or an instance of the class list.')
         
-        if(not self.silence):
-            logging.info('Loaded "' + set_name + '" set labels with '+ str(eval('self.len_'+set_name)) + ' samples.')
+        return labels
     
+    # ------------------------------------------------------- #
+    #       TYPE 'binary' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+       
+    def preprocessBinary(self, labels_list):
+        
+        if(isinstance(labels_list, list)):
+            labels = labels_list
+        else:
+            raise Exception('Wrong type for "path_list". It must be an instance of the class list.')
+        
+        return labels
+    
+    # ------------------------------------------------------- #
+    #       TYPE 'features' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+    
+    def preprocessFeatures(self, path_list):
+        
+        # file with a list, each line being a path to a .npy file with a feature vector
+        if(isinstance(path_list, str) and os.path.isfile(path_list)): 
+            data = []
+            with open(path_list, 'r') as list_:
+                for line in list_:
+                    #data.append(np.fromstring(line.rstrip('\n'), sep=','))
+                    data.append(line.rstrip('\n'))
+        elif(isinstance(path_list, list)):
+            data = path_list
+        else:
+            raise Exception('Wrong type for "path_list". It must be a path to a .txt file. Each line must contain a path to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
+        
+        return data
+    
+    
+    def loadFeatures(self, X, loaded=False, external=False):
+        
+        features = []
+        
+        for feat in X:
+            if(not external):
+                feat = self.path +'/'+ feat
+
+            # Check if the filename includes the extension
+            feat = np.load(feat)
+            features.append(feat)
+            
+        return np.array(features)
+    
+    # ------------------------------------------------------- #
+    #       TYPE 'text' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+    
+    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary):
+        
+        labels = []
+        if(isinstance(annotations_list, str) and os.path.isfile(annotations_list)):
+            with open(annotations_list, 'r') as list_:
+                for line in list_:
+                    labels.append(line.rstrip('\n'))
+        else:
+            raise Exception('Wrong type for "annotations_list". It must be a path to a .txt with the sentences or a list of sentences.')
+        
+        if(build_vocabulary):
+            self.build_vocabulary(labels, id)
+        
+        if(not id in self.vocabulary):
+            raise Exception('The dataset must include a vocabulary with id "'+id+'" in order to process the type "text" data. Set "build_vocabulary" to True if you want to use the current data for building the vocabulary.')
+            
+        # Tokenize sentences
+        if(hasattr(self, tokenization)):
+            tokfun = eval('self.'+type)
+            eval('labels = self.'+type+'(labels)')
+        else:
+            raise Exception('Tokenization procedure "'+ type +'" is not implemented.')
+        for i in range(len(labels)):
+            for j in range(len(labels[i])):
+                labels[i][j] = tokfun(labels[i][j])
+    
+        return labels
+    
+    
+    def build_vocabulary(captions, id, n_words=0):
+        """
+            Vocabulary builder for data of type 'text'
+        """
+        logging.info("Creating vocabulary for data with id '"+id+"'.")
+        
+        counters = []
+        sentence_counts = []
+        counter = Counter()
+        sentence_count = 0
+        for line in captions:
+            tokenized = tokenize(line)
+            words = tokenized.strip().split(' ')
+            words_low = map(lambda x: x.lower(), words)
+            counter.update(words_low)
+            sentence_count += 1
+
+        counters.append(counter)
+        sentence_counts.append(sentence_count)
+        logging.info("\t %d unique words in %d sentences with a total of %d words." %
+              (len(counter), sentence_count, sum(counter.values())))
+
+        combined_counter = reduce(add, counters)
+        logging.info("\t Total: %d unique words in %d sentences with a total of %d words." %
+              (len(combined_counter), sum(sentence_counts),sum(combined_counter.values())))
+
+
+        if n_words > 0:
+            vocab_count = combined_counter.most_common(n_words - 2)
+            logging.info("Creating dictionary of %s most common words, covering "
+                        "%2.1f%% of the text."
+                        % (n_words,
+                           100.0 * sum([count for word, count in vocab_count]) /
+                           sum(combined_counter.values())))
+        else:
+            logging.info("Creating dictionary of all words")
+            vocab_count = counter.most_common()
+
+        dictionary = {}
+        for i, (word, count) in enumerate(vocab_count):
+                dictionary[word] = i + 2
+        dictionary['<eos>'] = 0
+        dictionary['<unk>'] = 1
+        
+        self.vocabulary[id] = dict()
+        self.vocabulary[id]['words2idx'] = dictionary
+        inv_dictionary = {v: k for k, v in dictionary.items()}
+        self.vocabulary[id]['idx2words'] = dictionary
+
+
+    def loadText(self, X, vocabularies):
+        """
+            Text encoder. Transforms samples from a text representation into a numerical one.
+        """
+        vocab = vocabularies['words2idx']
+        for i in range(len(X)):
+            X[i] = [vocab[w] if w in vocab else vocab['<unk>'] for w in X[i]]
+        
+        return X
+            
+    # ------------------------------------------------------- #
+    #       Tokenization functions
+    # ------------------------------------------------------- #
+            
+    def tokenize_basic(caption):
+        """
+            Basic tokenizer for the input/output data of type 'text'
+        """
+
+        def processPunctuation(inText):
+            outText = inText
+            for p in punct:
+                if (p + ' ' in inText or ' ' + p in inText) or (re.search(commaStrip, inText) != None):
+                    outText = outText.replace(p, '')
+                else:
+                    outText = outText.replace(p, ' ')
+            outText = periodStrip.sub("", outText, re.UNICODE)
+            return outText
+
+        def processDigitArticle(inText):
+            outText = []
+            tempText = inText.lower().split()
+            for word in tempText:
+                word = manualMap.setdefault(word, word)
+                if word not in articles:
+                    outText.append(word)
+                else:
+                    pass
+            for wordId, word in enumerate(outText):
+                if word in contractions:
+                    outText[wordId] = contractions[word]
+            outText = ' '.join(outText)
+            return outText
+
+        resAns = caption.lower()
+        resAns = resAns.replace('\n', ' ')
+        resAns = resAns.replace('\t', ' ')
+        resAns = resAns.strip()
+        resAns = processPunctuation(resAns.encode("utf-8"))
+        resAns = processDigitArticle(resAns)
+
+        return resAns
+    
+    
+    
+    # ------------------------------------------------------- #
+    #       TYPE 'image' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+    
+    def preprocessImages(self, path_list):
+        
+        if(isinstance(path_list, str) and os.path.isfile(path_list)): # path to list of images' paths
+            data = []
+            with open(path_list, 'r') as list_:
+                for line in list_:
+                    data.append(line.rstrip('\n'))
+        elif(isinstance(path_list, list)):
+            data = path_list
+        else:
+            raise Exception('Wrong type for "path_list". It must be a path to a .txt with an image path in each line or an instance of the class list with an image path in each position.')
+        return data
+    
+        
+    def setImageSize(self, size):
+        """
+            Changes the default image return size.
+        """
+        self.img_size = size
+        
+    
+    def setImageSizeCrop(self, size_crop):
+        """
+            Changes the default image return size.
+        """
+        self.img_size_crop = size_crop
+       
     
     def setTrainMean(self, mean_image, normalization=False):
         """
@@ -310,9 +673,9 @@ class Dataset(object):
                 self.train_mean = mean_image
             else:
                 logging.warning("The loaded training mean size does not match the desired images size.\nChange the images size with setImageSize(size) or recalculate the training mean with calculateTrainMean().")
-        
-        
-        
+    
+
+    
     # ------------------------------------------------------- #
     #       GETTERS
     #           [X,Y] pairs, X only, image mean, etc.
@@ -339,8 +702,15 @@ class Dataset(object):
         if(init >= final):
             raise Exception('"init" index must be smaller than "final" index.')
         
-        X = eval('self.X_'+set_name+'[init:final]')
-        X = self.loadImages(X, normalization, meanSubstraction, dataAugmentation)
+        X = []
+        for id,type in zip(self.ids_inputs, self.types_inputs):
+            x = eval('self.X_'+set_name+'[id][init:final]')
+            if(type == 'image'):
+                x = self.loadImages(x, normalization, meanSubstraction, dataAugmentation)
+            X.append(x)
+        
+        #X = eval('self.X_'+set_name+'[init:final]')
+        #X = self.loadImages(X, normalization, meanSubstraction, dataAugmentation)
         return X
         
         
@@ -359,17 +729,47 @@ class Dataset(object):
         self.__isLoaded(set_name, 1)
         
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
-        if(surpassed):
-            Y = eval('self.Y_'+set_name+'[last:]') + eval('self.Y_'+set_name+'[0:new_last]')
-            X = eval('self.X_'+set_name+'[last:]') + eval('self.X_'+set_name+'[0:new_last]')
-        else:
-            Y = eval('self.Y_'+set_name+'[last:new_last]')
-            X = eval('self.X_'+set_name+'[last:new_last]')
         
-        X = self.loadImages(X, normalization, meanSubstraction, dataAugmentation)
-        
-        nClasses = len(self.classes)
-        Y = np_utils.to_categorical(Y, nClasses).astype(np.uint8)
+        # Recover input samples
+        X = []
+        for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
+            if(surpassed):
+                x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
+            else:
+                x = eval('self.X_'+set_name+'[id_in][last:new_last]')
+                
+            #if(set_name=='val'):
+            #    logging.info(x)
+                
+            # Pre-process inputs
+            if(type_in == 'image'):
+                x = self.loadImages(x, normalization, meanSubstraction, dataAugmentation)
+            elif(type_in == 'text'):
+                x = self.loadText(x, self.vocabularies[id_in])
+            elif(type_in == 'features'):
+                x = self.loadFeatures(x)
+            X.append(x)
+            
+        # Recover output samples
+        Y = []
+        for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
+            if(surpassed):
+                y = eval('self.Y_'+set_name+'[id_out][last:]') + eval('self.Y_'+set_name+'[id_out][0:new_last]')
+            else:
+                y = eval('self.Y_'+set_name+'[id_out][last:new_last]')
+            
+            #if(set_name=='val'):
+            #    logging.info(y)
+            
+            # Pre-process outputs
+            if(type_out == 'categorical'):
+                nClasses = len(self.classes)                
+                y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
+            elif(type_out == 'binary'):
+                y = np.array(y).astype(np.uint8)
+            elif(type_out == 'features'):
+                y = self.loadFeatures(y)
+            Y.append(y)
         
         return [X,Y]
     
@@ -578,18 +978,20 @@ class Dataset(object):
     
     def __checkLengthSet(self, set_name):
         if(eval('self.loaded_'+set_name+'[0] and self.loaded_'+set_name+'[1]')):
-            exec('lenX = len(self.X_'+ set_name +')')
-            exec('lenY = len(self.Y_'+ set_name +')')
-            if(lenX != lenY):
-                raise Exception('Samples (' +str(lenX)+ ') and labels (' +str(lenY)+ ') size for "' +set_name+ '" set do not match.')
-        return 
+            lengths = []
+            for id_in in self.ids_inputs:
+                exec('lengths.append(len(self.X_'+ set_name +'[id_in]))')
+            for id_out in self.ids_outputs:
+                exec('lengths.append(len(self.Y_'+ set_name +'[id_out]))')
+            if(lengths[1:] != lengths[:-1]):
+                raise Exception('Inputs and outputs size for "' +set_name+ '" set do not match.')
             
                 
     def __getNextSamples(self, k, set_name):
         """
             Gets the indices to the next K samples we are going to read.
         """
-        self.__lock_read.acquire() # LOCK
+        self.__lock_read.acquire() # LOCK (for avoiding reading the same samples by different threads)
         
         new_last = eval('self.last_'+set_name+'+k')
         last = eval('self.last_'+set_name)

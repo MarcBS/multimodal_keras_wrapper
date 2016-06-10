@@ -1,15 +1,20 @@
 from ThreadLoader import ThreadDataLoader, retrieveXY
-from Dataset import Dataset
+from Dataset import Dataset, Data_Batch_Generator
 from ECOC_Classifier import ECOC_Classifier
+from Callbacks_keras_wrapper import *
 
 from keras.models import Sequential, Graph, model_from_json
-from keras.layers.core import Dense, Dropout, Activation, Flatten
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D
+#from keras.layers.core import Dense, Dropout, Activation, Flatten
+#from keras.layers.convolutional import Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D
 from keras.layers.advanced_activations import PReLU
 from keras.optimizers import SGD
 from keras.utils import np_utils
+from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D
+from keras.engine.training import Model
+from keras.utils.layer_utils import print_summary
 
-from keras.caffe.extra_layers import LRN2D
+#from keras.caffe.extra_layers import LRN2D
 
 import matplotlib as mpl
 mpl.use('Agg') # run matplotlib without X server (GUI)
@@ -92,7 +97,8 @@ class CNN_Model(object):
     """
     
     def __init__(self, nOutput=1000, type='basic_model', silence=False, input_shape=[256, 256, 3], 
-                structure_path=None, weights_path=None, model_name=None, plots_path=None, models_path=None):
+                 structure_path=None, weights_path=None, seq_to_functional=False, 
+                 model_name=None, plots_path=None, models_path=None):
         """
             CNN_Model object constructor. 
             
@@ -102,6 +108,7 @@ class CNN_Model(object):
             :param input_shape: array with 3 integers which define the images' input shape [height, width, channels]. Only valid if 'structure_path' == None.
             :param structure_path: path to a Keras' model json file. If we speficy this parameter then 'type' will be only an informative parameter.
             :param weights_path: path to the pre-trained weights file (if None, then it will be randomly initialized)
+            :param seq_to_functional: indicates if we are loading a set of weights trained on a Sequential model to a Functional one
             :param model_name: optional name given to the network (if None, then it will be assigned to current time as its name)
             :param plots_path: path to the folder where the plots will be stored during training
             :param models_path: path to the folder where the temporal model packups will be stored
@@ -117,6 +124,9 @@ class CNN_Model(object):
         self.training_parameters = []
         self.testing_parameters = []
         self.training_state = dict()
+        
+        # Dictionary for storing any additional data needed
+        self.additional_data = dict()
         
         # Set Network name
         self.setName(model_name, plots_path, models_path)
@@ -147,10 +157,32 @@ class CNN_Model(object):
         if weights_path:
             if(not self.silence):
                 logging.info("<<< Loading weights from file "+ weights_path +" >>>")
-            self.model.load_weights(weights_path)
+            self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
     
     
-    def setOptimizer(self, lr=None, momentum=None, loss=None):
+    def setInputsMapping(self, inputsMapping):
+        """
+            Sets the mapping of the inputs from the format given by the dataset to the format received by the model.
+            
+            :param inputsMapping: dictionary with the model inputs' identifiers as keys and the dataset inputs' identifiers as values. If the current model is Sequential then keys must be ints with the desired input order (starting from 0). If it is Graph then keys must be str.
+        """
+        self.inputsMapping = inputsMapping
+        
+        
+    def setOutputsMapping(self, outputsMapping, acc_output):
+        """
+            Sets the mapping of the outputs from the format given by the dataset to the format received by the model.
+            
+            :param outputsMapping: dictionary with the model outputs' identifiers as keys and the dataset outputs' identifiers as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Graph then keys must be str.
+            :param acc_output: name of the model's output that will be used for calculating the accuracy of the model
+        """
+        if(isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1):
+            raise Exception("When using Sequential models only one output can be provided in outputsMapping")
+        self.outputsMapping = outputsMapping
+        self.acc_output = acc_output
+
+    
+    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None):
         """
             Sets a new optimizer for the CNN model.
             
@@ -159,35 +191,110 @@ class CNN_Model(object):
             :param loss: loss function applied for optimization
         """
         # Pick default parameters
-        if(not lr):
+        if(lr is None):
             lr = self.lr
         else:
             self.lr = lr
-        if(not momentum):
+        if(momentum is None):
             momentum = self.momentum
         else:
             self.momentum = momentum
-        if(not loss):
+        if(loss is None):
             loss = self.loss
         else:
             self.loss = loss
+        if(metrics is None):
+            metrics = []
             
         #sgd = SGD(lr=lr, decay=1e-6, momentum=momentum, nesterov=True)
         sgd = SGD(lr=lr, decay=0.0, momentum=momentum, nesterov=True)
         
-        # compile differently depending if our model is 'Sequential' or 'Graph'
-        if(isinstance(self.model, Sequential)):
-            self.model.compile(loss=loss, optimizer=sgd)
+        if(not self.silence):
+            logging.info("Compiling model...")
+        
+        # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
+        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+            self.model.compile(loss=loss, optimizer=sgd, metrics=metrics)
+        elif(isinstance(self.model, Graph)):
+            if(not isinstance(loss, dict)):
+                loss_dict = dict()
+                for out in self.model.output_order:
+                    loss_dict[out] = loss
+            else:
+                loss_dict = loss
+            self.model.compile(loss=loss_dict, optimizer=sgd, metrics=metrics)
         else:
-            loss_dict = dict()
-            for out in self.model.output_order:
-                loss_dict[out] = loss
-            self.model.compile(loss=loss_dict, optimizer=sgd)
+            raise NotImplementedError()
         
         if(not self.silence):
             logging.info("Optimizer updated, learning rate set to "+ str(lr))
+    
+    
+    def setName(self, model_name, plots_path=None, models_path=None, clear_dirs=True):
+        """
+            Changes the name (identifier) of the CNN_Model instance.
+        """
+        if(not model_name):
+            self.name = time.strftime("%Y-%m-%d") + '_' + time.strftime("%X")
+            create_dirs = False
+        else:
+            self.name = model_name
+            create_dirs = True
+            
+        if(not plots_path):
+            self.plot_path = 'Plots/' + self.name
+        else:
+            self.plot_path = plots_path
+            
+        if(not models_path):
+            self.model_path = 'Models/' + self.name
+        else:
+            self.model_path = models_path
         
         
+        # Remove directories if existed
+        if(clear_dirs):
+            if(os.path.isdir(self.model_path)):
+                shutil.rmtree(self.model_path)
+            if(os.path.isdir(self.plot_path)):
+                shutil.rmtree(self.plot_path)
+        
+        # Create new ones
+        if(create_dirs):
+            if(not os.path.isdir(self.model_path)):
+                os.makedirs(self.model_path)
+            if(not os.path.isdir(self.plot_path)):
+                os.makedirs(self.plot_path)
+        
+    
+    def checkParameters(self, input_params, default_params):
+        """
+            Validates a set of input parameters and uses the default ones if not specified.
+        """
+        valid_params = [key for key in default_params]
+        params = dict()
+        
+        # Check input parameters' validity
+        for key,val in input_params.iteritems():
+            if key in valid_params:
+                params[key] = val
+            else:
+                raise Exception("Parameter '"+ key +"' is not a valid parameter.")
+        
+        # Use default parameters if not provided
+        for key,default_val in default_params.iteritems():
+            if key not in params:
+                params[key] = default_val
+        
+        return params
+    
+    
+    # ------------------------------------------------------- #
+    #       MODEL MODIFICATION
+    #           Methods for modifying specific layers of the network
+    # ------------------------------------------------------- #
+    
+    
     def replaceLastLayers(self, num_remove, new_layers):
         """
             Replaces the last 'num_remove' layers in the model by the newly defined in 'new_layers'.
@@ -298,65 +405,6 @@ class CNN_Model(object):
         return False
     
     
-    def setName(self, model_name, plots_path=None, models_path=None, clear_dirs=True):
-        """
-            Changes the name (identifier) of the CNN_Model instance.
-        """
-        if(not model_name):
-            self.name = time.strftime("%Y-%m-%d") + '_' + time.strftime("%X")
-            create_dirs = False
-        else:
-            self.name = model_name
-            create_dirs = True
-            
-        if(not plots_path):
-            self.plot_path = 'Plots/' + self.name
-        else:
-            self.plot_path = plots_path
-            
-        if(not models_path):
-            self.model_path = 'Models/' + self.name
-        else:
-            self.model_path = models_path
-        
-        
-        # Remove directories if existed
-        if(clear_dirs):
-            if(os.path.isdir(self.model_path)):
-                shutil.rmtree(self.model_path)
-            if(os.path.isdir(self.plot_path)):
-                shutil.rmtree(self.plot_path)
-        
-        # Create new ones
-        if(create_dirs):
-            if(not os.path.isdir(self.model_path)):
-                os.makedirs(self.model_path)
-            if(not os.path.isdir(self.plot_path)):
-                os.makedirs(self.plot_path)
-        
-    
-    def checkParameters(self, input_params, default_params):
-        """
-            Validates a set of input parameters and uses the default ones if not specified.
-        """
-        valid_params = [key for key in default_params]
-        params = dict()
-        
-        # Check input parameters' validity
-        for key,val in input_params.iteritems():
-            if key in valid_params:
-                params[key] = val
-            else:
-                raise Exception("Parameter '"+ key +"' is not a valid parameter.")
-        
-        # Use default parameters if not provided
-        for key,default_val in default_params.iteritems():
-            if key not in params:
-                params[key] = default_val
-        
-        return params
-    
-    
     # ------------------------------------------------------- #
     #       TRAINING/TEST
     #           Methods for train and testing on the current CNN_Model
@@ -396,10 +444,18 @@ class CNN_Model(object):
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'n_epochs': 1, 'batch_size': 50, 'report_iter': 50, 'iter_for_val': 1000, 
-                                'lr_decay': 1000, 'lr_gamma':0.1, 'save_model': 5000, 'num_iterations_val': None,
-                                'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
-                                'data_augmentation': True};
+        
+        default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1, 
+                          'epochs_for_save': 1, 'num_iterations_val': None, 'n_parallel_loaders': 8, 
+                          'normalize_images': False, 'mean_substraction': True,
+                          'data_augmentation': True, 'verbose': 1};
+        
+        # deprecated params
+        #default_params = {'n_epochs': 1, 'batch_size': 50, 'report_iter': 50,  'iter_for_val': 1000, 
+        #                  'lr_decay': 1000, 'lr_gamma':0.1, 'save_model': 5000, 'num_iterations_val': None,
+        #                  'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
+        #                  'data_augmentation': True, 'verbose': 0};
+        
         params = self.checkParameters(parameters, default_params)
         self.training_parameters.append(copy.copy(params))
         
@@ -432,8 +488,57 @@ class CNN_Model(object):
         
         logging.info("<<< Finished training CNN_Model >>>")
         
+    
+    def __train(self, ds, params, state=dict()):
         
-    def __train(self, ds, params, state=dict(), out_name=None):
+        logging.info("Training parameters: "+ str(params))
+        
+        # initialize state
+        state['samples_per_epoch'] = ds.len_train
+        state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch'])/params['batch_size']))
+        
+        # Calculate how many validation interations are we going to perform per test
+        n_valid_samples = ds.len_val
+        if(params['num_iterations_val'] == None):
+            params['num_iterations_val'] = int(math.ceil(float(n_valid_samples)/params['batch_size']))
+        
+        # Prepare callbacks
+        callbacks = []
+        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+        callback_lr_reducer = LearningRateReducerWithEarlyStopping(patience=0, 
+                                                                   lr_decay=params['lr_decay'], 
+                                                                   reduce_rate=params['lr_gamma'])
+        callbacks.append(callback_store_model)
+        callbacks.append(callback_lr_reducer)
+        
+        
+        # Prepare data generators
+        train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
+                                         batch_size=params['batch_size'], 
+                                         normalize_images=params['normalize_images'], 
+                                         data_augmentation=params['data_augmentation'], 
+                                         mean_substraction=params['mean_substraction'])
+        val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+                                         batch_size=params['batch_size'], 
+                                         normalize_images=params['normalize_images'], 
+                                         data_augmentation=False, 
+                                         mean_substraction=params['mean_substraction'])
+
+        # Train model
+        silence = ds.silence
+        ds.silence = True
+        self.model.fit_generator(train_gen.generator(),
+                                 validation_data=val_gen.generator(),
+                                 nb_val_samples=n_valid_samples,
+                                 samples_per_epoch=state['samples_per_epoch'], 
+                                 nb_epoch=params['n_epochs'],
+                                 max_q_size=params['n_parallel_loaders'],
+                                 verbose=params['verbose'],
+                                 callbacks=callbacks)
+        ds.silence = silence
+    
+    
+    def __train_deprecated(self, ds, params, state=dict(), out_name=None):
         """
             Main training function, which will only be called from self.trainNet(...) or self.resumeTrainNet(...)
         """
@@ -477,12 +582,19 @@ class CNN_Model(object):
                 state['count_iteration'] +=1
 
                 # Recovers a pre-loaded batch of data
+                time_load = time.time()*1000.0
                 t = t_queue[state['it']]
                 t.join()
+                time_load = time.time()*1000.0-time_load
+                if(params['verbose'] > 0):
+                    logging.info("DEBUG: Batch loaded in %0.8s ms" % str(time_load))
+                    
                 if(t.resultOK):
                     X_batch = t.X 
                     Y_batch = t.Y
                 else:
+                    if params['verbose'] > 1:
+                        logging.info("DEBUG: Exception occurred.")
                     exc_type, exc_obj, exc_trace = t.exception
                     # deal with the exception
                     print exc_type, exc_obj
@@ -490,14 +602,31 @@ class CNN_Model(object):
                     raise Exception('Exception occurred in ThreadLoader.')
                 t_queue[state['it']] = None
                 if(state['it']+params['n_parallel_loaders'] < state['n_iterations_per_epoch']):
+                    if params['verbose'] > 1:
+                        logging.info("DEBUG: Starting new thread loader.")
                     t = t_queue[state['it']+params['n_parallel_loaders']]
                     t.start()
                 
                 # Forward and backward passes on the current batch
+                time_train = time.time()*1000.0
                 if(isinstance(self.model, Sequential)):
-                    loss = self.model.train_on_batch(X_batch, Y_batch, accuracy=False)
+                    [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
+                    loss = self.model.train_on_batch(X_batch, Y_batch)
                     loss = loss[0]
                     [score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch)[0])
+                elif(isinstance(self.model, Model)):
+                    t1 = time.time()*1000.0
+                    [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
+                    if params['verbose'] > 1:
+                        t2 = time.time()*1000.0
+                        logging.info("DEBUG: Data ready for training (%0.8s ms)." % (t2-t1))
+                    loss = self.model.train_on_batch(X_batch, Y_batch)
+                    if params['verbose'] > 1:
+                        t3 = time.time()*1000.0
+                        logging.info("DEBUG: Training forward & backward passes performed (%0.8s ms)." % (t3-t2))
+                    loss = loss[0]
+                    score = loss[1]
+                    #[score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch))
                 else:
                     [data, last_output] = self._prepareGraphData(X_batch, Y_batch)
                     loss = self.model.train_on_batch(data)
@@ -511,7 +640,10 @@ class CNN_Model(object):
                     else:
                         score = score[last_output]
                         top_score = top_score[last_output]
-                        
+                time_train = time.time()*1000.0-time_train
+                if(params['verbose'] > 0):
+                    logging.info("DEBUG: Train on batch performed in %0.8s ms" % str(time_train))
+                                 
                 scores_train.append(float(score))
                 losses_train.append(float(loss))
                 top_scores_train.append(float(top_score))
@@ -574,7 +706,8 @@ class CNN_Model(object):
                             t_val.start()
                         
                         # Forward prediction pass
-                        if(isinstance(self.model, Sequential)):
+                        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+                            [X_val, Y_val] = self._prepareSequentialData(X_val, Y_val)
                             loss = self.model.test_on_batch(X_val, Y_val, accuracy=False)
                             loss = loss[0]
                             [score, top_score] = self._getSequentialAccuracy(Y_val, self.model.predict_on_batch(X_val)[0])
@@ -641,8 +774,34 @@ class CNN_Model(object):
             self.training_state = state
             state['it'] = -1 # start again from the first iteration of the next epoch
     
-                
+    
     def testNet(self, ds, parameters, out_name=None):
+        
+        # Check input parameters and recover default values if needed
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True};
+        params = self.checkParameters(parameters, default_params)
+        self.testing_parameters.append(copy.copy(params))
+        
+        logging.info("<<< Testing model >>>")
+        
+        # Calculate how many test interations are we going to perform
+        n_valid_samples = ds.len_test
+        num_iterations = int(math.ceil(float(n_valid_samples)/params['batch_size']))
+
+        # Test model
+        out = self.model.evaluate_generator(self.data_batch_generator('test', ds, copy.copy(params), num_iterations),
+                                      val_samples=n_valid_samples,
+                                      max_q_size=params['n_parallel_loaders'])
+        loss_all = out[0]
+        loss_ecoc = out[1]
+        loss_final = out[2]
+        acc_ecoc = out[3]
+        acc_final = out[4]
+        logging.info('Test loss: %0.8s' % loss_final)
+        logging.info('Test accuracy: %0.8s' % acc_final)
+        
+        
+    def testNet_deprecated(self, ds, parameters, out_name=None):
         """
             Applies a complete round of tests using the test set in the provided Dataset instance.
             
@@ -696,8 +855,9 @@ class CNN_Model(object):
                 t_test = t_test_queue[it_test+params['n_parallel_loaders']]
                 t_test.start()
             
-            if(isinstance(self.model, Sequential)):
+            if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
 #                (loss, score) = self.model.evaluate(X_test, Y_test, show_accuracy=True)
+                [X_test, Y_test] = self._prepareSequentialData(X_test, Y_test)
                 loss = self.model.test_on_batch(X_test, Y_test, accuracy=False)
                 loss = loss[0]
                 [score, top_score] = self._getSequentialAccuracy(Y_test, self.model.predict_on_batch(X_test)[0])
@@ -742,7 +902,8 @@ class CNN_Model(object):
             :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.
         """
         n_samples = X.shape[1]
-        if(isinstance(self.model, Sequential)):
+        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+            [X, Y] = self._prepareSequentialData(X, Y)
             loss = self.model.test_on_batch(X, Y, accuracy=False)
             loss = loss[0]
             if(accuracy):
@@ -782,7 +943,9 @@ class CNN_Model(object):
         
         # Prepare data if Graph model
         if(isinstance(self.model, Graph)):
-            [X, last_out] = self._prepareGraphData(X, np.zeros((X.shape[0],1)))
+            [X, last_out] = self._prepareGraphData(X)
+        elif(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+            [X, _] = self._prepareSequentialData(X)
         
         # Apply forward pass for prediction
         predictions = self.model.predict_on_batch(X)
@@ -791,10 +954,72 @@ class CNN_Model(object):
         if(isinstance(self.model, Graph)): # Graph
             if(out_name):
                 predictions = predictions[out_name]
-        else: # Sequential
+        elif(isinstance(self.model, Sequential) or isinstance(self.model, Model)): # Sequential
             predictions = predictions[0]
             
         return predictions
+    
+    
+    def prepareData(self, X_batch, Y_batch):
+        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+            data = self._prepareSequentialData(X_batch, Y_batch)
+        elif(isinstance(self.model, Graph)):
+            [data, Y_batch] = self._prepareGraphData(X_batch, Y_batch)
+        else:
+            raise NotImplementedError
+        return data  
+    
+    
+    def _prepareSequentialData(self, X, Y=None):
+        
+        # Format input data
+        if(len(self.inputsMapping.keys()) == 1): # single input
+            X = X[self.inputsMapping[0]]
+        else:
+            X_new = [0 for i in range(len(self.inputsMapping.keys()))] # multiple inputs
+            for in_model, in_ds in self.inputsMapping.iteritems():
+                X_new[in_model] = X[in_ds]
+            X = X_new
+        
+        # Format output data (only one output possible for Sequential models)
+        if(Y is not None):
+            if(len(self.outputsMapping.keys()) == 1): # single output
+                Y = Y[self.outputsMapping[0]]
+            else:
+                Y_new = [0 for i in range(len(self.outputsMapping.keys()))] # multiple inputs
+                for out_model, out_ds in self.outputsMapping.iteritems():
+                    Y_new[out_model] = Y[out_ds]
+                Y = Y_new
+        
+        return [X, Y]
+        
+        
+    def _prepareGraphData(self, X, Y=None):
+        
+        data = dict()
+        last_out = self.acc_output
+        
+        # Format input data
+        for in_model, in_ds in self.inputsMapping.iteritems():
+            data[in_model] = X[in_ds]
+        
+        # Format output data
+        for out_model, out_ds in self.outputsMapping.iteritems():
+            if(Y is None):
+                data[out_model] = None
+            else:
+                data[out_model] = Y[out_ds]
+        
+        # Currently all samples are assigned to all inputs and all labels to all outputs
+        #data = dict()
+        #last_out = ''
+        #for input in self.model.input_order:
+        #    data[input] = X
+        #for output in self.model.output_order:
+        #    data[output] = Y
+        #    last_out = output
+        
+        return [data, last_out]
     
     
     def _getGraphAccuracy(self, data, prediction, topN=5):
@@ -824,7 +1049,6 @@ class CNN_Model(object):
         """
             Calculates the topN accuracy obtained from a set of samples on a Sequential model.
         """
-        
         top_pred = np.argsort(pred,axis=1)[:,::-1][:,:np.min([topN, pred.shape[1]])]
         pred = np_utils.categorical_probas_to_classes(pred)
         GT = np_utils.categorical_probas_to_classes(GT)
@@ -838,18 +1062,7 @@ class CNN_Model(object):
         top_accuracies = float(np.sum(top_correct)) / float(len(top_correct))
         
         return [accuracies, top_accuracies]
-    
-        
-    def _prepareGraphData(self, X, Y):
-        # Currently all samples are assigned to all inputs and all labels to all outputs
-        data = dict()
-        last_out = ''
-        for input in self.model.input_order:
-            data[input] = X
-        for output in self.model.output_order:
-            data[output] = Y
-            last_out = output
-        return [data, last_out]
+
     
     # ------------------------------------------------------- #
     #       VISUALIZATION
@@ -860,6 +1073,12 @@ class CNN_Model(object):
         """
             Plot basic model information.
         """
+        
+        #if(isinstance(self.model, Model)):
+        print_summary(self.model.layers)
+        return ''
+        
+        
         obj_str = '-----------------------------------------------------------------------------------\n'
         class_name = self.__class__.__name__
         obj_str += '\t\t'+class_name +' instance\n'
@@ -887,6 +1106,8 @@ class CNN_Model(object):
                 obj_str += "OUTPUT (" +str(i)+ "): "+ str(outputs['name']) + ', in ['+ str(outputs['input']) +']' +', out_shape: ' +str(self.model.outputs[outputs['name']].output_shape) +"\n"
             
         obj_str += '-----------------------------------------------------------------------------------\n'
+        
+        print_summary(self.model.layers)
         
         return obj_str
     
@@ -1245,6 +1466,237 @@ class CNN_Model(object):
         self.model.add(Dense(nOutput, activation='softmax')) # default nOutput=1000
     
     
+
+    def VGG_16_FunctionalAPI(self, nOutput, input):
+        """
+            16-layered VGG model implemented in Keras' Functional API
+        """
+        if(len(input) == 3):
+            input_shape = tuple([input[2]] + input[0:2])
+        else:
+            input_shape = tuple(input)
+        
+        vis_input = Input(shape=input_shape, name="vis_input")
+
+        x = ZeroPadding2D((1,1))                           (vis_input)
+        x = Convolution2D(64, 3, 3, activation='relu')     (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(64, 3, 3, activation='relu')     (x)
+        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(128, 3, 3, activation='relu')    (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(128, 3, 3, activation='relu')    (x)
+        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(256, 3, 3, activation='relu')    (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(256, 3, 3, activation='relu')    (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(256, 3, 3, activation='relu')    (x)
+        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(512, 3, 3, activation='relu')    (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(512, 3, 3, activation='relu')    (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(512, 3, 3, activation='relu')    (x)
+        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(512, 3, 3, activation='relu')    (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(512, 3, 3, activation='relu')    (x)
+        x = ZeroPadding2D((1,1))                           (x)
+        x = Convolution2D(512, 3, 3, activation='relu')    (x)
+        x = MaxPooling2D((2,2), strides=(2,2), 
+                         name='last_max_pool')             (x)
+
+        x = Flatten()                                      (x)
+        x = Dense(4096, activation='relu')                 (x)
+        x = Dropout(0.5)                                   (x)
+        x = Dense(4096, activation='relu')                 (x)
+        x = Dropout(0.5, name='last_dropout')              (x)
+        x = Dense(nOutput, activation='softmax', name='output')   (x) # nOutput=1000 by default
+
+        self.model = Model(input=vis_input, output=x)
+    
+    ########################################
+    # GoogLeNet implementation from http://dandxy89.github.io/ImageModels/googlenet/
+    ########################################
+    
+    def inception_module(self, x, params, dim_ordering, concat_axis,
+                         subsample=(1, 1), activation='relu',
+                         border_mode='same', weight_decay=None):
+
+        # https://gist.github.com/nervanazoo/2e5be01095e935e90dd8  #
+        # file-googlenet_neon-py
+
+        (branch1, branch2, branch3, branch4) = params
+
+        if weight_decay:
+            W_regularizer = regularizers.l2(weight_decay)
+            b_regularizer = regularizers.l2(weight_decay)
+        else:
+            W_regularizer = None
+            b_regularizer = None
+
+        pathway1 = Convolution2D(branch1[0], 1, 1,
+                                 subsample=subsample,
+                                 activation=activation,
+                                 border_mode=border_mode,
+                                 W_regularizer=W_regularizer,
+                                 b_regularizer=b_regularizer,
+                                 bias=False,
+                                 dim_ordering=dim_ordering)(x)
+
+        pathway2 = Convolution2D(branch2[0], 1, 1,
+                                 subsample=subsample,
+                                 activation=activation,
+                                 border_mode=border_mode,
+                                 W_regularizer=W_regularizer,
+                                 b_regularizer=b_regularizer,
+                                 bias=False,
+                                 dim_ordering=dim_ordering)(x)
+        pathway2 = Convolution2D(branch2[1], 3, 3,
+                                 subsample=subsample,
+                                 activation=activation,
+                                 border_mode=border_mode,
+                                 W_regularizer=W_regularizer,
+                                 b_regularizer=b_regularizer,
+                                 bias=False,
+                                 dim_ordering=dim_ordering)(pathway2)
+
+        pathway3 = Convolution2D(branch3[0], 1, 1,
+                                 subsample=subsample,
+                                 activation=activation,
+                                 border_mode=border_mode,
+                                 W_regularizer=W_regularizer,
+                                 b_regularizer=b_regularizer,
+                                 bias=False,
+                                 dim_ordering=dim_ordering)(x)
+        pathway3 = Convolution2D(branch3[1], 5, 5,
+                                 subsample=subsample,
+                                 activation=activation,
+                                 border_mode=border_mode,
+                                 W_regularizer=W_regularizer,
+                                 b_regularizer=b_regularizer,
+                                 bias=False,
+                                 dim_ordering=dim_ordering)(pathway3)
+
+        pathway4 = MaxPooling2D(pool_size=(1, 1), dim_ordering=dim_ordering)(x)
+        pathway4 = Convolution2D(branch4[0], 1, 1,
+                                 subsample=subsample,
+                                 activation=activation,
+                                 border_mode=border_mode,
+                                 W_regularizer=W_regularizer,
+                                 b_regularizer=b_regularizer,
+                                 bias=False,
+                                 dim_ordering=dim_ordering)(pathway4)
+
+        return merge([pathway1, pathway2, pathway3, pathway4],
+                     mode='concat', concat_axis=concat_axis)
+
+
+    def conv_layer(self, x, nb_filter, nb_row, nb_col, dim_ordering,
+                   subsample=(1, 1), activation='relu',
+                   border_mode='same', weight_decay=None, padding=None):
+
+        if weight_decay:
+            W_regularizer = regularizers.l2(weight_decay)
+            b_regularizer = regularizers.l2(weight_decay)
+        else:
+            W_regularizer = None
+            b_regularizer = None
+
+        x = Convolution2D(nb_filter, nb_row, nb_col,
+                          subsample=subsample,
+                          activation=activation,
+                          border_mode=border_mode,
+                          W_regularizer=W_regularizer,
+                          b_regularizer=b_regularizer,
+                          bias=False,
+                          dim_ordering=dim_ordering)(x)
+
+        if padding:
+            for i in range(padding):
+                x = ZeroPadding2D(padding=(1, 1), dim_ordering=dim_ordering)(x)
+
+        return x
+
+
+    def GoogLeNet_FunctionalAPI(self, nOutput, input):
+        
+        if(len(input) == 3):
+            input_shape = tuple([input[2]] + input[0:2])
+        else:
+            input_shape = tuple(input)
+        
+        # Define image input layer
+        img_input = Input(shape=input_shape, name='input_data')
+        CONCAT_AXIS = 1
+        NB_CLASS = nOutput         # number of classes (default 1000)
+        DROPOUT = 0.4
+        WEIGHT_DECAY = 0.0005   # L2 regularization factor
+        USE_BN = True           # whether to use batch normalization
+        # Theano - 'th' (channels, width, height)
+        # Tensorflow - 'tf' (width, height, channels)
+        DIM_ORDERING = 'th'
+        pool_name = 'last_max_pool' # name of the last max-pooling layer
+
+        x = self.conv_layer(img_input, nb_col=7, nb_filter=64, subsample=(2,2),
+                       nb_row=7, dim_ordering=DIM_ORDERING, padding=1)
+        x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING)(x)
+
+        x = self.conv_layer(x, nb_col=1, nb_filter=64,
+                       nb_row=1, dim_ordering=DIM_ORDERING)
+        x = self.conv_layer(x, nb_col=3, nb_filter=192,
+                       nb_row=3, dim_ordering=DIM_ORDERING, padding=1)
+        x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING)(x)
+
+        x = self.inception_module(x, params=[(64, ), (96, 128), (16, 32), (32, )],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(128,), (128, 192), (32, 96), (64, )],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+
+        x = ZeroPadding2D(padding=(2, 2), dim_ordering=DIM_ORDERING)(x)
+        x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING)(x)
+
+        x = self.inception_module(x, params=[(192,), (96, 208), (16, 48), (64, )],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        # AUX 1 - Branch HERE
+        x = self.inception_module(x, params=[(160,), (112, 224), (24, 64), (64, )],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(128,), (128, 256), (24, 64), (64, )],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(112,), (144, 288), (32, 64), (64, )],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        # AUX 2 - Branch HERE
+        x = self.inception_module(x, params=[(256,), (160, 320), (32, 128), (128,)],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING, name=pool_name)(x)
+
+        x = self.inception_module(x, params=[(256,), (160, 320), (32, 128), (128,)],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(384,), (192, 384), (48, 128), (128,)],
+                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = AveragePooling2D(strides=(1, 1), dim_ordering=DIM_ORDERING)(x)
+        x = Flatten()(x)
+        x = Dropout(DROPOUT)(x)
+        #x = Dense(output_dim=NB_CLASS,
+        #          activation='linear')(x)
+        x = Dense(output_dim=NB_CLASS,
+                  activation='softmax', name='output')(x)
+
+        
+        self.model = Model(input=img_input, output=[x])
+        
+    
+    ########################################
+    
     def Identity_Layer(self, nOutput, input):
         """
             Builds an dummy Identity_Layer, which should give as output the same as the input.
@@ -1301,7 +1753,92 @@ class CNN_Model(object):
         self.model.add_node(Dense(nOutput, activation='softmax'), name='loss_OnevsOne', input='loss_OnevsOne/drop')
         # Output
         self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
+    
+    
+    def add_One_vs_One_Inception(self, input, input_shape, id_branch, nOutput=2):
+        """
+            Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
+        """
+
+        # Inception Ea
+        out_Ea = self.__addInception('inceptionEa_'+str(id_branch), input, 4, 2, 8, 2, 2, 2)
+        # Inception Eb
+        out_Eb = self.__addInception('inceptionEb_'+str(id_branch), out_Ea, 2, 2, 4, 2, 1, 1)
+        # Average Pooling    pool_size=(7,7)
+        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1,1)), name='ave_pool/ECOC_'+str(id_branch), input=out_Eb)
+        # Softmax
+        self.model.add_node(Flatten(), 
+                            name='fc_OnevsOne_'+str(id_branch)+'/flatten', input='ave_pool/ECOC_'+str(id_branch))
+        self.model.add_node(Dropout(0.5), 
+                            name='fc_OnevsOne_'+str(id_branch)+'/drop', input='fc_OnevsOne_'+str(id_branch)+'/flatten')
+        output_name = 'fc_OnevsOne_'+str(id_branch)
+        self.model.add_node(Dense(nOutput, activation='softmax'), 
+                            name=output_name, input='fc_OnevsOne_'+str(id_branch)+'/drop')
         
+        return output_name
+        
+        
+    def add_One_vs_One_Inception_Functional(self, input, input_shape, id_branch, nOutput=2):
+        """
+            Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
+        """
+
+        in_node = self.model.get_layer(input).output
+        
+        # Inception Ea
+        [out_Ea, out_Ea_name] = self.__addInception_Functional('inceptionEa_'+str(id_branch), in_node, 4, 2, 8, 2, 2, 2)
+        # Inception Eb
+        [out_Eb, out_Eb_name] = self.__addInception_Functional('inceptionEb_'+str(id_branch), out_Ea, 2, 2, 4, 2, 1, 1)
+        # Average Pooling    pool_size=(7,7)
+        x = AveragePooling2D(pool_size=input_shape, strides=(1,1), name='ave_pool/ECOC_'+str(id_branch)) (out_Eb)
+        
+        # Softmax
+        output_name = 'fc_OnevsOne_'+str(id_branch)
+        x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
+        x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
+        out_node = Dense(nOutput, activation='softmax', name=output_name)         (x)
+        
+        return out_node
+    
+    
+    
+    def add_One_vs_One_3x3_Functional(self, input, input_shape, id_branch, nkernels, nOutput=2):
+
+        # 3x3 convolution
+        out_3x3 = Convolution2D(nkernels, 3, 3, name='3x3/ecoc_'+str(id_branch), activation='relu')            (input)
+        
+        # Average Pooling    pool_size=(7,7)
+        x = AveragePooling2D(pool_size=input_shape, strides=(1,1), name='ave_pool/ecoc_'+str(id_branch)) (out_3x3)
+        
+        # Softmax
+        output_name = 'fc_OnevsOne_'+str(id_branch)+'/out'
+        x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
+        x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
+        out_node = Dense(nOutput, activation='softmax', name=output_name)         (x)
+        
+        return out_node
+    
+    
+    def add_One_vs_One_3x3_double_Functional(self, input, input_shape, id_branch, nOutput=2):
+
+        # 3x3 convolution
+        out_3x3 = Convolution2D(64, 3, 3, name='3x3_1/ecoc_'+str(id_branch), activation='relu')          (input)
+        
+        # Max Pooling
+        x = MaxPooling2D(strides=(2, 2), pool_size=(2, 2), name='max_pool/ecoc_'+str(id_branch))         (out_3x3)
+        
+        # 3x3 convolution
+        x = Convolution2D(32, 3, 3, name='3x3_2/ecoc_'+str(id_branch), activation='relu')                (x)
+        
+        # Softmax
+        output_name = 'fc_OnevsOne_'+str(id_branch)+'/out'
+        x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
+        x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
+        out_node = Dense(nOutput, activation='softmax', name=output_name)         (x)
+        
+        return out_node
+    
+    
         
     def One_vs_One_Inception_v2(self, nOutput=2, input=[224,224,3]):
         """
@@ -1327,6 +1864,31 @@ class CNN_Model(object):
         self.model.add_node(Dense(nOutput, activation='softmax'), name='loss_OnevsOne', input='loss_OnevsOne/drop')
         # Output
         self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
+    
+    
+    
+    def add_One_vs_One_Inception_v2(self, input, input_shape, id_branch, nOutput=2):
+        """
+            Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
+        """
+
+        # Inception Ea
+        out_Ea = self.__addInception('inceptionEa_'+str(id_branch), input, 16, 8, 32, 8, 8, 8)
+        # Inception Eb
+        out_Eb = self.__addInception('inceptionEb_'+str(id_branch), out_Ea, 8, 8, 16, 8, 4, 4)
+        # Average Pooling    pool_size=(7,7)
+        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1,1)), name='ave_pool/ECOC_'+str(id_branch), input=out_Eb)
+        # Softmax
+        self.model.add_node(Flatten(), 
+                            name='fc_OnevsOne_'+str(id_branch)+'/flatten', input='ave_pool/ECOC_'+str(id_branch))
+        self.model.add_node(Dropout(0.5), 
+                            name='fc_OnevsOne_'+str(id_branch)+'/drop', input='fc_OnevsOne_'+str(id_branch)+'/flatten')
+        output_name = 'fc_OnevsOne_'+str(id_branch)
+        self.model.add_node(Dense(nOutput, activation='softmax'), 
+                            name=output_name, input='fc_OnevsOne_'+str(id_branch)+'/drop')
+        
+        return output_name
+    
     
     
     def __addInception(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
@@ -1372,6 +1934,78 @@ class CNN_Model(object):
         self.model.add_node(Activation('linear'), name=out_name, inputs=inputs_list, concat_axis=1)
         
         return out_name
+    
+    
+    def __addInception_Functional(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
+        """
+            Adds an inception module to the model.
+            
+            :param id: string identifier of the inception layer
+            :param input_layer: identifier of the layer that will serve as an input to the built inception module
+            :param kernels_1x1: number of kernels of size 1x1                                      (1st branch)
+            :param kernels_3x3_reduce: number of kernels of size 1x1 before the 3x3 layer          (2nd branch)
+            :param kernels_3x3: number of kernels of size 3x3                                      (2nd branch)
+            :param kernels_5x5_reduce: number of kernels of size 1x1 before the 5x5 layer          (3rd branch)
+            :param kernels_5x5: number of kernels of size 5x5                                      (3rd branch)
+            :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
+        """
+        # Branch 1
+        x_b1 = Convolution2D(kernels_1x1, 1, 1, name=id+'/1x1', activation='relu')                   (input_layer)
+        
+        # Branch 2
+        x_b2 = Convolution2D(kernels_3x3_reduce, 1, 1, name=id+'/3x3_reduce', activation='relu')     (input_layer)
+        x_b2 = ZeroPadding2D((1,1), name=id+'/3x3_zeropadding')                                      (x_b2)
+        x_b2 = Convolution2D(kernels_3x3, 3, 3, name=id+'/3x3', activation='relu')                   (x_b2)
+
+        # Branch 3
+        x_b3 = Convolution2D(kernels_5x5_reduce, 1, 1, name=id+'/5x5_reduce', activation='relu')     (input_layer)
+        x_b3 = ZeroPadding2D((2,2), name=id+'/5x5_zeropadding')                                      (x_b3)
+        x_b3 = Convolution2D(kernels_5x5, 5, 5, name=id+'/5x5', activation='relu')                   (x_b3)
+        
+        # Branch 4
+        x_b4 = ZeroPadding2D((1,1), name=id+'/pool_zeropadding')                                     (input_layer)
+        x_b4 = MaxPooling2D((3,3), strides=(1,1), name=id+'/pool')                                   (x_b4)
+        x_b4 = Convolution2D(kernels_pool_projection, 1, 1, name=id+'/pool_proj', activation='relu') (x_b4)
+        
+        
+        # Concat
+        out_name = id+'/concat'
+        out_node = merge([x_b1, x_b2, x_b3, x_b4], mode='concat', concat_axis=1, name=out_name)
+        
+        return [out_node, out_name]
+    
+    
+    def add_One_vs_One_Merge(self, inputs_list, nOutput):
+        
+        self.model.add_node(Flatten(), name='ecoc_loss', inputs=inputs_list, merge_mode='concat') # join outputs from OneVsOne classifers
+        self.model.add_node(Dropout(0.5), name='final_loss/drop', input='ecoc_loss')
+        self.model.add_node(Dense(nOutput, activation='softmax'), name='final_loss', input='final_loss/drop') # apply final joint prediction
+        
+        # Outputs
+        self.model.add_output(name='ecoc_loss/output', input='ecoc_loss')
+        self.model.add_output(name='final_loss/output', input='final_loss')
+        
+        return ['ecoc_loss/output', 'final_loss/output']
+    
+    
+    
+    def add_One_vs_One_Merge_Functional(self, inputs_list, nOutput):
+        
+        # join outputs from OneVsOne classifers
+        ecoc_loss_name = 'ecoc_loss'
+        final_loss_name = 'final_loss/out'
+        ecoc_loss = merge(inputs_list, name=ecoc_loss_name, mode='concat', concat_axis=1)
+        drop = Dropout(0.5, name='final_loss/drop')                                (ecoc_loss)
+        # apply final joint prediction
+        final_loss = Dense(nOutput, activation='softmax', name=final_loss_name)    (drop)
+        
+        in_node = self.model.layers[0].name
+        in_node = self.model.get_layer(in_node).output
+        self.model = Model(input=in_node, output=[ecoc_loss, final_loss])
+        #self.model = Model(input=in_node, output=['ecoc_loss', 'final_loss'])
+        
+        return [ecoc_loss_name, final_loss_name]
+    
     
     
     def GAP(self, nOutput, input):

@@ -4,6 +4,7 @@ from keras.models import Sequential, Graph, model_from_json
 
 import threading
 import logging
+import sys
 
 class ThreadDataLoader(threading.Thread):
     """
@@ -20,7 +21,7 @@ class ThreadDataLoader(threading.Thread):
         self.Y = Y
         self.resultOK = resultOK
         self.exception = exception
- 
+
 def retrieveXY(dataset, set_name, batchSize, normalization, meanSubstraction, dataAugmentation):
     """
         Retrieves a set of samples from the given dataset and the given set name
