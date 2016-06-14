@@ -593,7 +593,8 @@ class Dataset(object):
         """
             Vocabulary builder for data of type 'text'
         """
-        logging.info("Creating vocabulary for data with id '"+id+"'.")
+        if(not self.silence):
+            logging.info("Creating vocabulary for data with id '"+id+"'.")
         
         counters = []
         sentence_counts = []
@@ -607,7 +608,8 @@ class Dataset(object):
                 words_low = map(lambda x: x.lower(), words)
                 counter.update(words_low)
             else:
-                logging.info('Using whole sentence as a single word.')
+                if(not self.silence):
+                    logging.info('Using whole sentence as a single word.')
                 counter.update([line])
             sentence_count += 1
             
@@ -617,19 +619,22 @@ class Dataset(object):
         #      (len(counter), sentence_count, sum(counter.values())))
 
         combined_counter = reduce(add, counters)
-        logging.info("\t Total: %d unique words in %d sentences with a total of %d words." %
+        if(not self.silence):
+            logging.info("\t Total: %d unique words in %d sentences with a total of %d words." %
               (len(combined_counter), sum(sentence_counts),sum(combined_counter.values())))
 
 
         if n_words > 0:
             vocab_count = combined_counter.most_common(n_words - 2)
-            logging.info("Creating dictionary of %s most common words, covering "
+            if(not self.silence):
+                logging.info("Creating dictionary of %s most common words, covering "
                         "%2.1f%% of the text."
                         % (n_words,
                            100.0 * sum([count for word, count in vocab_count]) /
                            sum(combined_counter.values())))
         else:
-            logging.info("Creating dictionary of all words")
+            if(not self.silence):
+                logging.info("Creating dictionary of all words")
             vocab_count = counter.most_common()
 
         dictionary = {}

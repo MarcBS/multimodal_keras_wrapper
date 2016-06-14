@@ -98,7 +98,7 @@ class CNN_Model(object):
     
     def __init__(self, nOutput=1000, type='basic_model', silence=False, input_shape=[256, 256, 3], 
                  structure_path=None, weights_path=None, seq_to_functional=False, 
-                 model_name=None, plots_path=None, models_path=None):
+                 model_name=None, plots_path=None, models_path=None, inheritance=False):
         """
             CNN_Model object constructor. 
             
@@ -112,6 +112,7 @@ class CNN_Model(object):
             :param model_name: optional name given to the network (if None, then it will be assigned to current time as its name)
             :param plots_path: path to the folder where the plots will be stored during training
             :param models_path: path to the folder where the temporal model packups will be stored
+            :param inheritance: indicates if we are building an instance from a child class (in this case the model will not be built from this __init__, it should be built from the child class).
         """
         self.__toprint = ['net_type', 'name', 'plot_path', 'model_path', 'lr', 'momentum', 
                             'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
@@ -138,26 +139,27 @@ class CNN_Model(object):
         self.__data_types = ['iteration', 'loss', 'accuracy', 'accuracy top-5']
         
         # Prepare model
-        if(structure_path):
-            # Load a .json model
-            if(not self.silence):
-                logging.info("<<< Loading model structure from file "+ structure_path +" >>>")
-            self.model = model_from_json(open(structure_path).read())
-            
-        else:
-            # Build model from scratch
-            if(hasattr(self, type)):
+        if(not inheritance):
+            if(structure_path):
+                # Load a .json model
                 if(not self.silence):
-                    logging.info("<<< Building "+ type +" CNN >>>")
-                eval('self.'+type+'(nOutput, input_shape)')
+                    logging.info("<<< Loading model structure from file "+ structure_path +" >>>")
+                self.model = model_from_json(open(structure_path).read())
+
             else:
-                raise Exception('CNN type "'+ type +'" is not implemented.')
-        
-        # Load weights from file
-        if weights_path:
-            if(not self.silence):
-                logging.info("<<< Loading weights from file "+ weights_path +" >>>")
-            self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
+                # Build model from scratch
+                if(hasattr(self, type)):
+                    if(not self.silence):
+                        logging.info("<<< Building "+ type +" CNN >>>")
+                    eval('self.'+type+'(nOutput, input_shape)')
+                else:
+                    raise Exception('CNN type "'+ type +'" is not implemented.')
+
+            # Load weights from file
+            if weights_path:
+                if(not self.silence):
+                    logging.info("<<< Loading weights from file "+ weights_path +" >>>")
+                self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
     
     
     def setInputsMapping(self, inputsMapping):
@@ -169,12 +171,12 @@ class CNN_Model(object):
         self.inputsMapping = inputsMapping
         
         
-    def setOutputsMapping(self, outputsMapping, acc_output):
+    def setOutputsMapping(self, outputsMapping, acc_output=None):
         """
             Sets the mapping of the outputs from the format given by the dataset to the format received by the model.
             
             :param outputsMapping: dictionary with the model outputs' identifiers as keys and the dataset outputs' identifiers as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Graph then keys must be str.
-            :param acc_output: name of the model's output that will be used for calculating the accuracy of the model
+            :param acc_output: name of the model's output that will be used for calculating the accuracy of the model (only needed for Graph models)
         """
         if(isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1):
             raise Exception("When using Sequential models only one output can be provided in outputsMapping")

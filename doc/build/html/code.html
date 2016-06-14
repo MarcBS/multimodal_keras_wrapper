@@ -497,7 +497,7 @@ Each line must contain a unique identifier of the class.</p>
 <span id="cnn-model-py"></span><h2>cnn_model.py<a class="headerlink" href="#module-keras_wrapper.cnn_model" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="keras_wrapper.cnn_model.CNN_Model">
-<em class="property">class </em><code class="descclassname">keras_wrapper.cnn_model.</code><code class="descname">CNN_Model</code><span class="sig-paren">(</span><em>nOutput=1000, type='basic_model', silence=False, input_shape=[256, 256, 3], structure_path=None, weights_path=None, seq_to_functional=False, model_name=None, plots_path=None, models_path=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">keras_wrapper.cnn_model.</code><code class="descname">CNN_Model</code><span class="sig-paren">(</span><em>nOutput=1000, type='basic_model', silence=False, input_shape=[256, 256, 3], structure_path=None, weights_path=None, seq_to_functional=False, model_name=None, plots_path=None, models_path=None, inheritance=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="docutils">
 <dt>Wrapper for Keras&#8217; models. It provides the following utilities:</dt>
 <dd><ul class="first last simple">
@@ -723,7 +723,7 @@ If we introduce any parameter through the argument &#8216;parameters&#8217;, it 
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.setOutputsMapping">
-<code class="descname">setOutputsMapping</code><span class="sig-paren">(</span><em>outputsMapping</em>, <em>acc_output</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.setOutputsMapping" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setOutputsMapping</code><span class="sig-paren">(</span><em>outputsMapping</em>, <em>acc_output=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.setOutputsMapping" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sets the mapping of the outputs from the format given by the dataset to the format received by the model.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -731,7 +731,7 @@ If we introduce any parameter through the argument &#8216;parameters&#8217;, it 
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>outputsMapping</strong> &#8211; dictionary with the model outputs&#8217; identifiers as keys and the dataset outputs&#8217; identifiers as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Graph then keys must be str.</li>
-<li><strong>acc_output</strong> &#8211; name of the model&#8217;s output that will be used for calculating the accuracy of the model</li>
+<li><strong>acc_output</strong> &#8211; name of the model&#8217;s output that will be used for calculating the accuracy of the model (only needed for Graph models)</li>
 </ul>
 </td>
 </tr>

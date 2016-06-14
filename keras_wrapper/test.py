@@ -1,4 +1,4 @@
-from keras_wrapper.dataset import Dataset, saveDataset, loadDataset, Data_Batch_Generator
+from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
 from keras_wrapper.cnn_model import CNN_Model, saveModel, loadModel
 
 from keras.layers import Dense
