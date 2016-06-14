@@ -450,7 +450,7 @@ class CNN_Model(object):
         default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1, 
                           'epochs_for_save': 1, 'num_iterations_val': None, 'n_parallel_loaders': 8, 
                           'normalize_images': False, 'mean_substraction': True,
-                          'data_augmentation': True, 'verbose': 1};
+                          'data_augmentation': True, 'verbose': 1, 'extra_callbacks': []};
         
         # deprecated params
         #default_params = {'n_epochs': 1, 'batch_size': 50, 'report_iter': 50,  'iter_for_val': 1000, 
@@ -512,7 +512,7 @@ class CNN_Model(object):
                                                                    reduce_rate=params['lr_gamma'])
         callbacks.append(callback_store_model)
         callbacks.append(callback_lr_reducer)
-        
+        callbacks += params['extra_callbacks'] 
         
         # Prepare data generators
         train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],

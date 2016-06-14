@@ -164,6 +164,7 @@ class Dataset(object):
         ############################ Parameters used for inputs of type 'text'
         self.vocabulary = dict()
         self.max_text_len = dict()
+        self.n_classes_text = dict() # only used for output text
         #################################################
         
         
@@ -585,6 +586,7 @@ class Dataset(object):
     
         # Store max text len
         self.max_text_len[id] = max_text_len
+        self.n_classes_text[id] = len(self.vocabulary[id]['words2idx'])
     
         return sentences
     
@@ -1197,10 +1199,12 @@ class Dataset(object):
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
-                    max_len = self.max_text_len[id_out]
-                    y = self.loadText(y, self.vocabulary[id_out], max_len)
-                    if max_len == 0:
-                        y = np_utils.to_categorical(y, n_classes_text).astype(np.uint8)
+                    y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out])
+                    #if max_len == 0:
+                    y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
+                    for idx in range(y.shape[0]):
+                        y_aux[idx] = np_utils.to_categorical(y[idx], self.n_classes_text[id_out]).astype(np.uint8)
+                    y = y_aux
             Y.append(y)
         
         return [X,Y]
