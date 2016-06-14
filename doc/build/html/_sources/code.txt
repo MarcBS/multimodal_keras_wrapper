@@ -3,7 +3,7 @@ Documentation for the Code
 
 Documentation for the keras_wrapper module.
 
-See examples in test.py
+See code examples in demo.ipynb and test.py
 
 
 dataset.py

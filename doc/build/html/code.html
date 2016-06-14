@@ -138,35 +138,35 @@
   <div class="section" id="documentation-for-the-code">
 <h1>Documentation for the Code<a class="headerlink" href="#documentation-for-the-code" title="Permalink to this headline">¶</a></h1>
 <p>Documentation for the keras_wrapper module.</p>
-<p>See examples in test.py</p>
+<p>See code examples in demo.ipynb and test.py</p>
 <div class="section" id="module-keras_wrapper.dataset">
 <span id="dataset-py"></span><h2>dataset.py<a class="headerlink" href="#module-keras_wrapper.dataset" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="keras_wrapper.dataset.Dataset">
-<em class="property">class </em><code class="descclassname">keras_wrapper.dataset.</code><code class="descname">Dataset</code><span class="sig-paren">(</span><em>name, path, silence=False, size=[256, 256, 3], size_crop=[227, 227, 3]</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="descclassname">keras_wrapper.dataset.</code><code class="descname">Dataset</code><span class="sig-paren">(</span><em>name</em>, <em>path</em>, <em>silence=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Class for defining instances of databases adapted for Keras. It includes several utility functions for easily managing
 data splits, image loading, mean calculation, etc.</p>
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.build_vocabulary">
-<code class="descname">build_vocabulary</code><span class="sig-paren">(</span><em>captions</em>, <em>id</em>, <em>n_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.build_vocabulary" title="Permalink to this definition">¶</a></dt>
+<code class="descname">build_vocabulary</code><span class="sig-paren">(</span><em>captions</em>, <em>id</em>, <em>tokfun</em>, <em>do_split</em>, <em>n_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.build_vocabulary" title="Permalink to this definition">¶</a></dt>
 <dd><p>Vocabulary builder for data of type &#8216;text&#8217;</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.calculateTrainMean">
-<code class="descname">calculateTrainMean</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.calculateTrainMean" title="Permalink to this definition">¶</a></dt>
+<code class="descname">calculateTrainMean</code><span class="sig-paren">(</span><em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.calculateTrainMean" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculates the mean of the data belonging to the training set split in each channel.</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.getClassID">
-<code class="descname">getClassID</code><span class="sig-paren">(</span><em>class_name</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getClassID" title="Permalink to this definition">¶</a></dt>
+<code class="descname">getClassID</code><span class="sig-paren">(</span><em>class_name</em>, <em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getClassID" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the class id (int) for a given class string.</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.getX">
-<code class="descname">getX</code><span class="sig-paren">(</span><em>set_name</em>, <em>init</em>, <em>final</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getX" title="Permalink to this definition">¶</a></dt>
+<code class="descname">getX</code><span class="sig-paren">(</span><em>set_name</em>, <em>init</em>, <em>final</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getX" title="Permalink to this definition">¶</a></dt>
 <dd><p>Gets all the data samples stored between the positions init to final</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -176,7 +176,36 @@ data splits, image loading, mean calculation, etc.</p>
 <li><strong>set_name</strong> &#8211; &#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217; set</li>
 <li><strong>init</strong> &#8211; initial position in the corresponding set split. Must be bigger or equal than 0 and bigger than final.</li>
 <li><strong>final</strong> &#8211; final position in the corresponding set split.</li>
-<li><strong>normalization</strong> &#8211; indicates if we want to apply a 0-1 normalization on the images. If normalization then the images are stored in float32, else they are stored in int32</li>
+<li><strong>debug</strong> &#8211; if True all data will be returned without preprocessing</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217;, &#8216;video&#8217;, &#8216;image-features&#8217; and &#8216;video-features&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>normalization</strong> &#8211; indicates if we want to normalize the data.</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image-features&#8217; and &#8216;video-features&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>normalization_type</strong> &#8211; indicates the type of normalization applied. See available types in self.__available_norm_im_vid for &#8216;image&#8217; and &#8216;video&#8217; and self.__available_norm_feat for &#8216;image-features&#8217; and &#8216;video-features&#8217;.</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217; and &#8216;video&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>meanSubstraction</strong> &#8211; indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)</li>
 <li><strong>dataAugmentation</strong> &#8211; indicates if we want to apply data augmentation to the loaded images (random flip and cropping)</li>
 </ul>
@@ -188,7 +217,7 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.getXY">
-<code class="descname">getXY</code><span class="sig-paren">(</span><em>set_name</em>, <em>k</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getXY" title="Permalink to this definition">¶</a></dt>
+<code class="descname">getXY</code><span class="sig-paren">(</span><em>set_name</em>, <em>k</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getXY" title="Permalink to this definition">¶</a></dt>
 <dd><p>Gets the [X,Y] pairs for the next &#8216;k&#8217; samples in the desired set.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -197,7 +226,36 @@ data splits, image loading, mean calculation, etc.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>set_name</strong> &#8211; &#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217; set</li>
 <li><strong>k</strong> &#8211; number of consecutive samples retrieved from the corresponding set.</li>
-<li><strong>normalization</strong> &#8211; indicates if we want to apply a 0-1 normalization on the images. If &#8216;normalization&#8217; == True then the images are stored in float32, else they are stored in int32</li>
+<li><strong>debug</strong> &#8211; if True all data will be returned without preprocessing</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217;, &#8216;video&#8217;, &#8216;image-features&#8217; and &#8216;video-features&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>normalization</strong> &#8211; indicates if we want to normalize the data.</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image-features&#8217; and &#8216;video-features&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>normalization_type</strong> &#8211; indicates the type of normalization applied. See available types in self.__available_norm_im_vid for &#8216;image&#8217; and &#8216;video&#8217; and self.__available_norm_feat for &#8216;image-features&#8217; and &#8216;video-features&#8217;.</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217; and &#8216;video&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>meanSubstraction</strong> &#8211; indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)</li>
 <li><strong>dataAugmentation</strong> &#8211; indicates if we want to apply data augmentation to the loaded images (random flip and cropping)</li>
 </ul>
@@ -209,9 +267,10 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadImages">
-<code class="descname">loadImages</code><span class="sig-paren">(</span><em>images</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>external=False</em>, <em>loaded=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadImages" title="Permalink to this definition">¶</a></dt>
+<code class="descname">loadImages</code><span class="sig-paren">(</span><em>images</em>, <em>id</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>external=False</em>, <em>loaded=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadImages" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of images from disk.</p>
 <p>:param images : list of image string names or list of matrices representing images
+:param normalization_type: type of normalization applied
 :param normalization : whether we applying a 0-1 normalization to the images
 :param meanSubstraction : whether we are removing the training mean
 :param dataAugmentation : whether we are applying dataAugmentatino (random cropping and horizontal flip)
@@ -221,7 +280,7 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadText">
-<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
+<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
 <dd><p>Text encoder. Transforms samples from a text representation into a numerical one.</p>
 </dd></dl>
 
@@ -233,28 +292,17 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setClasses">
-<code class="descname">setClasses</code><span class="sig-paren">(</span><em>path_classes</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setClasses" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setClasses</code><span class="sig-paren">(</span><em>path_classes</em>, <em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setClasses" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads the list of classes of the dataset.
 Each line must contain a unique identifier of the class.</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="keras_wrapper.dataset.Dataset.setImageSize">
-<code class="descname">setImageSize</code><span class="sig-paren">(</span><em>size</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setImageSize" title="Permalink to this definition">¶</a></dt>
-<dd><p>Changes the default image return size.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.dataset.Dataset.setImageSizeCrop">
-<code class="descname">setImageSizeCrop</code><span class="sig-paren">(</span><em>size_crop</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setImageSizeCrop" title="Permalink to this definition">¶</a></dt>
-<dd><p>Changes the default image return size.</p>
-</dd></dl>
-
-<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setInput">
-<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='image'</em>, <em>id='image'</em>, <em>tokenization='tokenize_basic'</em>, <em>build_vocabulary=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='image', id='image', repeat_set=1, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], max_text_len=35, tokenization='tokenize_basic', build_vocabulary=False, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a list of samples which can contain all samples from the &#8216;train&#8217;, &#8216;val&#8217;, or
 &#8216;test&#8217; sets (specified by set_name).</p>
+<p># General parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -264,10 +312,54 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;)</li>
 <li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)</li>
 <li><strong>id</strong> &#8211; identifier of the input data loaded</li>
-<li><strong>tokenization</strong> &#8211; type of tokenization applied (must be declared as a method of this class) (only applicable when type==&#8217;text&#8217;).</li>
-<li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
+<li><strong>repeat_set</strong> &#8211; repats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>img_size</strong> &#8211; size of the input images (any input image will be resized to this)</li>
+<li><strong>img_size_crop</strong> &#8211; size of the cropped zone (when dataAugmentation=False the central crop will be used)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;text&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>tokenization</strong> &#8211; type of tokenization applied (must be declared as a method of this class) (only applicable when type==&#8217;text&#8217;).</li>
+<li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
+<li><strong>max_text_len</strong> &#8211; maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type &#8216;text&#8217;).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image-features&#8217; and &#8216;video-features&#8217;- related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>feat_len</strong> &#8211; length of the feature vectors if we are using types &#8216;image-features&#8217; or &#8216;video-features&#8217;</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;video&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>max_video_len</strong> &#8211; maximum video length, the rest of the data will be padded with 0s (only applicable if the input data is of type &#8216;video&#8217; or video-features&#8217;).</td>
 </tr>
 </tbody>
 </table>
@@ -276,7 +368,8 @@ Each line must contain a unique identifier of the class.</p>
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setInputGeneral">
 <code class="descname">setInputGeneral</code><span class="sig-paren">(</span><em>path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='image', id='image'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInputGeneral" title="Permalink to this definition">¶</a></dt>
-<dd><p>Loads a single list of samples from which train/val/test divisions will be applied.</p>
+<dd><p>DEPRECATED</p>
+<p>Loads a single list of samples from which train/val/test divisions will be applied.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
@@ -297,13 +390,13 @@ Each line must contain a unique identifier of the class.</p>
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setLabels">
 <code class="descname">setLabels</code><span class="sig-paren">(</span><em>labels_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setLabels" title="Permalink to this definition">¶</a></dt>
-<dd><p>Deprecated</p>
+<dd><p>DEPRECATED</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setList">
 <code class="descname">setList</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='image'</em>, <em>id='image'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setList" title="Permalink to this definition">¶</a></dt>
-<dd><p>Deprecated</p>
+<dd><p>DEPRECATED</p>
 </dd></dl>
 
 <dl class="method">
@@ -314,19 +407,33 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setOutput">
-<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>tokenization='tokenize_basic'</em>, <em>build_vocabulary=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
-<dd><p>Loads a set of output data, usually referencing values in self.classes (starting from 0)</p>
+<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>build_vocabulary=False</em>, <em>max_text_len=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a set of output data, usually (type==&#8217;categorical&#8217;) referencing values in self.classes (starting from 0)</p>
+<p># General parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>path_list</strong> &#8211; can either be a path to a .txt file containing the labels or a python list of labels</li>
-<li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;)</li>
-<li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs)</li>
-<li><strong>id</strong> &#8211; identifier of the input data loaded</li>
+<li><strong>path_list</strong> &#8211; can either be a path to a .txt file containing the labels or a python list of labels.</li>
+<li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;).</li>
+<li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).</li>
+<li><strong>id</strong> &#8211; identifier of the input data loaded.</li>
+<li><strong>repeat_set</strong> &#8211; repats the outputs given (useful when we have more inputs than outputs). Int or array of ints.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;text&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>tokenization</strong> &#8211; type of tokenization applied (must be declared as a method of this class) (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
+<li><strong>max_text_len</strong> &#8211; maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type &#8216;text&#8217;) Set to 0 if the whole sentence will be used as an output class.</li>
 </ul>
 </td>
 </tr>
@@ -342,13 +449,21 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setTrainMean">
-<code class="descname">setTrainMean</code><span class="sig-paren">(</span><em>mean_image</em>, <em>normalization=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setTrainMean" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setTrainMean</code><span class="sig-paren">(</span><em>mean_image</em>, <em>id</em>, <em>normalization=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setTrainMean" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a pre-calculated training mean image, &#8216;mean_image&#8217; can either be:</p>
 <ul class="simple">
 <li>numpy.array (complete image)</li>
 <li>list with a value per channel</li>
 <li>string with the path to the stored image.</li>
 </ul>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>id</strong> &#8211; identifier of the type of input whose train mean is being introduced.</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
