@@ -59,7 +59,7 @@ def classifyFood101():
     net.model = Model(input=vis_input, output=output) # define inputs and outputs
     
     # Compile
-    net.setOptimizer(lr=0.01, metrics=['accuracy'])
+    net.setOptimizer(lr=0.001, metrics=['accuracy'])
     
                     
     # Define the inputs and outputs mapping from our Dataset instance to our CNN_Model instance
@@ -74,7 +74,16 @@ def classifyFood101():
     # the first output of our dataset (pos_labels) will also be the first output of our model (named output)
     outputMapping = {0: pos_labels}
     net.setOutputsMapping(outputMapping, acc_output='output')
-                    
+
+    
+    # Save model
+    saveModel(net, 0)
+    
+    # Load model
+    net = loadModel('Models/'+model_name, 0)
+    # the model must be compiled again when loaded
+    net.setOptimizer(lr=0.001, metrics=['accuracy'])
+    
     
     # Apply short training (1 epoch)
     training_params = {'n_epochs': 1, 'batch_size': 50, 
