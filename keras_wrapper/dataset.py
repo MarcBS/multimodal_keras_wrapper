@@ -688,8 +688,28 @@ class Dataset(object):
     # ------------------------------------------------------- #
     #       Tokenization functions
     # ------------------------------------------------------- #
-            
-    def tokenize_basic(self, caption):
+
+    def tokenize_basic(self, caption, lowercase=True):
+        """
+            Basic tokenizer for the input/output data of type 'text':
+                Splits punctuation
+                Lowercase
+        """
+        punct = [';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!']
+        def processPunctuation(inText):
+            outText = inText
+            for p in punct:
+                outText = outText.replace(p, ' ' + p + ' ')
+            return outText
+        resAns = caption.lower() if lowercase else caption
+        resAns = resAns.replace('\n', ' ')
+        resAns = resAns.replace('\t', ' ')
+        resAns = processPunctuation(resAns)
+        resAns = resAns.replace('  ', ' ')
+        return resAns
+
+
+    def tokenize_questions(self, caption):
         """
             Basic tokenizer for the input/output data of type 'text'
         """
@@ -728,7 +748,7 @@ class Dataset(object):
         manualMap = {'none': '0', 'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6',
              'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10'}
         articles = ['a', 'an', 'the']
-        
+
         def processPunctuation(inText):
             outText = inText
             for p in punct:
@@ -762,7 +782,6 @@ class Dataset(object):
         resAns = processDigitArticle(resAns)
 
         return resAns
-    
     # ------------------------------------------------------- #
     #       TYPE 'video' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
