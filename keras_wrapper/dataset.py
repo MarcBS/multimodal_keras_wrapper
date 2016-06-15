@@ -161,16 +161,17 @@ class Dataset(object):
         #################################################
         
         
-        ############################ Parameters used for inputs of type 'text'
-        self.vocabulary = dict()
-        self.max_text_len = dict()
+        ############################ Parameters used for inputs/outputs of type 'text'
+        self.vocabulary = dict()     # vocabularies (words2idx and idx2words)
+        self.max_text_len = dict()   # number of words accepted in a 'text' sample
+        self.vocabulary_len = dict() # number of words in the vocabulary
         self.n_classes_text = dict() # only used for output text
         #################################################
         
         
         ############################ Parameters used for inputs of type 'video'
         self.paths_frames = dict()
-        self.max_video_len = dict()
+        self.max_video_len = dict() 
         #################################################
         
         ############################ Parameters used for inputs of type 'image-features' or 'video-features'
@@ -314,7 +315,8 @@ class Dataset(object):
     
     def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                     # 'image' / 'video'
-                 max_text_len=35, tokenization='tokenize_basic', build_vocabulary=False,  # 'text'
+                 max_text_len=35, tokenization='tokenize_basic',                          # 'text'
+                 build_vocabulary=False, max_words=0,
                  feat_len = 1024,                                                         # 'image-features' / 'video-features'
                  max_video_len=26):                                                       # 'video'
         """
@@ -341,6 +343,7 @@ class Dataset(object):
             :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
+            :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
             
             
             # 'image-features' and 'video-features'- related parameters
@@ -371,7 +374,7 @@ class Dataset(object):
         elif(type == 'video'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words)
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, feat_len)
         elif(type == 'video-features'):
@@ -402,7 +405,8 @@ class Dataset(object):
         self.setOutput(self, labels_list, set_name, type, id)
     
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, 
-                  tokenization='tokenize_basic', build_vocabulary=False, max_text_len=0):     # 'text'
+                  tokenization='tokenize_basic', max_text_len=0,                          # 'text'
+                  build_vocabulary=False, max_words=0):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
             
@@ -419,6 +423,7 @@ class Dataset(object):
             :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text') Set to 0 if the whole sentence will be used as an output class.
+            :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
         """
         self.__checkSetName(set_name)
         
@@ -437,7 +442,7 @@ class Dataset(object):
         if(type == 'categorical'):
             data = self.preprocessCategorical(path_list)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
             
@@ -556,7 +561,7 @@ class Dataset(object):
     #       TYPE 'text' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len):
+    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, max_words):
         
         sentences = []
         if(isinstance(annotations_list, str) and os.path.isfile(annotations_list)):
@@ -579,7 +584,7 @@ class Dataset(object):
     
         # Build vocabulary
         if(build_vocabulary):
-            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0)
+            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, n_words=max_words)
         
         if(not id in self.vocabulary):
             raise Exception('The dataset must include a vocabulary with id "'+id+'" in order to process the type "text" data. Set "build_vocabulary" to True if you want to use the current data for building the vocabulary.')
@@ -649,6 +654,8 @@ class Dataset(object):
         self.vocabulary[id]['words2idx'] = dictionary
         inv_dictionary = {v: k for k, v in dictionary.items()}
         self.vocabulary[id]['idx2words'] = inv_dictionary
+        
+        self.vocabulary_len[id] = len(vocab_count)+2
 
 
     def loadText(self, X, vocabularies, max_len):

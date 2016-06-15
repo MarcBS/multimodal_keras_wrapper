@@ -114,7 +114,7 @@ class CNN_Model(object):
             :param models_path: path to the folder where the temporal model packups will be stored
             :param inheritance: indicates if we are building an instance from a child class (in this case the model will not be built from this __init__, it should be built from the child class).
         """
-        self.__toprint = ['net_type', 'name', 'plot_path', 'model_path', 'lr', 'momentum', 
+        self.__toprint = ['net_type', 'name', 'plot_path', 'models_path', 'lr', 'momentum', 
                             'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
         
         self.silence = silence
@@ -252,7 +252,6 @@ class CNN_Model(object):
             self.model_path = 'Models/' + self.name
         else:
             self.model_path = models_path
-        
         
         # Remove directories if existed
         if(clear_dirs):

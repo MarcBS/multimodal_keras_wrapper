@@ -299,7 +299,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setInput">
-<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='image', id='image', repeat_set=1, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], max_text_len=35, tokenization='tokenize_basic', build_vocabulary=False, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='image', id='image', repeat_set=1, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], max_text_len=35, tokenization='tokenize_basic', build_vocabulary=False, max_words=0, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a list of samples which can contain all samples from the &#8216;train&#8217;, &#8216;val&#8217;, or
 &#8216;test&#8217; sets (specified by set_name).</p>
 <p># General parameters</p>
@@ -340,6 +340,7 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>tokenization</strong> &#8211; type of tokenization applied (must be declared as a method of this class) (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>max_text_len</strong> &#8211; maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type &#8216;text&#8217;).</li>
+<li><strong>max_words</strong> &#8211; a maximum of &#8216;max_words&#8217; words from the whole vocabulary will be chosen by number or occurrences</li>
 </ul>
 </td>
 </tr>
@@ -407,7 +408,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setOutput">
-<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>build_vocabulary=False</em>, <em>max_text_len=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of output data, usually (type==&#8217;categorical&#8217;) referencing values in self.classes (starting from 0)</p>
 <p># General parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -434,6 +435,7 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>tokenization</strong> &#8211; type of tokenization applied (must be declared as a method of this class) (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>max_text_len</strong> &#8211; maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type &#8216;text&#8217;) Set to 0 if the whole sentence will be used as an output class.</li>
+<li><strong>max_words</strong> &#8211; a maximum of &#8216;max_words&#8217; words from the whole vocabulary will be chosen by number or occurrences</li>
 </ul>
 </td>
 </tr>
