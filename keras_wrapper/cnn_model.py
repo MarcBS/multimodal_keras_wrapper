@@ -55,9 +55,9 @@ def saveModel(model_wrapper, iter, path=None):
     json_string = model_wrapper.model.to_json()
     open(path + '/iter_'+ iter +'_structure.json', 'w').write(json_string)
     # Save model weights
-    model_wrapper.model.save_weights(path + '/iter_'+ iter +'_weights.h5', overwrite=True)
+    model_wrapper.model.save_weights(path + '/epoch_'+ iter +'_weights.h5', overwrite=True)
     # Save additional information
-    pk.dump(model_wrapper, open(path + '/iter_' + iter + '_CNN_Model.pkl', 'wb'))
+    pk.dump(model_wrapper, open(path + '/epoch_' + iter + '_CNN_Model.pkl', 'wb'))
     
     if(not model_wrapper.silence):
         logging.info("<<< Model saved >>>")
@@ -69,14 +69,14 @@ def loadModel(model_path, iter):
     """
     t = time.time()
     iter = str(iter)
-    logging.info("<<< Loading model from "+ model_path + "/iter_" + iter + "_CNN_Model.pkl ... >>>")
+    logging.info("<<< Loading model from "+ model_path + "/epoch_" + iter + "_CNN_Model.pkl ... >>>")
     
     # Load model structure
-    model = model_from_json(open(model_path + '/iter_'+ iter +'_structure.json').read())
+    model = model_from_json(open(model_path + '/epoch_'+ iter +'_structure.json').read())
     # Load model weights
-    model.load_weights(model_path + '/iter_'+ iter +'_weights.h5')
+    model.load_weights(model_path + '/epoch_'+ iter +'_weights.h5')
     # Load additional information
-    model_wrapper = pk.load(open(model_path + '/iter_' + iter + '_CNN_Model.pkl', 'rb'))
+    model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_CNN_Model.pkl', 'rb'))
     model_wrapper.model = model
     
     logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time()-t))
