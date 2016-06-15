@@ -53,7 +53,7 @@ def saveModel(model_wrapper, iter, path=None):
     iter = str(iter)
     # Save model structure
     json_string = model_wrapper.model.to_json()
-    open(path + '/iter_'+ iter +'_structure.json', 'w').write(json_string)
+    open(path + '/epoch_'+ iter +'_structure.json', 'w').write(json_string)
     # Save model weights
     model_wrapper.model.save_weights(path + '/epoch_'+ iter +'_weights.h5', overwrite=True)
     # Save additional information
@@ -129,10 +129,6 @@ class CNN_Model(object):
         # Dictionary for storing any additional data needed
         self.additional_data = dict()
         
-        # Set Network name
-        self.setName(model_name, plots_path, models_path)
-        
-        
         # Prepare logger
         self.__logger = dict()
         self.__modes = ['train', 'val']
@@ -140,6 +136,9 @@ class CNN_Model(object):
         
         # Prepare model
         if(not inheritance):
+            # Set Network name
+            self.setName(model_name, plots_path, models_path)
+            
             if(structure_path):
                 # Load a .json model
                 if(not self.silence):
