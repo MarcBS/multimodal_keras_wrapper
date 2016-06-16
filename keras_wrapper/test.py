@@ -88,13 +88,17 @@ def classifyFood101():
     # Apply short training (1 epoch)
     training_params = {'n_epochs': 1, 'batch_size': 50, 
                        'lr_decay': 2, 'lr_gamma': 0.8, 
-                       'epochs_for_save': 1, 'verbose': 1}
-    net.trainNet(ds, training_params)
+                       'epochs_for_save': 1, 'verbose': 1, 'eval_on_sets': ['val']}
+    #net.trainNet(ds, training_params)
     
     
     # Test network on test set
-    test_params = {'batch_size': 300}
+    test_params = {'batch_size': 50}
     #net.testNet(ds, test_params)
+    
+    # Predict network on all sets
+    test_params['predict_on_sets'] = ['train', 'val', 'test']
+    predictions = net.predictNet(ds, test_params)
     
     logging.info("Done")
     

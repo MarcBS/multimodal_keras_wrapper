@@ -61,11 +61,13 @@ class Data_Batch_Generator(object):
                  batch_size=50, 
                  normalize_images=False, 
                  data_augmentation=True, 
-                 mean_substraction=True):
+                 mean_substraction=True,
+                 predict=False):
         
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
+        self.predict = predict
         # Several parameters
         self.params = {'batch_size': batch_size, 
                        'data_augmentation': data_augmentation,
@@ -75,7 +77,7 @@ class Data_Batch_Generator(object):
     
     def generator(self):
             
-        if(self.set_split == 'train'):
+        if(self.set_split == 'train' and not self.predict):
             data_augmentation = self.params['data_augmentation']
         else:
             data_augmentation = False
@@ -83,19 +85,39 @@ class Data_Batch_Generator(object):
         it = 0
         while 1:
 
-            if(self.set_split == 'train' and it%self.params['num_iterations']==0):
+            if(self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict):
+                silence = self.dataset.silence
+                self.dataset.silence = True
                 self.dataset.shuffleTraining()
-            elif(it%self.params['num_iterations']==0):
+                self.dataset.silence = silence
+            elif(it%self.params['num_iterations']==0 and not self.predict):
                 self.dataset.resetCounters(set_name=self.set_split)
             it += 1
             
+            # Checks if we are finishing processing the data split
+            init_sample = (it-1)*self.params['batch_size']
+            final_sample = it*self.params['batch_size']
+            batch_size = self.params['batch_size']
+            n_samples_split = eval("self.dataset.len_"+self.set_split)
+            if final_sample >= n_samples_split:
+                final_sample = n_samples_split
+                batch_size = final_sample-init_sample
+                it = 0
+            
             # Recovers a batch of data
-            X_batch, Y_batch = self.dataset.getXY(self.set_split, self.params['batch_size'], 
+            if(self.predict):
+                X_batch = self.dataset.getX(self.set_split, init_sample, final_sample, 
+                                             normalization=self.params['normalize_images'],
+                                             meanSubstraction=self.params['mean_substraction'],
+                                             dataAugmentation=False)
+                data = self.net.prepareData(X_batch, None)[0]
+            else:
+                X_batch, Y_batch = self.dataset.getXY(self.set_split, batch_size, 
                                              normalization=self.params['normalize_images'],
                                              meanSubstraction=self.params['mean_substraction'],
                                              dataAugmentation=data_augmentation)
             
-            data = self.net.prepareData(X_batch, Y_batch)
+                data = self.net.prepareData(X_batch, Y_batch)
             
             yield(data)
 
@@ -162,6 +184,7 @@ class Dataset(object):
         
         
         ############################ Parameters used for inputs/outputs of type 'text'
+        self.extra_words = {'<unk>': 0, '<bos>': 1, '<eos>': 2}    # extra words introduced in all vocabularies
         self.vocabulary = dict()     # vocabularies (words2idx and idx2words)
         self.max_text_len = dict()   # number of words accepted in a 'text' sample
         self.vocabulary_len = dict() # number of words in the vocabulary
@@ -632,7 +655,7 @@ class Dataset(object):
 
 
         if n_words > 0:
-            vocab_count = combined_counter.most_common(n_words - 2)
+            vocab_count = combined_counter.most_common(n_words - len(self.extra_words))
             if(not self.silence):
                 logging.info("Creating dictionary of %s most common words, covering "
                         "%2.1f%% of the text."
@@ -646,16 +669,19 @@ class Dataset(object):
 
         dictionary = {}
         for i, (word, count) in enumerate(vocab_count):
-                dictionary[word] = i + 2
-        dictionary['<eos>'] = 0
-        dictionary['<unk>'] = 1
+                dictionary[word] = i + len(self.extra_words)
+                
+        for w,k in self.extra_words.iteritems():
+            dictionary[w] = k
+        #dictionary['<eos>'] = 0
+        #dictionary['<unk>'] = 1
         
         self.vocabulary[id] = dict()
         self.vocabulary[id]['words2idx'] = dictionary
         inv_dictionary = {v: k for k, v in dictionary.items()}
         self.vocabulary[id]['idx2words'] = inv_dictionary
         
-        self.vocabulary_len[id] = len(vocab_count)+2
+        self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
 
 
     def loadText(self, X, vocabularies, max_len):
@@ -684,7 +710,8 @@ class Dataset(object):
                     X_out[i,j+offset_j] = vocab['<unk>']
         
         return X_out
-            
+
+    
     # ------------------------------------------------------- #
     #       Tokenization functions
     # ------------------------------------------------------- #
@@ -1099,7 +1126,7 @@ class Dataset(object):
             Gets all the data samples stored between the positions init to final
             
             :param set_name: 'train', 'val' or 'test' set
-            :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and bigger than final.
+            :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than final.
             :param final: final position in the corresponding set split.
             :param debug: if True all data will be returned without preprocessing
             
@@ -1130,17 +1157,17 @@ class Dataset(object):
             raise Exception('"init" index must be smaller than "final" index.')
         
         X = []
-        for id,type in zip(self.ids_inputs, self.types_inputs):
-            x = eval('self.X_'+set_name+'[id][init:final]')
+        for id_in,type_in in zip(self.ids_inputs, self.types_inputs):
+            x = eval('self.X_'+set_name+'[id_in][init:final]')
             
             if(not debug):
-                if(type == 'image'):
-                    x = self.loadImages(x, id, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                if(type_in == 'image'):
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
-                    x = self.loadText(x, self.vocabularies[id_in], self.max_text_len[id_in])
+                    x = self.loadText(x, self.vocabulary[id_in], self.max_text_len[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):

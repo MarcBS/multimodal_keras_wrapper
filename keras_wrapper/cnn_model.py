@@ -447,17 +447,13 @@ class CNN_Model(object):
         
         default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1, 
                           'epochs_for_save': 1, 'num_iterations_val': None, 'n_parallel_loaders': 8, 
-                          'normalize_images': False, 'mean_substraction': True,
-                          'data_augmentation': True, 'verbose': 1, 'extra_callbacks': []};
-        
-        # deprecated params
-        #default_params = {'n_epochs': 1, 'batch_size': 50, 'report_iter': 50,  'iter_for_val': 1000, 
-        #                  'lr_decay': 1000, 'lr_gamma':0.1, 'save_model': 5000, 'num_iterations_val': None,
-        #                  'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
-        #                  'data_augmentation': True, 'verbose': 0};
+                          'normalize_images': False, 'mean_substraction': True, 'data_augmentation': True, 
+                          'verbose': 1, 'eval_on_sets': ['val'], 'extra_callbacks': []};
         
         params = self.checkParameters(parameters, default_params)
-        self.training_parameters.append(copy.copy(params))
+        save_params = copy.copy(params)
+        del save_params['extra_callbacks']
+        self.training_parameters.append(save_params)
         
         logging.info("<<< Training model >>>")
         
@@ -497,11 +493,6 @@ class CNN_Model(object):
         state['samples_per_epoch'] = ds.len_train
         state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch'])/params['batch_size']))
         
-        # Calculate how many validation interations are we going to perform per test
-        n_valid_samples = ds.len_val
-        if(params['num_iterations_val'] == None):
-            params['num_iterations_val'] = int(math.ceil(float(n_valid_samples)/params['batch_size']))
-        
         # Prepare callbacks
         callbacks = []
         callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
@@ -517,25 +508,35 @@ class CNN_Model(object):
                                          batch_size=params['batch_size'], 
                                          normalize_images=params['normalize_images'], 
                                          data_augmentation=params['data_augmentation'], 
-                                         mean_substraction=params['mean_substraction'])
-        val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+                                         mean_substraction=params['mean_substraction']).generator()
+        
+        # Are we going to validate on 'val' data?
+        if('val' in params['eval_on_sets']):
+            
+            # Calculate how many validation interations are we going to perform per test
+            n_valid_samples = ds.len_val
+            if(params['num_iterations_val'] == None):
+                params['num_iterations_val'] = int(math.ceil(float(n_valid_samples)/params['batch_size']))
+                
+            # prepare data generator    
+            val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
                                          batch_size=params['batch_size'], 
                                          normalize_images=params['normalize_images'], 
                                          data_augmentation=False, 
-                                         mean_substraction=params['mean_substraction'])
-
+                                         mean_substraction=params['mean_substraction']).generator()
+        else:
+            val_gen = None
+            n_valid_samples = None
+            
         # Train model
-        silence = ds.silence
-        ds.silence = True
-        self.model.fit_generator(train_gen.generator(),
-                                 validation_data=val_gen.generator(),
+        self.model.fit_generator(train_gen,
+                                 validation_data=val_gen,
                                  nb_val_samples=n_valid_samples,
                                  samples_per_epoch=state['samples_per_epoch'], 
                                  nb_epoch=params['n_epochs'],
                                  max_q_size=params['n_parallel_loaders'],
                                  verbose=params['verbose'],
                                  callbacks=callbacks)
-        ds.silence = silence
     
     
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
@@ -785,20 +786,31 @@ class CNN_Model(object):
         logging.info("<<< Testing model >>>")
         
         # Calculate how many test interations are we going to perform
-        n_valid_samples = ds.len_test
-        num_iterations = int(math.ceil(float(n_valid_samples)/params['batch_size']))
+        n_samples = ds.len_test
+        num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
 
         # Test model
-        out = self.model.evaluate_generator(self.data_batch_generator('test', ds, copy.copy(params), num_iterations),
-                                      val_samples=n_valid_samples,
+        data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
+                                         batch_size=params['batch_size'], 
+                                         normalize_images=params['normalize_images'], 
+                                         data_augmentation=False, 
+                                         mean_substraction=params['mean_substraction']).generator()
+        
+        out = self.model.evaluate_generator(data_gen,
+                                      val_samples=n_samples,
                                       max_q_size=params['n_parallel_loaders'])
-        loss_all = out[0]
-        loss_ecoc = out[1]
-        loss_final = out[2]
-        acc_ecoc = out[3]
-        acc_final = out[4]
-        logging.info('Test loss: %0.8s' % loss_final)
-        logging.info('Test accuracy: %0.8s' % acc_final)
+        
+        # Display metrics results
+        for name, o in zip(self.model.metrics_names, out):
+            logging.info('test '+name+': %0.8s' % o)
+        
+        #loss_all = out[0]
+        #loss_ecoc = out[1]
+        #loss_final = out[2]
+        #acc_ecoc = out[3]
+        #acc_final = out[4]
+        #logging.info('Test loss: %0.8s' % loss_final)
+        #logging.info('Test accuracy: %0.8s' % acc_final)
         
         
     def testNet_deprecated(self, ds, parameters, out_name=None):
@@ -927,7 +939,52 @@ class CNN_Model(object):
                 return (loss, score, top_score, n_samples)
             return (loss, n_samples)
         
+    
+    def predictNet(self, ds, parameters, out_name=None):
+        '''
+            Returns the predictions of the net on the dataset splits chosen. The valid parameters are:
+            
+            :param batch_size: size of the batch
+            :param n_parallel_loaders: number of parallel data batch loaders
+            :param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
+            :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
+            :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+            
+            :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        '''
         
+        # Check input parameters and recover default values if needed
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 
+                          'normalize_images': False, 'mean_substraction': True, 
+                          'predict_on_sets': ['val']};
+        params = self.checkParameters(parameters, default_params)
+        
+        predictions = dict()
+        for s in params['predict_on_sets']:
+        
+            logging.info("<<< Predicting outputs of "+s+" set >>>")
+
+            # Calculate how many interations are we going to perform
+            n_samples = eval("ds.len_"+s)
+            num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+
+            # Prepare data generator
+            data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
+                                         batch_size=params['batch_size'], 
+                                         normalize_images=params['normalize_images'], 
+                                         data_augmentation=False, 
+                                         mean_substraction=params['mean_substraction'],
+                                         predict=True).generator()
+            
+            # Predict on model
+            out = self.model.predict_generator(data_gen,
+                                                val_samples=n_samples,
+                                                max_q_size=params['n_parallel_loaders'])
+            
+            predictions[s] = out
+        return predictions
+    
+    
     def predictOnBatch(self, X, in_name=None, out_name=None, expand=False):
         """
             Applies a forward pass and returns the predicted values.
@@ -960,7 +1017,7 @@ class CNN_Model(object):
         return predictions
     
     
-    def prepareData(self, X_batch, Y_batch):
+    def prepareData(self, X_batch, Y_batch=None):
         if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
             data = self._prepareSequentialData(X_batch, Y_batch)
         elif(isinstance(self.model, Graph)):
