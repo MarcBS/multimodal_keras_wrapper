@@ -186,7 +186,7 @@ class Dataset(object):
         
         
         ############################ Parameters used for inputs/outputs of type 'text'
-        self.extra_words = {'<unk>': 0, '<bos>': 1, '<eos>': 2}    # extra words introduced in all vocabularies
+        self.extra_words = {'<pad>': 0, '<unk>': 1}    # extra words introduced in all vocabularies
         self.vocabulary = dict()     # vocabularies (words2idx and idx2words)
         self.max_text_len = dict()   # number of words accepted in a 'text' sample
         self.vocabulary_len = dict() # number of words in the vocabulary
