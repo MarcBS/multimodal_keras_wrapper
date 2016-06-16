@@ -986,7 +986,7 @@ class CNN_Model(object):
             if(len(self.outputsMapping.keys()) == 1): # single output
                 Y = Y[self.outputsMapping[0]]
             else:
-                Y_new = [0 for i in range(len(self.outputsMapping.keys()))] # multiple inputs
+                Y_new = [0 for i in range(len(self.outputsMapping.keys()))] # multiple outputs
                 for out_model, out_ds in self.outputsMapping.iteritems():
                     Y_new[out_model] = Y[out_ds]
                 Y = Y_new
