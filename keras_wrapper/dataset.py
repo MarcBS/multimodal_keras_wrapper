@@ -118,7 +118,7 @@ class Data_Batch_Generator(object):
                                              dataAugmentation=data_augmentation)
             
                 data = self.net.prepareData(X_batch, Y_batch)
-            
+
             yield(data)
 
             
@@ -170,9 +170,11 @@ class Dataset(object):
         # (which will define the preprocessing applied)
         self.ids_inputs = []
         self.types_inputs = [] # see accepted types in self.__accepted_types_inputs
+        self.optional_inputs = []
+
         self.ids_outputs = []
         self.types_outputs = [] # see accepted types in self.__accepted_types_outputs
-        
+
         # List of implemented input and output data types
         self.__accepted_types_inputs = ['image', 'video', 'image-features', 'video-features', 'text']
         self.__accepted_types_outputs = ['categorical', 'binary', 'text']
@@ -189,6 +191,7 @@ class Dataset(object):
         self.max_text_len = dict()   # number of words accepted in a 'text' sample
         self.vocabulary_len = dict() # number of words in the vocabulary
         self.n_classes_text = dict() # only used for output text
+        self.text_offset = dict()    # number of timesteps that the text is shifted (to the right)
         #################################################
         
         
@@ -287,7 +290,7 @@ class Dataset(object):
         """
         
         raise NotImplementedError("This function is deprecated use setInput instead.")
-        
+
         if(sum(split) != 1):
             raise Exception('"split" values must sum 1.')
         if(len(split) != 3):
@@ -336,12 +339,13 @@ class Dataset(object):
         self.setInput(path_list, set_name, type, id)
     
     
-    def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1,
+    def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1, required=True,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                     # 'image' / 'video'
-                 max_text_len=35, tokenization='tokenize_basic',                          # 'text'
+                 max_text_len=35, tokenization='tokenize_basic',offset=0,                 # 'text'
                  build_vocabulary=False, max_words=0,
                  feat_len = 1024,                                                         # 'image-features' / 'video-features'
-                 max_video_len=26):                                                       # 'video'
+                 max_video_len=26                                                       # 'video'
+                 ):
         """
             Loads a list of samples which can contain all samples from the 'train', 'val', or
             'test' sets (specified by set_name).
@@ -353,6 +357,7 @@ class Dataset(object):
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
             :param id: identifier of the input data loaded
             :param repeat_set: repats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
+            :param required: flag for optional inputs
             
             
             # 'image'-related parameters
@@ -367,7 +372,7 @@ class Dataset(object):
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
-            
+            :param offset: Number of timesteps that the text is shifted to the right (for *_cond models)
             
             # 'image-features' and 'video-features'- related parameters
             
@@ -385,6 +390,8 @@ class Dataset(object):
         if(id not in self.ids_inputs):
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
+            if not required:
+                self.optional_inputs.append(id)
         elif id in keys_X_set:
             raise Exception('An input with id "'+id+'" is already loaded into the Database.')
 
@@ -397,7 +404,7 @@ class Dataset(object):
         elif(type == 'video'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset)
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, feat_len)
         elif(type == 'video-features'):
@@ -412,8 +419,8 @@ class Dataset(object):
         exec('self.X_'+set_name+'[id] = set')
         exec('self.loaded_'+set_name+'[0] = True')
         exec('self.len_'+set_name+' = len(set)')
-        
-        self.__checkLengthSet(set_name)
+        if id not in self.optional_inputs:
+            self.__checkLengthSet(set_name)
         
         if(not self.silence):
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
@@ -428,7 +435,7 @@ class Dataset(object):
         self.setOutput(self, labels_list, set_name, type, id)
     
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, 
-                  tokenization='tokenize_basic', max_text_len=0,                          # 'text'
+                  tokenization='tokenize_basic', max_text_len=0, offset=0,                         # 'text'
                   build_vocabulary=False, max_words=0):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -465,12 +472,11 @@ class Dataset(object):
         if(type == 'categorical'):
             data = self.preprocessCategorical(path_list)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
             
         data = list(np.repeat(data,repeat_set))
-            
         self.__setOutput(data, set_name, type, id)
     
     
@@ -478,7 +484,6 @@ class Dataset(object):
         exec('self.Y_'+set_name+'[id] = labels')
         exec('self.loaded_'+set_name+'[1] = True')
         exec('self.len_'+set_name+' = len(labels)')
-    
         self.__checkLengthSet(set_name)
         
         if(not self.silence):
@@ -584,7 +589,7 @@ class Dataset(object):
     #       TYPE 'text' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, max_words):
+    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset):
         
         sentences = []
         if(isinstance(annotations_list, str) and os.path.isfile(annotations_list)):
@@ -615,7 +620,8 @@ class Dataset(object):
         # Store max text len
         self.max_text_len[id] = max_text_len
         self.n_classes_text[id] = len(self.vocabulary[id]['words2idx'])
-    
+        self.text_offset[id] = offset
+
         return sentences
     
     
@@ -669,12 +675,10 @@ class Dataset(object):
 
         dictionary = {}
         for i, (word, count) in enumerate(vocab_count):
-                dictionary[word] = i + len(self.extra_words)
+            dictionary[word] = i + len(self.extra_words)
                 
         for w,k in self.extra_words.iteritems():
             dictionary[w] = k
-        #dictionary['<eos>'] = 0
-        #dictionary['<unk>'] = 1
         
         self.vocabulary[id] = dict()
         self.vocabulary[id]['words2idx'] = dictionary
@@ -684,7 +688,7 @@ class Dataset(object):
         self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
 
 
-    def loadText(self, X, vocabularies, max_len):
+    def loadText(self, X, vocabularies, max_len, offset):
         """
             Text encoder. Transforms samples from a text representation into a numerical one.
         """
@@ -702,13 +706,14 @@ class Dataset(object):
             offset_j = max_len - len_j
             if offset_j < 0:
                 len_j = len_j + offset_j
-                offset_j = 0
+                offset_j = vocab['<pad>']
             for j, w in zip(range(len_j),x[:len_j]):
                 if w in vocab:
                     X_out[i,j+offset_j] = vocab[w]
                 else:
                     X_out[i,j+offset_j] = vocab['<unk>']
-        
+            if offset > 0: # Move the text to the right
+                X_out[i] = np.append([vocab['<pad>']]*offset, X_out[i, :-offset])
         return X_out
 
     
@@ -1121,7 +1126,8 @@ class Dataset(object):
     #           [X,Y] pairs or X only
     # ------------------------------------------------------- #
         
-    def getX(self, set_name, init, final, normalization_type='0-1', normalization=False, meanSubstraction=True, dataAugmentation=True, debug=False):
+    def getX(self, set_name, init, final, normalization_type='0-1', normalization=False,
+             meanSubstraction=True, dataAugmentation=True, debug=False):
         """
             Gets all the data samples stored between the positions init to final
             
@@ -1167,7 +1173,7 @@ class Dataset(object):
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
-                    x = self.loadText(x, self.vocabulary[id_in], self.max_text_len[id_in])
+                    x = self.loadText(x, self.vocabulary[id_in], self.max_text_len[id_in], self.text_offset[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1226,7 +1232,7 @@ class Dataset(object):
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
-                    x = self.loadText(x, self.vocabulary[id_in], self.max_text_len[id_in])
+                    x = self.loadText(x, self.vocabulary[id_in], self.max_text_len[id_in], self.text_offset[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1252,7 +1258,7 @@ class Dataset(object):
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
-                    y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out])
+                    y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out], self.text_offset[id_in])
                     #if max_len == 0:
                     y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
                     for idx in range(y.shape[0]):
@@ -1287,7 +1293,8 @@ class Dataset(object):
         if(eval('self.loaded_'+set_name+'[0] and self.loaded_'+set_name+'[1]')):
             lengths = []
             for id_in in self.ids_inputs:
-                exec('lengths.append(len(self.X_'+ set_name +'[id_in]))')
+                if id_in not in self.optional_inputs:
+                    exec('lengths.append(len(self.X_'+ set_name +'[id_in]))')
             for id_out in self.ids_outputs:
                 exec('lengths.append(len(self.Y_'+ set_name +'[id_out]))')
             if(lengths[1:] != lengths[:-1]):
