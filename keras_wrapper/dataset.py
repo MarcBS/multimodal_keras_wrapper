@@ -176,8 +176,10 @@ class Dataset(object):
         self.types_outputs = [] # see accepted types in self.__accepted_types_outputs
 
         # List of implemented input and output data types
-        self.__accepted_types_inputs = ['image', 'video', 'image-features', 'video-features', 'text']
-        self.__accepted_types_outputs = ['categorical', 'binary', 'text']
+        self.__accepted_types_inputs = ['image', 'video', 'image-features', 'video-features', 'text', 'id']
+        self.__accepted_types_outputs = ['categorical', 'binary', 'text', 'id']
+        #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
+        #    they will not be used in any way. IDs must be stored in text files with a single id per line
         
         # List of implemented input normalization functions
         self.__available_norm_im_vid = ['0-1']    # 'image' and 'video' only
@@ -282,7 +284,7 @@ class Dataset(object):
         
             Loads a single list of samples from which train/val/test divisions will be applied. 
             
-            :param path_list: path to the .txt file with the list of images.
+            :param path_list: path to the text file with the list of images.
             :param split: percentage of images used for [training, validation, test].
             :param shuffle: whether we are randomly shuffling the input samples or not.
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
@@ -352,7 +354,7 @@ class Dataset(object):
             
             # General parameters
             
-            :param path_list: can either be a path to a .txt file containing the paths to the images or a python list of paths
+            :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
             :param id: identifier of the input data loaded
@@ -409,6 +411,8 @@ class Dataset(object):
             data = self.preprocessFeatures(path_list, id, feat_len)
         elif(type == 'video-features'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
+        elif(type == 'id'):
+            data = self.preprocessIDs(path_list, id)
         
         data = list(np.repeat(data,repeat_set))
         
@@ -442,7 +446,7 @@ class Dataset(object):
             
             # General parameters
             
-            :param path_list: can either be a path to a .txt file containing the labels or a python list of labels.
+            :param path_list: can either be a path to a text file containing the labels or a python list of labels.
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test').
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).
             :param id: identifier of the input data loaded.
@@ -475,6 +479,8 @@ class Dataset(object):
             data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
+        elif(type == 'id'):
+            data = self.preprocessIDs(path_list, id)
             
         data = list(np.repeat(data,repeat_set))
         self.__setOutput(data, set_name, type, id)
@@ -522,7 +528,7 @@ class Dataset(object):
         elif(isinstance(labels_list, list)):
             labels = labels_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a .txt with the labels or an instance of the class list.')
+            raise Exception('Wrong type for "path_list". It must be a path to a text file with the labels or an instance of the class list.')
         
         return labels
     
@@ -555,7 +561,7 @@ class Dataset(object):
         elif(isinstance(path_list, list)):
             data = path_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a .txt file. Each line must contain a path to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
+            raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
         
         self.features_lengths[id] = feat_len
         
@@ -597,7 +603,7 @@ class Dataset(object):
                 for line in list_:
                     sentences.append(line.rstrip('\n'))
         else:
-            raise Exception('Wrong type for "annotations_list". It must be a path to a .txt with the sentences or a list of sentences.')
+            raise Exception('Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences.')
             
         # Check if tokenization method exists
         if(hasattr(self, tokenization)):
@@ -644,10 +650,11 @@ class Dataset(object):
                 words_low = map(lambda x: x.lower(), words)
                 counter.update(words_low)
             else:
-                if(not self.silence):
-                    logging.info('Using whole sentence as a single word.')
                 counter.update([line])
             sentence_count += 1
+            
+        if(not do_split and not self.silence):
+            logging.info('Using whole sentence as a single word.')
             
         counters.append(counter)
         sentence_counts.append(sentence_count)
@@ -814,6 +821,8 @@ class Dataset(object):
         resAns = processDigitArticle(resAns)
 
         return resAns
+    
+    
     # ------------------------------------------------------- #
     #       TYPE 'video' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -839,7 +848,7 @@ class Dataset(object):
             self.img_size[id] = img_size
             self.img_size_crop[id] = img_size_crop
         else:
-            raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a .txt with the paths to all images in all videos in [0] and a path to another .txt with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
+            raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
         return counts_frames
     
     
@@ -874,6 +883,25 @@ class Dataset(object):
     
     
     # ------------------------------------------------------- #
+    #       TYPE 'id' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+    
+    def preprocessIDs(self, path_list, id):
+        
+        logging.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
+        if(isinstance(path_list, str) and os.path.isfile(path_list)): # path to list of IDs
+            data = []
+            with open(path_list, 'r') as list_:
+                for line in list_:
+                    data.append(line.rstrip('\n'))
+        elif(isinstance(path_list, list)):
+            data = path_list
+        else:
+            raise Exception('Wrong type for "path_list". It must be a path to a text file with an id in each line or an instance of the class list with an id in each position.')
+    
+        return data
+    
+    # ------------------------------------------------------- #
     #       TYPE 'image' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
@@ -887,7 +915,7 @@ class Dataset(object):
         elif(isinstance(path_list, list)):
             data = path_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a .txt with an image path in each line or an instance of the class list with an image path in each position.')
+            raise Exception('Wrong type for "path_list". It must be a path to a text file with an image path in each line or an instance of the class list with an image path in each position.')
             
         self.img_size[id] = img_size
         self.img_size_crop[id] = img_size_crop

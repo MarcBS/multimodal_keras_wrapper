@@ -129,6 +129,10 @@ class CNN_Model(object):
         # Dictionary for storing any additional data needed
         self.additional_data = dict()
         
+        # Inputs and outputs names for models of class Model
+        self.ids_inputs = list()
+        self.ids_outputs = list()
+        
         # Prepare logger
         self.__logger = dict()
         self.__modes = ['train', 'val']
@@ -1018,8 +1022,10 @@ class CNN_Model(object):
     
     
     def prepareData(self, X_batch, Y_batch=None):
-        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+        if(isinstance(self.model, Sequential)):
             data = self._prepareSequentialData(X_batch, Y_batch)
+        elif(isinstance(self.model, Model)):
+            data = self._prepareModelData(X_batch, Y_batch)
         elif(isinstance(self.model, Graph)):
             [data, Y_batch] = self._prepareGraphData(X_batch, Y_batch)
         else:
@@ -1049,6 +1055,22 @@ class CNN_Model(object):
                 Y = Y_new
         
         return [X, Y]
+        
+        
+    def _prepareModelData(self, X, Y=None):
+        X_new = dict()
+        Y_new = dict()
+        
+        # Format input data
+        for in_model, in_ds in self.inputsMapping.iteritems():
+            X_new[in_model] = X[in_ds]
+        
+        # Format output data
+        if(Y is not None):
+            for out_model, out_ds in self.outputsMapping.iteritems():
+                Y_new[out_model] = Y[out_ds]
+        
+        return [X_new, Y_new]
         
         
     def _prepareGraphData(self, X, Y=None):
