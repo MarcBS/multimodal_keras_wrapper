@@ -1286,7 +1286,7 @@ class Dataset(object):
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
-                    y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out], self.text_offset[id_in])
+                    y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out], self.text_offset[id_out])
                     #if max_len == 0:
                     y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
                     for idx in range(y.shape[0]):
