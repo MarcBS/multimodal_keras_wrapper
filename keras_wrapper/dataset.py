@@ -118,7 +118,7 @@ class Data_Batch_Generator(object):
                                              dataAugmentation=data_augmentation)
             
                 data = self.net.prepareData(X_batch, Y_batch)
-
+            
             yield(data)
 
             
@@ -701,7 +701,7 @@ class Dataset(object):
         """
         n_batch = len(X)
         if(max_len == 0): # use whole sentence as class
-            X_out = np.zeros((n_batch, 1)).astype('int32')
+            X_out = np.zeros((n_batch)).astype('int32')
         else:
             X_out = np.zeros((n_batch, max_len)).astype('int32')
             
@@ -1287,10 +1287,12 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out], self.text_offset[id_out])
-                    #if max_len == 0:
                     y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
-                    for idx in range(y.shape[0]):
-                        y_aux[idx] = np_utils.to_categorical(y[idx], self.n_classes_text[id_out]).astype(np.uint8)
+                    if self.max_text_len[id_out] == 0:
+                        y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                    else:
+                        for idx in range(y.shape[0]):
+                            y_aux[idx] = np_utils.to_categorical(y[idx], self.n_classes_text[id_out]).astype(np.uint8)
                     y = y_aux
             Y.append(y)
         
