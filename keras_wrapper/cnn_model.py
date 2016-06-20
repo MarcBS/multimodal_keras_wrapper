@@ -452,7 +452,7 @@ class CNN_Model(object):
         default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1, 
                           'epochs_for_save': 1, 'num_iterations_val': None, 'n_parallel_loaders': 8, 
                           'normalize_images': False, 'mean_substraction': True, 'data_augmentation': True, 
-                          'verbose': 1, 'eval_on_sets': ['val'], 'extra_callbacks': []};
+                          'verbose': 1, 'eval_on_sets': ['val'], 'reload_epoch': 0, 'extra_callbacks': []};
         
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -464,16 +464,21 @@ class CNN_Model(object):
         self.__logger = dict()
         self.__train(ds, params)
         
-        logging.info("<<< Finished training CNN_Model >>>")
+        logging.info("<<< Finished training model >>>")
         
         
     def resumeTrainNet(self, ds, parameters, out_name=None):
         """
+            DEPRECATED
+        
             Resumes the last training state of a stored model keeping also its training parameters. 
             If we introduce any parameter through the argument 'parameters', it will be replaced by the old one.
             
             :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.
         """
+        
+        raise NotImplementedError('Deprecated')
+        
         # Recovers the old training parameters (replacing them by the new ones if any)
         default_params = self.training_parameters[-1]
         params = self.checkParameters(parameters, default_params)
@@ -499,7 +504,8 @@ class CNN_Model(object):
         
         # Prepare callbacks
         callbacks = []
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, 
+                                                           params['epochs_for_save'], reload_epoch=params['reload_epoch'])
         callback_lr_reducer = LearningRateReducerWithEarlyStopping(patience=0, 
                                                                    lr_decay=params['lr_decay'], 
                                                                    reduce_rate=params['lr_gamma'])

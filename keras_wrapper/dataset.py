@@ -141,7 +141,8 @@ class Dataset(object):
         # If silence = False, some informative sentences will be printed while using the "Dataset" object instance
         self.silence = silence
         
-        
+        # Variable for storing external extra variables
+        self.extra_variables = dict()
         
         ############################ Data loading parameters
         # Lock for threads synchronization
@@ -699,28 +700,35 @@ class Dataset(object):
         """
             Text encoder. Transforms samples from a text representation into a numerical one.
         """
+        vocab = vocabularies['words2idx']
         n_batch = len(X)
         if(max_len == 0): # use whole sentence as class
             X_out = np.zeros((n_batch)).astype('int32')
-        else:
-            X_out = np.zeros((n_batch, max_len)).astype('int32')
-            
-        vocab = vocabularies['words2idx']
-        # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
-        for i in range(n_batch):
-            x = X[i].split(' ')
-            len_j = len(x)
-            offset_j = max_len - len_j
-            if offset_j < 0:
-                len_j = len_j + offset_j
-                offset_j = vocab['<pad>']
-            for j, w in zip(range(len_j),x[:len_j]):
+            for i in range(n_batch):
+                w = X[i]
                 if w in vocab:
-                    X_out[i,j+offset_j] = vocab[w]
+                    X_out[i] = vocab[w]
                 else:
-                    X_out[i,j+offset_j] = vocab['<unk>']
-            if offset > 0: # Move the text to the right
-                X_out[i] = np.append([vocab['<pad>']]*offset, X_out[i, :-offset])
+                    X_out[i] = vocab['<unk>']
+            
+        else: # process text as a sequence of words
+            X_out = np.zeros((n_batch, max_len)).astype('int32')
+        
+            # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
+            for i in range(n_batch):
+                x = X[i].split(' ')
+                len_j = len(x)
+                offset_j = max_len - len_j
+                if offset_j < 0:
+                    len_j = len_j + offset_j
+                    offset_j = 0
+                for j, w in zip(range(len_j),x[:len_j]):
+                    if w in vocab:
+                        X_out[i,j+offset_j] = vocab[w]
+                    else:
+                        X_out[i,j+offset_j] = vocab['<unk>']
+                if offset > 0: # Move the text to the right
+                    X_out[i] = np.append([vocab['<pad>']]*offset, X_out[i, :-offset])
         return X_out
 
     
