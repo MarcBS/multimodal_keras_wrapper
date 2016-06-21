@@ -280,10 +280,12 @@ class Dataset(object):
         exec('ids = self.Y_'+set_name+'.keys()')
         for id in ids:
             exec('self.Y_'+set_name+'[id] = [self.Y_'+set_name+'[id][k] for k in kept]')
+        new_len = len(samples[id_out])
+        exec('self.len_'+set_name+' = new_len')
         
         self.__checkLengthSet(set_name)
         
-        logging.info(str(len(samples[id_out]))+' samples remaining after removal.')
+        logging.info(str(new_len)+' samples remaining after removal.')
     
     
     # ------------------------------------------------------- #
