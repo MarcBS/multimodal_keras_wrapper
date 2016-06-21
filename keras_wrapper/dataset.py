@@ -247,6 +247,44 @@ class Dataset(object):
             logging.info("Shuffling training done.")
     
     
+    def keepTopOutputs(self, set_name, id_out, n_top):
+        self.__checkSetName(set_name)
+        
+        if id_out not in self.ids_outputs:
+            raise Exception("The parameter 'id_out' must specify a valid id for an output of the dataset.")
+        
+        #type_out = self.types_outputs(self.ids_outputs.index(id_out))
+        #if type_out != 'text':
+        #    raise Exception("This method is only applicable to outputs of type 'text'.")
+        
+        logging.info('Keeping top '+str(n_top)+' outputs from the '+set_name+' set and removing the rest.')
+        
+        # Sort outputs by number of occurrences
+        exec('samples = self.Y_'+set_name)
+        count = Counter(samples[id_out])
+        most_frequent = sorted(count.items(), key=lambda x:x[1], reverse=True)[:n_top]
+        most_frequent = [m[0] for m in most_frequent]
+        
+        # Select top samples
+        kept = []
+        for i, s in enumerate(samples[id_out]):
+            if s in most_frequent:
+                kept.append(i)
+                
+        # Remove non-top samples    
+        # Inputs
+        exec('ids = self.X_'+set_name+'.keys()')
+        for id in ids:
+            exec('self.X_'+set_name+'[id] = [self.X_'+set_name+'[id][k] for k in kept]')
+        # Outputs
+        exec('ids = self.Y_'+set_name+'.keys()')
+        for id in ids:
+            exec('self.Y_'+set_name+'[id] = [self.Y_'+set_name+'[id][k] for k in kept]')
+        
+        self.__checkLengthSet(set_name)
+        
+        logging.info(str(len(samples[id_out]))+' samples remaining after removal.')
+    
     
     # ------------------------------------------------------- #
     #       GENERAL SETTERS
@@ -439,7 +477,7 @@ class Dataset(object):
         logging.info("WARNING: The method setLabels() is deprecated, consider using () instead.")
         self.setOutput(self, labels_list, set_name, type, id)
     
-    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, 
+    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
                   tokenization='tokenize_basic', max_text_len=0, offset=0,                         # 'text'
                   build_vocabulary=False, max_words=0):
         """
@@ -451,7 +489,7 @@ class Dataset(object):
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test').
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).
             :param id: identifier of the input data loaded.
-            :param repeat_set: repats the outputs given (useful when we have more inputs than outputs). Int or array of ints.
+            :param repeat_set: repeats the outputs given (useful when we have more inputs than outputs). Int or array of ints.
             
             # 'text'-related parameters
             
@@ -482,6 +520,7 @@ class Dataset(object):
             data = self.preprocessBinary(path_list)
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
+            
             
         data = list(np.repeat(data,repeat_set))
         self.__setOutput(data, set_name, type, id)
