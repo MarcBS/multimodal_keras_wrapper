@@ -174,7 +174,7 @@ data splits, image loading, mean calculation, etc.</p>
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>set_name</strong> &#8211; &#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217; set</li>
-<li><strong>init</strong> &#8211; initial position in the corresponding set split. Must be bigger or equal than 0 and bigger than final.</li>
+<li><strong>init</strong> &#8211; initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than final.</li>
 <li><strong>final</strong> &#8211; final position in the corresponding set split.</li>
 <li><strong>debug</strong> &#8211; if True all data will be returned without preprocessing</li>
 </ul>
@@ -280,7 +280,7 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadText">
-<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
+<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
 <dd><p>Text encoder. Transforms samples from a text representation into a numerical one.</p>
 </dd></dl>
 
@@ -299,7 +299,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setInput">
-<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='image', id='image', repeat_set=1, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], max_text_len=35, tokenization='tokenize_basic', build_vocabulary=False, max_words=0, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='image', id='image', repeat_set=1, required=True, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], max_text_len=35, tokenization='tokenize_basic', offset=0, build_vocabulary=False, max_words=0, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a list of samples which can contain all samples from the &#8216;train&#8217;, &#8216;val&#8217;, or
 &#8216;test&#8217; sets (specified by set_name).</p>
 <p># General parameters</p>
@@ -308,11 +308,12 @@ Each line must contain a unique identifier of the class.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>path_list</strong> &#8211; can either be a path to a .txt file containing the paths to the images or a python list of paths</li>
+<li><strong>path_list</strong> &#8211; can either be a path to a text file containing the paths to the images or a python list of paths</li>
 <li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;)</li>
 <li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)</li>
 <li><strong>id</strong> &#8211; identifier of the input data loaded</li>
 <li><strong>repeat_set</strong> &#8211; repats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
+<li><strong>required</strong> &#8211; flag for optional inputs</li>
 </ul>
 </td>
 </tr>
@@ -341,6 +342,7 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>max_text_len</strong> &#8211; maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type &#8216;text&#8217;).</li>
 <li><strong>max_words</strong> &#8211; a maximum of &#8216;max_words&#8217; words from the whole vocabulary will be chosen by number or occurrences</li>
+<li><strong>offset</strong> &#8211; Number of timesteps that the text is shifted to the right (for <a href="#id1"><span class="problematic" id="id2">*</span></a>_cond models)</li>
 </ul>
 </td>
 </tr>
@@ -376,7 +378,7 @@ Each line must contain a unique identifier of the class.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>path_list</strong> &#8211; path to the .txt file with the list of images.</li>
+<li><strong>path_list</strong> &#8211; path to the text file with the list of images.</li>
 <li><strong>split</strong> &#8211; percentage of images used for [training, validation, test].</li>
 <li><strong>shuffle</strong> &#8211; whether we are randomly shuffling the input samples or not.</li>
 <li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)</li>
@@ -408,7 +410,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setOutput">
-<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>offset=0</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of output data, usually (type==&#8217;categorical&#8217;) referencing values in self.classes (starting from 0)</p>
 <p># General parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -416,11 +418,11 @@ Each line must contain a unique identifier of the class.</p>
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>path_list</strong> &#8211; can either be a path to a .txt file containing the labels or a python list of labels.</li>
+<li><strong>path_list</strong> &#8211; can either be a path to a text file containing the labels or a python list of labels.</li>
 <li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;).</li>
 <li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).</li>
 <li><strong>id</strong> &#8211; identifier of the input data loaded.</li>
-<li><strong>repeat_set</strong> &#8211; repats the outputs given (useful when we have more inputs than outputs). Int or array of ints.</li>
+<li><strong>repeat_set</strong> &#8211; repeats the outputs given (useful when we have more inputs than outputs). Int or array of ints.</li>
 </ul>
 </td>
 </tr>
@@ -476,7 +478,17 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.tokenize_basic">
-<code class="descname">tokenize_basic</code><span class="sig-paren">(</span><em>caption</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_basic" title="Permalink to this definition">¶</a></dt>
+<code class="descname">tokenize_basic</code><span class="sig-paren">(</span><em>caption</em>, <em>lowercase=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_basic" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Basic tokenizer for the input/output data of type &#8216;text&#8217;:</dt>
+<dd>Splits punctuation
+Lowercase</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.tokenize_questions">
+<code class="descname">tokenize_questions</code><span class="sig-paren">(</span><em>caption</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_questions" title="Permalink to this definition">¶</a></dt>
 <dd><p>Basic tokenizer for the input/output data of type &#8216;text&#8217;</p>
 </dd></dl>
 
@@ -636,6 +648,31 @@ Only used for passing the output from a previous stage to the next (see Staged_N
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.cnn_model.CNN_Model.predictNet">
+<code class="descname">predictNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.predictNet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the predictions of the net on the dataset splits chosen. The valid parameters are:</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>batch_size</strong> &#8211; size of the batch</li>
+<li><strong>n_parallel_loaders</strong> &#8211; number of parallel data batch loaders</li>
+<li><strong>normalize_images</strong> &#8211; apply data normalization on images/features or not (only if using images/features as input)</li>
+<li><strong>mean_substraction</strong> &#8211; apply mean data normalization on images or not (only if using images as input)</li>
+<li><strong>predict_on_sets</strong> &#8211; list of set splits for which we want to extract the predictions [&#8216;train&#8217;, &#8216;val&#8217;, &#8216;test&#8217;]</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name" colspan="2">Returns predictions:</th></tr>
+<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><p class="first last">dictionary with set splits as keys and matrices of predictions as values.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.predictOnBatch">
 <code class="descname">predictOnBatch</code><span class="sig-paren">(</span><em>X</em>, <em>in_name=None</em>, <em>out_name=None</em>, <em>expand=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.predictOnBatch" title="Permalink to this definition">¶</a></dt>
 <dd><p>Applies a forward pass and returns the predicted values.</p>
@@ -672,7 +709,8 @@ Function only valid for Sequential models. Use self.removeLayers(...) for Graph 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.resumeTrainNet">
 <code class="descname">resumeTrainNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.resumeTrainNet" title="Permalink to this definition">¶</a></dt>
-<dd><p>Resumes the last training state of a stored model keeping also its training parameters. 
+<dd><p>DEPRECATED</p>
+<p>Resumes the last training state of a stored model keeping also its training parameters. 
 If we introduce any parameter through the argument &#8216;parameters&#8217;, it will be replaced by the old one.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
