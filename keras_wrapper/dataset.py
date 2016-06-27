@@ -116,7 +116,7 @@ class Data_Batch_Generator(object):
                                              normalization=self.params['normalize_images'],
                                              meanSubstraction=self.params['mean_substraction'],
                                              dataAugmentation=data_augmentation)
-            
+
                 data = self.net.prepareData(X_batch, Y_batch)
             
             yield(data)
@@ -737,9 +737,11 @@ class Dataset(object):
         self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
 
 
-    def loadText(self, X, vocabularies, max_len, offset):
+    def loadText(self, X, vocabularies, max_len, offset, fill='start'):
         """
             Text encoder. Transforms samples from a text representation into a numerical one.
+            If fill=='start' the resulting vector will be filled with 0s at the beginning, 
+            if fill=='end' it will be filled with 0s at the end.
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
@@ -753,13 +755,16 @@ class Dataset(object):
                     X_out[i] = vocab['<unk>']
             
         else: # process text as a sequence of words
-            X_out = np.zeros((n_batch, max_len)).astype('int32')
+            X_out = np.ones((n_batch, max_len)).astype('int32') * self.extra_words['<pad>']
         
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
                 x = X[i].split(' ')
                 len_j = len(x)
-                offset_j = max_len - len_j
+                if(fill=='start'):
+                    offset_j = max_len - len_j
+                else:
+                    offset_j = 0
                 if offset_j < 0:
                     len_j = len_j + offset_j
                     offset_j = 0
@@ -1250,7 +1255,9 @@ class Dataset(object):
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
-                    x = self.loadText(x, self.vocabulary[id_in], self.max_text_len[id_in], self.text_offset[id_in])
+                    x = self.loadText(x, self.vocabulary[id_in], 
+                                      self.max_text_len[id_in], self.text_offset[id_in], 
+                                      fill='start')
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1309,7 +1316,9 @@ class Dataset(object):
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
-                    x = self.loadText(x, self.vocabulary[id_in], self.max_text_len[id_in], self.text_offset[id_in])
+                    x = self.loadText(x, self.vocabulary[id_in], 
+                                      self.max_text_len[id_in], self.text_offset[id_in],
+                                      fill='start')
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1335,7 +1344,9 @@ class Dataset(object):
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
-                    y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out], self.text_offset[id_out])
+                    y = self.loadText(y, self.vocabulary[id_out], 
+                                      self.max_text_len[id_out], self.text_offset[id_out], 
+                                      fill='end')
                     y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
                     if self.max_text_len[id_out] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)

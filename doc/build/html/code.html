@@ -280,8 +280,10 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadText">
-<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
-<dd><p>Text encoder. Transforms samples from a text representation into a numerical one.</p>
+<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em>, <em>fill='start'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
+<dd><p>Text encoder. Transforms samples from a text representation into a numerical one.
+If fill==&#8217;start&#8217; the resulting vector will be filled with 0s at the beginning, 
+if fill==&#8217;end&#8217; it will be filled with 0s at the end.</p>
 </dd></dl>
 
 <dl class="method">
