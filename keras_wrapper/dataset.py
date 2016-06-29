@@ -454,8 +454,9 @@ class Dataset(object):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
-        
-        data = list(np.repeat(data,repeat_set))
+       
+        if(repeat_set > 1): 
+            data = list(np.repeat(data,repeat_set))
         
         self.__setInput(data, set_name, type, id)
         
@@ -523,8 +524,9 @@ class Dataset(object):
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
             
-            
-        data = list(np.repeat(data,repeat_set))
+        if(repeat_set > 1):  
+            data = list(np.repeat(data,repeat_set))
+
         self.__setOutput(data, set_name, type, id)
     
     
