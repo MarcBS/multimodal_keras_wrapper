@@ -22,6 +22,11 @@ git clone https://github.com/MarcBS/staged_keras_wrapper.git
 export PYTHONPATH=$PYTHONPATH:/path/to/staged_keras_wrapper
 ```
 
+## Projects
+
+You can see more practical examples in projects which use this library:
+
+[VIBIKNet for Visual Question Answering](https://github.com/MarcBS/VIBIKNet)
 
 ## Keras
 
