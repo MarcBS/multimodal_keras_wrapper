@@ -1007,21 +1007,24 @@ class CNN_Model(object):
         if(expand):
             while(len(X.shape) < 4):
                 X = np.expand_dims(X, axis=1)
-        
+       
+        ''' 
         # Prepare data if Graph model
         if(isinstance(self.model, Graph)):
             [X, last_out] = self._prepareGraphData(X)
         elif(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
             [X, _] = self._prepareSequentialData(X)
+        '''
+        X = self.prepareData(X, None)[0]
         
         # Apply forward pass for prediction
         predictions = self.model.predict_on_batch(X)
         
         # Select output if indicated
-        if(isinstance(self.model, Graph)): # Graph
+        if(isinstance(self.model, Graph) or isinstance(self.model, Model)): # Graph
             if(out_name):
                 predictions = predictions[out_name]
-        elif(isinstance(self.model, Sequential) or isinstance(self.model, Model)): # Sequential
+        elif(isinstance(self.model, Sequential)): # Sequential
             predictions = predictions[0]
             
         return predictions

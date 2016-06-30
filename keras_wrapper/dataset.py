@@ -1359,6 +1359,9 @@ class Dataset(object):
                     y = y_aux
             Y.append(y)
         
+        if debug:
+            return [X, Y, [new_last, last, surpassed]]
+ 
         return [X,Y]
         
     
