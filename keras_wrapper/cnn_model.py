@@ -951,17 +951,17 @@ class CNN_Model(object):
             return (loss, n_samples)
 
 
-    def predict_cond(self, src_text, states_below, params, ii):
+    def predict_cond(self, X, states_below, params, ii):
 
         p = []
         for state_below in states_below:
-            probs = self.model.predict_on_batch({params['model_inputs'][0]: src_text.reshape(1,-1),
-                                                 params['model_inputs'][1]: state_below.reshape(1,-1)})
+            X['state_below'] = state_below.reshape(1,-1)
+            probs = self.model.predict_on_batch(X)
             p.append(np.array(probs)[:, ii, :])
         p = np.asarray(p)
         return p[:, 0, :]
 
-    def beam_search(self, src_text, params):
+    def beam_search(self, X, params):
 
         k = params['beam_size']
         sample = []
@@ -975,7 +975,7 @@ class CNN_Model(object):
         ii = 0
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
-            probs = self.predict_cond(src_text, state_below, params, ii)
+            probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
             cand_scores = np.array(hyp_scores)[:,None] - np.log(probs)
             cand_flat = cand_scores.flatten()
@@ -1012,7 +1012,7 @@ class CNN_Model(object):
                 break
 
             state_below = np.asarray(hyp_samples, dtype='int64')
-            state_below = np.hstack((np.zeros((state_below.shape[0],1),dtype='int64'), state_below,
+            state_below = np.hstack((np.zeros((state_below.shape[0],1), dtype='int64'), state_below,
                                      np.zeros((state_below.shape[0], max(params['maxlen'] - state_below.shape[1]-1, 0)),
                                               dtype='int64')))
         # dump every remaining one
@@ -1045,6 +1045,7 @@ class CNN_Model(object):
         for s in params['predict_on_sets']:
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
+            assert len(params['model_inputs']) > 0, 'We need at least one input!'
 
             # Calculate how many interations are we going to perform
             n_samples = eval("ds.len_"+s)
@@ -1058,13 +1059,18 @@ class CNN_Model(object):
                                          mean_substraction=params['mean_substraction'],
                                          predict=True).generator()
             data = data_gen.next()
-            src_data = data['source_text']
+            X = dict()
+            for input_id in params['model_inputs']:
+                X[input_id] = data[input_id]
             out = []
-            for i, src_text in enumerate(src_data):
+            for i in range(len(X[params['model_inputs'][0]])):
                 sys.stdout.write('\r')
-                sys.stdout.write("Sampling %d/%d" % (i, len(src_data)))
+                sys.stdout.write("Sampling %d/%d" % (i, len(X[params['model_inputs'][0]])))
                 sys.stdout.flush()
-                samples, scores = self.beam_search(src_text, params)
+                x = dict()
+                for input_id in params['model_inputs']:
+                    x[input_id] = X[input_id][i].reshape(1,-1)
+                samples, scores = self.beam_search(x, params)
                 out.append(samples[0])
             predictions[s] = np.asarray(out)
         return predictions
@@ -1110,7 +1116,6 @@ class CNN_Model(object):
                                                 max_q_size=params['n_parallel_loaders'])
 
             predictions[s] = out
-            print "out.shape", out.shape
         return predictions
 
 
@@ -1127,20 +1132,23 @@ class CNN_Model(object):
             while(len(X.shape) < 4):
                 X = np.expand_dims(X, axis=1)
 
+        '''
         # Prepare data if Graph model
         if(isinstance(self.model, Graph)):
             [X, last_out] = self._prepareGraphData(X)
         elif(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
             [X, _] = self._prepareSequentialData(X)
+        '''
+        X = self.prepareData(X, None)[0]
 
         # Apply forward pass for prediction
         predictions = self.model.predict_on_batch(X)
 
         # Select output if indicated
-        if(isinstance(self.model, Graph)): # Graph
+        if(isinstance(self.model, Graph) or isinstance(self.model, Model)): # Graph
             if(out_name):
                 predictions = predictions[out_name]
-        elif(isinstance(self.model, Sequential) or isinstance(self.model, Model)): # Sequential
+        elif(isinstance(self.model, Sequential)): # Sequential
             predictions = predictions[0]
 
         return predictions
@@ -1166,7 +1174,7 @@ class CNN_Model(object):
         else:
             X_new = [0 for i in range(len(self.inputsMapping.keys()))] # multiple inputs
             for in_model, in_ds in self.inputsMapping.iteritems():
-                X_new[in_ds] = X[in_model]
+                X_new[in_model] = X[in_ds]
             X = X_new
 
         # Format output data (only one output possible for Sequential models)
@@ -1189,10 +1197,12 @@ class CNN_Model(object):
         # Format input data
         for in_model, in_ds in self.inputsMapping.iteritems():
             X_new[in_model] = X[in_ds]
+
         # Format output data
         if(Y is not None):
             for out_model, out_ds in self.outputsMapping.iteritems():
                 Y_new[out_model] = Y[out_ds]
+
         return [X_new, Y_new]
 
 
