@@ -195,6 +195,8 @@ class Dataset(object):
         self.vocabulary_len = dict() # number of words in the vocabulary
         self.n_classes_text = dict() # only used for output text
         self.text_offset = dict()    # number of timesteps that the text is shifted (to the right)
+        self.fill_text = dict()      # text padding mode
+
         #################################################
         
         
@@ -384,7 +386,7 @@ class Dataset(object):
     
     def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1, required=True,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                     # 'image' / 'video'
-                 max_text_len=35, tokenization='tokenize_basic',offset=0,                 # 'text'
+                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end',     # 'text'
                  build_vocabulary=False, max_words=0,
                  feat_len = 1024,                                                         # 'image-features' / 'video-features'
                  max_video_len=26                                                       # 'video'
@@ -401,7 +403,7 @@ class Dataset(object):
             :param id: identifier of the input data loaded
             :param repeat_set: repats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
             :param required: flag for optional inputs
-            
+
             
             # 'image'-related parameters
             
@@ -415,8 +417,9 @@ class Dataset(object):
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
-            :param offset: Number of timesteps that the text is shifted to the right (for *_cond models)
-            
+            :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
+            :param fill: select whether padding before or after the sequence
+
             # 'image-features' and 'video-features'- related parameters
             
             :param feat_len: length of the feature vectors if we are using types 'image-features' or 'video-features'
@@ -447,7 +450,7 @@ class Dataset(object):
         elif(type == 'video'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset, fill)
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, feat_len)
         elif(type == 'video-features'):
@@ -481,7 +484,7 @@ class Dataset(object):
         self.setOutput(self, labels_list, set_name, type, id)
     
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0,                         # 'text'
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end',                         # 'text'
                   build_vocabulary=False, max_words=0):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -500,6 +503,9 @@ class Dataset(object):
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text') Set to 0 if the whole sentence will be used as an output class.
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
+            :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
+            :param fill: select whether padding before or after the sequence
+
         """
         self.__checkSetName(set_name)
         
@@ -518,7 +524,7 @@ class Dataset(object):
         if(type == 'categorical'):
             data = self.preprocessCategorical(path_list)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset, fill)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
         elif(type == 'id'):
@@ -608,7 +614,7 @@ class Dataset(object):
             raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
         
         self.features_lengths[id] = feat_len
-        
+
         return data
     
     
@@ -639,7 +645,7 @@ class Dataset(object):
     #       TYPE 'text' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset):
+    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset, fill):
         
         sentences = []
         if(isinstance(annotations_list, str) and os.path.isfile(annotations_list)):
@@ -671,6 +677,7 @@ class Dataset(object):
         self.max_text_len[id] = max_text_len
         self.n_classes_text[id] = len(self.vocabulary[id]['words2idx'])
         self.text_offset[id] = offset
+        self.fill_text[id] = fill
 
         return sentences
     
@@ -739,7 +746,7 @@ class Dataset(object):
         self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
 
 
-    def loadText(self, X, vocabularies, max_len, offset, fill='start'):
+    def loadText(self, X, vocabularies, max_len, offset, fill):
         """
             Text encoder. Transforms samples from a text representation into a numerical one.
             If fill=='start' the resulting vector will be filled with 0s at the beginning, 
@@ -776,8 +783,12 @@ class Dataset(object):
                         X_out[i,j+offset_j] = vocab[w]
                     else:
                         X_out[i,j+offset_j] = vocab['<unk>']
-                if offset > 0: # Move the text to the right
+
+                if offset > 0 and fill == 'start': # Move the text to the left
+                    X_out[i] = np.append(X_out[i, offset:], [vocab['<pad>']]*offset)
+                if offset > 0 and fill == 'end': # Move the text to the right
                     X_out[i] = np.append([vocab['<pad>']]*offset, X_out[i, :-offset])
+
         return X_out
 
     
@@ -1260,7 +1271,7 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in], 
                                       self.max_text_len[id_in], self.text_offset[id_in], 
-                                      fill='start')
+                                      fill=self.fill_text[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1319,9 +1330,9 @@ class Dataset(object):
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
-                    x = self.loadText(x, self.vocabulary[id_in], 
+                    x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in], self.text_offset[id_in],
-                                      fill='start')
+                                      fill=self.fill_text[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1349,7 +1360,7 @@ class Dataset(object):
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out], self.text_offset[id_out], 
-                                      fill='end')
+                                      fill=self.fill_text[id_out])
                     y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
                     if self.max_text_len[id_out] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
