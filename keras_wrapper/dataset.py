@@ -387,7 +387,7 @@ class Dataset(object):
                  max_text_len=35, tokenization='tokenize_basic',offset=0,                 # 'text'
                  build_vocabulary=False, max_words=0,
                  feat_len = 1024,                                                         # 'image-features' / 'video-features'
-                 max_video_len=26                                                       # 'video'
+                 max_video_len=26                                                         # 'video'
                  ):
         """
             Loads a list of samples which can contain all samples from the 'train', 'val', or
@@ -1342,7 +1342,7 @@ class Dataset(object):
             # Pre-process outputs
             if(not debug):
                 if(type_out == 'categorical'):
-                    nClasses = len(self.classes[id_out])                
+                    nClasses = len(self.classes[id_out])
                     y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)

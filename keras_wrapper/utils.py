@@ -180,9 +180,10 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
 
 
 
-def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, ds, ecoc_version=3, pairs=None, functional_api=False):
+def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, ecoc_version=3, pairs=None, 
+                                           functional_api=False, activations=['softmax', 'softmax']):
 
-    n_classes = len(ds.classes)
+    n_classes = len(classes)
     if(pairs is None): # generate any possible combination of two classes
         pairs = tuple(itertools.combinations(range(n_classes), 2))
     
@@ -203,14 +204,14 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, ds, ecoc_ver
         # Create each one_vs_one classifier of the intermediate stage
         if(functional_api==False):
             if(ecoc_version == 1):
-                output_name = net.add_One_vs_One_Inception(input, input_shape, i, nOutput=2)
+                output_name = net.add_One_vs_One_Inception(input, input_shape, i, nOutput=2, activation=activations[0])
             elif(ecoc_version == 2):
-                output_name = net.add_One_vs_One_Inception_v2(input, input_shape, i, nOutput=2)
+                output_name = net.add_One_vs_One_Inception_v2(input, input_shape, i, nOutput=2, activation=activations[0])
             else:
                 raise NotImplementedError
         else:
             if(ecoc_version == 1):
-                output_name = net.add_One_vs_One_Inception_Functional(input, input_shape, i, nOutput=2)
+                output_name = net.add_One_vs_One_Inception_Functional(input, input_shape, i, nOutput=2, activation=activations[0])
             elif(ecoc_version == 2):
                 raise NotImplementedError()
             elif(ecoc_version == 3 or ecoc_version == 4 or ecoc_version == 5 or ecoc_version == 6):
@@ -227,26 +228,26 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, ds, ecoc_ver
                 if(i==0):
                     in_node = net.model.get_layer(input).output
                     padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')   (in_node)
-                output_name = net.add_One_vs_One_3x3_Functional(padding_node, input_shape, i, nkernels, nOutput=2)
+                output_name = net.add_One_vs_One_3x3_Functional(padding_node, input_shape, i, nkernels, nOutput=2, activation=activations[0])
             elif(ecoc_version == 7):
                 if(i==0):
                     in_node = net.model.get_layer(input).output
                     padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')   (in_node)
-                output_name = net.add_One_vs_One_3x3_double_Functional(padding_node, input_shape, i, nOutput=2)
+                output_name = net.add_One_vs_One_3x3_double_Functional(padding_node, input_shape, i, nOutput=2, activation=activations[0])
             else:
                 raise NotImplementedError()
         outputs_list.append(output_name)
         
-        #logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.'%(str(i+1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time()-t)))
+        #logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.'%(str(i+1), str(n_pairs), c, (classes[c[0]], classes[c[1]]), str(time.time()-t)))
           
     ecoc_table = np.reshape(ecoc_table, [n_classes, 2*n_pairs])
     
     
     # Build final Softmax layer
     if(functional_api==False):
-        output_names = net.add_One_vs_One_Merge(outputs_list, n_classes)
+        output_names = net.add_One_vs_One_Merge(outputs_list, n_classes, activation=activations[1])
     else:
-        output_names = net.add_One_vs_One_Merge_Functional(outputs_list, n_classes)
+        output_names = net.add_One_vs_One_Merge_Functional(outputs_list, n_classes, activation=activations[1])
     logging.info('Built ECOC merge layers.')
     
     return [ecoc_table, output_names]
@@ -277,12 +278,12 @@ def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits
     pos_labels = ds.types_outputs.index('categorical')
     pos_labels_ecoc = ds.types_outputs.index('binary')
     
-    #inputMapping = {input_name: pos_images}
-    inputMapping = {0: pos_images}
+    inputMapping = {input_name: pos_images}
+    #inputMapping = {0: pos_images}
     net.setInputsMapping(inputMapping)
     
-    #outputMapping = {output_names[0]: pos_labels_ecoc, output_names[1]: pos_labels}
-    outputMapping = {0: pos_labels_ecoc, 1: pos_labels}
+    outputMapping = {output_names[0]: pos_labels_ecoc, output_names[1]: pos_labels}
+    #outputMapping = {0: pos_labels_ecoc, 1: pos_labels}
     net.setOutputsMapping(outputMapping, acc_output=output_names[1])
 
 
@@ -390,10 +391,10 @@ def prepareGoogleNet_Stage2(stage1, stage2):
     ##stage2.model.input = input # recover input
 
 
-def simplifyDataset(ds, n_classes=50):
+def simplifyDataset(ds, id_classes, n_classes=50):
     
     logging.info("Simplifying %s from %d to %d classes." % (str(ds.name), len(ds.classes), n_classes))
-    ds.classes = ds.classes[:n_classes]
+    ds.classes[id_classes] = ds.classes[id_classes][:n_classes]
     
     id_labels = ds.ids_outputs[ds.types_outputs.index('categorical')]
     

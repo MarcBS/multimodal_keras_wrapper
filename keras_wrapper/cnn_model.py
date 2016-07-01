@@ -1843,7 +1843,7 @@ class CNN_Model(object):
         self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
     
     
-    def add_One_vs_One_Inception(self, input, input_shape, id_branch, nOutput=2):
+    def add_One_vs_One_Inception(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
         """
@@ -1860,13 +1860,13 @@ class CNN_Model(object):
         self.model.add_node(Dropout(0.5), 
                             name='fc_OnevsOne_'+str(id_branch)+'/drop', input='fc_OnevsOne_'+str(id_branch)+'/flatten')
         output_name = 'fc_OnevsOne_'+str(id_branch)
-        self.model.add_node(Dense(nOutput, activation='softmax'), 
+        self.model.add_node(Dense(nOutput, activation=activation), 
                             name=output_name, input='fc_OnevsOne_'+str(id_branch)+'/drop')
         
         return output_name
         
         
-    def add_One_vs_One_Inception_Functional(self, input, input_shape, id_branch, nOutput=2):
+    def add_One_vs_One_Inception_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
         """
@@ -1884,13 +1884,13 @@ class CNN_Model(object):
         output_name = 'fc_OnevsOne_'+str(id_branch)
         x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
         x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
-        out_node = Dense(nOutput, activation='softmax', name=output_name)         (x)
+        out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
         
         return out_node
     
     
     
-    def add_One_vs_One_3x3_Functional(self, input, input_shape, id_branch, nkernels, nOutput=2):
+    def add_One_vs_One_3x3_Functional(self, input, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
         out_3x3 = Convolution2D(nkernels, 3, 3, name='3x3/ecoc_'+str(id_branch), activation='relu')            (input)
@@ -1902,12 +1902,12 @@ class CNN_Model(object):
         output_name = 'fc_OnevsOne_'+str(id_branch)+'/out'
         x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
         x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
-        out_node = Dense(nOutput, activation='softmax', name=output_name)         (x)
+        out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
         
         return out_node
     
     
-    def add_One_vs_One_3x3_double_Functional(self, input, input_shape, id_branch, nOutput=2):
+    def add_One_vs_One_3x3_double_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
         out_3x3 = Convolution2D(64, 3, 3, name='3x3_1/ecoc_'+str(id_branch), activation='relu')          (input)
@@ -1922,7 +1922,7 @@ class CNN_Model(object):
         output_name = 'fc_OnevsOne_'+str(id_branch)+'/out'
         x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
         x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
-        out_node = Dense(nOutput, activation='softmax', name=output_name)         (x)
+        out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
         
         return out_node
     
@@ -1955,7 +1955,7 @@ class CNN_Model(object):
     
     
     
-    def add_One_vs_One_Inception_v2(self, input, input_shape, id_branch, nOutput=2):
+    def add_One_vs_One_Inception_v2(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
         """
@@ -1972,7 +1972,7 @@ class CNN_Model(object):
         self.model.add_node(Dropout(0.5), 
                             name='fc_OnevsOne_'+str(id_branch)+'/drop', input='fc_OnevsOne_'+str(id_branch)+'/flatten')
         output_name = 'fc_OnevsOne_'+str(id_branch)
-        self.model.add_node(Dense(nOutput, activation='softmax'), 
+        self.model.add_node(Dense(nOutput, activation=activation), 
                             name=output_name, input='fc_OnevsOne_'+str(id_branch)+'/drop')
         
         return output_name
@@ -2063,11 +2063,11 @@ class CNN_Model(object):
         return [out_node, out_name]
     
     
-    def add_One_vs_One_Merge(self, inputs_list, nOutput):
+    def add_One_vs_One_Merge(self, inputs_list, nOutput, activation='softmax'):
         
         self.model.add_node(Flatten(), name='ecoc_loss', inputs=inputs_list, merge_mode='concat') # join outputs from OneVsOne classifers
         self.model.add_node(Dropout(0.5), name='final_loss/drop', input='ecoc_loss')
-        self.model.add_node(Dense(nOutput, activation='softmax'), name='final_loss', input='final_loss/drop') # apply final joint prediction
+        self.model.add_node(Dense(nOutput, activation=activation), name='final_loss', input='final_loss/drop') # apply final joint prediction
         
         # Outputs
         self.model.add_output(name='ecoc_loss/output', input='ecoc_loss')
@@ -2077,7 +2077,7 @@ class CNN_Model(object):
     
     
     
-    def add_One_vs_One_Merge_Functional(self, inputs_list, nOutput):
+    def add_One_vs_One_Merge_Functional(self, inputs_list, nOutput, activation='softmax'):
         
         # join outputs from OneVsOne classifers
         ecoc_loss_name = 'ecoc_loss'
@@ -2085,7 +2085,7 @@ class CNN_Model(object):
         ecoc_loss = merge(inputs_list, name=ecoc_loss_name, mode='concat', concat_axis=1)
         drop = Dropout(0.5, name='final_loss/drop')                                (ecoc_loss)
         # apply final joint prediction
-        final_loss = Dense(nOutput, activation='softmax', name=final_loss_name)    (drop)
+        final_loss = Dense(nOutput, activation=activation, name=final_loss_name)    (drop)
         
         in_node = self.model.layers[0].name
         in_node = self.model.get_layer(in_node).output
