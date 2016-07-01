@@ -1,5 +1,3 @@
-import sys
-
 from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.dataset import Dataset, Data_Batch_Generator
 from keras_wrapper.ecoc_classifier import ECOC_Classifier
@@ -25,6 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cPickle as pk
 
+import sys
 import time
 import os
 import math
