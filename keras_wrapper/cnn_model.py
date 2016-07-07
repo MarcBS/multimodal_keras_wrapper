@@ -956,8 +956,7 @@ class CNN_Model(object):
         p = []
         for state_below in states_below:
             X['state_below'] = state_below.reshape(1,-1)
-            probs = self.model.predict_on_batch(X)
-            p.append(np.array(probs)[:, ii, :])
+            p.append(np.array(self.model.predict_on_batch(X))[:, ii, :])  # Get probs of all words in the current timestep
         p = np.asarray(p)
         return p[:, 0, :]
 
@@ -972,12 +971,11 @@ class CNN_Model(object):
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
         state_below = np.asarray([np.zeros(params['maxlen'])] * live_k)
-        ii = 0
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
-            cand_scores = np.array(hyp_scores)[:,None] - np.log(probs)
+            cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
             ranks_flat = cand_flat.argsort()[:(k-dead_k)]
             voc_size = probs.shape[1]
@@ -1012,7 +1010,7 @@ class CNN_Model(object):
                 break
 
             state_below = np.asarray(hyp_samples, dtype='int64')
-            state_below = np.hstack((np.zeros((state_below.shape[0],1), dtype='int64'), state_below,
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
                                      np.zeros((state_below.shape[0], max(params['maxlen'] - state_below.shape[1]-1, 0)),
                                               dtype='int64')))
         # dump every remaining one
@@ -1058,20 +1056,28 @@ class CNN_Model(object):
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction'],
                                          predict=True).generator()
-            data = data_gen.next()
-            X = dict()
-            for input_id in params['model_inputs']:
-                X[input_id] = data[input_id]
             out = []
-            for i in range(len(X[params['model_inputs'][0]])):
-                sys.stdout.write('\r')
-                sys.stdout.write("Sampling %d/%d" % (i, len(X[params['model_inputs'][0]])))
-                sys.stdout.flush()
-                x = dict()
+            total_cost = 0
+            sampled = 0
+            for j in range(num_iterations):
+                data = data_gen.next()
+                X = dict()
                 for input_id in params['model_inputs']:
-                    x[input_id] = X[input_id][i].reshape(1,-1)
-                samples, scores = self.beam_search(x, params)
-                out.append(samples[0])
+                    X[input_id] = data[input_id]
+                for i in range(len(X[params['model_inputs'][0]])):
+                    sampled += 1
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Sampling %d/%d" % (sampled, n_samples))
+                    sys.stdout.flush()
+                    x = dict()
+                    for input_id in params['model_inputs']:
+                        x[input_id] = X[input_id][i].reshape(1,-1)
+                    samples, scores = self.beam_search(x, params)
+                    out.append(samples[0])
+                    total_cost += scores[0]
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            logging.info('\nCost of the translations: %f'%scores[0])
             predictions[s] = np.asarray(out)
         return predictions
 

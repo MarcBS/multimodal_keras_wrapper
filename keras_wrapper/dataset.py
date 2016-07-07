@@ -653,7 +653,8 @@ class Dataset(object):
                 for line in list_:
                     sentences.append(line.rstrip('\n'))
         else:
-            raise Exception('Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences.')
+            raise Exception('Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences. '
+                            'It currently is: %s'%(str(annotations_list)))
             
         # Check if tokenization method exists
         if(hasattr(self, tokenization)):
