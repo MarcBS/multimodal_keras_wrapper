@@ -1056,21 +1056,28 @@ class CNN_Model(object):
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction'],
                                          predict=True).generator()
-            data = data_gen.next()
-            X = dict()
-            for input_id in params['model_inputs']:
-                X[input_id] = data[input_id]
             out = []
-            for i in range(len(X[params['model_inputs'][0]])):
-                sys.stdout.write('\r')
-                sys.stdout.write("Sampling %d/%d" % (i, len(X[params['model_inputs'][0]])))
-                sys.stdout.flush()
-                x = dict()
+            total_cost = 0
+            sampled = 0
+            for j in range(num_iterations):
+                data = data_gen.next()
+                X = dict()
                 for input_id in params['model_inputs']:
-                    x[input_id] = X[input_id][i].reshape(1,-1)
-                samples, scores = self.beam_search(x, params)
-                out.append(samples[0])
-            logging.info('Cost of the translations: %f'%scores[0])
+                    X[input_id] = data[input_id]
+                for i in range(len(X[params['model_inputs'][0]])):
+                    sampled += 1
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Sampling %d/%d" % (sampled, n_samples))
+                    sys.stdout.flush()
+                    x = dict()
+                    for input_id in params['model_inputs']:
+                        x[input_id] = X[input_id][i].reshape(1,-1)
+                    samples, scores = self.beam_search(x, params)
+                    out.append(samples[0])
+                    total_cost += scores[0]
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+            logging.info('\nCost of the translations: %f'%scores[0])
             predictions[s] = np.asarray(out)
         return predictions
 
