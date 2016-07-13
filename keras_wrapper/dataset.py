@@ -121,7 +121,117 @@ class Data_Batch_Generator(object):
             
             yield(data)
 
-            
+
+class Homogeneous_Data_Batch_Generator(object):
+    '''
+    Retrieves batches of the same length.
+    Parts of the code borrowed from https://github.com/kelvinxu/arctic-captions/blob/master/homogeneous_data.py
+    '''
+
+    def __init__(self, set_split, net, dataset, num_iterations,
+                 batch_size=50, maxlen=100,
+                 normalize_images=False,
+                 data_augmentation=True,
+                 mean_substraction=True,
+                 predict=False
+                 ):
+        self.set_split = set_split
+        self.dataset = dataset
+        self.net = net
+        self.predict = predict
+        self.maxlen = maxlen
+        self.batch_size = batch_size
+        # Several parameters
+        self.params = {'data_augmentation': data_augmentation,
+                       'mean_substraction': mean_substraction,
+                       'normalize_images': normalize_images,
+                       'num_iterations': num_iterations}
+        self.prepare()
+        self.reset()
+
+
+
+    def prepare(self):
+        #TODO: Deal with multiple outputs!
+        self.data = self.dataset.getY(self.set_split, normalization=self.params['normalize_images'],
+                                             meanSubstraction=self.params['mean_substraction'])[0] # TODO: This 0 is harcoded!
+        # find the unique lengths
+        self.lengths = [len(np.nonzero(cc)[0]) for cc in self.data]
+        self.len_unique = np.unique(self.lengths)
+
+        # remove any overly long captions
+        if self.maxlen:
+            self.len_unique = [ll for ll in self.len_unique if ll <= self.maxlen]
+
+        # indices of unique lengths
+        self.len_indices = dict()
+        self.len_counts = dict()
+        for ll in self.len_unique:
+            self.len_indices[ll] = np.where(self.lengths == ll)[0]
+            self.len_counts[ll] = len(self.len_indices[ll])
+
+        # current counter
+        self.len_curr_counts = copy.copy(self.len_counts)
+
+    def reset(self):
+        self.len_curr_counts = copy.copy(self.len_counts)
+        self.len_unique = np.random.permutation(self.len_unique)
+        self.len_indices_pos = dict()
+        for ll in self.len_unique:
+            self.len_indices_pos[ll] = 0
+            self.len_indices[ll] = np.random.permutation(self.len_indices[ll])
+        self.len_idx = -1
+
+    def generator(self):
+
+        if(self.set_split == 'train' and not self.predict):
+            data_augmentation = self.params['data_augmentation']
+        else:
+            data_augmentation = False
+
+        it = 0
+        while True:
+            it += 1
+            if(self.predict):
+                # Checks if we are finishing processing the data split
+                init_sample = (it-1)*self.batch_size
+                final_sample = it*self.batch_size
+                n_samples_split = eval("self.dataset.len_"+self.set_split)
+                if final_sample >= n_samples_split:
+                    final_sample = n_samples_split
+                    it = 0
+                # Recovers a batch of data
+                X_batch = self.dataset.getX(self.set_split, init_sample, final_sample,
+                                             normalization=self.params['normalize_images'],
+                                             meanSubstraction=self.params['mean_substraction'],
+                                             dataAugmentation=False)
+                data = self.net.prepareData(X_batch, None)[0]
+            else:
+                while True:
+                    self.len_idx = np.mod(self.len_idx+1, len(self.len_unique))
+                    if self.len_curr_counts[self.len_unique[self.len_idx]] > 0:
+                        break
+                    it += 1
+                    if it >= len(self.len_unique):
+                        break
+                    if it >= len(self.len_unique):
+                        self.reset()
+                    raise StopIteration()
+
+                # get the batch size
+                curr_batch_size = np.minimum(self.batch_size, self.len_curr_counts[self.len_unique[self.len_idx]])
+                curr_pos = self.len_indices_pos[self.len_unique[self.len_idx]]
+                # get the indices for the current batch
+                curr_indices = self.len_indices[self.len_unique[self.len_idx]][curr_pos:curr_pos+curr_batch_size]
+                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, curr_indices,
+                                             normalization=self.params['normalize_images'],
+                                             meanSubstraction=self.params['mean_substraction'],
+                                             dataAugmentation=data_augmentation)
+
+                data = self.net.prepareData(X_batch, Y_batch)
+
+            yield(data)
+
 # ------------------------------------------------------- #
 #       MAIN CLASS
 # ------------------------------------------------------- #
@@ -1288,12 +1398,14 @@ class Dataset(object):
         return X
         
         
-    def getXY(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True, dataAugmentation=True, debug=False):
+    def getXY(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
+              dataAugmentation=True, debug=False):
         """
             Gets the [X,Y] pairs for the next 'k' samples in the desired set.
             
             :param set_name: 'train', 'val' or 'test' set
             :param k: number of consecutive samples retrieved from the corresponding set.
+            :param sorted_batches: If True, it will pick data of the same size
             :param debug: if True all data will be returned without preprocessing
             
             
@@ -1382,7 +1494,143 @@ class Dataset(object):
  
         return [X,Y]
         
-    
+    def getXY_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
+              dataAugmentation=True, debug=False):
+        """
+            Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
+
+            :param set_name: 'train', 'val' or 'test' set
+            :param k: positions of the desired samples
+            :param sorted_batches: If True, it will pick data of the same size
+            :param debug: if True all data will be returned without preprocessing
+
+
+            # 'image', 'video', 'image-features' and 'video-features'-related parameters
+
+            :param normalization: indicates if we want to normalize the data.
+
+
+            # 'image-features' and 'video-features'-related parameters
+
+            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
+
+
+            # 'image' and 'video'-related parameters
+
+            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
+            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
+        """
+        self.__checkSetName(set_name)
+        self.__isLoaded(set_name, 0)
+        self.__isLoaded(set_name, 1)
+
+        # Recover input samples
+        X = []
+        for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
+            x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+
+            #if(set_name=='val'):
+            #    logging.info(x)
+
+            # Pre-process inputs
+            if(not debug):
+                if(type_in == 'image'):
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                elif(type_in == 'video'):
+                    x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in],
+                                        normalization_type, normalization, meanSubstraction, dataAugmentation)
+                elif(type_in == 'text'):
+                    x = self.loadText(x, self.vocabulary[id_in],
+                                      self.max_text_len[id_in], self.text_offset[id_in],
+                                      fill=self.fill_text[id_in])
+                elif(type_in == 'image-features'):
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+                elif(type_in == 'video-features'):
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+            X.append(x)
+
+        # Recover output samples
+        Y = []
+        for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
+            y = [eval('self.Y_'+set_name+'[id_out][index]') for index in k]
+
+            #if(set_name=='val'):
+            #    logging.info(y)
+
+            # Pre-process outputs
+            if(not debug):
+                if(type_out == 'categorical'):
+                    nClasses = len(self.classes[id_out])
+                    y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
+                elif(type_out == 'binary'):
+                    y = np.array(y).astype(np.uint8)
+                elif(type_out == 'text'):
+                    y = self.loadText(y, self.vocabulary[id_out],
+                                      self.max_text_len[id_out], self.text_offset[id_out],
+                                      fill=self.fill_text[id_out])
+                    y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
+                    if self.max_text_len[id_out] == 0:
+                        y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                    else:
+                        for idx in range(y.shape[0]):
+                            y_aux[idx] = np_utils.to_categorical(y[idx], self.n_classes_text[id_out]).astype(np.uint8)
+                    y = y_aux
+            Y.append(y)
+
+        if debug:
+            return [X, Y, [k]]
+
+        return [X,Y]
+
+    def getY(self, set_name, normalization_type='0-1', normalization=False, meanSubstraction=True,
+              dataAugmentation=True, debug=False):
+        """
+            Gets the [Y] samples for the FULL dataset
+
+            :param set_name: 'train', 'val' or 'test' set
+            :param k: number of consecutive samples retrieved from the corresponding set.
+            :param sorted_batches: If True, it will pick data of the same size
+            :param debug: if True all data will be returned without preprocessing
+
+
+            # 'image', 'video', 'image-features' and 'video-features'-related parameters
+
+            :param normalization: indicates if we want to normalize the data.
+
+
+            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
+
+
+            # 'image' and 'video'-related parameters
+
+            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
+            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
+        """
+        self.__checkSetName(set_name)
+        self.__isLoaded(set_name, 0)
+        self.__isLoaded(set_name, 1)
+
+        # Recover output samples
+        Y = []
+        for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
+            y = eval('self.Y_'+set_name+'[id_out][:]')
+
+            # Pre-process outputs
+            if(not debug):
+                if(type_out == 'categorical'):
+                    nClasses = len(self.classes[id_out])
+                    y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
+                elif(type_out == 'binary'):
+                    y = np.array(y).astype(np.uint8)
+                elif(type_out == 'text'):
+                    y = self.loadText(y, self.vocabulary[id_out],
+                                      self.max_text_len[id_out], self.text_offset[id_out],
+                                      fill=self.fill_text[id_out])
+            Y.append(y)
+
+        return Y
+
+
     # ------------------------------------------------------- #
     #       AUXILIARY FUNCTIONS
     #           
@@ -1434,8 +1682,7 @@ class Dataset(object):
         self.__lock_read.release() # UNLOCK
         
         return [new_last, last, surpassed]
-            
-                    
+
     def __getstate__(self):
         """
             Behavour applied when pickling a Dataset instance.
