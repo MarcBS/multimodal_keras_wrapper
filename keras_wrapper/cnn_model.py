@@ -1123,7 +1123,6 @@ class CNN_Model(object):
             n_samples = eval("ds.len_"+s)
             num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
             # Prepare data generator
-
             data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                      batch_size=params['batch_size'],
                                      normalize_images=params['normalize_images'],
