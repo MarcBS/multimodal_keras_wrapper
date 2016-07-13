@@ -665,11 +665,17 @@ class Dataset(object):
             Loads the list of classes of the dataset.
             Each line must contain a unique identifier of the class.
         """
-        classes = []
-        with open(path_classes, 'r') as list_:
-            for line in list_:
-                classes.append(line.rstrip('\n'))
-        self.classes[id] = classes
+
+        if(isinstance(path_classes, str) and os.path.isfile(path_classes)):
+            classes = []
+            with open(path_classes, 'r') as list_:
+                for line in list_:
+                    classes.append(line.rstrip('\n'))
+            self.classes[id] = classes
+        elif isinstance(path_classes, list):
+            self.classes[id] = path_classes
+        else:
+            raise Exception('Wrong type for "path_classes". It must be a path to a text file with the classes or an instance of the class list.')
         
         self.dic_classes[id] = dict()
         for c in range(len(self.classes[id])):
