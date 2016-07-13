@@ -1,5 +1,5 @@
 from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
-from keras_wrapper.dataset import Dataset, Data_Batch_Generator
+from keras_wrapper.dataset import Dataset, Data_Batch_Generator, Homogeneous_Data_Batch_Generator
 from keras_wrapper.ecoc_classifier import ECOC_Classifier
 from keras_wrapper.callbacks_keras_wrapper import *
 
@@ -450,10 +450,11 @@ class CNN_Model(object):
 
         # Check input parameters and recover default values if needed
 
-        default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1,
-                          'epochs_for_save': 1, 'num_iterations_val': None, 'n_parallel_loaders': 8,
-                          'normalize_images': False, 'mean_substraction': True, 'data_augmentation': True,
-                          'verbose': 1, 'eval_on_sets': ['val'], 'reload_epoch': 0, 'extra_callbacks': []};
+        default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1, 'maxlen':100,
+                          'homogeneous_batches': False, 'epochs_for_save': 1, 'num_iterations_val': None,
+                          'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
+                          'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0, 'extra_callbacks': []};
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -515,12 +516,18 @@ class CNN_Model(object):
         callbacks += params['extra_callbacks']
 
         # Prepare data generators
-        train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
-                                         batch_size=params['batch_size'],
-                                         normalize_images=params['normalize_images'],
-                                         data_augmentation=params['data_augmentation'],
-                                         mean_substraction=params['mean_substraction']).generator()
-
+        if params['homogeneous_batches']:
+            train_gen = Homogeneous_Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
+                                             batch_size=params['batch_size'], maxlen=params['maxlen'],
+                                             normalize_images=params['normalize_images'],
+                                             data_augmentation=params['data_augmentation'],
+                                             mean_substraction=params['mean_substraction']).generator()
+        else:
+            train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
+                                             batch_size=params['batch_size'],
+                                             normalize_images=params['normalize_images'],
+                                             data_augmentation=params['data_augmentation'],
+                                             mean_substraction=params['mean_substraction']).generator()
         # Are we going to validate on 'val' data?
         if('val' in params['eval_on_sets']):
 
@@ -790,7 +797,8 @@ class CNN_Model(object):
     def testNet(self, ds, parameters, out_name=None):
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True};
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize_images': False,
+                          'mean_substraction': True};
         params = self.checkParameters(parameters, default_params)
         self.testing_parameters.append(copy.copy(params))
 
@@ -801,6 +809,7 @@ class CNN_Model(object):
         num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
 
         # Test model
+        # We won't use an Homogeneous_Batch_Generator for testing
         data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
                                          batch_size=params['batch_size'],
                                          normalize_images=params['normalize_images'],
@@ -1049,16 +1058,19 @@ class CNN_Model(object):
             n_samples = eval("ds.len_"+s)
             num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
 
-            # Prepare data generator
+            # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+
             data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                         batch_size=params['batch_size'],
-                                         normalize_images=params['normalize_images'],
-                                         data_augmentation=False,
-                                         mean_substraction=params['mean_substraction'],
-                                         predict=True).generator()
+                                     batch_size=params['batch_size'],
+                                     normalize_images=params['normalize_images'],
+                                     data_augmentation=False,
+                                     mean_substraction=params['mean_substraction'],
+                                     predict=True).generator()
             out = []
             total_cost = 0
             sampled = 0
+            start_time = time.time()
+            eta = -1
             for j in range(num_iterations):
                 data = data_gen.next()
                 X = dict()
@@ -1067,7 +1079,7 @@ class CNN_Model(object):
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
                     sys.stdout.write('\r')
-                    sys.stdout.write("Sampling %d/%d" % (sampled, n_samples))
+                    sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
                     sys.stdout.flush()
                     x = dict()
                     for input_id in params['model_inputs']:
@@ -1075,6 +1087,8 @@ class CNN_Model(object):
                     samples, scores = self.beam_search(x, params)
                     out.append(samples[0])
                     total_cost += scores[0]
+                    eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
+
             sys.stdout.write("\n")
             sys.stdout.flush()
             logging.info('\nCost of the translations: %f'%scores[0])
@@ -1109,12 +1123,13 @@ class CNN_Model(object):
             n_samples = eval("ds.len_"+s)
             num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
             # Prepare data generator
+
             data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                         batch_size=params['batch_size'],
-                                         normalize_images=params['normalize_images'],
-                                         data_augmentation=False,
-                                         mean_substraction=params['mean_substraction'],
-                                         predict=True).generator()
+                                     batch_size=params['batch_size'],
+                                     normalize_images=params['normalize_images'],
+                                     data_augmentation=False,
+                                     mean_substraction=params['mean_substraction'],
+                                     predict=True).generator()
 
             # Predict on model
             out = self.model.predict_generator(data_gen,
