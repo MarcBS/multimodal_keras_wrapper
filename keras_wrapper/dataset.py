@@ -26,12 +26,18 @@ import numpy as np
 #           External functions for saving and loading Dataset instances
 # ------------------------------------------------------- #
 
+def create_dir_if_not_exists(directory):
+    if not os.path.exists(directory):
+        logging.info("<<< creating directory " + directory + " ... >>>")
+        os.makedirs(directory)
+
+
 def saveDataset(dataset, store_path):
     """
         Saves a backup of the current Dataset object.
     """
+    create_dir_if_not_exists(store_path)
     store_path = store_path + '/Dataset_'+ dataset.name +'.pkl'
-    
     if(not dataset.silence):
         logging.info("<<< Saving Dataset instance to "+ store_path +" ... >>>")
     
@@ -190,22 +196,23 @@ class Homogeneous_Data_Batch_Generator(object):
             data_augmentation = False
 
         it = 0
-        while True:
+        while 1:
             it += 1
             if(self.predict):
+                raise Exception, 'Homogeneous data should not be used in predict mode!'
                 # Checks if we are finishing processing the data split
-                init_sample = (it-1)*self.batch_size
-                final_sample = it*self.batch_size
-                n_samples_split = eval("self.dataset.len_"+self.set_split)
-                if final_sample >= n_samples_split:
-                    final_sample = n_samples_split
-                    it = 0
-                # Recovers a batch of data
-                X_batch = self.dataset.getX(self.set_split, init_sample, final_sample,
-                                             normalization=self.params['normalize_images'],
-                                             meanSubstraction=self.params['mean_substraction'],
-                                             dataAugmentation=False)
-                data = self.net.prepareData(X_batch, None)[0]
+                #init_sample = (it-1)*self.batch_size
+                #final_sample = it*self.batch_size
+                #n_samples_split = eval("self.dataset.len_"+self.set_split)
+                #if final_sample >= n_samples_split:
+                #    final_sample = n_samples_split
+                #    it = 0
+                ## Recovers a batch of data
+                #X_batch = self.dataset.getX(self.set_split, init_sample, final_sample,
+                #                             normalization=self.params['normalize_images'],
+                #                             meanSubstraction=self.params['mean_substraction'],
+                #                             dataAugmentation=False)
+                #data = self.net.prepareData(X_batch, None)[0]
             else:
                 while True:
                     self.len_idx = np.mod(self.len_idx+1, len(self.len_unique))
@@ -227,7 +234,6 @@ class Homogeneous_Data_Batch_Generator(object):
                                              normalization=self.params['normalize_images'],
                                              meanSubstraction=self.params['mean_substraction'],
                                              dataAugmentation=data_augmentation)
-
                 data = self.net.prepareData(X_batch, Y_batch)
 
             yield(data)
@@ -935,7 +941,7 @@ class Dataset(object):
 
     def tokenize_questions(self, caption):
         """
-            Basic tokenizer for the input/output data of type 'text'
+            Basic tokenizer for VQA questions
         """
         contractions = {"aint": "ain't", "arent": "aren't", "cant": "can't", "couldve": "could've", "couldnt": "couldn't",
                 "couldn'tve": "couldn’t’ve", "couldnt’ve": "couldn’t’ve", "didnt": "didn’t", "doesnt": "doesn’t",
@@ -1528,7 +1534,6 @@ class Dataset(object):
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
             x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
-
             #if(set_name=='val'):
             #    logging.info(x)
 
@@ -1607,7 +1612,6 @@ class Dataset(object):
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
         """
         self.__checkSetName(set_name)
-        self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
 
         # Recover output samples
