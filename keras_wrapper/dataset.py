@@ -229,6 +229,7 @@ class Homogeneous_Data_Batch_Generator(object):
                 curr_batch_size = np.minimum(self.batch_size, self.len_curr_counts[self.len_unique[self.len_idx]])
                 curr_pos = self.len_indices_pos[self.len_unique[self.len_idx]]
                 # get the indices for the current batch
+                np.random.shuffle(self.len_indices[self.len_unique[self.len_idx]])
                 curr_indices = self.len_indices[self.len_unique[self.len_idx]][curr_pos:curr_pos+curr_batch_size]
                 X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, curr_indices,
                                              normalization=self.params['normalize_images'],
