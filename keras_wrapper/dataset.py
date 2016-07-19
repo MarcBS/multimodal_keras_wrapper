@@ -575,7 +575,7 @@ class Dataset(object):
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
        
-        if(repeat_set > 1): 
+        if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1): 
             data = list(np.repeat(data,repeat_set))
         
         self.__setInput(data, set_name, type, id)
@@ -647,7 +647,7 @@ class Dataset(object):
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
             
-        if(repeat_set > 1):  
+        if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1):  
             data = list(np.repeat(data,repeat_set))
 
         self.__setOutput(data, set_name, type, id)
