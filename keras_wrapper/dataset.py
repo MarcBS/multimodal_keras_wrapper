@@ -221,9 +221,9 @@ class Homogeneous_Data_Batch_Generator(object):
                     it += 1
                     if it >= len(self.len_unique):
                         break
-                    if it >= len(self.len_unique):
-                        self.reset()
-                    raise StopIteration()
+                if it >= len(self.len_unique):
+                    self.reset()
+                #raise StopIteration()
 
                 # get the batch size
                 curr_batch_size = np.minimum(self.batch_size, self.len_curr_counts[self.len_unique[self.len_idx]])
