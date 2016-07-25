@@ -1045,7 +1045,8 @@ class CNN_Model(object):
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
                           'normalize_images': False, 'mean_substraction': True,
-                          'predict_on_sets': ['val'], 'maxlen': 20, 'model_inputs': ['source_text', 'state_below']}
+                          'predict_on_sets': ['val'], 'maxlen': 20,
+                          'model_inputs': ['source_text', 'state_below']}
         params = self.checkParameters(parameters, default_params)
 
         predictions = dict()
@@ -1083,7 +1084,7 @@ class CNN_Model(object):
                     sys.stdout.flush()
                     x = dict()
                     for input_id in params['model_inputs']:
-                        x[input_id] = X[input_id][i].reshape(1,-1)
+                        x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores = self.beam_search(x, params)
                     out.append(samples[0])
                     total_cost += scores[0]
