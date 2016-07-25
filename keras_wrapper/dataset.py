@@ -571,7 +571,7 @@ class Dataset(object):
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, feat_len)
         elif(type == 'video-features'):
-            data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
+            data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len=feat_len)
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
        
@@ -1016,10 +1016,10 @@ class Dataset(object):
     
     
     # ------------------------------------------------------- #
-    #       TYPE 'video' SPECIFIC FUNCTIONS
+    #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessVideos(self, path_list, id, set_name, max_video_len, img_size, img_size_crop):
+    def preprocessVideos(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len=None):
         
         if(isinstance(path_list, list) and len(path_list) == 2):
             # path to all images in all videos
@@ -1041,6 +1041,10 @@ class Dataset(object):
             self.img_size_crop[id] = img_size_crop
         else:
             raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
+
+        if feat_len is not None:
+            self.features_lengths[id] = feat_len
+
         return counts_frames
     
     
@@ -1073,6 +1077,38 @@ class Dataset(object):
         
         return V
     
+    
+    def loadVideoFeatures(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, feat_len, external=False):
+        n_videos = len(n_frames)
+        features = np.zeros((n_videos, max_len, feat_len))
+        
+        idx = [0 for i in range(n_videos)]
+        # recover all indices from image's paths of all videos
+        for v in range(n_videos):
+            this_last = last+v                
+            if this_last >= n_videos:
+                v = this_last%n_videos
+                this_last = v
+            idx[v] = int(sum(eval('self.X_'+set_name+'[id][:this_last]')))
+        
+        # load images from each video
+        for enum, (n, i) in enumerate(zip(n_frames, idx)):
+            paths = self.paths_frames[id][set_name][i:i+n]
+        
+            for j, feat in enumerate(paths):
+                if(not external):
+                    feat = self.path +'/'+ feat
+
+                # Check if the filename includes the extension
+                feat = np.load(feat)
+
+                if(normalization):
+                    if normalization_type == 'L2':
+                        feat = feat / np.linalg.norm(feat,ord=2)
+
+                features[enum,j] = feat
+            
+        return np.array(features)
     
     # ------------------------------------------------------- #
     #       TYPE 'id' SPECIFIC FUNCTIONS
@@ -1399,7 +1435,8 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+                    x = self.loadVideoFeatures(x, id_in, last, set_name, self.max_video_len[id_in], 
+                                          normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
         
         return X
@@ -1462,7 +1499,8 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+                    x = self.loadVideoFeatures(x, id_in, last, set_name, self.max_video_len[id_in], 
+                                          normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
             
         # Recover output samples
@@ -1552,7 +1590,8 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+                    x = self.loadVideoFeatures(x, id_in, last, set_name, self.max_video_len[id_in], 
+                                          normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
 
         # Recover output samples
