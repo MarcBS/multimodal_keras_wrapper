@@ -1426,7 +1426,7 @@ class Dataset(object):
                 if(type_in == 'image'):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
-                    x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
+                    x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in], 
@@ -1435,7 +1435,7 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadVideoFeatures(x, id_in, last, set_name, self.max_video_len[id_in], 
+                    x = self.loadVideoFeatures(x, id_in, final, set_name, self.max_video_len[id_in],
                                           normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
         
