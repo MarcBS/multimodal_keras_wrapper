@@ -948,7 +948,7 @@ class Dataset(object):
         """
         punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')',
                  '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!',
-                 '¿', '¡', '\n', '\t']
+                 '¿', '¡', '\n', '\t', '\r']
         def processPunctuation(inText):
             outText = inText
             for p in punct:
