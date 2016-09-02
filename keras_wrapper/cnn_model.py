@@ -1089,10 +1089,8 @@ class CNN_Model(object):
                     out.append(samples[0])
                     total_cost += scores[0]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
-
-            sys.stdout.write("\n")
+            sys.stdout.write('Cost of the translations: %f\n'%scores[0])
             sys.stdout.flush()
-            logging.info('\nCost of the translations: %f'%scores[0])
             predictions[s] = np.asarray(out)
         return predictions
 

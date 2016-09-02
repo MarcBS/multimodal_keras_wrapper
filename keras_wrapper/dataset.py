@@ -926,7 +926,7 @@ class Dataset(object):
                 Splits punctuation
                 Lowercase
         """
-        punct = [';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!']
+        punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!']
         def processPunctuation(inText):
             outText = inText
             for p in punct:
@@ -939,6 +939,25 @@ class Dataset(object):
         resAns = resAns.replace('  ', ' ')
         return resAns
 
+
+    def tokenize_aggressive(self, caption, lowercase=True):
+        """
+            Aggressive tokenizer for the input/output data of type 'text':
+                Removes punctuation
+                Lowercase
+        """
+        punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')',
+                 '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!',
+                 '¿', '¡', '\n', '\t']
+        def processPunctuation(inText):
+            outText = inText
+            for p in punct:
+                outText = outText.replace(p, '')
+            return outText
+        resAns = caption.lower() if lowercase else caption
+        resAns = processPunctuation(resAns)
+        resAns = re.sub('[  ]+', ' ', resAns)
+        return resAns
 
     def tokenize_questions(self, caption):
         """
