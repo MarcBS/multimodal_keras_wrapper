@@ -317,7 +317,8 @@ class Dataset(object):
         #################################################
         
         
-        ############################ Parameters used for inputs of type 'video'
+        ############################ Parameters used for inputs of type 'video' or 'video-features'
+        self.counts_frames = dict()
         self.paths_frames = dict()
         self.max_video_len = dict() 
         #################################################
@@ -518,7 +519,7 @@ class Dataset(object):
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
             :param id: identifier of the input data loaded
-            :param repeat_set: repats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
+            :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
             :param required: flag for optional inputs
 
             
@@ -571,7 +572,7 @@ class Dataset(object):
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, feat_len)
         elif(type == 'video-features'):
-            data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len=feat_len)
+            data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len)
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
        
@@ -1038,7 +1039,7 @@ class Dataset(object):
     #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessVideos(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len=None):
+    def preprocessVideos(self, path_list, id, set_name, max_video_len, img_size, img_size_crop):
         
         if(isinstance(path_list, list) and len(path_list) == 2):
             # path to all images in all videos
@@ -1061,10 +1062,43 @@ class Dataset(object):
         else:
             raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
 
+        return counts_frames
+    
+    
+    def preprocessVideoFeatures(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len):
+        
+        if(isinstance(path_list, list) and len(path_list) == 2):
+            # path to all images in all videos
+            paths_frames = []
+            with open(path_list[0], 'r') as list_:
+                for line in list_:
+                    paths_frames.append(line.rstrip('\n'))
+            # frame counts
+            counts_frames = []
+            with open(path_list[1], 'r') as list_:
+                for line in list_:
+                    counts_frames.append(int(line.rstrip('\n')))
+            
+            # video indices
+            video_indices = range(len(counts_frames))
+            
+            if(id not in self.paths_frames):
+                self.paths_frames[id] = dict()
+            if(id not in self.counts_frames):
+                self.counts_frames[id] = dict()
+            
+            self.paths_frames[id][set_name] = paths_frames
+            self.counts_frames[id][set_name] = counts_frames
+            self.max_video_len[id] = max_video_len
+            self.img_size[id] = img_size
+            self.img_size_crop[id] = img_size_crop
+        else:
+            raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
+
         if feat_len is not None:
             self.features_lengths[id] = feat_len
 
-        return counts_frames
+        return video_indices
     
     
     def loadVideos(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, meanSubstraction, dataAugmentation):
@@ -1097,22 +1131,18 @@ class Dataset(object):
         return V
     
     
-    def loadVideoFeatures(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, feat_len, external=False):
-        n_videos = len(n_frames)
-        features = np.zeros((n_videos, max_len, feat_len))
-        n_videos_total = eval('self.len_'+set_name)
+    def loadVideoFeatures(self, idx_videos, id, last, set_name, max_len, normalization_type, normalization, feat_len, external=False):
         
-        idx = [0 for i in range(n_videos)]
-        # recover all indices from image's paths of all videos
+        n_videos = len(idx_videos)
+        features = np.zeros((n_videos, max_len, feat_len))
+        
+        n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
+        
+        idx = [0 for i_nvid in range(n_videos)]
+        # recover all initial indices from image's paths of all videos
         for v in range(n_videos):
-            this_last = last+v-1
-            if this_last >= n_videos_total:
-                this_last = this_last%n_videos_total
-                
-            if this_last == -1:
-                idx[v] = 0
-            else:
-                idx[v] = int(sum(eval('self.X_'+set_name+'[id][:this_last]')))
+            last_idx = idx_videos[v]
+            idx[v] = int(sum(self.counts_frames[id][set_name][:last_idx]))
         
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
@@ -1130,7 +1160,7 @@ class Dataset(object):
                         feat = feat / np.linalg.norm(feat,ord=2)
 
                 features[enum,j] = feat
-            
+        
         return np.array(features)
     
     # ------------------------------------------------------- #
