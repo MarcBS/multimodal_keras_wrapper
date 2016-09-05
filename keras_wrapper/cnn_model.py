@@ -1045,28 +1045,43 @@ class CNN_Model(object):
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
                           'normalize_images': False, 'mean_substraction': True,
-                          'predict_on_sets': ['val'], 'maxlen': 20,
-                          'model_inputs': ['source_text', 'state_below']}
+                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples':-1,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description']}
         params = self.checkParameters(parameters, default_params)
 
         predictions = dict()
         for s in params['predict_on_sets']:
-
             logging.info("<<< Predicting outputs of "+s+" set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
 
             # Calculate how many interations are we going to perform
-            n_samples = eval("ds.len_"+s)
-            num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+            if params['n_samples'] < 1:
+                n_samples = eval("ds.len_"+s)
+                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
 
-            # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
 
-            data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                     batch_size=params['batch_size'],
-                                     normalize_images=params['normalize_images'],
-                                     data_augmentation=False,
-                                     mean_substraction=params['mean_substraction'],
-                                     predict=True).generator()
+                data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
+                                         batch_size=params['batch_size'],
+                                         normalize_images=params['normalize_images'],
+                                         data_augmentation=False,
+                                         mean_substraction=params['mean_substraction'],
+                                         predict=True).generator()
+            else:
+                n_samples = params['n_samples']
+                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+
+                # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
+                                         batch_size=params['batch_size'],
+                                         normalize_images=params['normalize_images'],
+                                         data_augmentation=False,
+                                         mean_substraction=params['mean_substraction'],
+                                         predict=False,
+                                         random_samples=n_samples).generator()
+            if params['n_samples'] > 0:
+                references = []
             out = []
             total_cost = 0
             sampled = 0
@@ -1075,8 +1090,16 @@ class CNN_Model(object):
             for j in range(num_iterations):
                 data = data_gen.next()
                 X = dict()
-                for input_id in params['model_inputs']:
-                    X[input_id] = data[input_id]
+                if params['n_samples'] > 0:
+                    for input_id in params['model_inputs']:
+                        X[input_id] = data[0][input_id]
+                    Y = dict()
+                    for output_id in params['model_outputs']:
+                        Y[output_id] = data[1][output_id]
+                else:
+                    for input_id in params['model_inputs']:
+                        X[input_id] = data[input_id]
+
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
                     sys.stdout.write('\r')
@@ -1089,10 +1112,18 @@ class CNN_Model(object):
                     out.append(samples[0])
                     total_cost += scores[0]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
+                    if params['n_samples'] > 0:
+                        for output_id in params['model_outputs']:
+                            references.append(Y[output_id][i])
+
             sys.stdout.write('Cost of the translations: %f\n'%scores[0])
             sys.stdout.flush()
             predictions[s] = np.asarray(out)
-        return predictions
+
+        if params['n_samples'] < 1:
+            return predictions
+        else:
+            return predictions, references
 
     def predictNet(self, ds, parameters, out_name=None):
         '''
@@ -1109,7 +1140,7 @@ class CNN_Model(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
-                          'normalize_images': False, 'mean_substraction': True,
+                          'normalize_images': False, 'mean_substraction': True, 'n_samples':None,
                           'predict_on_sets': ['val']}
         params = self.checkParameters(parameters, default_params)
 
@@ -1118,8 +1149,13 @@ class CNN_Model(object):
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
 
+
             # Calculate how many interations are we going to perform
-            n_samples = eval("ds.len_"+s)
+            if default_params['n_samples'] is None:
+                n_samples = eval("ds.len_"+s)
+            else:
+                n_samples = default_params['n_samples']
+
             num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
             # Prepare data generator
             data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
