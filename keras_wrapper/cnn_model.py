@@ -1090,13 +1090,15 @@ class CNN_Model(object):
             for j in range(num_iterations):
                 data = data_gen.next()
                 X = dict()
-                for input_id in params['model_inputs']:
-                    X[input_id] = data[0][input_id]
-
                 if params['n_samples'] > 0:
+                    for input_id in params['model_inputs']:
+                        X[input_id] = data[0][input_id]
                     Y = dict()
                     for output_id in params['model_outputs']:
                         Y[output_id] = data[1][output_id]
+                else:
+                    for input_id in params['model_inputs']:
+                        X[input_id] = data[input_id]
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
