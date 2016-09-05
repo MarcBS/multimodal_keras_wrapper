@@ -68,7 +68,8 @@ class Data_Batch_Generator(object):
                  normalize_images=False, 
                  data_augmentation=True, 
                  mean_substraction=True,
-                 predict=False):
+                 predict=False,
+                 random_samples=-1):
         
         self.set_split = set_split
         self.dataset = dataset
@@ -79,7 +80,8 @@ class Data_Batch_Generator(object):
                        'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
                        'normalize_images': normalize_images,
-                       'num_iterations': num_iterations}
+                       'num_iterations': num_iterations,
+                       'random_samples': random_samples}
     
     def generator(self):
             
@@ -111,20 +113,31 @@ class Data_Batch_Generator(object):
                 it = 0
             
             # Recovers a batch of data
-            if(self.predict):
-                X_batch = self.dataset.getX(self.set_split, init_sample, final_sample, 
-                                             normalization=self.params['normalize_images'],
-                                             meanSubstraction=self.params['mean_substraction'],
-                                             dataAugmentation=False)
-                data = self.net.prepareData(X_batch, None)[0]
-            else:
-                X_batch, Y_batch = self.dataset.getXY(self.set_split, batch_size, 
+            if self.params['random_samples'] > 0:
+                # At sampling from train/val, we always have Y
+                indices = np.random.randint(0, n_samples_split, self.params['random_samples'])
+
+                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, indices,
                                              normalization=self.params['normalize_images'],
                                              meanSubstraction=self.params['mean_substraction'],
                                              dataAugmentation=data_augmentation)
-
                 data = self.net.prepareData(X_batch, Y_batch)
-            
+
+
+            else:
+                if(self.predict):
+                    X_batch = self.dataset.getX(self.set_split, init_sample, final_sample,
+                                                 normalization=self.params['normalize_images'],
+                                                 meanSubstraction=self.params['mean_substraction'],
+                                                 dataAugmentation=False)
+                    data = self.net.prepareData(X_batch, None)[0]
+                else:
+                    X_batch, Y_batch = self.dataset.getXY(self.set_split, batch_size,
+                                                 normalization=self.params['normalize_images'],
+                                                 meanSubstraction=self.params['mean_substraction'],
+                                                 dataAugmentation=data_augmentation)
+
+                    data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
 
 
@@ -1128,7 +1141,60 @@ class Dataset(object):
                 features[enum,j] = feat
             
         return np.array(features)
-    
+
+    def loadVideosByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization, meanSubstraction, dataAugmentation):
+        n_videos = len(indices)
+        V = np.zeros((n_videos, max_len*3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
+
+        idx = [0 for i in range(n_videos)]
+        # recover all indices from image's paths of all videos
+        for v in range(n_videos):
+            idx[v] = int(sum(eval('self.X_'+set_name+'[id][indices[v]]')))
+
+        # load images from each video
+        for enum, (n, i) in enumerate(zip(n_frames, idx)):
+            paths = self.paths_frames[id][set_name][i:i+n]
+            # returns numpy array with dimensions (batch, channels, height, width)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation)
+            # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
+            len_j = images.shape[0]
+            offset_j = max_len - len_j
+            if offset_j < 0:
+                len_j = len_j + offset_j
+                offset_j = 0
+            for j in range(len_j):
+                V[enum, (j+offset_j)*3:(j+offset_j+1)*3] = images[j]
+
+        return V
+
+
+    def loadVideoFeaturesByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization, feat_len, external=False):
+
+        n_videos = len(indices)
+        features = np.zeros((n_videos, max_len, feat_len))
+
+        idx = [0 for i in range(n_videos)]
+        # recover all indices from image's paths of all videos
+        for v in range(n_videos):
+            idx[v] = int(indices[v])
+        # load images from each video
+        for enum, (n, i) in enumerate(zip(n_frames, idx)):
+            paths = self.paths_frames[id][set_name][i:i+n]
+
+            for j, feat in enumerate(paths):
+                if(not external):
+                    feat = self.path +'/'+ feat
+
+                # Check if the filename includes the extension
+                feat = np.load(feat)
+
+                if(normalization):
+                    if normalization_type == 'L2':
+                        feat = feat / np.linalg.norm(feat,ord=2)
+
+                features[enum,j] = feat
+
+        return np.array(features)
     # ------------------------------------------------------- #
     #       TYPE 'id' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -1600,7 +1666,7 @@ class Dataset(object):
                 if(type_in == 'image'):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
-                    x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in],
+                    x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
@@ -1609,7 +1675,7 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadVideoFeatures(x, id_in, last, set_name, self.max_video_len[id_in], 
+                    x = self.loadVideoFeaturesByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
                                           normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
 
