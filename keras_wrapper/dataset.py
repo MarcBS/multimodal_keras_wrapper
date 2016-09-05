@@ -1100,15 +1100,19 @@ class Dataset(object):
     def loadVideoFeatures(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, feat_len, external=False):
         n_videos = len(n_frames)
         features = np.zeros((n_videos, max_len, feat_len))
+        n_videos_total = eval('self.len_'+set_name)
         
         idx = [0 for i in range(n_videos)]
         # recover all indices from image's paths of all videos
         for v in range(n_videos):
-            this_last = last+v                
-            if this_last >= n_videos:
-                v = this_last%n_videos
-                this_last = v
-            idx[v] = int(sum(eval('self.X_'+set_name+'[id][:this_last]')))
+            this_last = last+v-1
+            if this_last >= n_videos_total:
+                this_last = this_last%n_videos_total
+                
+            if this_last == -1:
+                idx[v] = 0
+            else:
+                idx[v] = int(sum(eval('self.X_'+set_name+'[id][:this_last]')))
         
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
