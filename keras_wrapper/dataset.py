@@ -213,19 +213,7 @@ class Homogeneous_Data_Batch_Generator(object):
             it += 1
             if(self.predict):
                 raise Exception, 'Homogeneous data should not be used in predict mode!'
-                # Checks if we are finishing processing the data split
-                #init_sample = (it-1)*self.batch_size
-                #final_sample = it*self.batch_size
-                #n_samples_split = eval("self.dataset.len_"+self.set_split)
-                #if final_sample >= n_samples_split:
-                #    final_sample = n_samples_split
-                #    it = 0
-                ## Recovers a batch of data
-                #X_batch = self.dataset.getX(self.set_split, init_sample, final_sample,
-                #                             normalization=self.params['normalize_images'],
-                #                             meanSubstraction=self.params['mean_substraction'],
-                #                             dataAugmentation=False)
-                #data = self.net.prepareData(X_batch, None)[0]
+
             else:
                 while True:
                     self.len_idx = np.mod(self.len_idx+1, len(self.len_unique))
@@ -1144,7 +1132,7 @@ class Dataset(object):
         return V
     
     
-    def loadVideoFeatures(self, idx_videos, id, last, set_name, max_len, normalization_type, normalization, feat_len, external=False):
+    def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len, external=False):
         
         n_videos = len(idx_videos)
         features = np.zeros((n_videos, max_len, feat_len))
@@ -1176,6 +1164,7 @@ class Dataset(object):
         
         return np.array(features)
 
+    
     def loadVideosByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization, meanSubstraction, dataAugmentation):
         n_videos = len(indices)
         V = np.zeros((n_videos, max_len*3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
@@ -1201,16 +1190,19 @@ class Dataset(object):
 
         return V
 
-
+    '''
     def loadVideoFeaturesByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization, feat_len, external=False):
 
         n_videos = len(indices)
         features = np.zeros((n_videos, max_len, feat_len))
 
+        n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in indices]
+        
         idx = [0 for i in range(n_videos)]
         # recover all indices from image's paths of all videos
         for v in range(n_videos):
             idx[v] = int(indices[v])
+            idx[v] = int(sum(self.counts_frames[id][set_name][:indices[v]]))
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
@@ -1229,6 +1221,8 @@ class Dataset(object):
                 features[enum,j] = feat
 
         return np.array(features)
+    '''
+        
     # ------------------------------------------------------- #
     #       TYPE 'id' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -1554,7 +1548,7 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadVideoFeatures(x, id_in, final, set_name, self.max_video_len[id_in],
+                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
                                           normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
         
@@ -1618,7 +1612,7 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadVideoFeatures(x, id_in, last, set_name, self.max_video_len[id_in], 
+                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], 
                                           normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
             
@@ -1658,6 +1652,7 @@ class Dataset(object):
  
         return [X,Y]
         
+    
     def getXY_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
               dataAugmentation=True, debug=False):
         """
@@ -1684,6 +1679,7 @@ class Dataset(object):
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
         """
+        
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
@@ -1709,7 +1705,7 @@ class Dataset(object):
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
-                    x = self.loadVideoFeaturesByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
+                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], 
                                           normalization_type, normalization, self.features_lengths[id_in])
             X.append(x)
 
