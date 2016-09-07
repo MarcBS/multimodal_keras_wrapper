@@ -793,8 +793,16 @@ class Dataset(object):
                 sentences[i] = tokfun(sentences[i])
     
         # Build vocabulary
-        if(build_vocabulary):
+        error_vocab = False
+        if build_vocabulary == True:
             self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, n_words=max_words)
+        elif isinstance(build_vocabulary, str):
+            if build_vocabulary in self.vocabulary:
+                self.vocabulary[id] = self.vocabulary[build_vocabulary]
+                if not self.silence:
+                    logging.info('\tReusing vocabulary named "'+build_vocabulary+'" for data with id "'+id+'".')
+            else:
+                raise Exception('The parameter "build_vocabulary" must be a boolean or a str containing an id of the vocabulary we want to copy.')
         
         if(not id in self.vocabulary):
             raise Exception('The dataset must include a vocabulary with id "'+id+'" in order to process the type "text" data. Set "build_vocabulary" to True if you want to use the current data for building the vocabulary.')
@@ -864,12 +872,33 @@ class Dataset(object):
         for w,k in self.extra_words.iteritems():
             dictionary[w] = k
         
-        self.vocabulary[id] = dict()
-        self.vocabulary[id]['words2idx'] = dictionary
-        inv_dictionary = {v: k for k, v in dictionary.items()}
-        self.vocabulary[id]['idx2words'] = inv_dictionary
+        # Store dictionary and append to previously existent if needed.
+        if id not in self.vocabulary:
+            self.vocabulary[id] = dict()
+            self.vocabulary[id]['words2idx'] = dictionary
+            inv_dictionary = {v: k for k, v in dictionary.items()}
+            self.vocabulary[id]['idx2words'] = inv_dictionary
+
+            self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
         
-        self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
+        else:
+            old_keys = self.vocabulary[id]['words2idx'].keys()
+            new_keys = dictionary.keys()
+            added = 0
+            for key in new_keys:
+                if key not in old_keys:
+                    self.vocabulary[id]['words2idx'][key] = self.vocabulary_len[id]
+                    self.vocabulary_len[id] += 1
+                    added +=1
+            
+            inv_dictionary = {v: k for k, v in self.vocabulary[id]['words2idx'].items()}
+            self.vocabulary[id]['idx2words'] = inv_dictionary
+            
+            if not self.silence:
+                logging.info('Appending ' +str(added)+ ' words to dictionary with id "' +id+ '".')
+                logging.info('\tThe new total is '+str(self.vocabulary_len[id]) +'.')
+        
+        
 
 
     def loadText(self, X, vocabularies, max_len, offset, fill):
@@ -1376,14 +1405,16 @@ class Dataset(object):
         
         # Prepare the training mean image
         if(meanSubstraction): # remove mean
-            #if(not isinstance(self.train_mean[id], np.ndarray)):
+            
             if(id not in self.train_mean):
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "'+id+'".')
             train_mean = copy.copy(self.train_mean[id])
+            
             # Take central part
             left = np.round(np.divide([self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]], 2.0))
             right = left + self.img_size_crop[id][0:2]
             train_mean = train_mean[left[0]:right[0], left[1]:right[1], :]
+            
             # Transpose dimensions
             if(len(self.img_size[id]) == 3): # if it is a 3D image
                 # Convert RGB to BGR
@@ -1392,8 +1423,6 @@ class Dataset(object):
                     train_mean[:,:,0] = aux[:,:,2]
                     train_mean[:,:,2] = aux[:,:,0]
                 train_mean = np.transpose(train_mean, (2, 0, 1))
-            else:
-                pass
             
         prob_flip_horizontal = 0.5
         prob_flip_vertical = 0.0
