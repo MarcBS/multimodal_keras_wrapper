@@ -1108,6 +1108,20 @@ class CNN_Model(object):
                     x = dict()
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
+                    
+                    # ------------
+                    if params['n_samples'] <0:
+                        print '-----',i
+                        for k in x.keys():
+                            print 'key',k
+                            if(k != 'state_below'):
+                                for elem in x[k]:
+                                    print '----new_video'
+                                    for row in elem:
+                                        print row[:6]
+                        print 
+                    # ------------
+                    
                     samples, scores = self.beam_search(x, params)
                     out.append(samples[0])
                     total_cost += scores[0]

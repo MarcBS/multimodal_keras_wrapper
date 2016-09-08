@@ -93,12 +93,12 @@ class Data_Batch_Generator(object):
         it = 0
         while 1:
 
-            if(self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict):
+            if(self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict and self.params['random_samples'] == -1):
                 silence = self.dataset.silence
                 self.dataset.silence = True
                 self.dataset.shuffleTraining()
                 self.dataset.silence = silence
-            elif(it%self.params['num_iterations']==0 and not self.predict):
+            if(it%self.params['num_iterations']==0 and self.params['random_samples'] == -1):
                 self.dataset.resetCounters(set_name=self.set_split)
             it += 1
             
@@ -988,6 +988,7 @@ class Dataset(object):
         resAns = caption.lower() if lowercase else caption
         resAns = processPunctuation(resAns)
         resAns = re.sub('[  ]+', ' ', resAns)
+        resAns = resAns.strip()
         return resAns
 
     def tokenize_questions(self, caption):
