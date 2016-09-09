@@ -955,9 +955,10 @@ class Dataset(object):
                     else:
                         X_out[i,j+offset_j] = vocab['<unk>']
 
-                if offset > 0 and fill == 'start': # Move the text to the left
-                    X_out[i] = np.append(X_out[i, offset:], [vocab['<pad>']]*offset)
-                if offset > 0 and fill == 'end': # Move the text to the right
+                #if offset > 0 and fill == 'start': # Move the text to the left
+                #    X_out[i] = np.append(X_out[i, offset:], [vocab['<pad>']]*offset)
+                #if offset > 0 and fill == 'end': # Move the text to the right
+                if offset > 0: # Move the text to the right
                     X_out[i] = np.append([vocab['<pad>']]*offset, X_out[i, :-offset])
 
         return X_out
