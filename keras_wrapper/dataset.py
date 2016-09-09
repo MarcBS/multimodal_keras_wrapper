@@ -504,11 +504,11 @@ class Dataset(object):
     
     
     def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1, required=True,
-                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                     # 'image' / 'video'
-                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end',     # 'text'
+                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                             # 'image' / 'video'
+                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
                  build_vocabulary=False, max_words=0,
-                 feat_len = 1024,                                                         # 'image-features' / 'video-features'
-                 max_video_len=26                                                         # 'video'
+                 feat_len = 1024,                                                                 # 'image-features' / 'video-features'
+                 max_video_len=26                                                                 # 'video'
                  ):
         """
             Loads a list of samples which can contain all samples from the 'train', 'val', or
@@ -538,6 +538,7 @@ class Dataset(object):
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
             :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
             :param fill: select whether padding before or after the sequence
+            :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
 
             # 'image-features' and 'video-features'- related parameters
             
@@ -569,7 +570,8 @@ class Dataset(object):
         elif(type == 'video'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset, fill)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, 
+                                       max_words, offset, fill, min_occ)
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, feat_len)
         elif(type == 'video-features'):
@@ -603,7 +605,7 @@ class Dataset(object):
         self.setOutput(self, labels_list, set_name, type, id)
     
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end',                         # 'text'
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,                   # 'text'
                   build_vocabulary=False, max_words=0):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -624,10 +626,11 @@ class Dataset(object):
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
             :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
             :param fill: select whether padding before or after the sequence
+            :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
 
         """
         self.__checkSetName(set_name)
-        
+
         # Insert type and id of output data
         keys_Y_set = eval('self.Y_'+set_name+'.keys()')
         if(id not in self.ids_outputs):
@@ -643,7 +646,8 @@ class Dataset(object):
         if(type == 'categorical'):
             data = self.preprocessCategorical(path_list)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset, fill)
+            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, 
+                                       max_words, offset, fill, min_occ)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
         elif(type == 'id'):
@@ -770,7 +774,8 @@ class Dataset(object):
     #       TYPE 'text' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, max_words, offset, fill):
+    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, 
+                       max_words, offset, fill, min_occ):
         
         sentences = []
         if(isinstance(annotations_list, str) and os.path.isfile(annotations_list)):
@@ -795,7 +800,7 @@ class Dataset(object):
         # Build vocabulary
         error_vocab = False
         if build_vocabulary == True:
-            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, n_words=max_words)
+            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words)
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
@@ -816,7 +821,7 @@ class Dataset(object):
         return sentences
     
     
-    def build_vocabulary(self, captions, id, tokfun, do_split, n_words=0):
+    def build_vocabulary(self, captions, id, tokfun, do_split, min_occ=0, n_words=0):
         """
             Vocabulary builder for data of type 'text'
         """
@@ -829,7 +834,7 @@ class Dataset(object):
         sentence_count = 0
         for line in captions:
             if(do_split):
-                #tokenized = tokfun(line)
+                #tokenized = tokfun(line)º
                 #words = tokenized.strip().split(' ')
                 words = line.strip().split(' ')
                 words_low = map(lambda x: x.lower(), words)
@@ -851,7 +856,18 @@ class Dataset(object):
             logging.info("\t Total: %d unique words in %d sentences with a total of %d words." %
               (len(combined_counter), sum(sentence_counts),sum(combined_counter.values())))
 
-
+        # keep only words with less than 'min_occ' occurrences
+        if min_occ > 1:
+            removed = 0
+            for k in combined_counter.keys():
+                if combined_counter[k] < min_occ:
+                    del combined_counter[k]
+                    removed +=1
+            if(not self.silence):
+                logging.info("\t Removed %d words with less than %d occurrences. New total: %d." %
+                  (removed, min_occ,len(combined_counter)))
+                    
+        # keep only top 'n_words'
         if n_words > 0:
             vocab_count = combined_counter.most_common(n_words - len(self.extra_words))
             if(not self.silence):
