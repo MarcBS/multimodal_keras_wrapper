@@ -961,11 +961,20 @@ class CNN_Model(object):
 
 
     def predict_cond(self, X, states_below, params, ii):
-
         p = []
         for state_below in states_below:
             X['state_below'] = state_below.reshape(1,-1)
-            p.append(np.array(self.model.predict_on_batch(X))[:, ii, :])  # Get probs of all words in the current timestep
+            #data = self.model_test.predict_on_batch(X)
+            data = self.model.predict_on_batch(X)
+            if len(params['model_outputs']) > 1:
+                all_data = {}
+                for output_id in range(len(params['model_outputs'])):
+                    print output_id, data[output_id]
+                    all_data[params['model_outputs'][output_id]] = data[output_id]
+                all_data[params['model_outputs'][0]] = np.array(all_data[params['model_outputs'][0]])[:, ii, :]
+            else:
+                all_data = {params['model_outputs'][0]: np.array(data)[:, ii, :]}
+            p.append(all_data[params['model_outputs'][0]])  # Get probs of all words in the current timestep
         p = np.asarray(p)
         return p[:, 0, :]
 
@@ -1047,7 +1056,10 @@ class CNN_Model(object):
                           'normalize_images': False, 'mean_substraction': True,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples':-1,
                           'model_inputs': ['source_text', 'state_below'],
-                          'model_outputs': ['description']}
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description']
+                          }
         params = self.checkParameters(parameters, default_params)
 
         predictions = dict()
@@ -1091,31 +1103,30 @@ class CNN_Model(object):
                 data = data_gen.next()
                 X = dict()
                 if params['n_samples'] > 0:
-                    for input_id in params['model_inputs']:
+                    for input_id in params['dataset_inputs']:
                         X[input_id] = data[0][input_id]
                     Y = dict()
-                    for output_id in params['model_outputs']:
+                    for output_id in params['dataset_outputs']:
                         Y[output_id] = data[1][output_id]
                 else:
-                    for input_id in params['model_inputs']:
+                    for input_id in params['dataset_inputs']:
                         X[input_id] = data[input_id]
 
-                for i in range(len(X[params['model_inputs'][0]])):
+                for i in range(len(X[params['dataset_inputs'][0]])):
                     sampled += 1
                     sys.stdout.write('\r')
                     sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
                     sys.stdout.flush()
                     x = dict()
-                    for input_id in params['model_inputs']:
+                    for input_id in params['dataset_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores = self.beam_search(x, params)
                     out.append(samples[0])
                     total_cost += scores[0]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
                     if params['n_samples'] > 0:
-                        for output_id in params['model_outputs']:
+                        for output_id in params['dataset_outputs']:
                             references.append(Y[output_id][i])
-
             sys.stdout.write('Cost of the translations: %f\n'%scores[0])
             sys.stdout.flush()
             predictions[s] = np.asarray(out)
