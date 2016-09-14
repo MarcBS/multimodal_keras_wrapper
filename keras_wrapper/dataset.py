@@ -837,8 +837,7 @@ class Dataset(object):
                 #tokenized = tokfun(line)º
                 #words = tokenized.strip().split(' ')
                 words = line.strip().split(' ')
-                words_low = map(lambda x: x.lower(), words)
-                counter.update(words_low)
+                counter.update(words)
             else:
                 counter.update([line])
             sentence_count += 1
@@ -1007,6 +1006,32 @@ class Dataset(object):
         resAns = re.sub('[  ]+', ' ', resAns)
         resAns = resAns.strip()
         return resAns
+
+    def tokenize_icann(self, caption, lowercase=True):
+        """
+            Tokenization used for the icann paper:
+                Removes some punctuation
+                Lowercase
+        """
+        tokenized = re.sub('[.,"\n\t]+', '', caption.strip())
+        tokenized = re.sub('[  ]+', ' ', tokenized)
+        tokenized = map(lambda x: x.lower(), tokenized.split())
+        tokenized = " ".join(tokenized)
+        return tokenized
+
+    def tokenize_soft(self, caption, lowercase=True):
+        """
+            Tokenization used for the icann paper:
+                Removes very little punctuation
+                Lowercase
+        """
+        tokenized = re.sub('[",!\n\t]+', '', caption.strip())
+        tokenized = re.sub('[\.]+', ' . ', tokenized)
+        tokenized = re.sub('[  ]+', ' ', tokenized)
+        tokenized = map(lambda x: x.lower(), tokenized.split())
+        tokenized = " ".join(tokenized)
+        return tokenized
+
 
     def tokenize_questions(self, caption):
         """
