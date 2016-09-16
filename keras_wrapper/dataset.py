@@ -136,7 +136,6 @@ class Data_Batch_Generator(object):
                                                  normalization=self.params['normalize_images'],
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
-
                     data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
 
@@ -307,7 +306,7 @@ class Dataset(object):
         
         
         ############################ Parameters used for inputs/outputs of type 'text'
-        self.extra_words = {'<pad>': 0, '<unk>': 1}    # extra words introduced in all vocabularies
+        self.extra_words = {'<pad>': 0, '<unk>': 1, '<null>':2}    # extra words introduced in all vocabularies
         self.vocabulary = dict()     # vocabularies (words2idx and idx2words)
         self.max_text_len = dict()   # number of words accepted in a 'text' sample
         self.vocabulary_len = dict() # number of words in the vocabulary
@@ -957,8 +956,8 @@ class Dataset(object):
                 #if offset > 0 and fill == 'start': # Move the text to the left
                 #    X_out[i] = np.append(X_out[i, offset:], [vocab['<pad>']]*offset)
                 #if offset > 0 and fill == 'end': # Move the text to the right
-                if offset > 0: # Move the text to the right
-                    X_out[i] = np.append([vocab['<pad>']]*offset, X_out[i, :-offset])
+                if offset > 0: # Move the text to the right -> null symbol
+                    X_out[i] = np.append([vocab['<null>']]*offset, X_out[i, :-offset])
 
         return X_out
 
