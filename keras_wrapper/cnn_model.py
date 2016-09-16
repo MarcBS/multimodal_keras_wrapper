@@ -978,7 +978,7 @@ class CNN_Model(object):
         p = np.asarray(p)
         return p[:, 0, :]
 
-    def beam_search(self, X, params):
+    def beam_search(self, X, params, null_sym=2):
 
         k = params['beam_size']
         sample = []
@@ -988,7 +988,7 @@ class CNN_Model(object):
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
-        state_below = np.asarray([np.zeros(params['maxlen'])] * live_k)
+        state_below = np.asarray([np.zeros(params['maxlen'])+null_sym]* live_k)
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             probs = self.predict_cond(X, state_below, params, ii)
@@ -1026,9 +1026,8 @@ class CNN_Model(object):
                 break
             if dead_k >= k:
                 break
-
             state_below = np.asarray(hyp_samples, dtype='int64')
-            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below,
                                      np.zeros((state_below.shape[0], max(params['maxlen'] - state_below.shape[1]-1, 0)),
                                               dtype='int64')))
         # dump every remaining one
@@ -1120,7 +1119,7 @@ class CNN_Model(object):
                     x = dict()
                     for input_id in params['dataset_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
-                    samples, scores = self.beam_search(x, params)
+                    samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                     out.append(samples[0])
                     total_cost += scores[0]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
