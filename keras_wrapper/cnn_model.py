@@ -966,15 +966,21 @@ class CNN_Model(object):
             X['state_below'] = state_below.reshape(1,-1)
             #data = self.model_test.predict_on_batch(X)
             data = self.model.predict_on_batch(X)
+            # Get probs of all words in the current timestep
             if len(params['model_outputs']) > 1:
                 all_data = {}
+
                 for output_id in range(len(params['model_outputs'])):
                     print output_id, data[output_id]
                     all_data[params['model_outputs'][output_id]] = data[output_id]
                 all_data[params['model_outputs'][0]] = np.array(all_data[params['model_outputs'][0]])[:, ii, :]
             else:
                 all_data = {params['model_outputs'][0]: np.array(data)[:, ii, :]}
-            p.append(all_data[params['model_outputs'][0]])  # Get probs of all words in the current timestep
+            # Append the prob distribution
+            if params['sampling_type'].lower() == 'max_likelihood':
+                p.append(all_data[params['model_outputs'][0]])  # Use the true distribution
+            elif params['sampling_type'].lower() == 'multinomial':
+                p.append(np.random.multinomial(1, all_data[params['model_outputs'][0]], 1))# Introduce multinomial bias
         p = np.asarray(p)
         return p[:, 0, :]
 
@@ -992,6 +998,7 @@ class CNN_Model(object):
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             probs = self.predict_cond(X, state_below, params, ii)
+
             # total score for every sample is sum of -log of word prb
             cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
@@ -1057,7 +1064,8 @@ class CNN_Model(object):
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
-                          'dataset_outputs': ['description']
+                          'dataset_outputs': ['description'],
+                          'sampling_type': 'max_likelihood'
                           }
         params = self.checkParameters(parameters, default_params)
 
