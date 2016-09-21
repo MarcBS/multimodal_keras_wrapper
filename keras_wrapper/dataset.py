@@ -136,6 +136,9 @@ class Data_Batch_Generator(object):
                                                  normalization=self.params['normalize_images'],
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
+                    #print 'state_below:', X_batch[1]
+                    #print 'state_below_words:', [map(lambda x: self.dataset.vocabulary['state_below']['idx2words'][x], seq) for seq in X_batch[1]]
+
                     data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
 
@@ -923,6 +926,7 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
+        max_len_batch = max([len(x.split(' ')) for x in X])
         if(max_len == 0): # use whole sentence as class
             X_out = np.zeros((n_batch)).astype('int32')
             for i in range(n_batch):
@@ -933,8 +937,8 @@ class Dataset(object):
                     X_out[i] = vocab['<unk>']
             
         else: # process text as a sequence of words
-            X_out = np.ones((n_batch, max_len)).astype('int32') * self.extra_words['<pad>']
-        
+            X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
                 x = X[i].split(' ')
@@ -953,9 +957,6 @@ class Dataset(object):
                     else:
                         X_out[i,j+offset_j] = vocab['<unk>']
 
-                #if offset > 0 and fill == 'start': # Move the text to the left
-                #    X_out[i] = np.append(X_out[i, offset:], [vocab['<pad>']]*offset)
-                #if offset > 0 and fill == 'end': # Move the text to the right
                 if offset > 0: # Move the text to the right -> null symbol
                     X_out[i] = np.append([vocab['<null>']]*offset, X_out[i, :-offset])
 
@@ -1024,8 +1025,19 @@ class Dataset(object):
                 Removes very little punctuation
                 Lowercase
         """
-        tokenized = re.sub('[",!\n\t]+', '', caption.strip())
+        tokenized = re.sub('[\n\t]+', '', caption.strip())
         tokenized = re.sub('[\.]+', ' . ', tokenized)
+        tokenized = re.sub('[,]+', ' , ', tokenized)
+        tokenized = re.sub('[!]+', ' ! ', tokenized)
+        tokenized = re.sub('[?]+', ' ? ', tokenized)
+        tokenized = re.sub('[\{]+', ' { ', tokenized)
+        tokenized = re.sub('[\}]+', ' } ', tokenized)
+        tokenized = re.sub('[\(]+', ' ( ', tokenized)
+        tokenized = re.sub('[\)]+', ' ) ', tokenized)
+        tokenized = re.sub('[\[]+', ' [ ', tokenized)
+        tokenized = re.sub('[\]]+', ' ] ', tokenized)
+        tokenized = re.sub('["]+', ' " ', tokenized)
+        tokenized = re.sub('[\']+', " ' ", tokenized)
         tokenized = re.sub('[  ]+', ' ', tokenized)
         tokenized = map(lambda x: x.lower(), tokenized.split())
         tokenized = " ".join(tokenized)
