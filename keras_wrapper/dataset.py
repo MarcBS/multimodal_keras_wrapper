@@ -926,7 +926,7 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
-        max_len_batch = max([len(x.split(' ')) for x in X])
+        max_len_batch = max([len(x.split(' ')) for x in X]) + 2
         if(max_len == 0): # use whole sentence as class
             X_out = np.zeros((n_batch)).astype('int32')
             for i in range(n_batch):
@@ -938,7 +938,7 @@ class Dataset(object):
             
         else: # process text as a sequence of words
             X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
-
+            max_len = max_len_batch
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
                 x = X[i].split(' ')
@@ -1014,6 +1014,21 @@ class Dataset(object):
                 Lowercase
         """
         tokenized = re.sub('[.,"\n\t]+', '', caption.strip())
+        tokenized = re.sub('[\']+', " '", tokenized)
+        tokenized = re.sub('[  ]+', ' ', tokenized)
+        tokenized = map(lambda x: x.lower(), tokenized.split())
+        tokenized = " ".join(tokenized)
+        return tokenized
+
+
+    def tokenize_montreal(self, caption, lowercase=True):
+        """
+            Tokenization used for the icann paper:
+                Removes some punctuation
+                Lowercase
+        """
+        tokenized = re.sub('[.,"\n\t]+', '', caption.strip())
+        tokenized = re.sub('[\']+', " '", tokenized)
         tokenized = re.sub('[  ]+', ' ', tokenized)
         tokenized = map(lambda x: x.lower(), tokenized.split())
         tokenized = " ".join(tokenized)
