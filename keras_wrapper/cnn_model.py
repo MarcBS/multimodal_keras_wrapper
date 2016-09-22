@@ -21,7 +21,9 @@ mpl.use('Agg') # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 
 import numpy as np
-import cPickle as pk
+#import cPickle as pk
+#import dill as pk
+import cloud.serialization.cloudpickle as pk
 
 import sys
 import time

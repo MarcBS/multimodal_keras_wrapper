@@ -9,6 +9,15 @@ You can access the initial documentation version in [doc/build/html/index.html](
 See code examples in demo.ipynb and test.py
 
 
+## Dependencies
+
+The following dependencies are required for using this library:
+
+[Anaconda](https://www.continuum.io/downloads)
+Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
+[cloud](https://pypi.python.org/pypi/cloud/2.7.2) >= 2.8.5
+
+
 ## Installation
 
 In order to install the library you just have to follow these steps:
