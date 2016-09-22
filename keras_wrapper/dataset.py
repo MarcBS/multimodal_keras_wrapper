@@ -136,8 +136,12 @@ class Data_Batch_Generator(object):
                                                  normalization=self.params['normalize_images'],
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
-                    #print 'state_below:', X_batch[1]
-                    #print 'state_below_words:', [map(lambda x: self.dataset.vocabulary['state_below']['idx2words'][x], seq) for seq in X_batch[1]]
+
+                    #print 'state_below:',X_batch[1]
+                    #print 'state_below words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in X_batch[1]]
+                    #ones_pos = [np.nonzero(sample)[1] for  sample in Y_batch[0]]
+                    #print 'description_pos:', ones_pos
+                    #print 'description words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in ones_pos]
 
                     data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
@@ -926,7 +930,7 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
-        max_len_batch = max([len(x.split(' ')) for x in X]) + 2
+        max_len_batch = max([len(x.split(' ')) for x in X]) + 1
         if(max_len == 0): # use whole sentence as class
             X_out = np.zeros((n_batch)).astype('int32')
             for i in range(n_batch):
