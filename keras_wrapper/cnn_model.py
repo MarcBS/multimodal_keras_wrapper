@@ -21,9 +21,8 @@ mpl.use('Agg') # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 
 import numpy as np
-#import cPickle as pk
-#import dill as pk
-import cloud.serialization.cloudpickle as pk
+import cPickle as pk
+import cloud.serialization.cloudpickle as cloudpk
 
 import sys
 import time
@@ -60,7 +59,7 @@ def saveModel(model_wrapper, iter, path=None):
     # Save model weights
     model_wrapper.model.save_weights(path + '/epoch_'+ iter +'_weights.h5', overwrite=True)
     # Save additional information
-    pk.dump(model_wrapper, open(path + '/epoch_' + iter + '_CNN_Model.pkl', 'wb'))
+    cloudpk.dump(model_wrapper, open(path + '/epoch_' + iter + '_CNN_Model.pkl', 'wb'))
 
     if(not model_wrapper.silence):
         logging.info("<<< Model saved >>>")
