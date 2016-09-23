@@ -970,7 +970,6 @@ class CNN_Model(object):
             # Get probs of all words in the current timestep
             if len(params['model_outputs']) > 1:
                 all_data = {}
-
                 for output_id in range(len(params['model_outputs'])):
                     print output_id, data[output_id]
                     all_data[params['model_outputs'][output_id]] = data[output_id]
@@ -978,10 +977,7 @@ class CNN_Model(object):
             else:
                 all_data = {params['model_outputs'][0]: np.array(data)[:, ii, :]}
             # Append the prob distribution
-            if params['sampling_type'].lower() == 'max_likelihood':
-                p.append(all_data[params['model_outputs'][0]])  # Use the true distribution
-            elif params['sampling_type'].lower() == 'multinomial':
-                p.append(np.random.multinomial(1, all_data[params['model_outputs'][0]], 1))# Introduce multinomial bias
+            p.append(all_data[params['model_outputs'][0]])
         p = np.asarray(p)
         return p[:, 0, :]
 
@@ -1035,9 +1031,8 @@ class CNN_Model(object):
             if dead_k >= k:
                 break
             state_below = np.asarray(hyp_samples, dtype='int64')
-            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below,
-                                     np.zeros((state_below.shape[0], max(params['maxlen'] - state_below.shape[1]-1, 0)),
-                                              dtype='int64')))
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below))
+                                     #np.zeros((state_below.shape[0], ii),dtype='int64')))
         # dump every remaining one
         if live_k > 0:
             for idx in xrange(live_k):
