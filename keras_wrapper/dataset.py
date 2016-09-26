@@ -1,7 +1,7 @@
 # coding=utf-8
 
 from keras.utils import np_utils, generic_utils
-
+import sys
 import random
 import math
 import os
@@ -137,12 +137,6 @@ class Data_Batch_Generator(object):
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
 
-                    #print 'state_below:',X_batch[1]
-                    #print 'state_below words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in X_batch[1]]
-                    #ones_pos = [np.nonzero(sample)[1] for  sample in Y_batch[0]]
-                    #print 'description_pos:', ones_pos
-                    #print 'description words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in ones_pos]
-
                     data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
 
@@ -236,8 +230,10 @@ class Homogeneous_Data_Batch_Generator(object):
                 curr_batch_size = np.minimum(self.batch_size, self.len_curr_counts[self.len_unique[self.len_idx]])
                 curr_pos = self.len_indices_pos[self.len_unique[self.len_idx]]
                 # get the indices for the current batch
-                np.random.shuffle(self.len_indices[self.len_unique[self.len_idx]])
                 curr_indices = self.len_indices[self.len_unique[self.len_idx]][curr_pos:curr_pos+curr_batch_size]
+                self.len_indices_pos[self.len_unique[self.len_idx]] += curr_batch_size
+                self.len_curr_counts[self.len_unique[self.len_idx]] -= curr_batch_size
+
                 X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, curr_indices,
                                              normalization=self.params['normalize_images'],
                                              meanSubstraction=self.params['mean_substraction'],
@@ -930,7 +926,6 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
-        max_len_batch = max([len(x.split(' ')) for x in X]) + 1
         if(max_len == 0): # use whole sentence as class
             X_out = np.zeros((n_batch)).astype('int32')
             for i in range(n_batch):
@@ -941,17 +936,18 @@ class Dataset(object):
                     X_out[i] = vocab['<unk>']
             
         else: # process text as a sequence of words
+
+            max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
             X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
-            max_len = max_len_batch
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
                 x = X[i].split(' ')
                 len_j = len(x)
                 if(fill=='start'):
-                    offset_j = max_len - len_j
+                    offset_j = max_len_batch - len_j
                 else:
                     offset_j = 0
-                    len_j = min(len_j, max_len)
+                    len_j = min(len_j, max_len_batch)
                 if offset_j < 0:
                     len_j = len_j + offset_j
                     offset_j = 0
