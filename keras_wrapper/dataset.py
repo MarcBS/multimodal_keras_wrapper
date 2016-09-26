@@ -137,6 +137,8 @@ class Data_Batch_Generator(object):
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
 
+                    #print 'description words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for  sample in Y_batch[0]]]
+
                     data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
 
@@ -568,18 +570,20 @@ class Dataset(object):
         
         # Proprocess the input data depending on its type
         if(type == 'image'):
-            data = self.preprocessImages(path_list, id, img_size, img_size_crop)
+            data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop)
         elif(type == 'video'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, 
+            if self.max_text_len.get(id) is None:
+                self.max_text_len[id] = dict()
+            data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                                        max_words, offset, fill, min_occ)
         elif(type == 'image-features'):
-            data = self.preprocessFeatures(path_list, id, feat_len)
+            data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif(type == 'video-features'):
             data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len)
         elif(type == 'id'):
-            data = self.preprocessIDs(path_list, id)
+            data = self.preprocessIDs(path_list, id, set_name)
        
         if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1): 
             data = list(np.repeat(data,repeat_set))
@@ -648,7 +652,9 @@ class Dataset(object):
         if(type == 'categorical'):
             data = self.preprocessCategorical(path_list)
         elif(type == 'text'):
-            data = self.preprocessText(path_list, id, tokenization, build_vocabulary, max_text_len, 
+            if self.max_text_len.get(id) is None:
+                self.max_text_len[id] = dict()
+            data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                                        max_words, offset, fill, min_occ)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
@@ -730,7 +736,7 @@ class Dataset(object):
     #       TYPE 'features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessFeatures(self, path_list, id, feat_len):
+    def preprocessFeatures(self, path_list, id, set_name, feat_len):
         
         # file with a list, each line being a path to a .npy file with a feature vector
         if(isinstance(path_list, str) and os.path.isfile(path_list)): 
@@ -776,7 +782,7 @@ class Dataset(object):
     #       TYPE 'text' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessText(self, annotations_list, id, tokenization, build_vocabulary, max_text_len, 
+    def preprocessText(self, annotations_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                        max_words, offset, fill, min_occ):
         
         sentences = []
@@ -815,7 +821,7 @@ class Dataset(object):
             raise Exception('The dataset must include a vocabulary with id "'+id+'" in order to process the type "text" data. Set "build_vocabulary" to True if you want to use the current data for building the vocabulary.')
     
         # Store max text len
-        self.max_text_len[id] = max_text_len
+        self.max_text_len[id][set_name] = max_text_len
         self.n_classes_text[id] = len(self.vocabulary[id]['words2idx'])
         self.text_offset[id] = offset
         self.fill_text[id] = fill
@@ -1325,7 +1331,7 @@ class Dataset(object):
     #       TYPE 'id' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessIDs(self, path_list, id):
+    def preprocessIDs(self, path_list, id, set_name):
         
         logging.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
         if(isinstance(path_list, str) and os.path.isfile(path_list)): # path to list of IDs
@@ -1344,7 +1350,7 @@ class Dataset(object):
     #       TYPE 'image' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessImages(self, path_list, id, img_size, img_size_crop):
+    def preprocessImages(self, path_list, id, set_name, img_size, img_size_crop):
         
         if(isinstance(path_list, str) and os.path.isfile(path_list)): # path to list of images' paths
             data = []
@@ -1641,7 +1647,7 @@ class Dataset(object):
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in], 
-                                      self.max_text_len[id_in], self.text_offset[id_in], 
+                                      self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
@@ -1705,7 +1711,7 @@ class Dataset(object):
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
-                                      self.max_text_len[id_in], self.text_offset[id_in],
+                                      self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
@@ -1734,10 +1740,10 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out], 
-                                      self.max_text_len[id_out], self.text_offset[id_out], 
+                                      self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out])
                     y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
-                    if self.max_text_len[id_out] == 0:
+                    if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
                     else:
                         for idx in range(y.shape[0]):
@@ -1798,7 +1804,7 @@ class Dataset(object):
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
-                                      self.max_text_len[id_in], self.text_offset[id_in],
+                                      self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in])
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
@@ -1824,10 +1830,10 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
-                                      self.max_text_len[id_out], self.text_offset[id_out],
+                                      self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out])
                     y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
-                    if self.max_text_len[id_out] == 0:
+                    if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
                     else:
                         for idx in range(y.shape[0]):
@@ -1881,7 +1887,7 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
-                                      self.max_text_len[id_out], self.text_offset[id_out],
+                                      self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out])
             Y.append(y)
 
