@@ -385,6 +385,7 @@ class Dataset(object):
         logging.info('Keeping top '+str(n_top)+' outputs from the '+set_name+' set and removing the rest.')
         
         # Sort outputs by number of occurrences
+        samples = None
         exec('samples = self.Y_'+set_name)
         count = Counter(samples[id_out])
         most_frequent = sorted(count.items(), key=lambda x:x[1], reverse=True)[:n_top]
@@ -398,6 +399,7 @@ class Dataset(object):
                 
         # Remove non-top samples    
         # Inputs
+        ids = None
         exec('ids = self.X_'+set_name+'.keys()')
         for id in ids:
             exec('self.X_'+set_name+'[id] = [self.X_'+set_name+'[id][k] for k in kept]')
@@ -945,6 +947,10 @@ class Dataset(object):
 
             max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
             X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+            X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
+
+            if max_len_batch == max_len:
+                max_len_batch -= 1 # always leave space for <eos> symbol
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
                 x = X[i].split(' ')
@@ -962,9 +968,13 @@ class Dataset(object):
                         X_out[i,j+offset_j] = vocab[w]
                     else:
                         X_out[i,j+offset_j] = vocab['<unk>']
+                    X_mask[i,j+offset_j] = 1  # fill mask
+                X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
 
                 if offset > 0: # Move the text to the right -> null symbol
                     X_out[i] = np.append([vocab['<null>']]*offset, X_out[i, :-offset])
+                    X_mask[i] = np.append([0]*offset, X_mask[i, :-offset])
+            X_out = (X_out, X_mask)
 
         return X_out
 
@@ -1648,7 +1658,7 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in], 
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in])
+                                      fill=self.fill_text[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1712,7 +1722,7 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in])
+                                      fill=self.fill_text[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1728,9 +1738,6 @@ class Dataset(object):
             else:
                 y = eval('self.Y_'+set_name+'[id_out][last:new_last]')
             
-            #if(set_name=='val'):
-            #    logging.info(y)
-            
             # Pre-process outputs
             if(not debug):
                 if(type_out == 'categorical'):
@@ -1742,12 +1749,16 @@ class Dataset(object):
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out])
-                    y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
+
+                    # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                    # Use words separately (generator model)
                     else:
-                        for idx in range(y.shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[idx], self.n_classes_text[id_out]).astype(np.uint8)
+                        y_aux = np.zeros(list(y[0].shape) + [self.n_classes_text[id_out]]).astype(np.uint8)
+                        for idx in range(y[0].shape[0]):
+                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(np.uint8)
+                        y_aux = (y_aux, y[1]) # join data and mask
                     y = y_aux
             Y.append(y)
         
@@ -1805,7 +1816,7 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in])
+                                      fill=self.fill_text[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
                 elif(type_in == 'video-features'):
@@ -1832,12 +1843,17 @@ class Dataset(object):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out])
-                    y_aux = np.zeros(list(y.shape)+[self.n_classes_text[id_out]]).astype(np.uint8)
+
+                    # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                    # Use words separately (generator model)
                     else:
-                        for idx in range(y.shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[idx], self.n_classes_text[id_out]).astype(np.uint8)
+                        y_aux = np.zeros(list(y[0].shape) + [self.n_classes_text[id_out]]).astype(np.uint8)
+                        for idx in range(y[0].shape[0]):
+                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(
+                                np.uint8)
+                        y_aux = (y_aux, y[1])  # join data and mask
                     y = y_aux
             Y.append(y)
 
@@ -1889,6 +1905,18 @@ class Dataset(object):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out])
+
+                    # Use whole sentence as class (classifier model)
+                    if self.max_text_len[id_out][set_name] == 0:
+                        y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                    # Use words separately (generator model)
+                    else:
+                        y_aux = np.zeros(list(y[0].shape) + [self.n_classes_text[id_out]]).astype(np.uint8)
+                        for idx in range(y[0].shape[0]):
+                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(
+                                np.uint8)
+                        y_aux = (y_aux, y[1])  # join data and mask
+                    y = y_aux
             Y.append(y)
 
         return Y

@@ -1247,21 +1247,35 @@ class CNN_Model(object):
             X = X_new
 
         # Format output data (only one output possible for Sequential models)
+        Y_sample_weights = None
         if(Y is not None):
             if(len(self.outputsMapping.keys()) == 1): # single output
-                Y = Y[self.outputsMapping[0]]
+                if isinstance(Y[self.outputsMapping[0]], tuple):
+                    Y = Y[self.outputsMapping[0]][0]
+                    Y_sample_weights = Y[self.outputsMapping[0]][1]
+                else:
+                    Y = Y[self.outputsMapping[0]]
             else:
                 Y_new = [0 for i in range(len(self.outputsMapping.keys()))] # multiple outputs
+                Y_sample_weights = [None for i in range(len(self.outputsMapping.keys()))]
                 for out_model, out_ds in self.outputsMapping.iteritems():
-                    Y_new[out_model] = Y[out_ds]
+                    if isinstance(Y[out_ds], tuple):
+                        Y_new[out_model] = Y[out_ds][0]
+                        Y_sample_weights[out_model] = Y[out_ds][1]
+                    else:
+                        Y_new[out_model] = Y[out_ds]
                 Y = Y_new
 
-        return [X, Y]
+        if Y_sample_weights is None:
+            return [X, Y]
+        else:
+            return [X, Y, Y_sample_weights]
 
 
     def _prepareModelData(self, X, Y=None):
         X_new = dict()
         Y_new = dict()
+        Y_sample_weights = dict()
 
         # Format input data
         for in_model, in_ds in self.inputsMapping.iteritems():
@@ -1270,14 +1284,20 @@ class CNN_Model(object):
         # Format output data
         if(Y is not None):
             for out_model, out_ds in self.outputsMapping.iteritems():
-                Y_new[out_model] = Y[out_ds]
+                if isinstance(Y[out_ds], tuple):
+                    Y_new[out_model] = Y[out_ds][0]
+                    Y_sample_weights[out_model] = Y[out_ds][1]
+                else:
+                    Y_new[out_model] = Y[out_ds]
 
-        return [X_new, Y_new]
+        return [X_new, Y_new, Y_sample_weights]
 
 
     def _prepareGraphData(self, X, Y=None):
 
         data = dict()
+        data_sample_weight = dict()
+        any_sample_weight = False
         last_out = self.acc_output
 
         # Format input data
@@ -1289,18 +1309,17 @@ class CNN_Model(object):
             if(Y is None):
                 data[out_model] = None
             else:
-                data[out_model] = Y[out_ds]
+                if isinstance(Y[out_ds], tuple):
+                    data[out_model] = Y[out_ds][0]
+                    data_sample_weight[out_model] = Y[out_ds][1]
+                    any_sample_weight = True
+                else:
+                    data[out_model] = Y[out_ds]
 
-        # Currently all samples are assigned to all inputs and all labels to all outputs
-        #data = dict()
-        #last_out = ''
-        #for input in self.model.input_order:
-        #    data[input] = X
-        #for output in self.model.output_order:
-        #    data[output] = Y
-        #    last_out = output
-
-        return [data, last_out]
+        if any_sample_weight:
+            return [(data, data_sample_weight), last_out]
+        else:
+            return [data, last_out]
 
 
     def _getGraphAccuracy(self, data, prediction, topN=5):
