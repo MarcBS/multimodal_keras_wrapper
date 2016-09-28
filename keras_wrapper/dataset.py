@@ -783,7 +783,7 @@ class Dataset(object):
         return data
     
     
-    def loadFeatures(self, X, feat_len, normalization_type='L2', normalization=False, loaded=False, external=False):
+    def loadFeatures(self, X, feat_len, normalization_type='L2', normalization=False, loaded=False, external=False, data_augmentation=True):
         
         if(normalization and normalization_type not in self.__available_norm_feat):
             raise NotImplementedError('The chosen normalization type '+ normalization_type +' is not implemented for the type "image-features" and "video-features".')
@@ -795,9 +795,14 @@ class Dataset(object):
             if(not external):
                 feat = self.path +'/'+ feat
 
-            # Check if the filename includes the extension
             feat = np.load(feat)
-            
+
+            if(data_augmentation):
+                noise_mean = 0.0
+                noise_dev = 0.01
+                noise = np.random.normal(noise_mean, noise_dev, feat.shape)
+                feat += noise
+
             if(normalization):
                 if normalization_type == 'L2':
                     feat = feat / np.linalg.norm(feat,ord=2)
@@ -1272,7 +1277,7 @@ class Dataset(object):
         return V
     
     
-    def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len, external=False):
+    def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len, external=False, data_augmentation=True):
         
         n_videos = len(idx_videos)
         features = np.zeros((n_videos, max_len, feat_len))
@@ -1295,6 +1300,12 @@ class Dataset(object):
 
                 # Check if the filename includes the extension
                 feat = np.load(feat)
+
+                if(data_augmentation):
+                    noise_mean = 0.0
+                    noise_dev = 0.01
+                    noise = np.random.normal(noise_mean, noise_dev, feat.shape)
+                    feat += noise
 
                 if(normalization):
                     if normalization_type == 'L2':
@@ -1330,38 +1341,6 @@ class Dataset(object):
 
         return V
 
-    '''
-    def loadVideoFeaturesByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization, feat_len, external=False):
-
-        n_videos = len(indices)
-        features = np.zeros((n_videos, max_len, feat_len))
-
-        n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in indices]
-        
-        idx = [0 for i in range(n_videos)]
-        # recover all indices from image's paths of all videos
-        for v in range(n_videos):
-            idx[v] = int(indices[v])
-            idx[v] = int(sum(self.counts_frames[id][set_name][:indices[v]]))
-        # load images from each video
-        for enum, (n, i) in enumerate(zip(n_frames, idx)):
-            paths = self.paths_frames[id][set_name][i:i+n]
-
-            for j, feat in enumerate(paths):
-                if(not external):
-                    feat = self.path +'/'+ feat
-
-                # Check if the filename includes the extension
-                feat = np.load(feat)
-
-                if(normalization):
-                    if normalization_type == 'L2':
-                        feat = feat / np.linalg.norm(feat,ord=2)
-
-                features[enum,j] = feat
-
-        return np.array(features)
-    '''
         
     # ------------------------------------------------------- #
     #       TYPE 'id' SPECIFIC FUNCTIONS
@@ -1686,10 +1665,10 @@ class Dataset(object):
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in])[0]
                 elif(type_in == 'image-features'):
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
-                                          normalization_type, normalization, self.features_lengths[id_in])
+                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
             X.append(x)
         
         return X
@@ -1750,10 +1729,10 @@ class Dataset(object):
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in])[0]
                 elif(type_in == 'image-features'):
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], 
-                                          normalization_type, normalization, self.features_lengths[id_in])
+                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
             X.append(x)
             
         # Recover output samples
@@ -1845,10 +1824,10 @@ class Dataset(object):
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in])[0]
                 elif(type_in == 'image-features'):
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization)
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], 
-                                          normalization_type, normalization, self.features_lengths[id_in])
+                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
             X.append(x)
 
         # Recover output samples
