@@ -1235,7 +1235,7 @@ class CNN_Model(object):
         return data
 
 
-    def _prepareSequentialData(self, X, Y=None):
+    def _prepareSequentialData(self, X, Y=None,sample_weights=False):
 
         # Format input data
         if(len(self.inputsMapping.keys()) == 1): # single input
@@ -1266,10 +1266,7 @@ class CNN_Model(object):
                         Y_new[out_model] = Y[out_ds]
                 Y = Y_new
 
-        if Y_sample_weights is None:
-            return [X, Y]
-        else:
-            return [X, Y, Y_sample_weights]
+        return [X, Y] if Y_sample_weights is None else [X, Y, Y_sample_weights]
 
 
     def _prepareModelData(self, X, Y=None):
@@ -1290,7 +1287,7 @@ class CNN_Model(object):
                 else:
                     Y_new[out_model] = Y[out_ds]
 
-        return [X_new, Y_new, Y_sample_weights]
+        return [X_new, Y_new] if Y_sample_weights == dict() else [X_new, Y_new, Y_sample_weights]
 
 
     def _prepareGraphData(self, X, Y=None):
@@ -1316,10 +1313,7 @@ class CNN_Model(object):
                 else:
                     data[out_model] = Y[out_ds]
 
-        if any_sample_weight:
-            return [(data, data_sample_weight), last_out]
-        else:
-            return [data, last_out]
+        return [(data, data_sample_weight), last_out] if any_sample_weight else [data, last_out]
 
 
     def _getGraphAccuracy(self, data, prediction, topN=5):
