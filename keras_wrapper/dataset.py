@@ -166,18 +166,41 @@ class Homogeneous_Data_Batch_Generator(object):
         self.params = {'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
                        'normalize_images': normalize_images,
-                       'num_iterations': num_iterations}
+                       'num_iterations': num_iterations,
+                       'batch_size': batch_size}
         self.prepare()
         self.reset()
 
 
 
     def prepare(self):
-        #TODO: Deal with multiple outputs!
-        self.data = self.dataset.getY(self.set_split, normalization=self.params['normalize_images'],
-                                             meanSubstraction=self.params['mean_substraction'])[0] # TODO: This 0 is harcoded!
+        self.lengths = []
+        
+        it = 0
+        finished_iterations = False
+        while not finished_iterations:
+            it += 1
+            
+            # Checks if we are finishing processing the data split
+            init_sample = (it-1)*self.params['batch_size']
+            final_sample = it*self.params['batch_size']
+            batch_size = self.params['batch_size']
+            n_samples_split = eval("self.dataset.len_"+self.set_split)
+            if final_sample >= n_samples_split:
+                final_sample = n_samples_split
+                batch_size = final_sample-init_sample
+                finished_iterations = True
+            
+            #TODO: Deal with multiple outputs!
+            Y_batch = self.dataset.getY(self.set_split, init_sample, final_sample,
+                                    normalization=self.params['normalize_images'],
+                                    meanSubstraction=self.params['mean_substraction'])[0] # TODO: first output selection, this 0 is harcoded!
+            Y_batch = Y_batch[1] # just use mask
+
+            batch_lengths = [int(np.sum(cc)) for cc in Y_batch]
+            self.lengths += batch_lengths
+            
         # find the unique lengths
-        self.lengths = [len(np.nonzero(cc)[0]) for cc in self.data]
         self.len_unique = np.unique(self.lengths)
 
         # remove any overly long captions
@@ -1862,14 +1885,14 @@ class Dataset(object):
 
         return [X,Y]
 
-    def getY(self, set_name, normalization_type='0-1', normalization=False, meanSubstraction=True,
+    def getY(self, set_name, init, final, normalization_type='0-1', normalization=False, meanSubstraction=True,
               dataAugmentation=True, debug=False):
         """
             Gets the [Y] samples for the FULL dataset
 
             :param set_name: 'train', 'val' or 'test' set
-            :param k: number of consecutive samples retrieved from the corresponding set.
-            :param sorted_batches: If True, it will pick data of the same size
+            :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than final.
+            :param final: final position in the corresponding set split.
             :param debug: if True all data will be returned without preprocessing
 
 
@@ -1889,10 +1912,17 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 1)
 
+        if(final > eval('self.len_'+set_name)):
+            raise Exception('"final" index must be smaller than the number of samples in the set.')
+        if(init < 0):
+            raise Exception('"init" index must be equal or greater than 0.')
+        if(init >= final):
+            raise Exception('"init" index must be smaller than "final" index.')
+        
         # Recover output samples
         Y = []
         for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
-            y = eval('self.Y_'+set_name+'[id_out][:]')
+            y = eval('self.Y_'+set_name+'[id_out][init:final]')
 
             # Pre-process outputs
             if(not debug):
