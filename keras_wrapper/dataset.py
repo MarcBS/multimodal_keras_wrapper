@@ -137,8 +137,8 @@ class Data_Batch_Generator(object):
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
 
-                    #print 'description words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for  sample in Y_batch[0]]]
-
+                    #print 'description words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0][0]]]
+                    #print 'Mask:', Y_batch[0][1]
                     data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
 
@@ -278,7 +278,7 @@ class Dataset(object):
         self.len_val = 0
         self.len_test = 0
         
-        # Initlize dictionaries of samples
+        # Initialize dictionaries of samples
         self.X_train = dict()
         self.X_val = dict()
         self.X_test = dict()
@@ -297,6 +297,7 @@ class Dataset(object):
 
         self.ids_outputs = []
         self.types_outputs = [] # see accepted types in self.__accepted_types_outputs
+        self.sample_weights = dict() # Choose whether we should compute output masks or not
 
         # List of implemented input and output data types
         self.__accepted_types_inputs = ['image', 'video', 'image-features', 'video-features', 'text', 'id']
@@ -614,7 +615,7 @@ class Dataset(object):
     
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,                   # 'text'
-                  build_vocabulary=False, max_words=0):
+                  build_vocabulary=False, max_words=0, sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
             
@@ -650,7 +651,7 @@ class Dataset(object):
         if(type not in self.__accepted_types_outputs):
             raise NotImplementedError('The output type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_outputs))
 
-        # Proprocess the output data depending on its type
+        # Preprocess the output data depending on its type
         if(type == 'categorical'):
             data = self.preprocessCategorical(path_list)
         elif(type == 'text'):
@@ -665,9 +666,11 @@ class Dataset(object):
             
         if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1):  
             data = list(np.repeat(data,repeat_set))
-
+        if self.sample_weights.get(id) is None:
+            self.sample_weights[id] = dict()
+        self.sample_weights[id][set_name] = sample_weights
         self.__setOutput(data, set_name, type, id)
-    
+
     
     def __setOutput(self, labels, set_name, type, id):
         exec('self.Y_'+set_name+'[id] = labels')
@@ -1749,16 +1752,17 @@ class Dataset(object):
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out])
-
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+
                     # Use words separately (generator model)
                     else:
                         y_aux = np.zeros(list(y[0].shape) + [self.n_classes_text[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
                             y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(np.uint8)
-                        y_aux = (y_aux, y[1]) # join data and mask
+                        if self.sample_weights[id_out][set_name]:
+                            y_aux = (y_aux, y[1]) # join data and mask
                     y = y_aux
             Y.append(y)
         
@@ -1853,7 +1857,8 @@ class Dataset(object):
                         for idx in range(y[0].shape[0]):
                             y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(
                                 np.uint8)
-                        y_aux = (y_aux, y[1])  # join data and mask
+                        if self.sample_weights[id_out][set_name]:
+                            y_aux = (y_aux, y[1]) # join data and mask
                     y = y_aux
             Y.append(y)
 
@@ -1915,7 +1920,9 @@ class Dataset(object):
                         for idx in range(y[0].shape[0]):
                             y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(
                                 np.uint8)
-                        y_aux = (y_aux, y[1])  # join data and mask
+                        if self.sample_weights[id_out][set_name]:
+                            y_aux = (y_aux, y[1]) # join data and mask
+
                     y = y_aux
             Y.append(y)
 
