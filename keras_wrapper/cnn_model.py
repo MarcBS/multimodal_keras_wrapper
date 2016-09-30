@@ -962,48 +962,53 @@ class CNN_Model(object):
 
 
     def predict_cond(self, X, states_below, params, ii):
-        p = []
-        for state_below in states_below:
-            X['state_below'] = state_below.reshape(1,-1)
-            #data = self.model_test.predict_on_batch(X)
-            data = self.model.predict_on_batch(X)
-            # Get probs of all words in the current timestep
-            if len(params['model_outputs']) > 1:
-                all_data = {}
-                for output_id in range(len(params['model_outputs'])):
-                    print output_id, data[output_id]
-                    all_data[params['model_outputs'][output_id]] = data[output_id]
-                all_data[params['model_outputs'][0]] = np.array(all_data[params['model_outputs'][0]])[:, ii, :]
-            else:
-                all_data = {params['model_outputs'][0]: np.array(data)[:, ii, :]}
-            # Append the prob distribution
-            p.append(all_data[params['model_outputs'][0]])
-        p = np.asarray(p)
-        return p[:, 0, :]
+        x = {}
+        n_samples = states_below.shape[0]
+        for model_input in params['model_inputs']:
+            if model_input is not 'state_below':
+                if X[model_input].shape[0] == 1:
+                    #TODO: More generic inputs (e.g. for 1D-2D inputs)
+                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0).reshape((n_samples, X[model_input].shape[1],
+                                                                          X[model_input].shape[2]))
+        x['state_below'] = states_below
+        data = self.model.predict_on_batch(x)
+        if len(params['model_outputs']) > 1:
+            all_data = {}
+            for output_id in range(len(params['model_outputs'])):
+                all_data[params['model_outputs'][output_id]] = data[output_id]
+            all_data[params['model_outputs'][0]] = np.array(all_data[params['model_outputs'][0]])[:, ii, :]
+        else:
+             all_data = {params['model_outputs'][0]: np.array(data)[:, ii, :]}
+
+        return all_data[params['model_outputs'][0]]
 
     def beam_search(self, X, params, null_sym=2):
 
-        k = params['beam_size']
-        sample = []
-        sample_score = []
+        k = params['beam_size'] + 1
+        samples = []
+        sample_scores = []
 
         dead_k = 0  # samples that reached eos
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
-        state_below = np.asarray([np.zeros(params['maxlen'])+null_sym]* live_k)
+        state_below = np.asarray([null_sym] * live_k)
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             probs = self.predict_cond(X, state_below, params, ii)
-
             # total score for every sample is sum of -log of word prb
             cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
+            # Find the best options by calling argsort of flatten array
             ranks_flat = cand_flat.argsort()[:(k-dead_k)]
+
+            # Decypher flatten indices
             voc_size = probs.shape[1]
             trans_indices = ranks_flat / voc_size # index of row
             word_indices = ranks_flat % voc_size # index of col
             costs = cand_flat[ranks_flat]
+
+            # Form a beam for the next iteration
             new_hyp_samples = []
             new_hyp_scores = np.zeros(k-dead_k).astype('float32')
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
@@ -1016,8 +1021,8 @@ class CNN_Model(object):
             hyp_scores = []
             for idx in xrange(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == 0:
-                    sample.append(new_hyp_samples[idx])
-                    sample_score.append(new_hyp_scores[idx])
+                    samples.append(new_hyp_samples[idx])
+                    sample_scores.append(new_hyp_scores[idx])
                     dead_k += 1
                 else:
                     new_live_k += 1
@@ -1032,13 +1037,14 @@ class CNN_Model(object):
                 break
             state_below = np.asarray(hyp_samples, dtype='int64')
             state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below))
-                                     #np.zeros((state_below.shape[0], ii),dtype='int64')))
+
         # dump every remaining one
         if live_k > 0:
             for idx in xrange(live_k):
-                sample.append(hyp_samples[idx])
-                sample_score.append(hyp_scores[idx])
-        return sample, sample_score
+                samples.append(hyp_samples[idx])
+                sample_scores.append(hyp_scores[idx])
+
+        return samples, sample_scores
 
     def BeamSearchNet(self, ds, parameters):
         '''
@@ -1061,6 +1067,7 @@ class CNN_Model(object):
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
+                          'normalize': False,
                           'sampling_type': 'max_likelihood'
                           }
         params = self.checkParameters(parameters, default_params)
@@ -1124,14 +1131,20 @@ class CNN_Model(object):
                     for input_id in params['dataset_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                    out.append(samples[0])
-                    total_cost += scores[0]
+                    if params['normalize']:
+                        counts = [len(sample) for sample in samples]
+                        scores = [co / cn for co, cn in zip(scores, counts)]
+                    best_score = np.argmin(scores)
+                    best_sample = samples[best_score]
+                    out.append(best_sample)
+                    total_cost += scores[best_score]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
                     if params['n_samples'] > 0:
                         for output_id in params['dataset_outputs']:
                             references.append(Y[output_id][i])
-            sys.stdout.write('Cost of the translations: %f\n'%scores[0])
+            sys.stdout.write('Cost of the translations: %f\n'%total_cost)
             sys.stdout.flush()
+
             predictions[s] = np.asarray(out)
 
         if params['n_samples'] < 1:
