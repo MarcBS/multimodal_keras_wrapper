@@ -1289,7 +1289,46 @@ class Dataset(object):
         for v in range(n_videos):
             last_idx = idx_videos[v]
             idx[v] = int(sum(self.counts_frames[id][set_name][:last_idx]))
-        
+
+
+        # select subset of max_len from n_frames[i]
+        selected_frames = [0 for i_nvid in range(n_videos)]
+        for enum, (n, i) in enumerate(zip(n_frames, idx)):
+            paths = self.paths_frames[id][set_name][i:i + n]
+
+            if(data_augmentation): # apply random frames selection
+                selected_idx = sorted(random.sample(range(n), min(max_len, n)))
+            else: # apply equidistant frames selection
+                selected_idx = np.round(np.linspace(0, n-1, min(max_len, n)))
+                #splits = np.array_split(range(n), min(max_len, n))
+                #selected_idx = [s[0] for s in splits]
+
+            selected_paths = [paths[int(idx)] for idx in selected_idx]
+            selected_frames[enum] = selected_paths
+
+
+        # load features from selected paths
+        for i, vid_paths in enumerate(selected_frames):
+            for j, feat in enumerate(vid_paths):
+                if (not external):
+                    feat = self.path + '/' + feat
+
+                # Check if the filename includes the extension
+                feat = np.load(feat)
+
+                if (data_augmentation):
+                    noise_mean = 0.0
+                    noise_dev = 0.01
+                    noise = np.random.normal(noise_mean, noise_dev, feat.shape)
+                    feat += noise
+
+                if (normalization):
+                    if normalization_type == 'L2':
+                        feat = feat / np.linalg.norm(feat, ord=2)
+
+                features[i, j] = feat
+
+        '''
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
@@ -1312,7 +1351,8 @@ class Dataset(object):
                         feat = feat / np.linalg.norm(feat,ord=2)
 
                 features[enum,j] = feat
-        
+        '''
+
         return np.array(features)
 
     
