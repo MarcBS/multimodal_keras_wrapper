@@ -235,8 +235,9 @@ def loadMSVD():
 def loadFood101():
     
     logging.info('Loading Food101 dataset')
+    logging.info('INFO: in order to load this dataset it must be placed in ../data/Food101/images/ after downloading it form https://www.vision.ee.ethz.ch/datasets_extra/food-101/')
     
-    base_path = '../data/'
+    base_path = '../data/Food101/'
     name = 'Food101'
     ds = Dataset(name, base_path+'images')
     
