@@ -15,7 +15,7 @@ def main_test():
     #loadFlickr8k() # load Flickr8k dataset for Image Description
     
     #loadMSVD() # load MSVD dataset for Video Description
-    
+
     loadFood101() # load Food101 dataset for Image Classification
 
     
@@ -68,11 +68,11 @@ def classifyFood101():
     pos_labels = ds.types_outputs.index('categorical')
     
     # the first input of our dataset (pos_images) will also be the first input of our model (named vis_input)
-    inputMapping = {0: pos_images}
+    inputMapping = {'vis_input': pos_images}
     net.setInputsMapping(inputMapping)
     
     # the first output of our dataset (pos_labels) will also be the first output of our model (named output)
-    outputMapping = {0: pos_labels}
+    outputMapping = {'output': pos_labels}
     net.setOutputsMapping(outputMapping, acc_output='output')
 
     
@@ -97,7 +97,7 @@ def classifyFood101():
     #net.testNet(ds, test_params)
     
     # Predict network on all sets
-    test_params['predict_on_sets'] = ['train', 'val', 'test']
+    test_params['predict_on_sets'] = ['val']
     predictions = net.predictNet(ds, test_params)
     
     logging.info("Done")
@@ -236,7 +236,7 @@ def loadFood101():
     
     logging.info('Loading Food101 dataset')
     
-    base_path = '/media/HDD_2TB/DATASETS/Food_101_Dataset/'
+    base_path = '../data/'
     name = 'Food101'
     ds = Dataset(name, base_path+'images')
     
