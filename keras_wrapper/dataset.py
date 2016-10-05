@@ -323,7 +323,7 @@ class Dataset(object):
         self.sample_weights = dict() # Choose whether we should compute output masks or not
 
         # List of implemented input and output data types
-        self.__accepted_types_inputs = ['image', 'video', 'image-features', 'video-features', 'text', 'id']
+        self.__accepted_types_inputs = ['image', 'video', 'image-features', 'video-features', 'text', 'id', 'ghost']
         self.__accepted_types_outputs = ['categorical', 'binary', 'text', 'id']
         #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
@@ -610,8 +610,9 @@ class Dataset(object):
             data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len)
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id, set_name)
-       
-        if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1): 
+        elif(type == 'ghost'):
+            data = []
+        if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1):
             data = list(np.repeat(data,repeat_set))
         
         self.__setInput(data, set_name, type, id)
@@ -620,8 +621,8 @@ class Dataset(object):
     def __setInput(self, set, set_name, type, id):
         exec('self.X_'+set_name+'[id] = set')
         exec('self.loaded_'+set_name+'[0] = True')
-        exec('self.len_'+set_name+' = len(set)')
         if id not in self.optional_inputs:
+            exec('self.len_'+set_name+' = len(set)')
             self.__checkLengthSet(set_name)
         
         if(not self.silence):
@@ -1060,8 +1061,7 @@ class Dataset(object):
                 Removes some punctuation
                 Lowercase
         """
-        tokenized = re.sub('[.,"\n\t]+', '', caption.strip())
-        tokenized = re.sub('[\']+', " '", tokenized)
+        tokenized = re.sub('[.,"\n\t]+', '', caption)
         tokenized = re.sub('[  ]+', ' ', tokenized)
         tokenized = map(lambda x: x.lower(), tokenized.split())
         tokenized = " ".join(tokenized)
@@ -1691,10 +1691,19 @@ class Dataset(object):
             raise Exception('"init" index must be smaller than "final" index.')
         
         X = []
-        for id_in,type_in in zip(self.ids_inputs, self.types_inputs):
-            x = eval('self.X_'+set_name+'[id_in][init:final]')
-            
-            if(not debug):
+        for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
+            ghost_x = False
+            if id_in in self.optional_inputs:
+                try:
+                    x = eval('self.X_'+set_name+'[id_in][init:final]')
+                    assert len(x) == (final - init)
+                except:
+                    x = [[]] * (final - init)
+                    ghost_x = True
+            else:
+                x = eval('self.X_'+set_name+'[id_in][init:final]')
+
+            if not debug and not ghost_x:
                 if(type_in == 'image'):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
@@ -1749,10 +1758,19 @@ class Dataset(object):
         # Recover input samples
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
-            if(surpassed):
-                x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
+
+            if id_in in self.optional_inputs:
+                try:
+                    if(surpassed):
+                        x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
+                    else:
+                        x = eval('self.X_'+set_name+'[id_in][last:new_last]')
+                except: x = []
             else:
-                x = eval('self.X_'+set_name+'[id_in][last:new_last]')
+                if(surpassed):
+                    x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
+                else:
+                    x = eval('self.X_'+set_name+'[id_in][last:new_last]')
                 
             #if(set_name=='val'):
             #    logging.info(x)
@@ -1848,12 +1866,20 @@ class Dataset(object):
         # Recover input samples
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
-            x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+            ghost_x = False
+            if id_in in self.optional_inputs:
+                try:
+                    x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+                except:
+                    x = [[]] * len(k)
+                    ghost_x = True
+            else:
+                x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
             #if(set_name=='val'):
             #    logging.info(x)
 
             # Pre-process inputs
-            if(not debug):
+            if not debug and not ghost_x:
                 if(type_in == 'image'):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
