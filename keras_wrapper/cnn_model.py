@@ -1142,7 +1142,7 @@ class CNN_Model(object):
                     if params['n_samples'] > 0:
                         for output_id in params['dataset_outputs']:
                             references.append(Y[output_id][i])
-            sys.stdout.write('Cost of the translations: %f\n'%total_cost)
+            sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
             sys.stdout.flush()
 
             predictions[s] = np.asarray(out)
