@@ -968,8 +968,8 @@ class CNN_Model(object):
             if model_input is not 'state_below':
                 if X[model_input].shape[0] == 1:
                     #TODO: More generic inputs (e.g. for 1D-2D inputs)
-                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0).reshape((n_samples, X[model_input].shape[1],
-                                                                          X[model_input].shape[2]))
+                    n_dim = len(X[model_input].shape)
+                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0)#.reshape((n_samples, X[model_input].shape[1],X[model_input].shape[2]))
         x['state_below'] = states_below
         data = self.model.predict_on_batch(x)
         if len(params['model_outputs']) > 1:
@@ -1142,7 +1142,7 @@ class CNN_Model(object):
                     if params['n_samples'] > 0:
                         for output_id in params['dataset_outputs']:
                             references.append(Y[output_id][i])
-            sys.stdout.write('Cost of the translations: %f\n'%total_cost)
+            sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
             sys.stdout.flush()
 
             predictions[s] = np.asarray(out)
