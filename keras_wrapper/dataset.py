@@ -342,6 +342,8 @@ class Dataset(object):
         self.n_classes_text = dict() # only used for output text
         self.text_offset = dict()    # number of timesteps that the text is shifted (to the right)
         self.fill_text = dict()      # text padding mode
+        self.pad_on_batch = dict()   # text padding mode: If pad_on_batch, the sample will have the maximum length
+                                     # of the current batch. Else, it will have a fixed length (max_text_len)
 
         #################################################
         
@@ -535,7 +537,7 @@ class Dataset(object):
     
     def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1, required=True,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                             # 'image' / 'video'
-                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
+                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0, pad_on_batch=True,  # 'text'
                  build_vocabulary=False, max_words=0,
                  feat_len = 1024,                                                                 # 'image-features' / 'video-features'
                  max_video_len=26                                                                 # 'video'
@@ -603,7 +605,7 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ)
+                                       max_words, offset, fill, min_occ, pad_on_batch)
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif(type == 'video-features'):
@@ -638,7 +640,7 @@ class Dataset(object):
         self.setOutput(self, labels_list, set_name, type, id)
     
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,                   # 'text'
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0, pad_on_batch=True, # 'text'
                   build_vocabulary=False, max_words=0, sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -682,7 +684,7 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ)
+                                       max_words, offset, fill, min_occ, pad_on_batch)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
         elif(type == 'id'):
@@ -817,7 +819,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
     
     def preprocessText(self, annotations_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                       max_words, offset, fill, min_occ):
+                       max_words, offset, fill, min_occ, pad_on_batch):
         
         sentences = []
         if(isinstance(annotations_list, str) and os.path.isfile(annotations_list)):
@@ -859,6 +861,7 @@ class Dataset(object):
         self.n_classes_text[id] = len(self.vocabulary[id]['words2idx'])
         self.text_offset[id] = offset
         self.fill_text[id] = fill
+        self.pad_on_batch[id] = pad_on_batch
 
         return sentences
     
@@ -958,7 +961,7 @@ class Dataset(object):
         
 
 
-    def loadText(self, X, vocabularies, max_len, offset, fill):
+    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch):
         """
             Text encoder. Transforms samples from a text representation into a numerical one.
             If fill=='start' the resulting vector will be filled with 0s at the beginning, 
@@ -976,11 +979,12 @@ class Dataset(object):
                     X_out[i] = vocab['<unk>']
             
         else: # process text as a sequence of words
-
-            max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
+            if pad_on_batch:
+                max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
+            else:
+                max_len_batch = max_len
             X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
             X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
-
             if max_len_batch == max_len:
                 max_len_batch -= 1 # always leave space for <eos> symbol
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
@@ -1712,7 +1716,7 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in], 
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in])[0]
+                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
@@ -1785,7 +1789,7 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in])[0]
+                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
@@ -1811,7 +1815,7 @@ class Dataset(object):
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
-                                      fill=self.fill_text[id_out])
+                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out])
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
@@ -1888,7 +1892,7 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in])[0]
+                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
@@ -1914,7 +1918,7 @@ class Dataset(object):
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
-                                      fill=self.fill_text[id_out])
+                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out])
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
@@ -1984,7 +1988,7 @@ class Dataset(object):
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
-                                      fill=self.fill_text[id_out])
+                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out])
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
