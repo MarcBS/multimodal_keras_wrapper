@@ -36,6 +36,7 @@ export PYTHONPATH=$PYTHONPATH:/path/to/staged_keras_wrapper
 You can see more practical examples in projects which use this library:
 
 [VIBIKNet for Visual Question Answering](https://github.com/MarcBS/VIBIKNet)
+
 [ABiViRNet for Video Description](https://github.com/lvapeab/ABiViRNet)
 
 ## Keras
