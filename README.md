@@ -13,11 +13,9 @@ See code examples in demo.ipynb and test.py
 
 The following dependencies are required for using this library:
 
-[Anaconda](https://www.continuum.io/downloads)
-
-Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
-
-[cloud](https://pypi.python.org/pypi/cloud/2.7.2) >= 2.8.5
+ - [Anaconda](https://www.continuum.io/downloads)
+ - Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
+ - [cloud](https://pypi.python.org/pypi/cloud/2.7.2) >= 2.8.5
 
 
 ## Installation
@@ -38,6 +36,7 @@ export PYTHONPATH=$PYTHONPATH:/path/to/staged_keras_wrapper
 You can see more practical examples in projects which use this library:
 
 [VIBIKNet for Visual Question Answering](https://github.com/MarcBS/VIBIKNet)
+[ABiViRNet for Video Description](https://github.com/lvapeab/ABiViRNet)
 
 ## Keras
 
