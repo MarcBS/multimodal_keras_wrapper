@@ -136,8 +136,8 @@ class Data_Batch_Generator(object):
                                                  normalization=self.params['normalize_images'],
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
-
-                    #print 'description words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0][0]]]
+                    #print 'source words:', [map(lambda x: self.dataset.vocabulary['source_text']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in X_batch[0]]]
+                    #print 'target words:', [map(lambda x: self.dataset.vocabulary['target_text']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0]]]
                     #print 'Mask:', Y_batch[0][1]
                     data = self.net.prepareData(X_batch, Y_batch)
             yield(data)
@@ -989,7 +989,7 @@ class Dataset(object):
                 max_len_batch -= 1 # always leave space for <eos> symbol
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
-                x = X[i].split(' ')
+                x = X[i].strip().split(' ')
                 len_j = len(x)
                 if(fill=='start'):
                     offset_j = max_len_batch - len_j
@@ -1003,6 +1003,7 @@ class Dataset(object):
                     if w in vocab:
                         X_out[i,j+offset_j] = vocab[w]
                     else:
+                        print w, "not in vocab!"
                         X_out[i,j+offset_j] = vocab['<unk>']
                     X_mask[i,j+offset_j] = 1  # fill mask
                 X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
