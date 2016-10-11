@@ -1589,7 +1589,12 @@ class Dataset(object):
                         im = path+'/'+filename[0]
                 
                 # Read image
-                im = misc.imread(im)
+                try:
+                    im = misc.imread(im)
+                except:
+                    logging.warning("WARNING!")
+                    logging.warning("Can't load image "+im)
+                    im = np.zeros(tuple(self.img_size[id]))
             
             # Resize and convert to RGB (if in greyscale)
             im = misc.imresize(im, tuple(self.img_size[id])).astype(type_imgs)
