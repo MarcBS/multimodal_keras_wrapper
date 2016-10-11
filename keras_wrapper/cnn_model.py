@@ -967,8 +967,6 @@ class CNN_Model(object):
         for model_input in params['model_inputs']:
             if model_input is not 'state_below':
                 if X[model_input].shape[0] == 1:
-                    #TODO: More generic inputs (e.g. for 1D-2D inputs)
-                    n_dim = len(X[model_input].shape)
                     x[model_input] = np.repeat(X[model_input], n_samples, axis=0)#.reshape((n_samples, X[model_input].shape[1],X[model_input].shape[2]))
         x['state_below'] = states_below
         data = self.model.predict_on_batch(x)
