@@ -1003,7 +1003,7 @@ class Dataset(object):
                     if w in vocab:
                         X_out[i,j+offset_j] = vocab[w]
                     else:
-                        print w, "not in vocab!"
+                        #print w, "not in vocab!"
                         X_out[i,j+offset_j] = vocab['<unk>']
                     X_mask[i,j+offset_j] = 1  # fill mask
                 X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
