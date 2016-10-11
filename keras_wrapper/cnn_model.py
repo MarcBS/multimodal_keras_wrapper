@@ -1111,22 +1111,22 @@ class CNN_Model(object):
                 data = data_gen.next()
                 X = dict()
                 if params['n_samples'] > 0:
-                    for input_id in params['dataset_inputs']:
+                    for input_id in params['model_inputs']:
                         X[input_id] = data[0][input_id]
                     Y = dict()
-                    for output_id in params['dataset_outputs']:
+                    for output_id in params['model_outputs']:
                         Y[output_id] = data[1][output_id]
                 else:
-                    for input_id in params['dataset_inputs']:
+                    for input_id in params['model_inputs']:
                         X[input_id] = data[input_id]
 
-                for i in range(len(X[params['dataset_inputs'][0]])):
+                for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
                     sys.stdout.write('\r')
                     sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
                     sys.stdout.flush()
                     x = dict()
-                    for input_id in params['dataset_inputs']:
+                    for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                     if params['normalize']:
@@ -1138,7 +1138,7 @@ class CNN_Model(object):
                     total_cost += scores[best_score]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
                     if params['n_samples'] > 0:
-                        for output_id in params['dataset_outputs']:
+                        for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
             sys.stdout.flush()
