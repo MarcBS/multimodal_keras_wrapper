@@ -418,7 +418,7 @@ class CNN_Model(object):
 
     def ended_training(self):
         """
-            Indicates if the model has earlier stopped.
+            Indicates if the model has early stopped.
         """
         if hasattr(self.model, 'callback_model') and self.model.callback_model:
             callback_model = self.callback_model
