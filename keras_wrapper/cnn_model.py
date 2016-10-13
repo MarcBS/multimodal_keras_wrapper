@@ -1079,7 +1079,7 @@ class CNN_Model(object):
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
-                          'normalize': False,
+                          'normalize': False, 'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood'
                           }
         params = self.checkParameters(parameters, default_params)
@@ -1144,7 +1144,7 @@ class CNN_Model(object):
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                     if params['normalize']:
-                        counts = [len(sample) for sample in samples]
+                        counts = [len(sample)**params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
