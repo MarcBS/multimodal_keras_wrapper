@@ -139,7 +139,16 @@ class Data_Batch_Generator(object):
                     #print 'source words:', [map(lambda x: self.dataset.vocabulary['source_text']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in X_batch[0]]]
                     #print 'target words:', [map(lambda x: self.dataset.vocabulary['target_text']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0]]]
                     #print 'Mask:', Y_batch[0][1]
+
+                    # Fake outputs for debugging
+                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 64, 112, 112))
+                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 1, 112, 112))
+                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 64))
+                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 1000))
+                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], 1000))
+
                     data = self.net.prepareData(X_batch, Y_batch)
+
             yield(data)
 
 

@@ -1066,7 +1066,8 @@ class CNN_Model(object):
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
                           'normalize': False,
-                          'sampling_type': 'max_likelihood'
+                          'sampling_type': 'max_likelihood',
+                          'alpha_factor': 1.0
                           }
         params = self.checkParameters(parameters, default_params)
 
