@@ -1015,12 +1015,12 @@ class CNN_Model(object):
         k = params['beam_size'] + 1
         samples = []
         sample_scores = []
-
+        pad_on_batch = params['pad_on_batch']
         dead_k = 0  # samples that reached eos
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
-        state_below = np.asarray([null_sym] * live_k)
+        state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['maxlen'])] * live_k)
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             probs = self.predict_cond(X, state_below, params, ii)
@@ -1064,7 +1064,10 @@ class CNN_Model(object):
             if dead_k >= k:
                 break
             state_below = np.asarray(hyp_samples, dtype='int64')
-            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below))
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below)) if pad_on_batch\
+                else np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
+                                np.zeros((state_below.shape[0], max(params['maxlen'] - state_below.shape[1]-1, 0)),
+                                         dtype='int64')))
 
         # dump every remaining one
         if live_k > 0:
@@ -1103,7 +1106,7 @@ class CNN_Model(object):
         for s in params['predict_on_sets']:
             logging.info("<<< Predicting outputs of "+s+" set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
-
+            params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
                 n_samples = eval("ds.len_"+s)
