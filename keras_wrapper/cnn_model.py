@@ -416,6 +416,19 @@ class CNN_Model(object):
     #           Methods for train and testing on the current CNN_Model
     # ------------------------------------------------------- #
 
+    def ended_training(self):
+        """
+            Indicates if the model has early stopped.
+        """
+        if hasattr(self.model, 'callback_model') and self.model.callback_model:
+            callback_model = self.callback_model
+        else:
+            callback_model = self
+            
+        if hasattr(callback_model, 'stop_training') and callback_model.stop_training == True:
+            return True
+        else:
+            return False
 
     def trainNet(self, ds, parameters, out_name=None):
         """
@@ -455,7 +468,7 @@ class CNN_Model(object):
                           'homogeneous_batches': False, 'epochs_for_save': 1, 'num_iterations_val': None,
                           'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': []};
+                          'reload_epoch': 0, 'extra_callbacks': [], 'epoch_offset': 0};
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -555,7 +568,8 @@ class CNN_Model(object):
                                  nb_epoch=params['n_epochs'],
                                  max_q_size=params['n_parallel_loaders'],
                                  verbose=params['verbose'],
-                                 callbacks=callbacks)
+                                 callbacks=callbacks,
+                                 epoch_offset=params['epoch_offset'])
 
 
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
@@ -1065,9 +1079,8 @@ class CNN_Model(object):
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
-                          'normalize': False,
-                          'sampling_type': 'max_likelihood',
-                          'alpha_factor': 1.0
+                          'normalize': False, 'alpha_factor': 1.0,
+                          'sampling_type': 'max_likelihood'
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -1131,7 +1144,7 @@ class CNN_Model(object):
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                     if params['normalize']:
-                        counts = [len(sample) for sample in samples]
+                        counts = [len(sample)**params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
