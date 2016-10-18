@@ -976,13 +976,22 @@ class CNN_Model(object):
 
 
     def predict_cond(self, X, states_below, params, ii):
+        """
+        Returns predicions on batch given the (static) input X and the current history (states_below) at time-step ii.
+        WARNING!: It's assumed that the current history (state_below) is the last input of the model!
+                  See Dataset class for more information
+        :param X: Input context
+        :param states_below: Batch of partial hypotheses
+        :param params: Decoding parameters
+        :param ii: Decoding time-step
+        :return: Network predicions at time-step ii
+        """
         x = {}
         n_samples = states_below.shape[0]
-        for model_input in params['model_inputs']:
-            if model_input is not 'state_below':
-                if X[model_input].shape[0] == 1:
-                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0)#.reshape((n_samples, X[model_input].shape[1],X[model_input].shape[2]))
-        x['state_below'] = states_below
+        for model_input in params['model_inputs'][:-1]:
+            if X[model_input].shape[0] == 1:
+                x[model_input] = np.repeat(X[model_input], n_samples, axis=0)#.reshape((n_samples, X[model_input].shape[1],X[model_input].shape[2]))
+        x[params['model_inputs'][-1]] = states_below
         data = self.model.predict_on_batch(x)
         if len(params['model_outputs']) > 1:
             all_data = {}
@@ -995,16 +1004,23 @@ class CNN_Model(object):
         return all_data[params['model_outputs'][0]]
 
     def beam_search(self, X, params, null_sym=2):
-
+        """
+        Beam search method for Cond models.
+        (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
+        :param X: Model inputs
+        :param params: Search parameters
+        :param null_sym: <null> symbol
+        :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
+        """
         k = params['beam_size'] + 1
         samples = []
         sample_scores = []
-
+        pad_on_batch = params['pad_on_batch']
         dead_k = 0  # samples that reached eos
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
-        state_below = np.asarray([null_sym] * live_k)
+        state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['maxlen'])] * live_k)
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             probs = self.predict_cond(X, state_below, params, ii)
@@ -1048,7 +1064,10 @@ class CNN_Model(object):
             if dead_k >= k:
                 break
             state_below = np.asarray(hyp_samples, dtype='int64')
-            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below))
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64')+null_sym, state_below)) if pad_on_batch\
+                else np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
+                                np.zeros((state_below.shape[0], max(params['maxlen'] - state_below.shape[1]-1, 0)),
+                                         dtype='int64')))
 
         # dump every remaining one
         if live_k > 0:
@@ -1059,17 +1078,16 @@ class CNN_Model(object):
         return samples, sample_scores
 
     def BeamSearchNet(self, ds, parameters):
-        '''
-            Returns the predictions of the net on the dataset splits chosen. The valid parameters are:
+        """
+        Approximates by beam search the best predictions of the net on the dataset splits chosen.
+        :param batch_size: size of the batch
+        :param n_parallel_loaders: number of parallel data batch loaders
+        :param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
+        :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
+        :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
 
-            :param batch_size: size of the batch
-            :param n_parallel_loaders: number of parallel data batch loaders
-            :param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
-            :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
-            :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
-
-            :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
-        '''
+        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        """
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
@@ -1088,14 +1106,13 @@ class CNN_Model(object):
         for s in params['predict_on_sets']:
             logging.info("<<< Predicting outputs of "+s+" set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
-
+            params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
                 n_samples = eval("ds.len_"+s)
                 num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
 
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-
                 data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                          batch_size=params['batch_size'],
                                          normalize_images=params['normalize_images'],
