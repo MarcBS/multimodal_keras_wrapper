@@ -69,7 +69,8 @@ class Data_Batch_Generator(object):
                  data_augmentation=True, 
                  mean_substraction=True,
                  predict=False,
-                 random_samples=-1):
+                 random_samples=-1,
+                 shuffle=True):
         
         self.set_split = set_split
         self.dataset = dataset
@@ -81,7 +82,8 @@ class Data_Batch_Generator(object):
                        'mean_substraction': mean_substraction,
                        'normalize_images': normalize_images,
                        'num_iterations': num_iterations,
-                       'random_samples': random_samples}
+                       'random_samples': random_samples,
+                       'shuffle': shuffle}
     
     def generator(self):
             
@@ -93,7 +95,7 @@ class Data_Batch_Generator(object):
         it = 0
         while 1:
 
-            if(self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict and self.params['random_samples'] == -1):
+            if(self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict and self.params['random_samples'] == -1 and self.params['suffle']):
                 silence = self.dataset.silence
                 self.dataset.silence = True
                 self.dataset.shuffleTraining()

@@ -456,6 +456,7 @@ class CNN_Model(object):
             :param normalize_images: boolean indicating if we want to 0-1 normalize the image pixel values
             :param mean_substraction: boolean indicating if we want to substract the training mean
             :param data_augmentation: boolean indicating if we want to perform data augmentation (always False on validation)
+            :param shuffle: apply shuffling on training data at the beginning of each epoch.
 
             ####    Other parameters
 
@@ -468,7 +469,8 @@ class CNN_Model(object):
                           'homogeneous_batches': False, 'epochs_for_save': 1, 'num_iterations_val': None,
                           'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'epoch_offset': 0};
+                          'reload_epoch': 0, 'extra_callbacks': [], 'epoch_offset': 0,
+                          'shuffle': True};
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -541,7 +543,8 @@ class CNN_Model(object):
                                              batch_size=params['batch_size'],
                                              normalize_images=params['normalize_images'],
                                              data_augmentation=params['data_augmentation'],
-                                             mean_substraction=params['mean_substraction']).generator()
+                                             mean_substraction=params['mean_substraction'],
+                                             shuffle=params['shuffle']).generator()
         # Are we going to validate on 'val' data?
         if('val' in params['eval_on_sets']):
 
@@ -1022,6 +1025,8 @@ class CNN_Model(object):
         hyp_scores  = np.zeros(live_k).astype('float32')
         # we must include an additional dimension if the input for each timestep are all the generated words so far
         if params['words_so_far']:
+            if k > params['maxlen']:
+                raise NotImplementedError("BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
             state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))] * live_k)
         else:
             state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['maxlen'])] * live_k)
