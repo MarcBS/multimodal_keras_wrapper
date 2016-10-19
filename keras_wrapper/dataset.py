@@ -353,6 +353,9 @@ class Dataset(object):
         self.fill_text = dict()      # text padding mode
         self.pad_on_batch = dict()   # text padding mode: If pad_on_batch, the sample will have the maximum length
                                      # of the current batch. Else, it will have a fixed length (max_text_len)
+        self.words_so_far = dict()   # if True, each sample will be represented as the complete set of words until
+                                     # the point defined by the timestep dimension
+                                     # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
 
         #################################################
         
@@ -546,8 +549,8 @@ class Dataset(object):
     
     def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1, required=True,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                             # 'image' / 'video'
-                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0, pad_on_batch=True,  # 'text'
-                 build_vocabulary=False, max_words=0,
+                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
+                 pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,      # 'text'
                  feat_len = 1024,                                                                 # 'image-features' / 'video-features'
                  max_video_len=26                                                                 # 'video'
                  ):
@@ -580,6 +583,8 @@ class Dataset(object):
             :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
             :param fill: select whether padding before or after the sequence
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
+            :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
+            :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
 
             # 'image-features' and 'video-features'- related parameters
             
@@ -614,7 +619,7 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch)
+                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
         elif(type == 'image-features'):
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif(type == 'video-features'):
@@ -649,7 +654,7 @@ class Dataset(object):
         self.setOutput(self, labels_list, set_name, type, id)
     
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0, pad_on_batch=True, # 'text'
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0, pad_on_batch=True, words_so_far=False, # 'text'
                   build_vocabulary=False, max_words=0, sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -671,6 +676,8 @@ class Dataset(object):
             :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
             :param fill: select whether padding before or after the sequence
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
+            :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
+            :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
 
         """
         self.__checkSetName(set_name)
@@ -693,7 +700,7 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch)
+                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
         elif(type == 'id'):
@@ -828,7 +835,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
     
     def preprocessText(self, annotations_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                       max_words, offset, fill, min_occ, pad_on_batch):
+                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far):
         
         sentences = []
         if(isinstance(annotations_list, str) and os.path.isfile(annotations_list)):
@@ -871,6 +878,7 @@ class Dataset(object):
         self.text_offset[id] = offset
         self.fill_text[id] = fill
         self.pad_on_batch[id] = pad_on_batch
+        self.words_so_far[id] = words_so_far
 
         return sentences
     
@@ -970,7 +978,7 @@ class Dataset(object):
         
 
 
-    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch):
+    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far):
         """
             Text encoder. Transforms samples from a text representation into a numerical one.
             If fill=='start' the resulting vector will be filled with 0s at the beginning, 
@@ -992,8 +1000,18 @@ class Dataset(object):
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
             else:
                 max_len_batch = max_len
-            X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
-            X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
+
+            if words_so_far:
+                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
+                null_row = np.ones((1,max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                zero_row = np.zeros((1,max_len_batch)).astype('int8')
+                if offset > 0:
+                    null_row[0] = np.append([vocab['<null>']] * offset, null_row[0, :-offset])
+            else:
+                X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
+
             if max_len_batch == max_len:
                 max_len_batch -= 1 # always leave space for <eos> symbol
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
@@ -1008,18 +1026,38 @@ class Dataset(object):
                 if offset_j < 0:
                     len_j = len_j + offset_j
                     offset_j = 0
-                for j, w in zip(range(len_j),x[:len_j]):
-                    if w in vocab:
-                        X_out[i,j+offset_j] = vocab[w]
-                    else:
-                        #print w, "not in vocab!"
-                        X_out[i,j+offset_j] = vocab['<unk>']
-                    X_mask[i,j+offset_j] = 1  # fill mask
-                X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
+
+                if words_so_far:
+                    for j, w in zip(range(len_j), x[:len_j]):
+                        if w in vocab:
+                            next_w = vocab[w]
+                        else:
+                            next_w = vocab['<unk>']
+                        for k in range(j, len_j):
+                            X_out[i, k + offset_j, j + offset_j] = next_w
+                            X_mask[i, k + offset_j, j + offset_j] = 1  # fill mask
+                        X_mask[i, j + offset_j, j + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
+
+                else:
+                    for j, w in zip(range(len_j),x[:len_j]):
+                        if w in vocab:
+                            X_out[i,j+offset_j] = vocab[w]
+                        else:
+                            #print w, "not in vocab!"
+                            X_out[i,j+offset_j] = vocab['<unk>']
+                        X_mask[i,j+offset_j] = 1  # fill mask
+                    X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
 
                 if offset > 0: # Move the text to the right -> null symbol
-                    X_out[i] = np.append([vocab['<null>']]*offset, X_out[i, :-offset])
-                    X_mask[i] = np.append([0]*offset, X_mask[i, :-offset])
+                    if words_so_far:
+                        for k in range(len_j):
+                            X_out[i, k] = np.append([vocab['<null>']] * offset, X_out[i, k, :-offset])
+                            X_mask[i, k] = np.append([0] * offset, X_mask[i, k, :-offset])
+                        X_out[i] = np.append(null_row, X_out[i, :-offset], axis=0)
+                        X_mask[i] = np.append(zero_row, X_mask[i, :-offset], axis=0)
+                    else:
+                        X_out[i] = np.append([vocab['<null>']]*offset, X_out[i, :-offset])
+                        X_mask[i] = np.append([0]*offset, X_mask[i, :-offset])
             X_out = (X_out, X_mask)
 
         return X_out
@@ -1731,7 +1769,8 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in], 
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in])[0]
+                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
+                                      words_so_far=self.words_so_far[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
@@ -1804,7 +1843,8 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in])[0]
+                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
+                                      words_so_far=self.words_so_far[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
@@ -1830,7 +1870,8 @@ class Dataset(object):
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
-                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out])
+                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
+                                      words_so_far=self.words_so_far[id_out])
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
@@ -1907,7 +1948,8 @@ class Dataset(object):
                 elif(type_in == 'text'):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in])[0]
+                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
+                                      words_so_far=self.words_so_far[id_in])[0]
                 elif(type_in == 'image-features'):
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif(type_in == 'video-features'):
@@ -1933,7 +1975,8 @@ class Dataset(object):
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
-                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out])
+                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
+                                      words_so_far=self.words_so_far[id_out])
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
@@ -2003,7 +2046,8 @@ class Dataset(object):
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
-                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out])
+                                      fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
+                                      words_so_far=self.words_so_far[id_out])
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
