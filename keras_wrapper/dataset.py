@@ -95,7 +95,7 @@ class Data_Batch_Generator(object):
         it = 0
         while 1:
 
-            if(self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict and self.params['random_samples'] == -1 and self.params['suffle']):
+            if(self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']):
                 silence = self.dataset.silence
                 self.dataset.silence = True
                 self.dataset.shuffleTraining()
@@ -697,6 +697,7 @@ class Dataset(object):
 
         # Preprocess the output data depending on its type
         if(type == 'categorical'):
+            self.setClasses(path_list, id)
             data = self.preprocessCategorical(path_list)
         elif(type == 'text'):
             if self.max_text_len.get(id) is None:
@@ -752,7 +753,7 @@ class Dataset(object):
             self.dic_classes[id][self.classes[id][c]] = c
         
         if(not self.silence):
-            logging.info('Loaded classes list with ' + str(len(self.classes[id])) + " different labels.")
+            logging.info('Loaded classes list with ' + str(len(self.dic_classes[id])) + " different labels.")
     
     def preprocessCategorical(self, labels_list):
         
@@ -773,7 +774,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
        
     def preprocessBinary(self, labels_list):
-        
+
         if(isinstance(labels_list, list)):
             labels = labels_list
         else:
@@ -1865,7 +1866,7 @@ class Dataset(object):
             # Pre-process outputs
             if(not debug):
                 if(type_out == 'categorical'):
-                    nClasses = len(self.classes[id_out])
+                    nClasses = len(self.dic_classes[id_out])
                     y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
@@ -1970,7 +1971,7 @@ class Dataset(object):
             # Pre-process outputs
             if(not debug):
                 if(type_out == 'categorical'):
-                    nClasses = len(self.classes[id_out])
+                    nClasses = len(self.dic_classes[id_out])
                     y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
@@ -2041,7 +2042,7 @@ class Dataset(object):
             # Pre-process outputs
             if(not debug):
                 if(type_out == 'categorical'):
-                    nClasses = len(self.classes[id_out])
+                    nClasses = len(self.dic_classes[id_out])
                     y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
