@@ -991,11 +991,20 @@ class CNN_Model(object):
         """
         x = {}
         n_samples = states_below.shape[0]
-        for model_input in params['model_inputs'][:-1]:
-            if X[model_input].shape[0] == 1:
-                x[model_input] = np.repeat(X[model_input], n_samples, axis=0)#.reshape((n_samples, X[model_input].shape[1],X[model_input].shape[2]))
-        x[params['model_inputs'][-1]] = states_below
-        data = self.model.predict_on_batch(x)
+        if params['beam_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
+            for model_input in params['model_inputs'][:-1]:
+                if X[model_input].shape[0] == 1:
+                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+            x[params['model_inputs'][-1]] = states_below
+            data = self.model.predict_on_batch(x)
+        else: #  It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
+            data = []
+            for state_below in states_below:
+                x[params['model_inputs'][-1]] = state_below.reshape(1,-1)
+                for model_input in params['model_inputs'][:-1]:
+                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+                data.append(self.model.predict_on_batch(x))
+
         if len(params['model_outputs']) > 1:
             all_data = {}
             for output_id in range(len(params['model_outputs'])):
