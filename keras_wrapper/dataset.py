@@ -1160,7 +1160,12 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
-
+    def tokenize_none(self, caption):
+        """
+            Does not tokenizes the sentences. Only performs stripping
+        """
+        tokenized = re.sub('[\n\t]+', '', caption.strip())
+        return tokenized
     def tokenize_questions(self, caption):
         """
             Basic tokenizer for VQA questions
