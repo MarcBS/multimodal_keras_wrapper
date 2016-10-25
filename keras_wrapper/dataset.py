@@ -1577,7 +1577,10 @@ class Dataset(object):
         return self.train_mean[id]
     
         
-    def loadImages(self, images, id, normalization_type='0-1', normalization=False, meanSubstraction=True, dataAugmentation=True, external=False, loaded=False):
+    def loadImages(self, images, id, normalization_type='0-1',
+                   normalization=False, meanSubstraction=True, dataAugmentation=True,
+                   external=False, loaded=False,
+                   prob_flip_horizontal=0.5, prob_flip_vertical = 0.0):
         """
             Loads a set of images from disk.
             
@@ -1588,6 +1591,8 @@ class Dataset(object):
             :param dataAugmentation : whether we are applying dataAugmentatino (random cropping and horizontal flip)
             :param external : if True the images will be loaded from an external database, in this case the list of images must be absolute paths
             :param loaded : set this option to True if images is a list of matricies instead of a list of strings
+            :param prob_flip_horizontal: probability of horizontal image flip if applying dataAugmentation
+            :param prob_flip_vertical: probability of vertical image flip if applying dataAugmentation
         """
         # Check if the chosen normalization type exists
         if(normalization and normalization_type not in self.__available_norm_im_vid):
@@ -1613,9 +1618,7 @@ class Dataset(object):
                     train_mean[:,:,0] = aux[:,:,2]
                     train_mean[:,:,2] = aux[:,:,0]
                 train_mean = np.transpose(train_mean, (2, 0, 1))
-            
-        prob_flip_horizontal = 0.5
-        prob_flip_vertical = 0.0
+
         nImages = len(images)
         
         type_imgs = np.float32

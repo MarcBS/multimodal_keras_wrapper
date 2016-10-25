@@ -148,7 +148,7 @@
 data splits, image loading, mean calculation, etc.</p>
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.build_vocabulary">
-<code class="descname">build_vocabulary</code><span class="sig-paren">(</span><em>captions</em>, <em>id</em>, <em>tokfun</em>, <em>do_split</em>, <em>n_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.build_vocabulary" title="Permalink to this definition">¶</a></dt>
+<code class="descname">build_vocabulary</code><span class="sig-paren">(</span><em>captions</em>, <em>id</em>, <em>tokfun</em>, <em>do_split</em>, <em>min_occ=0</em>, <em>n_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.build_vocabulary" title="Permalink to this definition">¶</a></dt>
 <dd><p>Vocabulary builder for data of type &#8216;text&#8217;</p>
 </dd></dl>
 
@@ -226,6 +226,7 @@ data splits, image loading, mean calculation, etc.</p>
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>set_name</strong> &#8211; &#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217; set</li>
 <li><strong>k</strong> &#8211; number of consecutive samples retrieved from the corresponding set.</li>
+<li><strong>sorted_batches</strong> &#8211; If True, it will pick data of the same size</li>
 <li><strong>debug</strong> &#8211; if True all data will be returned without preprocessing</li>
 </ul>
 </td>
@@ -266,6 +267,103 @@ data splits, image loading, mean calculation, etc.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.getXY_FromIndices">
+<code class="descname">getXY_FromIndices</code><span class="sig-paren">(</span><em>set_name</em>, <em>k</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getXY_FromIndices" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets the [X,Y] pairs for the samples in positions &#8216;k&#8217; in the desired set.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>set_name</strong> &#8211; &#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217; set</li>
+<li><strong>k</strong> &#8211; positions of the desired samples</li>
+<li><strong>sorted_batches</strong> &#8211; If True, it will pick data of the same size</li>
+<li><strong>debug</strong> &#8211; if True all data will be returned without preprocessing</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217;, &#8216;video&#8217;, &#8216;image-features&#8217; and &#8216;video-features&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>normalization</strong> &#8211; indicates if we want to normalize the data.</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image-features&#8217; and &#8216;video-features&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>normalization_type</strong> &#8211; indicates the type of normalization applied. See available types in self.__available_norm_im_vid for &#8216;image&#8217; and &#8216;video&#8217; and self.__available_norm_feat for &#8216;image-features&#8217; and &#8216;video-features&#8217;.</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217; and &#8216;video&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>meanSubstraction</strong> &#8211; indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)</li>
+<li><strong>dataAugmentation</strong> &#8211; indicates if we want to apply data augmentation to the loaded images (random flip and cropping)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.getY">
+<code class="descname">getY</code><span class="sig-paren">(</span><em>set_name</em>, <em>init</em>, <em>final</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>debug=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getY" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets the [Y] samples for the FULL dataset</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>set_name</strong> &#8211; &#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217; set</li>
+<li><strong>init</strong> &#8211; initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than final.</li>
+<li><strong>final</strong> &#8211; final position in the corresponding set split.</li>
+<li><strong>debug</strong> &#8211; if True all data will be returned without preprocessing</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217;, &#8216;video&#8217;, &#8216;image-features&#8217; and &#8216;video-features&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>normalization</strong> &#8211; indicates if we want to normalize the data.</li>
+<li><strong>normalization_type</strong> &#8211; indicates the type of normalization applied. See available types in self.__available_norm_im_vid for &#8216;image&#8217; and &#8216;video&#8217; and self.__available_norm_feat for &#8216;image-features&#8217; and &#8216;video-features&#8217;.</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p># &#8216;image&#8217; and &#8216;video&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>meanSubstraction</strong> &#8211; indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)</li>
+<li><strong>dataAugmentation</strong> &#8211; indicates if we want to apply data augmentation to the loaded images (random flip and cropping)</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadImages">
 <code class="descname">loadImages</code><span class="sig-paren">(</span><em>images</em>, <em>id</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>external=False</em>, <em>loaded=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadImages" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of images from disk.</p>
@@ -280,7 +378,7 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadText">
-<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em>, <em>fill='start'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
+<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em>, <em>fill</em>, <em>pad_on_batch</em>, <em>words_so_far</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
 <dd><p>Text encoder. Transforms samples from a text representation into a numerical one.
 If fill==&#8217;start&#8217; the resulting vector will be filled with 0s at the beginning, 
 if fill==&#8217;end&#8217; it will be filled with 0s at the end.</p>
@@ -301,7 +399,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setInput">
-<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='image', id='image', repeat_set=1, required=True, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], max_text_len=35, tokenization='tokenize_basic', offset=0, build_vocabulary=False, max_words=0, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='image', id='image', repeat_set=1, required=True, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0, pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a list of samples which can contain all samples from the &#8216;train&#8217;, &#8216;val&#8217;, or
 &#8216;test&#8217; sets (specified by set_name).</p>
 <p># General parameters</p>
@@ -314,7 +412,7 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;)</li>
 <li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)</li>
 <li><strong>id</strong> &#8211; identifier of the input data loaded</li>
-<li><strong>repeat_set</strong> &#8211; repats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
+<li><strong>repeat_set</strong> &#8211; repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
 <li><strong>required</strong> &#8211; flag for optional inputs</li>
 </ul>
 </td>
@@ -344,7 +442,11 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>max_text_len</strong> &#8211; maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type &#8216;text&#8217;).</li>
 <li><strong>max_words</strong> &#8211; a maximum of &#8216;max_words&#8217; words from the whole vocabulary will be chosen by number or occurrences</li>
-<li><strong>offset</strong> &#8211; Number of timesteps that the text is shifted to the right (for <a href="#id1"><span class="problematic" id="id2">*</span></a>_cond models)</li>
+<li><strong>offset</strong> &#8211; number of timesteps that the text is shifted to the right (for <a href="#id1"><span class="problematic" id="id2">*</span></a>_cond models)</li>
+<li><strong>fill</strong> &#8211; select whether padding before or after the sequence</li>
+<li><strong>min_occ</strong> &#8211; minimum number of occurrences allowed for the words in the vocabulary. (default = 0)</li>
+<li><strong>pad_on_batch</strong> &#8211; the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise</li>
+<li><strong>words_so_far</strong> &#8211; if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 &#8216;a&#8217;, t=1 &#8216;a dog&#8217;, t=2 &#8216;a dog is&#8217;, etc.)</li>
 </ul>
 </td>
 </tr>
@@ -412,7 +514,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setOutput">
-<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>offset=0</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>offset=0</em>, <em>fill='end'</em>, <em>min_occ=0</em>, <em>pad_on_batch=True</em>, <em>words_so_far=False</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em>, <em>sample_weights=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of output data, usually (type==&#8217;categorical&#8217;) referencing values in self.classes (starting from 0)</p>
 <p># General parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -440,6 +542,11 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>build_vocabulary</strong> &#8211; whether a new vocabulary will be built from the loaded data or not (only applicable when type==&#8217;text&#8217;).</li>
 <li><strong>max_text_len</strong> &#8211; maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type &#8216;text&#8217;) Set to 0 if the whole sentence will be used as an output class.</li>
 <li><strong>max_words</strong> &#8211; a maximum of &#8216;max_words&#8217; words from the whole vocabulary will be chosen by number or occurrences</li>
+<li><strong>offset</strong> &#8211; number of timesteps that the text is shifted to the right (for <a href="#id3"><span class="problematic" id="id4">*</span></a>_cond models)</li>
+<li><strong>fill</strong> &#8211; select whether padding before or after the sequence</li>
+<li><strong>min_occ</strong> &#8211; minimum number of occurrences allowed for the words in the vocabulary. (default = 0)</li>
+<li><strong>pad_on_batch</strong> &#8211; the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise</li>
+<li><strong>words_so_far</strong> &#8211; if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 &#8216;a&#8217;, t=1 &#8216;a dog&#8217;, t=2 &#8216;a dog is&#8217;, etc.)</li>
 </ul>
 </td>
 </tr>
@@ -479,6 +586,16 @@ Each line must contain a unique identifier of the class.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.tokenize_aggressive">
+<code class="descname">tokenize_aggressive</code><span class="sig-paren">(</span><em>caption</em>, <em>lowercase=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_aggressive" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Aggressive tokenizer for the input/output data of type &#8216;text&#8217;:</dt>
+<dd>Removes punctuation
+Lowercase</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.tokenize_basic">
 <code class="descname">tokenize_basic</code><span class="sig-paren">(</span><em>caption</em>, <em>lowercase=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_basic" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="docutils">
@@ -489,11 +606,48 @@ Lowercase</dd>
 </dd></dl>
 
 <dl class="method">
-<dt id="keras_wrapper.dataset.Dataset.tokenize_questions">
-<code class="descname">tokenize_questions</code><span class="sig-paren">(</span><em>caption</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_questions" title="Permalink to this definition">¶</a></dt>
-<dd><p>Basic tokenizer for the input/output data of type &#8216;text&#8217;</p>
+<dt id="keras_wrapper.dataset.Dataset.tokenize_icann">
+<code class="descname">tokenize_icann</code><span class="sig-paren">(</span><em>caption</em>, <em>lowercase=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_icann" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Tokenization used for the icann paper:</dt>
+<dd>Removes some punctuation
+Lowercase</dd>
+</dl>
 </dd></dl>
 
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.tokenize_montreal">
+<code class="descname">tokenize_montreal</code><span class="sig-paren">(</span><em>caption</em>, <em>lowercase=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_montreal" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Tokenization used for the icann paper:</dt>
+<dd>Removes some punctuation
+Lowercase</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.tokenize_questions">
+<code class="descname">tokenize_questions</code><span class="sig-paren">(</span><em>caption</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_questions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Basic tokenizer for VQA questions</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.tokenize_soft">
+<code class="descname">tokenize_soft</code><span class="sig-paren">(</span><em>caption</em>, <em>lowercase=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_soft" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="docutils">
+<dt>Tokenization used for the icann paper:</dt>
+<dd>Removes very little punctuation
+Lowercase</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
+<dt id="keras_wrapper.dataset.Homogeneous_Data_Batch_Generator">
+<em class="property">class </em><code class="descclassname">keras_wrapper.dataset.</code><code class="descname">Homogeneous_Data_Batch_Generator</code><span class="sig-paren">(</span><em>set_split</em>, <em>net</em>, <em>dataset</em>, <em>num_iterations</em>, <em>batch_size=50</em>, <em>maxlen=100</em>, <em>normalize_images=False</em>, <em>data_augmentation=True</em>, <em>mean_substraction=True</em>, <em>predict=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Homogeneous_Data_Batch_Generator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Retrieves batches of the same length.
+Parts of the code borrowed from <a class="reference external" href="https://github.com/kelvinxu/arctic-captions/blob/master/homogeneous_data.py">https://github.com/kelvinxu/arctic-captions/blob/master/homogeneous_data.py</a></p>
 </dd></dl>
 
 <dl class="function">
@@ -526,6 +680,26 @@ Lowercase</dd>
 </dd>
 </dl>
 <dl class="method">
+<dt id="keras_wrapper.cnn_model.CNN_Model.BeamSearchNet">
+<code class="descname">BeamSearchNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.BeamSearchNet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Approximates by beam search the best predictions of the net on the dataset splits chosen.
+:param batch_size: size of the batch
+:param n_parallel_loaders: number of parallel data batch loaders
+:param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
+:param mean_substraction: apply mean data normalization on images or not (only if using images as input)
+:param predict_on_sets: list of set splits for which we want to extract the predictions [&#8216;train&#8217;, &#8216;val&#8217;, &#8216;test&#8217;]</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Returns predictions:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">dictionary with set splits as keys and matrices of predictions as values.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.Empty">
 <code class="descname">Empty</code><span class="sig-paren">(</span><em>nOutput</em>, <em>input</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.Empty" title="Permalink to this definition">¶</a></dt>
 <dd><p>Creates an empty CNN_Model (can be externally defined)</p>
@@ -536,8 +710,8 @@ Lowercase</dd>
 <code class="descname">GAP</code><span class="sig-paren">(</span><em>nOutput</em>, <em>input</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.GAP" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="docutils">
 <dt>Creates a GAP network for object localization as described in the paper</dt>
-<dd>Zhou B, Khosla A, Lapedriza A, Oliva A, Torralba A. 
-Learning Deep Features for Discriminative Localization. 
+<dd>Zhou B, Khosla A, Lapedriza A, Oliva A, Torralba A.
+Learning Deep Features for Discriminative Localization.
 arXiv preprint arXiv:1512.04150. 2015 Dec 14.</dd>
 <dt>Outputs:</dt>
 <dd>&#8216;GAP/softmax&#8217; output of the final softmax classification
@@ -596,19 +770,19 @@ Only used for passing the output from a previous stage to the next (see Staged_N
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception">
-<code class="descname">add_One_vs_One_Inception</code><span class="sig-paren">(</span><em>input</em>, <em>input_shape</em>, <em>id_branch</em>, <em>nOutput=2</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception" title="Permalink to this definition">¶</a></dt>
+<code class="descname">add_One_vs_One_Inception</code><span class="sig-paren">(</span><em>input</em>, <em>input_shape</em>, <em>id_branch</em>, <em>nOutput=2</em>, <em>activation='softmax'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception" title="Permalink to this definition">¶</a></dt>
 <dd><p>Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception_Functional">
-<code class="descname">add_One_vs_One_Inception_Functional</code><span class="sig-paren">(</span><em>input</em>, <em>input_shape</em>, <em>id_branch</em>, <em>nOutput=2</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception_Functional" title="Permalink to this definition">¶</a></dt>
+<code class="descname">add_One_vs_One_Inception_Functional</code><span class="sig-paren">(</span><em>input</em>, <em>input_shape</em>, <em>id_branch</em>, <em>nOutput=2</em>, <em>activation='softmax'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception_Functional" title="Permalink to this definition">¶</a></dt>
 <dd><p>Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).</p>
 </dd></dl>
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception_v2">
-<code class="descname">add_One_vs_One_Inception_v2</code><span class="sig-paren">(</span><em>input</em>, <em>input_shape</em>, <em>id_branch</em>, <em>nOutput=2</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception_v2" title="Permalink to this definition">¶</a></dt>
+<code class="descname">add_One_vs_One_Inception_v2</code><span class="sig-paren">(</span><em>input</em>, <em>input_shape</em>, <em>id_branch</em>, <em>nOutput=2</em>, <em>activation='softmax'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.add_One_vs_One_Inception_v2" title="Permalink to this definition">¶</a></dt>
 <dd><p>Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model (useful for ECOC_loss models).</p>
 </dd></dl>
 
@@ -619,9 +793,26 @@ Only used for passing the output from a previous stage to the next (see Staged_N
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.cnn_model.CNN_Model.beam_search">
+<code class="descname">beam_search</code><span class="sig-paren">(</span><em>X</em>, <em>params</em>, <em>null_sym=2</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.beam_search" title="Permalink to this definition">¶</a></dt>
+<dd><p>Beam search method for Cond models.
+(<a class="reference external" href="https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search">https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search</a>)
+:param X: Model inputs
+:param params: Search parameters
+:param null_sym: &lt;null&gt; symbol
+:return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)</p>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.checkParameters">
 <code class="descname">checkParameters</code><span class="sig-paren">(</span><em>input_params</em>, <em>default_params</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.checkParameters" title="Permalink to this definition">¶</a></dt>
 <dd><p>Validates a set of input parameters and uses the default ones if not specified.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.cnn_model.CNN_Model.ended_training">
+<code class="descname">ended_training</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.ended_training" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates if the model has early stopped.</p>
 </dd></dl>
 
 <dl class="method">
@@ -681,6 +872,32 @@ Only used for passing the output from a previous stage to the next (see Staged_N
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.cnn_model.CNN_Model.predict_cond">
+<code class="descname">predict_cond</code><span class="sig-paren">(</span><em>X</em>, <em>states_below</em>, <em>params</em>, <em>ii</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.predict_cond" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns predicions on batch given the (static) input X and the current history (states_below) at time-step ii.
+WARNING!: It&#8217;s assumed that the current history (state_below) is the last input of the model!</p>
+<blockquote>
+<div>See Dataset class for more information</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>X</strong> &#8211; Input context</li>
+<li><strong>states_below</strong> &#8211; Batch of partial hypotheses</li>
+<li><strong>params</strong> &#8211; Decoding parameters</li>
+<li><strong>ii</strong> &#8211; Decoding time-step</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Network predicions at time-step ii</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.removeInputs">
 <code class="descname">removeInputs</code><span class="sig-paren">(</span><em>inputs_names</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.removeInputs" title="Permalink to this definition">¶</a></dt>
 <dd><p>Removes the list of inputs whose names are passed by parameter from the current network.
@@ -712,7 +929,7 @@ Function only valid for Sequential models. Use self.removeLayers(...) for Graph 
 <dt id="keras_wrapper.cnn_model.CNN_Model.resumeTrainNet">
 <code class="descname">resumeTrainNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.resumeTrainNet" title="Permalink to this definition">¶</a></dt>
 <dd><p>DEPRECATED</p>
-<p>Resumes the last training state of a stored model keeping also its training parameters. 
+<p>Resumes the last training state of a stored model keeping also its training parameters.
 If we introduce any parameter through the argument &#8216;parameters&#8217;, it will be replaced by the old one.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -841,7 +1058,7 @@ If we introduce any parameter through the argument &#8216;parameters&#8217;, it 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.CNN_Model.trainNet">
 <code class="descname">trainNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.CNN_Model.trainNet" title="Permalink to this definition">¶</a></dt>
-<dd><p>Trains the network on the given dataset &#8216;ds&#8217;. 
+<dd><p>Trains the network on the given dataset &#8216;ds&#8217;.
 out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.</p>
 <p>The available (optional) training parameters are the following ones:</p>
 <p>####    Visualization parameters</p>
@@ -883,6 +1100,7 @@ out_name: name of the output node that will be used to evaluate the network accu
 <li><strong>normalize_images</strong> &#8211; boolean indicating if we want to 0-1 normalize the image pixel values</li>
 <li><strong>mean_substraction</strong> &#8211; boolean indicating if we want to substract the training mean</li>
 <li><strong>data_augmentation</strong> &#8211; boolean indicating if we want to perform data augmentation (always False on validation)</li>
+<li><strong>shuffle</strong> &#8211; apply shuffling on training data at the beginning of each epoch.</li>
 </ul>
 </td>
 </tr>
