@@ -1072,10 +1072,15 @@ class Dataset(object):
 
     def tokenize_basic(self, caption, lowercase=True):
         """
-            Basic tokenizer for the input/output data of type 'text':
-                Splits punctuation
-                Lowercase
+        Basic tokenizer for the input/output data of type 'text':
+            Splits punctuation
+            Optional lowercasing
+
+        :param caption: String to tokenize
+        :param lowercase: Whether to lowercase the caption or not
+        :return: Tokenized version of caption
         """
+
         punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!']
         def processPunctuation(inText):
             outText = inText
@@ -1092,9 +1097,12 @@ class Dataset(object):
 
     def tokenize_aggressive(self, caption, lowercase=True):
         """
-            Aggressive tokenizer for the input/output data of type 'text':
-                Removes punctuation
-                Lowercase
+        Aggressive tokenizer for the input/output data of type 'text':
+            Removes punctuation
+            Optional lowercasing
+        :param caption: String to tokenize
+        :param lowercase: Whether to lowercase the caption or not
+        :return: Tokenized version of caption
         """
         punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')',
                  '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!',
@@ -1110,11 +1118,13 @@ class Dataset(object):
         resAns = resAns.strip()
         return resAns
 
-    def tokenize_icann(self, caption, lowercase=True):
+    def tokenize_icann(self, caption):
         """
-            Tokenization used for the icann paper:
-                Removes some punctuation
-                Lowercase
+        Tokenization used for the icann paper:
+            * Removes some punctuation (. , ")
+            * Lowercasing
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
         """
         tokenized = re.sub('[.,"\n\t]+', '', caption)
         tokenized = re.sub('[  ]+', ' ', tokenized)
@@ -1123,11 +1133,13 @@ class Dataset(object):
         return tokenized
 
 
-    def tokenize_montreal(self, caption, lowercase=True):
+    def tokenize_montreal(self, caption):
         """
-            Tokenization used for the icann paper:
-                Removes some punctuation
-                Lowercase
+        Similar to tokenize_icann
+            Removes some punctuation
+            Lowercase
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
         """
         tokenized = re.sub('[.,"\n\t]+', '', caption.strip())
         tokenized = re.sub('[\']+', " '", tokenized)
@@ -1138,9 +1150,12 @@ class Dataset(object):
 
     def tokenize_soft(self, caption, lowercase=True):
         """
-            Tokenization used for the icann paper:
-                Removes very little punctuation
-                Lowercase
+        Tokenization used for the icann paper:
+            Removes very little punctuation
+            Lowercase
+        :param caption: String to tokenize
+        :param lowercase: Whether to lowercase the caption or not
+        :return: Tokenized version of caption
         """
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         tokenized = re.sub('[\.]+', ' . ', tokenized)
@@ -1162,13 +1177,24 @@ class Dataset(object):
 
     def tokenize_none(self, caption):
         """
-            Does not tokenizes the sentences. Only performs stripping
+        Does not tokenizes the sentences. Only performs a stripping
+
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
         """
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         return tokenized
+
     def tokenize_questions(self, caption):
         """
-            Basic tokenizer for VQA questions
+        Basic tokenizer for VQA questions:
+            * Lowercasing
+            * Splits contractions
+            * Removes punctuation
+            * Numbers to digits
+
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
         """
         contractions = {"aint": "ain't", "arent": "aren't", "cant": "can't", "couldve": "could've", "couldnt": "couldn't",
                 "couldn'tve": "couldn’t’ve", "couldnt’ve": "couldn’t’ve", "didnt": "didn’t", "doesnt": "doesn’t",
@@ -1199,11 +1225,12 @@ class Dataset(object):
                 "y’allll": "y’all’ll", "yall’d’ve": "y’all’d’ve", "y’alld’ve": "y’all’d’ve", "y’all’dve": "y’all’d’ve",
                 "youd": "you’d", "youd’ve": "you’d’ve", "you’dve": "you’d’ve", "youll": "you’ll",
                 "youre": "you’re", "youve": "you’ve"}
-        punct = [';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!']
+        punct = [';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\',
+                 '_', '-', '>', '<', '@', '`', ',', '?', '!']
         commaStrip = re.compile("(\d)(\,)(\d)")
         periodStrip = re.compile("(?!<=\d)(\.)(?!\d)")
-        manualMap = {'none': '0', 'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 'six': '6',
-             'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10'}
+        manualMap = {'none': '0', 'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5',
+                     'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10'}
         articles = ['a', 'an', 'the']
 
         def processPunctuation(inText):
