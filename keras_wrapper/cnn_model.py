@@ -991,7 +991,7 @@ class CNN_Model(object):
         """
         x = {}
         n_samples = states_below.shape[0]
-        if params['beam_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
+        if params['batch_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
             for model_input in params['model_inputs'][:-1]:
                 if X[model_input].shape[0] == 1:
                     x[model_input] = np.repeat(X[model_input], n_samples, axis=0)
@@ -1002,7 +1002,7 @@ class CNN_Model(object):
             for state_below in states_below:
                 x[params['model_inputs'][-1]] = state_below.reshape(1,-1)
                 for model_input in params['model_inputs'][:-1]:
-                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+                    x[model_input] = X[model_input]
                 data.append(self.model.predict_on_batch(x))
 
         if len(params['model_outputs']) > 1:
