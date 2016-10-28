@@ -977,6 +977,10 @@ class CNN_Model(object):
                 return (loss, score, top_score, n_samples)
             return (loss, n_samples)
 
+    # ------------------------------------------------------- #
+    #       PREDICTION FUNCTIONS
+    #           Functions for making prediction on input samples
+    # ------------------------------------------------------- #
 
     def predict_cond(self, X, states_below, params, ii):
         """
@@ -1297,6 +1301,138 @@ class CNN_Model(object):
 
         return predictions
 
+
+
+    # ------------------------------------------------------- #
+    #       DECODING FUNCTIONS
+    #           Functions for decoding predictions
+    # ------------------------------------------------------- #
+
+    def sample(self, a, temperature=1.0):
+        # helper function to sample an index from a probability array
+        a = np.log(a) / temperature
+        a = np.exp(a) / np.sum(np.exp(a))
+        return np.argmax(np.random.multinomial(1, a, 1))
+
+
+    def sampling(self, scores, sampling_type='max_likelihood', temperature=1.0):
+        """
+        Sampling words (each sample is drawn from a categorical distribution).
+        Or picks up words that maximize the likelihood.
+        In:
+            scores - array of size #samples x #classes;
+                every entry determines a score for sample i having class j
+            temperature - temperature for the predictions;
+                the higher the flatter probabilities and hence more random answers
+
+        Out:
+            set of indices chosen as output, a vector of size #samples
+        """
+        if isinstance(scores, dict):
+            scores = scores['output']
+
+        if sampling_type == 'multinomial':
+            logscores = np.log(scores) / temperature
+            # numerically stable version
+            normalized_logscores= logscores - np.max(logscores, axis=-1)[:, np.newaxis]
+            margin_logscores = np.sum(np.exp(normalized_logscores),axis=-1)
+            probs = np.exp(normalized_logscores) / margin_logscores[:, np.newaxis]
+
+            #probs = probs.astype('float32')
+            draws = np.zeros_like(probs)
+            num_samples = probs.shape[0]
+            # we use 1 trial to mimic categorical distributions using multinomial
+            for k in xrange(num_samples):
+                draws[k, :] = np.random.multinomial(1,probs[k,:],1)
+            return np.argmax(draws, axis=-1)
+        elif sampling_type == 'max_likelihood':
+            return np.argmax(scores, axis=-1)
+        else:
+            raise NotImplementedError()
+
+    def decode_predictions(self, preds, temperature, index2word, sampling_type, verbose=0):
+        """
+        Decodes predictions
+
+        In:
+            preds - predictions codified as the output of a softmax activation function
+            temperature - temperature for sampling
+            index2word - mapping from word indices into word characters
+            verbose - verbosity level, by default 0
+
+        Out:
+            Answer predictions (list of answers)
+        """
+        if verbose > 0:
+            logging.info('Decoding prediction ...')
+        flattened_preds = preds.reshape(-1, preds.shape[-1])
+        flattened_answer_pred = map(lambda x: index2word[x],self.sampling(scores=flattened_preds,
+                                                                          sampling_type=sampling_type,
+                                                                          temperature=temperature))
+        answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:2])
+        answer_pred = []
+        EOS = '<eos>'
+        BOS = '<bos>'
+        PAD = '<pad>'
+
+        for a_no in answer_pred_matrix:
+            init_token_pos = 0
+            end_token_pos = [j for j, x in enumerate(a_no) if x==EOS or x == PAD]
+            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
+            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+            answer_pred.append(tmp)
+        return answer_pred
+
+
+    def decode_predictions_beam_search(self, preds, index2word, verbose=0):
+        """
+        Decodes predictions
+
+        In:
+            preds - predictions codified as word indices
+            index2word - mapping from word indices into word characters
+            verbose - verbosity level, by default 0
+
+        Out:
+            Answer predictions (list of answers)
+        """
+        if verbose > 0:
+            logging.info('Decoding beam search prediction ...')
+
+        flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
+        answer_pred = []
+        for a_no in flattened_answer_pred:
+            tmp = ' '.join(a_no[:-1])
+            answer_pred.append(tmp)
+        return answer_pred
+
+
+    def decode_predictions_one_hot(self, preds, index2word, verbose=0):
+        """
+        Decodes predictions
+
+        In:
+            preds - predictions codified as one hot vectors
+            index2word - mapping from word indices into word characters
+            verbose - verbosity level, by default 0
+
+        Out:
+            Answer predictions (list of answers)
+        """
+        if verbose > 0:
+            logging.info('Decoding one hot prediction ...')
+        preds = map(lambda x: np.nonzero(x)[1], preds)
+        PAD = '<pad>'
+        flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
+        answer_pred_matrix = np.asarray(flattened_answer_pred)
+        answer_pred = []
+
+        for a_no in answer_pred_matrix:
+            end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
+            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
+            tmp = ' '.join(a_no[:end_token_pos])
+            answer_pred.append(tmp)
+        return answer_pred
 
     def prepareData(self, X_batch, Y_batch=None):
         if(isinstance(self.model, Sequential)):
