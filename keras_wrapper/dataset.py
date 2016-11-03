@@ -709,7 +709,7 @@ class Dataset(object):
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
             
-        if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1):  
+        if(isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1):
             data = list(np.repeat(data,repeat_set))
         if self.sample_weights.get(id) is None:
             self.sample_weights[id] = dict()
@@ -789,7 +789,7 @@ class Dataset(object):
     def preprocessFeatures(self, path_list, id, set_name, feat_len):
         
         # file with a list, each line being a path to a .npy file with a feature vector
-        if(isinstance(path_list, str) and os.path.isfile(path_list)): 
+        if(isinstance(path_list, str) and os.path.isfile(path_list)):
             data = []
             with open(path_list, 'r') as list_:
                 for line in list_:
@@ -997,7 +997,7 @@ class Dataset(object):
                     X_out[i] = vocab[w]
                 else:
                     X_out[i] = vocab['<unk>']
-            
+            X_out = (X_out, None) # This None simulates a mask
         else: # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
