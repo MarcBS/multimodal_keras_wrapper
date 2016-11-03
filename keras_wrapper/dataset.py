@@ -334,7 +334,7 @@ class Dataset(object):
         self.sample_weights = dict() # Choose whether we should compute output masks or not
 
         # List of implemented input and output data types
-        self.__accepted_types_inputs = ['image', 'video', 'image-features', 'video-features', 'text', 'id', 'ghost']
+        self.__accepted_types_inputs = ['raw-image', 'video', 'image-features', 'video-features', 'text', 'id', 'ghost']
         self.__accepted_types_outputs = ['categorical', 'binary', 'text', 'id']
         #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
@@ -372,7 +372,7 @@ class Dataset(object):
         self.features_lengths = dict()
         #################################################
         
-        ############################ Parameters used for inputs of type 'image'
+        ############################ Parameters used for inputs of type 'raw-image'
         # Image resize dimensions used for all the returned images
         self.img_size = dict()
         # Image crop dimensions for the returned images
@@ -479,14 +479,14 @@ class Dataset(object):
         self.silence = silence
         
         
-    def setListGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='image', id='image'):
+    def setListGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='raw-image', id='image'):
         """
             Deprecated
         """
         logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInputGeneral() instead.")
         self.setInputGeneral(path_list, split, shuffle, type, id)
     
-    def setInputGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='image', id='image'):
+    def setInputGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='raw-image', id='image'):
         """ 
             DEPRECATED
         
@@ -541,7 +541,7 @@ class Dataset(object):
         
     
     
-    def setList(self, path_list, set_name, type='image', id='image'):
+    def setList(self, path_list, set_name, type='raw-image', id='image'):
         """
             DEPRECATED
         """
@@ -549,8 +549,8 @@ class Dataset(object):
         self.setInput(path_list, set_name, type, id)
     
     
-    def setInput(self, path_list, set_name, type='image', id='image', repeat_set=1, required=True,
-                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                             # 'image' / 'video'
+    def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
+                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                             # 'raw-image' / 'video'
                  max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,      # 'text'
                  feat_len = 1024,                                                                 # 'image-features' / 'video-features'
@@ -570,7 +570,7 @@ class Dataset(object):
             :param required: flag for optional inputs
 
             
-            # 'image'-related parameters
+            # 'raw-image'-related parameters
             
             :param img_size: size of the input images (any input image will be resized to this)
             :param img_size_crop: size of the cropped zone (when dataAugmentation=False the central crop will be used)
@@ -613,7 +613,7 @@ class Dataset(object):
             raise NotImplementedError('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
         
         # Proprocess the input data depending on its type
-        if(type == 'image'):
+        if(type == 'raw-image'):
             data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop)
         elif(type == 'video'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
@@ -1489,7 +1489,7 @@ class Dataset(object):
         return data
     
     # ------------------------------------------------------- #
-    #       TYPE 'image' SPECIFIC FUNCTIONS
+    #       TYPE 'raw-image' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
     def preprocessImages(self, path_list, id, set_name, img_size, img_size_crop):
@@ -1623,7 +1623,7 @@ class Dataset(object):
         """
         # Check if the chosen normalization type exists
         if(normalization and normalization_type not in self.__available_norm_im_vid):
-            raise NotImplementedError('The chosen normalization type '+ normalization_type +' is not implemented for the type "image" and "video".')
+            raise NotImplementedError('The chosen normalization type '+ normalization_type +' is not implemented for the type "raw-image" and "video".')
         
         # Prepare the training mean image
         if(meanSubstraction): # remove mean
@@ -1760,17 +1760,17 @@ class Dataset(object):
             :param debug: if True all data will be returned without preprocessing
             
             
-            # 'image', 'video', 'image-features' and 'video-features'-related parameters
+            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
             
             :param normalization: indicates if we want to normalize the data.
             
             
             # 'image-features' and 'video-features'-related parameters
             
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
+            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
             
             
-            # 'image' and 'video'-related parameters
+            # 'raw-image' and 'video'-related parameters
             
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
@@ -1799,7 +1799,7 @@ class Dataset(object):
                 x = eval('self.X_'+set_name+'[id_in][init:final]')
 
             if not debug and not ghost_x:
-                if(type_in == 'image'):
+                if(type_in == 'raw-image'):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
                     x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
@@ -1830,7 +1830,7 @@ class Dataset(object):
             :param debug: if True all data will be returned without preprocessing
             
             
-            # 'image', 'video', 'image-features' and 'video-features'-related parameters
+            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
             
             :param normalization: indicates if we want to normalize the data.
             
@@ -1840,7 +1840,7 @@ class Dataset(object):
             :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
             
             
-            # 'image' and 'video'-related parameters
+            # 'raw-image' and 'video'-related parameters
             
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
@@ -1873,7 +1873,7 @@ class Dataset(object):
                 
             # Pre-process inputs
             if(not debug):
-                if(type_in == 'image'):
+                if(type_in == 'raw-image'):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
@@ -1941,17 +1941,17 @@ class Dataset(object):
             :param debug: if True all data will be returned without preprocessing
 
 
-            # 'image', 'video', 'image-features' and 'video-features'-related parameters
+            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
 
             :param normalization: indicates if we want to normalize the data.
 
 
             # 'image-features' and 'video-features'-related parameters
 
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
+            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
 
 
-            # 'image' and 'video'-related parameters
+            # 'raw-image' and 'video'-related parameters
 
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
@@ -1978,7 +1978,7 @@ class Dataset(object):
 
             # Pre-process inputs
             if not debug and not ghost_x:
-                if(type_in == 'image'):
+                if(type_in == 'raw-image'):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif(type_in == 'video'):
                     x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
@@ -2046,15 +2046,15 @@ class Dataset(object):
             :param debug: if True all data will be returned without preprocessing
 
 
-            # 'image', 'video', 'image-features' and 'video-features'-related parameters
+            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
 
             :param normalization: indicates if we want to normalize the data.
 
 
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
+            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
 
 
-            # 'image' and 'video'-related parameters
+            # 'raw-image' and 'video'-related parameters
 
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
