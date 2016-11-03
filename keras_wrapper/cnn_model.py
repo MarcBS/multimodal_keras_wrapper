@@ -13,6 +13,7 @@ from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D
 from keras.engine.training import Model
 from keras.utils.layer_utils import print_summary
+from keras.regularizers import l2
 
 #from keras.caffe.extra_layers import LRN2D
 
@@ -982,45 +983,139 @@ class CNN_Model(object):
     #           Functions for making prediction on input samples
     # ------------------------------------------------------- #
 
-    def predict_cond(self, X, states_below, params, ii):
+    def predict_cond(self, X, states_below, params, ii, optimized_search=False, prev_out=None):
         """
-        Returns predicions on batch given the (static) input X and the current history (states_below) at time-step ii.
+        Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
         WARNING!: It's assumed that the current history (state_below) is the last input of the model!
                   See Dataset class for more information
         :param X: Input context
         :param states_below: Batch of partial hypotheses
         :param params: Decoding parameters
         :param ii: Decoding time-step
+        :param optimized_search: indicates if we are using optimized search
+                (only applicable if beam search specific models self.model_init and self.model_next models are defined)
+        :param prev_out: output from the previous timestep, which will be reused by self.model_next
+                (only applicable if beam search specific models self.model_init and self.model_next models are defined)
         :return: Network predicions at time-step ii
         """
-        x = {}
+        in_data = {}
         n_samples = states_below.shape[0]
-        if params['batch_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
+
+        ##########################################
+        # Choose model to use for sampling
+        ##########################################
+        if not optimized_search:
+            model = self.model
+        elif ii == 0:
+            model = self.model_init
+        else:
+            model = self.model_next
+
+        ##########################################
+        # Get inputs
+        ##########################################
+        if ii == 0 or not optimized_search: # not optimized search model or first timestep
+
             for model_input in params['model_inputs'][:-1]:
                 if X[model_input].shape[0] == 1:
-                    x[model_input] = np.repeat(X[model_input], n_samples, axis=0)
-            x[params['model_inputs'][-1]] = states_below
-            data = self.model.predict_on_batch(x)
+                    in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+            in_data[params['model_inputs'][-1]] = states_below
+
+        elif ii == 1 and optimized_search: # optimized search model and timestep == 1 (model_init to model_next)
+
+            for idx, init_out_name in enumerate(self.ids_outputs_init):
+                if idx == 0:
+                    in_data[self.ids_inputs_next[0]] = states_below[:,-1]
+                if idx > 0: # first output must be the output probs.
+                    next_in_name = self.matchings_init_to_next[init_out_name]
+                    if prev_out[idx].shape[0] == 1:
+                        prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
+                    in_data[next_in_name] = prev_out[idx]
+
+        elif ii > 1 and optimized_search:  # optimized search model and timestep > 1 (model_next to model_next)
+
+            for idx, next_out_name in enumerate(self.ids_outputs_next):
+                if idx == 0:
+                    in_data[self.ids_inputs_next[0]] = states_below[:,-1]
+                if idx > 0:  # first output must be the output probs.
+                    next_in_name = self.matchings_next_to_next[next_out_name]
+                    if prev_out[idx].shape[0] == 1:
+                        prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
+                    in_data[next_in_name] = prev_out[idx]
+
+        if ii == 5:
+            for k,v in in_data.iteritems():
+                print k
+                print v
+            print 
+
+        ##########################################
+        # Apply prediction on current timestep
+        ##########################################
+        if params['batch_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
+            out_data = model.predict_on_batch(in_data)
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
-            data = []
+            out_data = []
+            for i in range(n_samples):
+                aux_in_data = {}
+                for k,v in in_data.iteritems():
+                    aux_in_data[k] = v[i]
+                if i == 0:
+                    out_data = model.predict_on_batch(aux_in_data)
+                else:
+                    out_data = np.vstack((out_data, model.predict_on_batch(aux_in_data)))
+            '''
             for state_below in states_below:
                 x[params['model_inputs'][-1]] = state_below.reshape(1,-1)
                 for model_input in params['model_inputs'][:-1]:
                     x[model_input] = X[model_input]
                 if data == []:
-                    data = self.model.predict_on_batch(x)
+                    data = model.predict_on_batch(x)
                 else:
-                    data = np.vstack((data, self.model.predict_on_batch(x)))
+                    data = np.vstack((data, model.predict_on_batch(x)))
+            '''
 
+        ##########################################
+        # Get outputs
+        ##########################################
+        # in any case, the first output of the models must be the next words' probabilities
+        pick_idx = -1
+        if not optimized_search:  # not optimized search model
+            output_ids_list = params['model_outputs']
+            pick_idx = ii
+        elif ii == 0 and optimized_search:  # optimized search model (model_init case)
+            output_ids_list = self.ids_outputs_init
+        elif ii > 0 and optimized_search:  # optimized search model (model_next case)
+            output_ids_list = self.ids_outputs_next
+
+        if len(output_ids_list) > 1:
+            all_data = {}
+            for output_id in range(len(output_ids_list)):
+                all_data[output_ids_list[output_id]] = out_data[output_id]
+            all_data[output_ids_list[0]] = np.array(all_data[output_ids_list[0]])[:, pick_idx, :]
+        else:
+            all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
+        probs = all_data[output_ids_list[0]]
+
+        '''
         if len(params['model_outputs']) > 1:
             all_data = {}
             for output_id in range(len(params['model_outputs'])):
-                all_data[params['model_outputs'][output_id]] = data[output_id]
+                all_data[params['model_outputs'][output_id]] = out_data[output_id]
             all_data[params['model_outputs'][0]] = np.array(all_data[params['model_outputs'][0]])[:, ii, :]
         else:
-             all_data = {params['model_outputs'][0]: np.array(data)[:, ii, :]}
+            all_data = {params['model_outputs'][0]: np.array(out_data)[:, ii, :]}
+        probs = all_data[params['model_outputs'][0]]
+        '''
 
-        return all_data[params['model_outputs'][0]]
+        ##########################################
+        # Define returned data
+        ##########################################
+        if not optimized_search:
+            return probs
+        else:
+            return [probs, out_data]
+
 
     def beam_search(self, X, params, null_sym=2):
         """
@@ -1039,16 +1134,23 @@ class CNN_Model(object):
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
-        # we must include an additional dimension if the input for each timestep are all the generated words so far
+
+        # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
             if k > params['maxlen']:
                 raise NotImplementedError("BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
             state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))] * live_k)
         else:
             state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['maxlen'])] * live_k)
+
+        prev_out = None
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
-            probs = self.predict_cond(X, state_below, params, ii)
+            if params['optimized_search']: # use optimized search model if available
+                [probs, prev_out] = self.predict_cond(X, state_below, params, ii,
+                                                        optimized_search=True, prev_out=prev_out)
+            else:
+                probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
             cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
@@ -1072,12 +1174,14 @@ class CNN_Model(object):
             new_live_k = 0
             hyp_samples = []
             hyp_scores = []
+            indices_alive = []
             for idx in xrange(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == 0:
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
                     dead_k += 1
                 else:
+                    indices_alive.append(idx)
                     new_live_k += 1
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
@@ -1105,6 +1209,11 @@ class CNN_Model(object):
                     state_below = np.hstack((state_below,
                                              np.zeros(( state_below.shape[0], params['maxlen'] - state_below.shape[1], state_below.shape[2]))))
 
+            if params['optimized_search'] and ii > 0:
+                # filter next search inputs w.r.t. remaining samples
+                for idx_vars in range(len(prev_out)):
+                    prev_out[idx_vars] = prev_out[idx_vars][indices_alive]
+
         # dump every remaining one
         if live_k > 0:
             for idx in xrange(live_k):
@@ -1112,6 +1221,7 @@ class CNN_Model(object):
                 sample_scores.append(hyp_scores[idx])
 
         return samples, sample_scores
+
 
     def BeamSearchNet(self, ds, parameters):
         """
@@ -1121,7 +1231,16 @@ class CNN_Model(object):
         :param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
         :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
-
+        :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate
+                self.model_init and self.model_next models for reusing the information from previous timesteps).
+                The following attributes must be inserted to the model when building an optimized search model:
+                    - ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
+                    - ids_outputs_init: list of output variables of model_init (model probs must be the first output)
+                    - ids_inputs_next: list of input variables to model_next (previous word must be the first input)
+                    - ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                        the number of out variables must match the number of in variables)
+                    - matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
+                    - matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
         :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         """
 
@@ -1135,9 +1254,27 @@ class CNN_Model(object):
                           'dataset_outputs': ['description'],
                           'normalize': False, 'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
-                          'words_so_far': False
+                          'words_so_far': False,
+                          'optimized_search': False
                           }
         params = self.checkParameters(parameters, default_params)
+
+        # Check if the model is ready for applying an optimized search
+        if params['optimized_search']:
+            if 'matchings_init_to_next' not in dir(self) or \
+                            'matchings_next_to_next' not in dir(self) or \
+                            'ids_inputs_init' not in dir(self) or \
+                            'ids_outputs_init' not in dir(self) or \
+                            'ids_inputs_next' not in dir(self) or \
+                            'ids_outputs_next' not in dir(self):
+                raise Exception(
+                    "The following attributes must be inserted to the model when building an optimized search model:\n",
+                    "- matchings_init_to_next\n",
+                    "- matchings_next_to_next\n",
+                    "- ids_inputs_init\n",
+                    "- ids_outputs_init\n",
+                    "- ids_inputs_next\n",
+                    "- ids_outputs_next\n")
 
         predictions = dict()
         for s in params['predict_on_sets']:
@@ -2043,8 +2180,8 @@ class CNN_Model(object):
         (branch1, branch2, branch3, branch4) = params
 
         if weight_decay:
-            W_regularizer = regularizers.l2(weight_decay)
-            b_regularizer = regularizers.l2(weight_decay)
+            W_regularizer = l2(weight_decay)
+            b_regularizer = l2(weight_decay)
         else:
             W_regularizer = None
             b_regularizer = None
@@ -2111,8 +2248,8 @@ class CNN_Model(object):
                    border_mode='same', weight_decay=None, padding=None):
 
         if weight_decay:
-            W_regularizer = regularizers.l2(weight_decay)
-            b_regularizer = regularizers.l2(weight_decay)
+            W_regularizer = l2(weight_decay)
+            b_regularizer = l2(weight_decay)
         else:
             W_regularizer = None
             b_regularizer = None
