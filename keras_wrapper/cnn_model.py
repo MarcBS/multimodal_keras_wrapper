@@ -1319,6 +1319,8 @@ class CNN_Model(object):
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
+            sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n'%((time.time() - start_time), ((time.time() - start_time))/n_samples))
+
             sys.stdout.flush()
 
             predictions[s] = np.asarray(out)
