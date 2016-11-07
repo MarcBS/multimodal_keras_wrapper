@@ -1043,12 +1043,6 @@ class CNN_Model(object):
                         prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                     in_data[next_in_name] = prev_out[idx]
 
-        if ii == 5:
-            for k,v in in_data.iteritems():
-                print k
-                print v
-            print 
-
         ##########################################
         # Apply prediction on current timestep
         ##########################################
@@ -1064,16 +1058,6 @@ class CNN_Model(object):
                     out_data = model.predict_on_batch(aux_in_data)
                 else:
                     out_data = np.vstack((out_data, model.predict_on_batch(aux_in_data)))
-            '''
-            for state_below in states_below:
-                x[params['model_inputs'][-1]] = state_below.reshape(1,-1)
-                for model_input in params['model_inputs'][:-1]:
-                    x[model_input] = X[model_input]
-                if data == []:
-                    data = model.predict_on_batch(x)
-                else:
-                    data = np.vstack((data, model.predict_on_batch(x)))
-            '''
 
         ##########################################
         # Get outputs
@@ -1096,17 +1080,6 @@ class CNN_Model(object):
         else:
             all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
         probs = all_data[output_ids_list[0]]
-
-        '''
-        if len(params['model_outputs']) > 1:
-            all_data = {}
-            for output_id in range(len(params['model_outputs'])):
-                all_data[params['model_outputs'][output_id]] = out_data[output_id]
-            all_data[params['model_outputs'][0]] = np.array(all_data[params['model_outputs'][0]])[:, ii, :]
-        else:
-            all_data = {params['model_outputs'][0]: np.array(out_data)[:, ii, :]}
-        probs = all_data[params['model_outputs'][0]]
-        '''
 
         ##########################################
         # Define returned data
