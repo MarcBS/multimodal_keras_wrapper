@@ -470,7 +470,7 @@ class CNN_Model(object):
                           'homogeneous_batches': False, 'epochs_for_save': 1, 'num_iterations_val': None,
                           'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True};
+                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0}
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -522,8 +522,7 @@ class CNN_Model(object):
 
         # Prepare callbacks
         callbacks = []
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel,
-                                                           params['epochs_for_save'], reload_epoch=params['reload_epoch'])
+        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
         callback_lr_reducer = LearningRateReducerWithEarlyStopping(patience=0,
                                                                    lr_decay=params['lr_decay'],
                                                                    reduce_rate=params['lr_gamma'])
@@ -572,7 +571,7 @@ class CNN_Model(object):
                                  max_q_size=params['n_parallel_loaders'],
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
-                                 epoch_offset=params['reload_epoch'])
+                                 epoch_offset=params['epoch_offset'])
 
 
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
