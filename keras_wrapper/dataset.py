@@ -1,5 +1,5 @@
-# coding=utf-8
-
+# -*- coding: utf-8 -*-
+# coding: utf-8
 from keras.utils import np_utils, generic_utils
 import sys
 import random
@@ -15,7 +15,7 @@ import logging
 import re
 from collections import Counter
 from operator import add
-
+import codecs
 import cPickle as pk
 from scipy import misc
 import numpy as np
@@ -1184,6 +1184,43 @@ class Dataset(object):
         """
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         return tokenized
+
+
+    def tokenize_none_char(self, caption):
+        """
+        Character-level tokenization. Respects all symbols. Separates chars. Inserts <space> sybmol for spaces.
+        If found an escaped char, "&apos;" symbol, it is converted to the original one
+        # List of escaped chars (by moses tokenizer)
+        & ->  &amp;
+        | ->  &#124;
+        < ->  &lt;
+        > ->  &gt;
+        ' ->  &apos;
+        " ->  &quot;
+        [ ->  &#91;
+        ] ->  &#93;
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
+        """
+        def convert_chars(x):
+            if x == ' ':
+                return '<space>'
+            else:
+                return x.encode('utf-8')
+        tokenized = re.sub('[\n\t]+', '', caption.strip())
+        tokenized = re.sub('&amp;', ' & ', tokenized)
+        tokenized = re.sub('&#124;',' | ', tokenized)
+        tokenized = re.sub('&gt;',  ' > ', tokenized)
+        tokenized = re.sub('&lt;',  ' < ', tokenized)
+        tokenized = re.sub('&apos;'," ' ", tokenized)
+        tokenized = re.sub('&quot;',' " ', tokenized)
+        tokenized = re.sub('&#91;', ' [ ', tokenized)
+        tokenized = re.sub('&#93;', ' ] ', tokenized)
+        tokenized = re.sub('[  ]+', ' ', tokenized)
+        tokenized = [convert_chars(char) for char in tokenized.decode('utf-8')]
+        tokenized = " ".join(tokenized)
+        return tokenized
+
 
     def tokenize_questions(self, caption):
         """
