@@ -16,26 +16,24 @@ from keras.callbacks import Callback as KerasCallback
 # Storing callbacks
 ###
 class StoreModelWeightsOnEpochEnd(KerasCallback):
-    def __init__(self, model, fun, epochs_for_save, reload_epoch=0, verbose=0):
+    def __init__(self, model, fun, epochs_for_save, verbose=0):
         """
         In:
             model - model to save
             fun - function for saving the model
             epochs_for_save - number of epochs before the last save
-            reload_epoch - number of the epochs trained (only if resuming training)
         """
         super(KerasCallback, self).__init__()
         self.model_to_save = model
         self.store_function = fun
         self.epochs_for_save = epochs_for_save
-        self.reload_epoch = reload_epoch
         self.verbose = verbose
 
     def on_epoch_end(self, epoch, logs={}):
         epoch += 1
         if(epoch%self.epochs_for_save==0):
             print('')
-            self.store_function(self.model_to_save, epoch+self.reload_epoch)
+            self.store_function(self.model_to_save, epoch)
 ###
 
 ###
