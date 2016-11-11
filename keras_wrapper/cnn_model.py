@@ -1043,6 +1043,7 @@ class CNN_Model(object):
                         prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                     in_data[next_in_name] = prev_out[idx]
 
+
         ##########################################
         # Apply prediction on current timestep
         ##########################################
@@ -1053,7 +1054,7 @@ class CNN_Model(object):
             for i in range(n_samples):
                 aux_in_data = {}
                 for k,v in in_data.iteritems():
-                    aux_in_data[k] = v[i]
+                    aux_in_data[k] = np.asarray([v[i]])
                 if i == 0:
                     out_data = model.predict_on_batch(aux_in_data)
                 else:
@@ -1392,13 +1393,6 @@ class CNN_Model(object):
             while(len(X.shape) < 4):
                 X = np.expand_dims(X, axis=1)
 
-        '''
-        # Prepare data if Graph model
-        if(isinstance(self.model, Graph)):
-            [X, last_out] = self._prepareGraphData(X)
-        elif(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
-            [X, _] = self._prepareSequentialData(X)
-        '''
         X = self.prepareData(X, None)[0]
 
         # Apply forward pass for prediction
