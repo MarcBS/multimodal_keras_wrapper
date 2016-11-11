@@ -470,8 +470,7 @@ class CNN_Model(object):
                           'homogeneous_batches': False, 'epochs_for_save': 1, 'num_iterations_val': None,
                           'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'epoch_offset': 0,
-                          'shuffle': True};
+                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0}
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -523,8 +522,7 @@ class CNN_Model(object):
 
         # Prepare callbacks
         callbacks = []
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel,
-                                                           params['epochs_for_save'], reload_epoch=params['reload_epoch'])
+        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
         callback_lr_reducer = LearningRateReducerWithEarlyStopping(patience=0,
                                                                    lr_decay=params['lr_decay'],
                                                                    reduce_rate=params['lr_gamma'])
@@ -1036,7 +1034,7 @@ class CNN_Model(object):
 
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:,-1]
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1]
                 if idx > 0:  # first output must be the output probs.
                     next_in_name = self.matchings_next_to_next[next_out_name]
                     if prev_out[idx].shape[0] == 1:
@@ -1149,7 +1147,7 @@ class CNN_Model(object):
             hyp_scores = []
             indices_alive = []
             for idx in xrange(len(new_hyp_samples)):
-                if new_hyp_samples[idx][-1] == 0:
+                if new_hyp_samples[idx][-1] == 0:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
                     dead_k += 1
@@ -1180,7 +1178,7 @@ class CNN_Model(object):
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
                     state_below = np.hstack((state_below,
-                                             np.zeros(( state_below.shape[0], params['maxlen'] - state_below.shape[1], state_below.shape[2]))))
+                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1], state_below.shape[2]))))
 
             if params['optimized_search'] and ii > 0:
                 # filter next search inputs w.r.t. remaining samples
