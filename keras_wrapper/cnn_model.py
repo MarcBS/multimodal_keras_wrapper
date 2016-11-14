@@ -36,12 +36,12 @@ import shutil
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
-#           External functions for saving and loading CNN_Model instances
+#           External functions for saving and loading Model_Wrapper instances
 # ------------------------------------------------------- #
 
 def saveModel(model_wrapper, iter, path=None):
     """
-        Saves a backup of the current CNN_Model object after trained for 'iter' iterations.
+        Saves a backup of the current Model_Wrapper object after being trained for 'iter' iterations.
     """
     if(not path):
         path = model_wrapper.model_path
@@ -54,13 +54,29 @@ def saveModel(model_wrapper, iter, path=None):
         os.makedirs(path)
 
     iter = str(iter)
+
     # Save model structure
     json_string = model_wrapper.model.to_json()
     open(path + '/epoch_'+ iter +'_structure.json', 'w').write(json_string)
     # Save model weights
     model_wrapper.model.save_weights(path + '/epoch_'+ iter +'_weights.h5', overwrite=True)
+
+    # Save auxiliar models for optimized search
+    if 'model_init' in dir(model_wrapper):
+        # Save model structure
+        json_string = model_wrapper.model_init.to_json()
+        open(path + '/epoch_' + iter + '_structure_init.json', 'w').write(json_string)
+        # Save model weights
+        model_wrapper.model_init.save_weights(path + '/epoch_' + iter + '_weights_init.h5', overwrite=True)
+    if 'model_next' in dir(model_wrapper):
+        # Save model structure
+        json_string = model_wrapper.model_next.to_json()
+        open(path + '/epoch_' + iter + '_structure_next.json', 'w').write(json_string)
+        # Save model weights
+        model_wrapper.model_next.save_weights(path + '/epoch_' + iter + '_weights_next.h5', overwrite=True)
+
     # Save additional information
-    cloudpk.dump(model_wrapper, open(path + '/epoch_' + iter + '_CNN_Model.pkl', 'wb'))
+    cloudpk.dump(model_wrapper, open(path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'wb'))
 
     if(not model_wrapper.silence):
         logging.info("<<< Model saved >>>")
@@ -68,19 +84,40 @@ def saveModel(model_wrapper, iter, path=None):
 
 def loadModel(model_path, iter):
     """
-        Loads a previously saved CNN_Model object.
+        Loads a previously saved Model_Wrapper object.
     """
     t = time.time()
     iter = str(iter)
-    logging.info("<<< Loading model from "+ model_path + "/epoch_" + iter + "_CNN_Model.pkl ... >>>")
+    logging.info("<<< Loading model from "+ model_path + "/epoch_" + iter + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
     model = model_from_json(open(model_path + '/epoch_'+ iter +'_structure.json').read())
     # Load model weights
     model.load_weights(model_path + '/epoch_'+ iter +'_weights.h5')
-    # Load additional information
-    model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_CNN_Model.pkl', 'rb'))
+
+    # Load auxiliar models for optimized search
+    try:
+        # Load model structure
+        model_init = model_from_json(open(model_path + '/epoch_' + iter + '_structure_init.json').read())
+        # Load model weights
+        model_init.load_weights(model_path + '/epoch_' + iter + '_weights_init.h5')
+        # Load model structure
+        model_next = model_from_json(open(model_path + '/epoch_' + iter + '_structure_next.json').read())
+        # Load model weights
+        model_next.load_weights(model_path + '/epoch_' + iter + '_weights_next.h5')
+        loaded_optimized = True
+    except:
+        loaded_optimized = False
+
+    # Load Model_Wrapper information
+    try:
+        model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'rb'))
+    except: # backwards compatibility
+        model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_CNN_Model.pkl', 'rb'))
     model_wrapper.model = model
+    if loaded_optimized:
+        model_wrapper.model_init = model_init
+        model_wrapper.model_next = model_next
 
     logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time()-t))
     return model_wrapper
@@ -89,7 +126,7 @@ def loadModel(model_path, iter):
 # ------------------------------------------------------- #
 #       MAIN CLASS
 # ------------------------------------------------------- #
-class CNN_Model(object):
+class Model_Wrapper(object):
     """
         Wrapper for Keras' models. It provides the following utilities:
             - Training visualization module.
@@ -103,7 +140,7 @@ class CNN_Model(object):
                  structure_path=None, weights_path=None, seq_to_functional=False,
                  model_name=None, plots_path=None, models_path=None, inheritance=False):
         """
-            CNN_Model object constructor.
+            Model_Wrapper object constructor.
 
             :param nOutput: number of outputs of the network. Only valid if 'structure_path' == None.
             :param type: network name type (corresponds to any method defined in the section 'MODELS' of this class). Only valid if 'structure_path' == None.
@@ -240,7 +277,7 @@ class CNN_Model(object):
 
     def setName(self, model_name, plots_path=None, models_path=None, clear_dirs=True):
         """
-            Changes the name (identifier) of the CNN_Model instance.
+            Changes the name (identifier) of the Model_Wrapper instance.
         """
         if(not model_name):
             self.name = time.strftime("%Y-%m-%d") + '_' + time.strftime("%X")
@@ -414,7 +451,7 @@ class CNN_Model(object):
 
     # ------------------------------------------------------- #
     #       TRAINING/TEST
-    #           Methods for train and testing on the current CNN_Model
+    #           Methods for train and testing on the current Model_Wrapper
     # ------------------------------------------------------- #
 
     def ended_training(self):
@@ -509,7 +546,7 @@ class CNN_Model(object):
 
         self.__train(ds, params, state)
 
-        logging.info("<<< Finished training CNN_Model >>>")
+        logging.info("<<< Finished training Model_Wrapper >>>")
 
 
     def __train(self, ds, params, state=dict()):
@@ -1025,10 +1062,11 @@ class CNN_Model(object):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:,-1]
                 if idx > 0: # first output must be the output probs.
-                    next_in_name = self.matchings_init_to_next[init_out_name]
-                    if prev_out[idx].shape[0] == 1:
-                        prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
-                    in_data[next_in_name] = prev_out[idx]
+                    if init_out_name in self.matchings_init_to_next.keys():
+                        next_in_name = self.matchings_init_to_next[init_out_name]
+                        if prev_out[idx].shape[0] == 1:
+                            prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
+                        in_data[next_in_name] = prev_out[idx]
 
         elif ii > 1 and optimized_search:  # optimized search model and timestep > 1 (model_next to model_next)
 
@@ -1036,30 +1074,24 @@ class CNN_Model(object):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:, -1]
                 if idx > 0:  # first output must be the output probs.
-                    next_in_name = self.matchings_next_to_next[next_out_name]
-                    if prev_out[idx].shape[0] == 1:
-                        prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
-                    in_data[next_in_name] = prev_out[idx]
+                    if next_out_name in self.matchings_next_to_next.keys():
+                        next_in_name = self.matchings_next_to_next[next_out_name]
+                        if prev_out[idx].shape[0] == 1:
+                            prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
+                        in_data[next_in_name] = prev_out[idx]
 
-
-        ##########################################
-        # Apply prediction on current timestep
-        ##########################################
-        if params['batch_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
-            out_data = model.predict_on_batch(in_data)
-        else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
-            out_data = []
-            for i in range(n_samples):
-                aux_in_data = {}
-                for k,v in in_data.iteritems():
-                    aux_in_data[k] = np.asarray([v[i]])
-                if i == 0:
-                    out_data = model.predict_on_batch(aux_in_data)
-                else:
-                    out_data = np.vstack((out_data, model.predict_on_batch(aux_in_data)))
+        '''
+        if ii == 0:
+            print 'iteration',ii
+            print "IN DATA"
+            for k,v in in_data.iteritems():
+                print k
+                print v.shape
+            print
+        '''
 
         ##########################################
-        # Get outputs
+        # Recover output identifiers
         ##########################################
         # in any case, the first output of the models must be the next words' probabilities
         pick_idx = -1
@@ -1071,6 +1103,31 @@ class CNN_Model(object):
         elif ii > 0 and optimized_search:  # optimized search model (model_next case)
             output_ids_list = self.ids_outputs_next
 
+
+        ##########################################
+        # Apply prediction on current timestep
+        ##########################################
+        if params['batch_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
+            out_data = model.predict_on_batch(in_data)
+        else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
+            for i in range(n_samples):
+                aux_in_data = {}
+                for k,v in in_data.iteritems():
+                    aux_in_data[k] = np.asarray([v[i]])
+                predicted_out = model.predict_on_batch(aux_in_data)
+                if i == 0:
+                    out_data = predicted_out
+                else:
+                    if len(output_ids_list) > 1:
+                        for iout in range(len(output_ids_list)):
+                            out_data[iout] = np.vstack((out_data[iout], predicted_out[iout]))
+                    else:
+                        out_data = np.vstack((out_data, predicted_out))
+
+        ##########################################
+        # Get outputs
+        ##########################################
+
         if len(output_ids_list) > 1:
             all_data = {}
             for output_id in range(len(output_ids_list)):
@@ -1079,6 +1136,21 @@ class CNN_Model(object):
         else:
             all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
         probs = all_data[output_ids_list[0]]
+
+        '''
+        if ii == 0:
+            print "OUT DATA"
+            for k, v in all_data.iteritems():
+                print k
+                print v.shape
+                if k == 'ctx_CNN':
+                    for s_ in range(n_samples):
+                        print s_
+                        for w_ in range(5):
+                            for h_ in range(5):
+                                print v[s_,:30,w_,h_]
+            print
+        '''
 
         ##########################################
         # Define returned data
@@ -1317,6 +1389,8 @@ class CNN_Model(object):
                     if params['n_samples'] > 0:
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
+                print 'exiting'
+                exit()
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
             sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n'%((time.time() - start_time), ((time.time() - start_time))/n_samples))
 
@@ -2653,7 +2727,7 @@ class CNN_Model(object):
 
     def Empty(self, nOutput, input):
         """
-            Creates an empty CNN_Model (can be externally defined)
+            Creates an empty Model_Wrapper (can be externally defined)
         """
         pass
 
@@ -2664,10 +2738,17 @@ class CNN_Model(object):
 
     def __getstate__(self):
         """
-            Behavour applied when pickling a CNN_Model instance.
+            Behaviour applied when pickling a Model_Wrapper instance.
         """
         obj_dict = self.__dict__.copy()
         del obj_dict['model']
+        # Remove also optimized search models if exist
+        if 'model_init' in obj_dict:
+            del obj_dict['model_init']
+            del obj_dict['model_next']
         return obj_dict
 
 
+
+# Backwards compatibility
+CNN_Model = Model_Wrapper
