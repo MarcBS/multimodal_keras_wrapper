@@ -505,7 +505,7 @@ class Model_Wrapper(object):
 
         default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1, 'maxlen':100,
                           'homogeneous_batches': False, 'epochs_for_save': 1, 'num_iterations_val': None,
-                          'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True,
+                          'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0}
 
@@ -571,13 +571,13 @@ class Model_Wrapper(object):
         if params['homogeneous_batches']:
             train_gen = Homogeneous_Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
                                              batch_size=params['batch_size'], maxlen=params['maxlen'],
-                                             normalize_images=params['normalize_images'],
+                                             normalize_images=params['normalize'],
                                              data_augmentation=params['data_augmentation'],
                                              mean_substraction=params['mean_substraction']).generator()
         else:
             train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
                                              batch_size=params['batch_size'],
-                                             normalize_images=params['normalize_images'],
+                                             normalize_images=params['normalize'],
                                              data_augmentation=params['data_augmentation'],
                                              mean_substraction=params['mean_substraction'],
                                              shuffle=params['shuffle']).generator()
@@ -592,7 +592,7 @@ class Model_Wrapper(object):
             # prepare data generator
             val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize_images'],
+                                         normalize_images=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction']).generator()
         else:
@@ -646,7 +646,7 @@ class Model_Wrapper(object):
             t_queue = []
             for t_ind in range(state['n_iterations_per_epoch']):
                 t = ThreadDataLoader(retrieveXY, ds, 'train', params['batch_size'],
-                                params['normalize_images'], params['mean_substraction'], params['data_augmentation'])
+                                params['normalize'], params['mean_substraction'], params['data_augmentation'])
                 if(t_ind > state['it'] and t_ind < params['n_parallel_loaders'] +state['it']+1):
                     t.start()
                 t_queue.append(t)
@@ -754,7 +754,7 @@ class Model_Wrapper(object):
                     t_val_queue = []
                     for t_ind in range(params['num_iterations_val']):
                         t = ThreadDataLoader(retrieveXY, ds, 'val', params['batch_size'],
-                                        params['normalize_images'], params['mean_substraction'], False)
+                                        params['normalize'], params['mean_substraction'], False)
                         if(t_ind < params['n_parallel_loaders']):
                             t.start()
                         t_val_queue.append(t)
@@ -851,7 +851,7 @@ class Model_Wrapper(object):
     def testNet(self, ds, parameters, out_name=None):
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize_images': False,
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize': False,
                           'mean_substraction': True};
         params = self.checkParameters(parameters, default_params)
         self.testing_parameters.append(copy.copy(params))
@@ -866,7 +866,7 @@ class Model_Wrapper(object):
         # We won't use an Homogeneous_Batch_Generator for testing
         data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize_images'],
+                                         normalize_images=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction']).generator()
 
@@ -904,7 +904,7 @@ class Model_Wrapper(object):
             :param mean_substraction: boolean indicating if we want to substract the training mean
         """
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize_images': False, 'mean_substraction': True};
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True};
         params = self.checkParameters(parameters, default_params)
         self.testing_parameters.append(copy.copy(params))
 
@@ -918,7 +918,7 @@ class Model_Wrapper(object):
         t_test_queue = []
         for t_ind in range(numIterationsTest):
             t = ThreadDataLoader(retrieveXY, ds, 'test', params['batch_size'],
-                            params['normalize_images'], params['mean_substraction'], False)
+                            params['normalize'], params['mean_substraction'], False)
             if(t_ind < params['n_parallel_loaders']):
                 t.start()
             t_test_queue.append(t)
@@ -1080,15 +1080,17 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
 
-        '''
+        """
         if ii == 0:
             print 'iteration',ii
-            print "IN DATA"
+            print 'IN DATA'
             for k,v in in_data.iteritems():
                 print k
                 print v.shape
+                if k == 'input_1':
+                    print v[0, :, 50:55, 50:55]
             print
-        '''
+        """
 
         ##########################################
         # Recover output identifiers
@@ -1107,13 +1109,13 @@ class Model_Wrapper(object):
         ##########################################
         # Apply prediction on current timestep
         ##########################################
-        if params['batch_size'] - 1 > n_samples: # The model inputs beam will fit into one batch in memory
+        if params['batch_size'] >= n_samples: # The model inputs beam will fit into one batch in memory
             out_data = model.predict_on_batch(in_data)
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
                 aux_in_data = {}
                 for k,v in in_data.iteritems():
-                    aux_in_data[k] = np.asarray([v[i]])
+                    aux_in_data[k] = np.expand_dims(v[i], axis=0)
                 predicted_out = model.predict_on_batch(aux_in_data)
                 if i == 0:
                     out_data = predicted_out
@@ -1123,6 +1125,14 @@ class Model_Wrapper(object):
                             out_data[iout] = np.vstack((out_data[iout], predicted_out[iout]))
                     else:
                         out_data = np.vstack((out_data, predicted_out))
+
+        """
+        if ii == 0:
+            for v in out_data:
+                print 'right after predict'
+                if v.shape == (1, 512, 7, 7):
+                    print v[0,0,:,:]
+        """
 
         ##########################################
         # Get outputs
@@ -1137,20 +1147,23 @@ class Model_Wrapper(object):
             all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
         probs = all_data[output_ids_list[0]]
 
-        '''
+        """
         if ii == 0:
-            print "OUT DATA"
+            print 'OUT DATA'
             for k, v in all_data.iteritems():
                 print k
                 print v.shape
                 if k == 'ctx_CNN':
                     for s_ in range(n_samples):
                         print s_
-                        for w_ in range(5):
-                            for h_ in range(5):
+                        print v[s_,0,:,:]
+                        '''
+                        for w_ in range(2,3):
+                            for h_ in range(2,3):
                                 print v[s_,:30,w_,h_]
+                        '''
             print
-        '''
+        """
 
         ##########################################
         # Define returned data
@@ -1290,13 +1303,13 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
-                          'normalize_images': False, 'mean_substraction': True,
+                          'normalize': False, 'mean_substraction': True,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples':-1,
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
-                          'normalize': False, 'alpha_factor': 1.0,
+                          'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
                           'words_so_far': False,
                           'optimized_search': False
@@ -1333,7 +1346,7 @@ class Model_Wrapper(object):
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize_images'],
+                                         normalize_images=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction'],
                                          predict=True).generator()
@@ -1344,7 +1357,7 @@ class Model_Wrapper(object):
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize_images'],
+                                         normalize_images=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction'],
                                          predict=False,
@@ -1389,8 +1402,7 @@ class Model_Wrapper(object):
                     if params['n_samples'] > 0:
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
-                print 'exiting'
-                exit()
+
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
             sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n'%((time.time() - start_time), ((time.time() - start_time))/n_samples))
 
@@ -1418,7 +1430,7 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
-                          'normalize_images': False, 'mean_substraction': True, 'n_samples':None,
+                          'normalize': False, 'mean_substraction': True, 'n_samples':None,
                           'predict_on_sets': ['val']}
         params = self.checkParameters(parameters, default_params)
 
@@ -1438,7 +1450,7 @@ class Model_Wrapper(object):
             # Prepare data generator
             data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                      batch_size=params['batch_size'],
-                                     normalize_images=params['normalize_images'],
+                                     normalize_images=params['normalize'],
                                      data_augmentation=False,
                                      mean_substraction=params['mean_substraction'],
                                      predict=True).generator()

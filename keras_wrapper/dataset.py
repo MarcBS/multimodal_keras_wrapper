@@ -18,6 +18,7 @@ from operator import add
 import codecs
 import cPickle as pk
 from scipy import misc
+from PIL import Image as pilimage
 import numpy as np
 
 
@@ -132,6 +133,20 @@ class Data_Batch_Generator(object):
                                                  normalization=self.params['normalize_images'],
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=False)
+                    """
+                    ###########
+                    print 'print in dataset.py L:136'
+
+                    xbatch = self.dataset.getX(self.set_split, init_sample, final_sample, debug=True)
+                    captions = self.dataset.Y_val['caption'][init_sample:final_sample]
+                    images_list = self.dataset.X_val['image'][init_sample:final_sample]
+                    for c,im,imdeb,impix in zip(captions, images_list, xbatch[0], X_batch[0]):
+                        print c
+                        print im
+                        print imdeb
+                        print impix[:,50:55,50:55]
+                    ###########
+                    """
                     data = self.net.prepareData(X_batch, None)[0]
                 else:
                     X_batch, Y_batch = self.dataset.getXY(self.set_split, batch_size,
@@ -335,7 +350,7 @@ class Dataset(object):
 
         # List of implemented input and output data types
         self.__accepted_types_inputs = ['raw-image', 'video', 'image-features', 'video-features', 'text', 'id', 'ghost']
-        self.__accepted_types_outputs = ['categorical', 'binary', 'text', 'id']
+        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', 'id']
         #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
         
@@ -646,15 +661,15 @@ class Dataset(object):
         if(not self.silence):
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
         
-    
-    
+
     def setLabels(self, labels_list, set_name, type='categorical', id='label'):
         """
             DEPRECATED
         """
         logging.info("WARNING: The method setLabels() is deprecated, consider using () instead.")
         self.setOutput(self, labels_list, set_name, type, id)
-    
+
+
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0, pad_on_batch=True, words_so_far=False, # 'text'
                   build_vocabulary=False, max_words=0, sample_weights=False):
@@ -706,6 +721,8 @@ class Dataset(object):
                                        max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
         elif(type == 'binary'):
             data = self.preprocessBinary(path_list)
+        elif (type == 'real'):
+            data = self.preprocessReal(path_list)
         elif(type == 'id'):
             data = self.preprocessIDs(path_list, id)
             
@@ -781,7 +798,26 @@ class Dataset(object):
             raise Exception('Wrong type for "path_list". It must be an instance of the class list.')
         
         return labels
-    
+
+    # ------------------------------------------------------- #
+    #       TYPE 'real' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+
+    def preprocessReal(self, labels_list):
+
+        if (isinstance(labels_list, str) and os.path.isfile(labels_list)):
+            labels = []
+            with open(labels_list, 'r') as list_:
+                for line in list_:
+                    labels.append(int(line.rstrip('\n')))
+        elif (isinstance(labels_list, list)):
+            labels = labels_list
+        else:
+            raise Exception(
+                'Wrong type for "path_list". It must be a path to a text file with real values or an instance of the class list.')
+
+        return labels
+
     # ------------------------------------------------------- #
     #       TYPE 'features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -1678,10 +1714,8 @@ class Dataset(object):
             if(len(self.img_size[id]) == 3): # if it is a 3D image
                 # Convert RGB to BGR
                 if(self.img_size[id][2] == 3): # if has 3 channels
-                    aux = copy.copy(train_mean)
-                    train_mean[:,:,0] = aux[:,:,2]
-                    train_mean[:,:,2] = aux[:,:,0]
-                train_mean = np.transpose(train_mean, (2, 0, 1))
+                    train_mean = train_mean[:, :, ::-1]
+                train_mean = train_mean.transpose(2, 0, 1)
 
         nImages = len(images)
         
@@ -1713,33 +1747,25 @@ class Dataset(object):
                 
                 # Read image
                 try:
-                    im = misc.imread(im)
+                    im = pilimage.open(im)
+
                 except:
                     logging.warning("WARNING!")
                     logging.warning("Can't load image "+im)
                     im = np.zeros(tuple(self.img_size[id]))
-            
-            # Resize and convert to RGB (if in greyscale)
-            im = misc.imresize(im, tuple(self.img_size[id])).astype(type_imgs)
-            if(len(self.img_size[id]) == 3 and len(im.shape) < 3): # convert grayscale into RGB (or any other channel#)
-                nCh = self.img_size[id][2]
-                rgb_im = np.empty((im.shape[0], im.shape[1], nCh), dtype=np.float32)
-                for c in range(nCh):
-                    rgb_im[:,:,c] = im
-                im = rgb_im
-                
-            # Normalize
-            if(normalization):
-                if(normalization_type == '0-1'):
-                    im = im/255.0
+
+            # Convert to RGB
+            im = im.convert('RGB')
                 
             # Data augmentation
             if(not dataAugmentation):
-                # Take central image
-                left = np.round(np.divide([self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]], 2))
-                right = left + self.img_size_crop[id][0:2]
-                im = im[left[0]:right[0], left[1]:right[1], :]
+                # Use whole image
+                im = im.resize((self.img_size_crop[id][0], self.img_size_crop[id][1]))
+                im = np.asarray(im, dtype=type_imgs)
             else:
+                # Resize
+                im = im.resize((self.img_size[id][0], self.img_size[id][1]))
+                im = np.asarray(im, dtype=type_imgs)
                 # Take random crop
                 margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
                 left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
@@ -1753,15 +1779,18 @@ class Dataset(object):
                 flip = random.random()
                 if(flip < prob_flip_vertical): # vertical flip
                     im = np.flipud(im)
-            
+
+            # Normalize
+            if(normalization):
+                if(normalization_type == '0-1'):
+                    im = im / 255.0
+
             # Permute dimensions
             if(len(self.img_size[id]) == 3):
                 # Convert RGB to BGR
                 if(self.img_size[id][2] == 3): # if has 3 channels
-                    aux = copy.copy(im)
-                    im[:,:,0] = aux[:,:,2]
-                    im[:,:,2] = aux[:,:,0]
-                im = np.transpose(im, (2, 0, 1))
+                    im = im[:, :, ::-1]
+                im = im.transpose(2, 0, 1)
             else:
                 pass
             
@@ -1942,6 +1971,8 @@ class Dataset(object):
                     y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
+                elif (type_out == 'real'):
+                    y = np.array(y).astype(np.float32)
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2047,6 +2078,8 @@ class Dataset(object):
                     y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
+                elif (type_out == 'real'):
+                    y = np.array(y).astype(np.float32)
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2118,6 +2151,8 @@ class Dataset(object):
                     y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
                 elif(type_out == 'binary'):
                     y = np.array(y).astype(np.uint8)
+                elif (type_out == 'real'):
+                    y = np.array(y).astype(np.float32)
                 elif(type_out == 'text'):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
