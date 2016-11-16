@@ -394,6 +394,8 @@ class Dataset(object):
         self.img_size_crop = dict()
         # Training mean image
         self.train_mean = dict()
+        # Whether they are RGB images (or grayscale)
+        self.use_RGB = dict()
         #################################################
         
         ############################ Parameters used for outputs of type 'categorical'
@@ -565,7 +567,7 @@ class Dataset(object):
     
     
     def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
-                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3],                             # 'raw-image' / 'video'
+                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,               # 'raw-image' / 'video'
                  max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,      # 'text'
                  feat_len = 1024,                                                                 # 'image-features' / 'video-features'
@@ -629,7 +631,7 @@ class Dataset(object):
         
         # Proprocess the input data depending on its type
         if(type == 'raw-image'):
-            data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop)
+            data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop, use_RGB)
         elif(type == 'video'):
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
         elif(type == 'text'):
@@ -1565,7 +1567,7 @@ class Dataset(object):
     #       TYPE 'raw-image' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocessImages(self, path_list, id, set_name, img_size, img_size_crop):
+    def preprocessImages(self, path_list, id, set_name, img_size, img_size_crop, use_RGB):
         
         if(isinstance(path_list, str) and os.path.isfile(path_list)): # path to list of images' paths
             data = []
@@ -1579,6 +1581,7 @@ class Dataset(object):
             
         self.img_size[id] = img_size
         self.img_size_crop[id] = img_size_crop
+        self.use_RGB[id] = use_RGB
             
         # Tries to load a train_mean file from the dataset folder if exists
         mean_file_path = self.path+'/train_mean'
@@ -1612,12 +1615,12 @@ class Dataset(object):
         if(normalization):
             self.train_mean[id] = self.train_mean[id]/255.0
             
-        if(self.train_mean[id].shape != tuple(self.img_size[id])):
-            if(len(self.train_mean[id].shape) == 1 and self.train_mean[id].shape[0] == self.img_size[id][2]):
+        if(self.train_mean[id].shape != tuple(self.img_size_crop[id])):
+            if(len(self.train_mean[id].shape) == 1 and self.train_mean[id].shape[0] == self.img_size_crop[id][2]):
                 if(not self.silence):
                     logging.info("Converting input train mean pixels into mean image.")
-                mean_image = np.zeros(tuple(self.img_size[id]))
-                for c in range(self.img_size[id][2]):
+                mean_image = np.zeros(tuple(self.img_size_crop[id]))
+                for c in range(self.img_size_crop[id][2]):
                     mean_image[:, :, c] = self.train_mean[id][c]
                 self.train_mean[id] = mean_image
             else:
@@ -1628,7 +1631,7 @@ class Dataset(object):
             Calculates the mean of the data belonging to the training set split in each channel.
         """
         calculate = False
-        if(not isinstance(self.train_mean[id], np.ndarray)):
+        if(not id in self.train_mean or not isinstance(self.train_mean[id], np.ndarray)):
             calculate = True
         elif(self.train_mean[id].shape != tuple(self.img_size[id])):
             calculate = True
@@ -1639,36 +1642,40 @@ class Dataset(object):
             if(not self.silence):
                 logging.info("Start training set mean calculation...")
             
-            I_sum = np.zeros(self.img_size[id], dtype=np.longlong)
+            I_sum = np.zeros(self.img_size_crop[id], dtype=np.float64)
             
             # Load images in batches and sum all of them
             init = 0
             batch = 200
             for final in range(batch, self.len_train, batch):
-                I = self.getX('train', init, final, resizeImage=True, meanSubstraction=False)
+                I = self.getX('train', init, final, meanSubstraction=False)[self.ids_inputs.index(id)]
                 for im in I:
                     I_sum += im
                 if(not self.silence):
-                    logging.info("\tProcessed "+str(final)+'/'+str(self.len_train)+' images...')
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Processed %d/%d images..." % (final, self.len_train))
+                    sys.stdout.flush()
                 init = final
-            I = self.getX('train', init, self.len_train, resizeImage=True, meanSubstraction=False)
+            I = self.getX('train', init, self.len_train, meanSubstraction=False)[self.ids_inputs.index(id)]
             for im in I:
                 I_sum += im
             if(not self.silence):
-                logging.info("\tProcessed "+str(final)+'/'+str(self.len_train)+' images...')
+                sys.stdout.write('\r')
+                sys.stdout.write("Processed %d/%d images..." % (final, self.len_train))
+                sys.stdout.flush()
             
             # Mean calculation
             self.train_mean[id] = I_sum/self.len_train
             
             # Store the calculated mean
-            mean_name = self.path+'/train_mean'
+            mean_name = '/train_mean'
             for s in range(len(self.img_size[id])):
                 mean_name += '_'+str(self.img_size[id][s])
             mean_name += '_'+id+'_.jpg'
             store_path = self.path+'/'+mean_name
             misc.imsave(store_path, self.train_mean[id])
-            
-            self.train_mean[id] = self.train_mean[id].astype(np.float32)/255.0
+
+            #self.train_mean[id] = self.train_mean[id].astype(np.float32)/255.0
             
             if(not self.silence):
                 logging.info("Image mean stored in "+ store_path)
@@ -1704,12 +1711,14 @@ class Dataset(object):
             if(id not in self.train_mean):
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "'+id+'".')
             train_mean = copy.copy(self.train_mean[id])
-            
+
+            '''
             # Take central part
             left = np.round(np.divide([self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]], 2.0))
             right = left + self.img_size_crop[id][0:2]
             train_mean = train_mean[left[0]:right[0], left[1]:right[1], :]
-            
+            '''
+
             # Transpose dimensions
             if(len(self.img_size[id]) == 3): # if it is a 3D image
                 # Convert RGB to BGR
@@ -1755,7 +1764,11 @@ class Dataset(object):
                     im = np.zeros(tuple(self.img_size[id]))
 
             # Convert to RGB
-            im = im.convert('RGB')
+            if not type(im).__module__ == np.__name__:
+                if self.use_RGB[id]:
+                    im = im.convert('RGB')
+                else:
+                    im = im.convert('L')
                 
             # Data augmentation
             if(not dataAugmentation):
@@ -1770,7 +1783,10 @@ class Dataset(object):
                 margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
                 left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
                 right = np.add(left, self.img_size_crop[id][0:2])
-                im = im[left[0]:right[0], left[1]:right[1], :]
+                if self.use_RGB[id]:
+                    im = im[left[0]:right[0], left[1]:right[1], :]
+                else:
+                    im = im[left[0]:right[0], left[1]:right[1]]
                 
                 # Randomly flip (with a certain probability)
                 flip = random.random()
