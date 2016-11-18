@@ -837,7 +837,9 @@ class Dataset(object):
             data = path_list
         else:
             raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
-        
+
+        if not isinstance(feat_len, list):
+            feat_len = [feat_len]
         self.features_lengths[id] = feat_len
 
         return data
@@ -849,7 +851,7 @@ class Dataset(object):
             raise NotImplementedError('The chosen normalization type '+ normalization_type +' is not implemented for the type "image-features" and "video-features".')
         
         n_batch = len(X)
-        features = np.zeros((n_batch, feat_len))
+        features = np.zeros(tuple([n_batch]+feat_len))
         
         for i, feat in enumerate(X):
             if(not external):
