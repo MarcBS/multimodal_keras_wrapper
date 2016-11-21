@@ -164,6 +164,8 @@ class Data_Batch_Generator(object):
                     #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 1000))
                     #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], 1000))
 
+
+
                     data = self.net.prepareData(X_batch, Y_batch)
 
             yield(data)
@@ -1037,7 +1039,7 @@ class Dataset(object):
                     X_out[i] = vocab[w]
                 else:
                     X_out[i] = vocab['<unk>']
-            X_out = (X_out, None) # This None simulates a mask
+            #X_out = (X_out, None) # This None simulates a mask
         else: # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
@@ -1406,6 +1408,8 @@ class Dataset(object):
             raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
 
         if feat_len is not None:
+            if not isinstance(feat_len, list):
+                feat_len = [feat_len]
             self.features_lengths[id] = feat_len
 
         return video_indices
