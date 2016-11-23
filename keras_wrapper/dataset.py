@@ -1039,6 +1039,7 @@ class Dataset(object):
                     X_out[i] = vocab[w]
                 else:
                     X_out[i] = vocab['<unk>']
+            # if the following line is active it fails on VQA (max_len == 0)
             #X_out = (X_out, None) # This None simulates a mask
         else: # process text as a sequence of words
             if pad_on_batch:
