@@ -1364,6 +1364,7 @@ class Model_Wrapper(object):
                                          random_samples=n_samples).generator()
             if params['n_samples'] > 0:
                 references = []
+                sources = []
             out = []
             total_cost = 0
             sampled = 0
@@ -1373,8 +1374,12 @@ class Model_Wrapper(object):
                 data = data_gen.next()
                 X = dict()
                 if params['n_samples'] > 0:
+                    s_dict = {}
                     for input_id in params['model_inputs']:
                         X[input_id] = data[0][input_id]
+                        s_dict[input_id] = X[input_id]
+                    sources.append(s_dict)
+
                     Y = dict()
                     for output_id in params['model_outputs']:
                         Y[output_id] = data[1][output_id]
@@ -1413,7 +1418,7 @@ class Model_Wrapper(object):
         if params['n_samples'] < 1:
             return predictions
         else:
-            return predictions, references
+            return predictions, references, sources
 
     def predictNet(self, ds, parameters, out_name=None):
         '''
@@ -1574,7 +1579,7 @@ class Model_Wrapper(object):
         return answer_pred
 
 
-    def decode_predictions_beam_search(self, preds, index2word, verbose=0):
+    def decode_predictions_beam_search(self, preds, index2word, pad_sequences=False, verbose=0):
         """
         Decodes predictions
 
@@ -1588,10 +1593,13 @@ class Model_Wrapper(object):
         """
         if verbose > 0:
             logging.info('Decoding beam search prediction ...')
+        if pad_sequences:
+            preds = [pred[:sum([int(elem > 0) for elem in pred])] for pred in preds]
 
         flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
         answer_pred = []
         for a_no in flattened_answer_pred:
+            init_token_pos = 0
             tmp = ' '.join(a_no[:-1])
             answer_pred.append(tmp)
         return answer_pred
