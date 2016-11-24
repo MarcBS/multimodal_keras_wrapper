@@ -142,6 +142,19 @@
 <div class="section" id="module-keras_wrapper.dataset">
 <span id="dataset-py"></span><h2>dataset.py<a class="headerlink" href="#module-keras_wrapper.dataset" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
+<dt id="keras_wrapper.dataset.Data_Batch_Generator">
+<em class="property">class </em><code class="descclassname">keras_wrapper.dataset.</code><code class="descname">Data_Batch_Generator</code><span class="sig-paren">(</span><em>set_split</em>, <em>net</em>, <em>dataset</em>, <em>num_iterations</em>, <em>batch_size=50</em>, <em>normalize_images=False</em>, <em>data_augmentation=True</em>, <em>mean_substraction=True</em>, <em>predict=False</em>, <em>random_samples=-1</em>, <em>shuffle=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Data_Batch_Generator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Batch generator class. Retrieves batches of data.</p>
+<dl class="method">
+<dt id="keras_wrapper.dataset.Data_Batch_Generator.generator">
+<code class="descname">generator</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Data_Batch_Generator.generator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets and processes the data
+:return: generator with the data</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="class">
 <dt id="keras_wrapper.dataset.Dataset">
 <em class="property">class </em><code class="descclassname">keras_wrapper.dataset.</code><code class="descname">Dataset</code><span class="sig-paren">(</span><em>name</em>, <em>path</em>, <em>silence=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Class for defining instances of databases adapted for Keras. It includes several utility functions for easily managing
@@ -894,6 +907,66 @@ If found an escaped char, &#8220;&amp;apos;&#8221; symbol, it is converted to th
 </table>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="class">
+<dt id="keras_wrapper.dataset.Homogeneous_Data_Batch_Generator">
+<em class="property">class </em><code class="descclassname">keras_wrapper.dataset.</code><code class="descname">Homogeneous_Data_Batch_Generator</code><span class="sig-paren">(</span><em>set_split</em>, <em>net</em>, <em>dataset</em>, <em>num_iterations</em>, <em>batch_size=50</em>, <em>maxlen=100</em>, <em>normalize_images=False</em>, <em>data_augmentation=True</em>, <em>mean_substraction=True</em>, <em>predict=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Homogeneous_Data_Batch_Generator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Retrieves batches of the same length.
+Parts of the code borrowed from <a class="reference external" href="https://github.com/kelvinxu/arctic-captions/blob/master/homogeneous_data.py">https://github.com/kelvinxu/arctic-captions/blob/master/homogeneous_data.py</a></p>
+</dd></dl>
+
+<dl class="function">
+<dt id="keras_wrapper.dataset.create_dir_if_not_exists">
+<code class="descclassname">keras_wrapper.dataset.</code><code class="descname">create_dir_if_not_exists</code><span class="sig-paren">(</span><em>directory</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.create_dir_if_not_exists" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates a directory if it doen&#8217;t exist</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>directory</strong> &#8211; Directory to create</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">None</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="keras_wrapper.dataset.loadDataset">
+<code class="descclassname">keras_wrapper.dataset.</code><code class="descname">loadDataset</code><span class="sig-paren">(</span><em>dataset_path</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.loadDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a previously saved Dataset object.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>dataset_path</strong> &#8211; Path to the stored Dataset to load</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">Loaded Dataset object</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="keras_wrapper.dataset.saveDataset">
+<code class="descclassname">keras_wrapper.dataset.</code><code class="descname">saveDataset</code><span class="sig-paren">(</span><em>dataset</em>, <em>store_path</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.saveDataset" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves a backup of the current Dataset object.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>dataset</strong> &#8211; Dataset object to save</li>
+<li><strong>store_path</strong> &#8211; Saving path</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">None</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 </div>

@@ -10,8 +10,6 @@ dataset.py
 =========================
 
 .. automodule:: keras_wrapper.dataset
-
-.. autoclass:: keras_wrapper.dataset.Dataset
    :members:
 
 
