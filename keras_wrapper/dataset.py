@@ -640,7 +640,7 @@ class Dataset(object):
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
-            :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
+            :param offset: number of timesteps that the text is shifted to the right (for sequential conditional models, which take as input the previous output)
             :param fill: select whether padding before or after the sequence
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
@@ -733,7 +733,7 @@ class Dataset(object):
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text') Set to 0 if the whole sentence will be used as an output class.
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
-            :param offset: number of timesteps that the text is shifted to the right (for *_cond models)
+            :param offset: number of timesteps that the text is shifted to the right (for sequential conditional models, which take as input the previous output)
             :param fill: select whether padding before or after the sequence
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
@@ -969,7 +969,7 @@ class Dataset(object):
         :param fill: Whether we path with zeros at the beginning or at the end of the sentences.
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
-                             sentences with a fixed (max_text_length) length.
+        sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Should be ignored.
         :return: Preprocessed sentences.
         """
@@ -1129,9 +1129,9 @@ class Dataset(object):
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
         :param fill: 'start': the resulting vector will be filled with 0s at the beginning,
-                    'end': it will be filled with 0s at the end.
+        'end': it will be filled with 0s at the end.
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch
-                             or sentences with a fixed (max_text_length) length.
+        or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :return: Text as sequence of number. Mask for each sentence.
         """
@@ -1247,8 +1247,9 @@ class Dataset(object):
     def tokenize_aggressive(self, caption, lowercase=True):
         """
         Aggressive tokenizer for the input/output data of type 'text':
-           * Removes punctuation
-           * Optional lowercasing
+            * Removes punctuation
+            * Optional lowercasing
+
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption
@@ -1272,6 +1273,7 @@ class Dataset(object):
         Tokenization used for the icann paper:
             * Removes some punctuation (. , ")
             * Lowercasing
+
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
@@ -1287,6 +1289,7 @@ class Dataset(object):
         Similar to tokenize_icann
             * Removes some punctuation
             * Lowercase
+
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
@@ -1300,8 +1303,9 @@ class Dataset(object):
     def tokenize_soft(self, caption, lowercase=True):
         """
         Tokenization used for the icann paper:
-           * Removes very little punctuation
-           * Lowercase
+            * Removes very little punctuation
+            * Lowercase
+
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption

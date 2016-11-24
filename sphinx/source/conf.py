@@ -49,7 +49,7 @@ source_suffix = ['.rst', '.md']
 master_doc = 'index'
 
 # General information about the project.
-project = u'staged_keras_wrapper'
+project = u'Staged Keras Wrapper'
 copyright = u'2016, Marc Bolaños'
 author = u'Marc Bolaños'
 

@@ -1030,17 +1030,16 @@ class Model_Wrapper(object):
     def predict_cond(self, X, states_below, params, ii, optimized_search=False, prev_out=None):
         """
         Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
-        WARNING!: It's assumed that the current history (state_below) is the last input of the model!
-                  See Dataset class for more information
+        WARNING!: It's assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
         :param X: Input context
         :param states_below: Batch of partial hypotheses
         :param params: Decoding parameters
         :param ii: Decoding time-step
         :param optimized_search: indicates if we are using optimized search
-                (only applicable if beam search specific models self.model_init and self.model_next models are defined)
+        (only applicable if beam search specific models self.model_init and self.model_next models are defined)
         :param prev_out: output from the previous timestep, which will be reused by self.model_next
-                (only applicable if beam search specific models self.model_init and self.model_next models are defined)
-        :return: Network predicions at time-step ii
+        (only applicable if beam search specific models self.model_init and self.model_next models are defined)
+        :return: Network predictions at time-step ii
         """
         in_data = {}
         n_samples = states_below.shape[0]
@@ -1150,17 +1149,22 @@ class Model_Wrapper(object):
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
         The algorithm in a nutshell does the following:
-            k = beam_size
-            open_nodes = [[]] * k
-            while k > 0:
-                1. Given the inputs, get (log) probabilities for the outputs.
-                2. Expand each open node with all possible output.
-                3. Prune and keep the k best nodes.
-                4. If a sample has reached the <eos> symbol:
-                    4.1. Mark it as final sample.
-                    4.2. k -= 1
-                5. Build new inputs (state_below) and go to 1.
-            return final_samples, final_scores
+
+        1. k = beam_size
+        2. open_nodes = [[]] * k
+        3. while k > 0:
+
+            3.1. Given the inputs, get (log) probabilities for the outputs.
+            3.2. Expand each open node with all possible output.
+            3.3. Prune and keep the k best nodes.
+            3.4. If a sample has reached the <eos> symbol:
+
+                3.4.1. Mark it as final sample.
+                3.4.2. k -= 1
+
+            3.5. Build new inputs (state_below) and go to 1.
+
+        4. return final_samples, final_scores
 
         :param X: Model inputs
         :param params: Search parameters
@@ -1273,15 +1277,16 @@ class Model_Wrapper(object):
         :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
         :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate
-                self.model_init and self.model_next models for reusing the information from previous timesteps).
-                The following attributes must be inserted to the model when building an optimized search model:
-                    - ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
-                    - ids_outputs_init: list of output variables of model_init (model probs must be the first output)
-                    - ids_inputs_next: list of input variables to model_next (previous word must be the first input)
-                    - ids_outputs_next: list of output variables of model_next (model probs must be the first output and
-                        the number of out variables must match the number of in variables)
-                    - matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
-                    - matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
+        self.model_init and self.model_next models for reusing the information from previous timesteps).
+        The following attributes must be inserted to the model when building an optimized search model:
+        
+            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
+            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
+            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and the number of out variables must match the number of in variables)
+            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
+            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
+
         :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         """
 
@@ -1505,7 +1510,7 @@ class Model_Wrapper(object):
         Sampling words (each sample is drawn from a categorical distribution).
         Or picks up words that maximize the likelihood.
         :param scores: array of size #samples x #classes;
-                every entry determines a score for sample i having class j
+        every entry determines a score for sample i having class j
         :param sampling_type:
         :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples

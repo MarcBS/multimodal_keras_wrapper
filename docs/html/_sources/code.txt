@@ -1,4 +1,4 @@
-Documentation for the Code
+Available Files and Methods
 **************************
 
 Documentation for the keras_wrapper module.
