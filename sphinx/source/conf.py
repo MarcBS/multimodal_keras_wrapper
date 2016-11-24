@@ -20,6 +20,7 @@ import os
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../../'))
+sys.path.insert(0, os.path.abspath('../_ext'))
 
 # -- General configuration ------------------------------------------------
 
@@ -32,8 +33,12 @@ sys.path.insert(0, os.path.abspath('../../'))
 extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.ifconfig',
-    'sphinx.ext.autodoc'
+    'sphinx.ext.autodoc',
+    'edit_on_github'
 ]
+
+edit_on_github_project = 'MarcBS/staged_keras_wrapper'
+edit_on_github_branch = 'master'
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

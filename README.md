@@ -1,10 +1,10 @@
 # Staged Keras Wrapper
-Wrapper for Keras with support to easy data loading and handling and the creation of staged networks.
+Wrapper for Keras with support to easy data and models loading and handling.
 
 
 ## Documentation
 
-You can access the library documentation page at [staged-keras-wrapper.readthedocs.io/](http://staged-keras-wrapper.readthedocs.io/).
+You can access the library documentation page at [marcbs.github.io/staged_keras_wrapper/](http://marcbs.github.io/staged_keras_wrapper/)
 
 Some code examples are available in demo.ipynb and test.py. Additionally, in the section Projects you can see some practical examples of projects using this library.
 
@@ -38,6 +38,7 @@ You can see more practical examples in projects which use this library:
 [VIBIKNet for Visual Question Answering](https://github.com/MarcBS/VIBIKNet)
 
 [ABiViRNet for Video Description](https://github.com/lvapeab/ABiViRNet)
+
 
 ## Keras
 
