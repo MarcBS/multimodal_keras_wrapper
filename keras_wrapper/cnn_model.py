@@ -480,9 +480,10 @@ class Model_Wrapper(object):
     def trainNet(self, ds, parameters, out_name=None):
         """
             Trains the network on the given dataset 'ds'.
-            out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.
 
-            The available (optional) training parameters are the following ones:
+            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.
+
+            The input 'parameters' is a dict() which may contain the following (optional) training parameters:
 
             ####    Visualization parameters
 
@@ -500,7 +501,7 @@ class Model_Wrapper(object):
             ####    Data processing parameters
 
             :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
-            :param normalize_images: boolean indicating if we want to 0-1 normalize the image pixel values
+            :param normalize: boolean indicating if we want to 0-1 normalize the image pixel values
             :param mean_substraction: boolean indicating if we want to substract the training mean
             :param data_augmentation: boolean indicating if we want to perform data augmentation (always False on validation)
             :param shuffle: apply shuffling on training data at the beginning of each epoch.
@@ -1412,11 +1413,12 @@ class Model_Wrapper(object):
 
     def predictNet(self, ds, parameters, out_name=None):
         '''
-            Returns the predictions of the net on the dataset splits chosen. The valid parameters are:
+            Returns the predictions of the net on the dataset splits chosen. The input 'parameters' is a dict()
+            which may contain the following parameters:
 
             :param batch_size: size of the batch
             :param n_parallel_loaders: number of parallel data batch loaders
-            :param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
+            :param normalize: apply data normalization on images/features or not (only if using images/features as input)
             :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
             :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
 

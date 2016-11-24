@@ -84,7 +84,7 @@ class Data_Batch_Generator(object):
 
     def __init__(self, set_split, net, dataset, num_iterations,
                  batch_size=50, 
-                 normalize_images=False, 
+                 normalization=False,
                  data_augmentation=True, 
                  mean_substraction=True,
                  predict=False,
@@ -97,7 +97,7 @@ class Data_Batch_Generator(object):
         :param dataset: Dataset instance
         :param num_iterations: Maximum number of iterations
         :param batch_size: Size of the minibatch
-        :param normalize_images: Switches on/off the normalization of images
+        :param normalization: Switches on/off the normalization of images
         :param data_augmentation: Switches on/off the data augmentation of the input
         :param mean_substraction: Switches on/off the mean substraction for images
         :param predict: Whether we are predicting or training
@@ -112,7 +112,7 @@ class Data_Batch_Generator(object):
         self.params = {'batch_size': batch_size, 
                        'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
-                       'normalize_images': normalize_images,
+                       'normalization': normalization,
                        'num_iterations': num_iterations,
                        'random_samples': random_samples,
                        'shuffle': shuffle}
@@ -156,7 +156,7 @@ class Data_Batch_Generator(object):
                 indices = np.random.randint(0, n_samples_split, self.params['random_samples'])
 
                 X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, indices,
-                                             normalization=self.params['normalize_images'],
+                                             normalization=self.params['normalization'],
                                              meanSubstraction=self.params['mean_substraction'],
                                              dataAugmentation=data_augmentation)
                 data = self.net.prepareData(X_batch, Y_batch)
@@ -165,7 +165,7 @@ class Data_Batch_Generator(object):
             else:
                 if self.predict:
                     X_batch = self.dataset.getX(self.set_split, init_sample, final_sample,
-                                                 normalization=self.params['normalize_images'],
+                                                 normalization=self.params['normalization'],
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=False)
                     """
@@ -185,7 +185,7 @@ class Data_Batch_Generator(object):
                     data = self.net.prepareData(X_batch, None)[0]
                 else:
                     X_batch, Y_batch = self.dataset.getXY(self.set_split, batch_size,
-                                                 normalization=self.params['normalize_images'],
+                                                 normalization=self.params['normalization'],
                                                  meanSubstraction=self.params['mean_substraction'],
                                                  dataAugmentation=data_augmentation)
                     #print 'source words:', [map(lambda x: self.dataset.vocabulary['source_text']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in X_batch[0]]]
@@ -213,7 +213,7 @@ class Homogeneous_Data_Batch_Generator(object):
     """
     def __init__(self, set_split, net, dataset, num_iterations,
                  batch_size=50, maxlen=100,
-                 normalize_images=False,
+                 normalization=False,
                  data_augmentation=True,
                  mean_substraction=True,
                  predict=False
@@ -227,7 +227,7 @@ class Homogeneous_Data_Batch_Generator(object):
         # Several parameters
         self.params = {'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
-                       'normalize_images': normalize_images,
+                       'normalization': normalization,
                        'num_iterations': num_iterations,
                        'batch_size': batch_size}
         self.prepare()
@@ -255,7 +255,7 @@ class Homogeneous_Data_Batch_Generator(object):
             
             #TODO: Deal with multiple outputs!
             Y_batch = self.dataset.getY(self.set_split, init_sample, final_sample,
-                                    normalization=self.params['normalize_images'],
+                                    normalization=self.params['normalization'],
                                     meanSubstraction=self.params['mean_substraction'])[0] # TODO: first output selection, this 0 is harcoded!
             Y_batch = Y_batch[1] # just use mask
 
@@ -322,7 +322,7 @@ class Homogeneous_Data_Batch_Generator(object):
                 self.len_curr_counts[self.len_unique[self.len_idx]] -= curr_batch_size
 
                 X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, curr_indices,
-                                             normalization=self.params['normalize_images'],
+                                             normalization=self.params['normalization'],
                                              meanSubstraction=self.params['mean_substraction'],
                                              dataAugmentation=data_augmentation)
                 data = self.net.prepareData(X_batch, Y_batch)
@@ -914,13 +914,15 @@ class Dataset(object):
     def loadFeatures(self, X, feat_len, normalization_type='L2', normalization=False, loaded=False, external=False, data_augmentation=True):
         """
         Loads and normalizes features.
+
         :param X: Features to load.
         :param feat_len: Length of the features.
         :param normalization_type: Normalization to perform to the features (see: self.__available_norm_feat)
         :param normalization: Whether to normalize or not the features.
         :param loaded: Flag that indicates if these features have been already loaded.
-        :param external:
+        :param external: Boolean indicating if the paths provided in 'X' are absolute paths to external images
         :param data_augmentation: Perform data augmentation (with mean=0.0, std_dev=0.01)
+
         :return: Loaded features as numpy array
         """
         if normalization and normalization_type not in self.__available_norm_feat:
@@ -1022,6 +1024,7 @@ class Dataset(object):
     def build_vocabulary(self, captions, id, tokfun, do_split, min_occ=0, n_words=0):
         """
         Vocabulary builder for data of type 'text'
+
         :param captions: Corpus sentences
         :param id: Dataset id of the text
         :param tokfun: Tokenization function. (used?)
@@ -1124,6 +1127,7 @@ class Dataset(object):
     def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far):
         """
         Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
+
         :param X: Text to encode.
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
@@ -1953,7 +1957,7 @@ class Dataset(object):
     
     def getClassID(self, class_name, id):
         """
-            Returns the class id (int) for a given class string.
+            :return: the class id (int) for a given class string.
         """
         return self.dic_classes[id][class_name]
     
@@ -1988,6 +1992,8 @@ class Dataset(object):
             
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
+
+            :return: X, list of input data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
@@ -2058,6 +2064,9 @@ class Dataset(object):
             
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
+
+            :return: [X,Y], list of input and output data variables of the next 'k' consecutive samples belonging to the chosen 'set_name'
+            :return: [X, Y, [new_last, last, surpassed]] if debug==True
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
@@ -2171,6 +2180,9 @@ class Dataset(object):
 
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
+
+            :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k' samples belonging to the chosen 'set_name'
+            :return: [X, Y, [new_last, last, surpassed]] if debug==True
         """
         
         self.__checkSetName(set_name)
@@ -2276,6 +2288,8 @@ class Dataset(object):
 
             :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
+
+            :return: Y, list of output data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 1)
