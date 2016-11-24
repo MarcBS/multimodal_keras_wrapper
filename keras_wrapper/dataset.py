@@ -609,7 +609,7 @@ class Dataset(object):
 
             # 'image-features' and 'video-features'- related parameters
             
-            :param feat_len: length of the feature vectors if we are using types 'image-features' or 'video-features'
+            :param feat_len: size of the feature vectors for each dimension. We must provide a list if the features are not vectors.
             
             
             # 'video'-related parameters
