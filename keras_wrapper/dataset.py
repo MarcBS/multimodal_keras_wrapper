@@ -793,8 +793,11 @@ class Dataset(object):
     
     def setClasses(self, path_classes, id):
         """
-            Loads the list of classes of the dataset.
-            Each line must contain a unique identifier of the class.
+        Loads the list of classes of the dataset.
+        Each line must contain a unique identifier of the class.
+        :param path_classes: Path to a text file with the classes or an instance of the class list.
+        :param id: Dataset id
+        :return: None
         """
 
         if isinstance(path_classes, str) and os.path.isfile(path_classes):
@@ -816,6 +819,11 @@ class Dataset(object):
             logging.info('Loaded classes list with ' + str(len(self.dic_classes[id])) + " different labels.")
     
     def preprocessCategorical(self, labels_list):
+        """
+        Preprocesses categorical data.
+        :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+        :return: Preprocessed labels.
+        """
         
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
             labels = []
@@ -834,7 +842,11 @@ class Dataset(object):
     # ------------------------------------------------------- #
        
     def preprocessBinary(self, labels_list):
-
+        """
+        Preprocesses binary classes.
+        :param labels_list: Binary label list given as an instance of the class list.
+        :return: Preprocessed labels.
+        """
         if isinstance(labels_list, list):
             labels = labels_list
         else:
@@ -847,7 +859,11 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocessReal(self, labels_list):
-
+        """
+        Preprocesses real classes.
+        :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+        :return: Preprocessed labels.
+        """
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
             labels = []
             with open(labels_list, 'r') as list_:
@@ -866,7 +882,15 @@ class Dataset(object):
     # ------------------------------------------------------- #
     
     def preprocessFeatures(self, path_list, id, set_name, feat_len):
-        
+        """
+        Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file storing a feature vector.
+        Alternatively "path_list" can be an instance of the class list.
+        :param path_list: Path to a text file where each line must contain a path to a .npy file storing a feature vector. Alternatively, instance of the class list.
+        :param id: Dataset id
+        :param set_name: Used?
+        :param feat_len: Length of features. If all features have the same length, given as a number. Otherwise, list.
+        :return: Preprocessed features
+        """
         # file with a list, each line being a path to a .npy file with a feature vector
         if isinstance(path_list, str) and os.path.isfile(path_list):
             data = []
@@ -877,7 +901,8 @@ class Dataset(object):
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
+            raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path'
+                            ' to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
 
         if not isinstance(feat_len, list):
             feat_len = [feat_len]
@@ -887,7 +912,17 @@ class Dataset(object):
     
     
     def loadFeatures(self, X, feat_len, normalization_type='L2', normalization=False, loaded=False, external=False, data_augmentation=True):
-        
+        """
+        Loads and normalizes features.
+        :param X: Features to load.
+        :param feat_len: Length of the features.
+        :param normalization_type: Normalization to perform to the features (see: self.__available_norm_feat)
+        :param normalization: Whether to normalize or not the features.
+        :param loaded: Flag that indicates if these features have been already loaded.
+        :param external:
+        :param data_augmentation: Perform data augmentation (with mean=0.0, std_dev=0.01)
+        :return: Loaded features as numpy array
+        """
         if normalization and normalization_type not in self.__available_norm_feat:
             raise NotImplementedError('The chosen normalization type '+ normalization_type +' is not implemented for the type "image-features" and "video-features".')
         
@@ -920,7 +955,24 @@ class Dataset(object):
     
     def preprocessText(self, annotations_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                        max_words, offset, fill, min_occ, pad_on_batch, words_so_far):
-        
+        """
+        Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
+        Also sets Dataset parameters.
+        :param annotations_list: Path to the sentences to process.
+        :param id: Dataset id of the data.
+        :param set_name: Name of the current set ('train', 'val', 'test')
+        :param tokenization: Tokenization to perform.
+        :param build_vocabulary: Whether we should build a vocabulary for this text or not.
+        :param max_text_len: Maximum length of the text. If max_text_len == 0, we treat the full sentence as a class.
+        :param max_words: Maximum number of words to include in the dictionary.
+        :param offset: Text shifting.
+        :param fill: Whether we path with zeros at the beginning or at the end of the sentences.
+        :param min_occ: Minimum occurrences of each word to be included in the dictionary.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
+                             sentences with a fixed (max_text_length) length.
+        :param words_so_far: Experimental feature. Should be ignored.
+        :return: Preprocessed sentences.
+        """
         sentences = []
         if isinstance(annotations_list, str) and os.path.isfile(annotations_list):
             with open(annotations_list, 'r') as list_:
@@ -969,7 +1021,14 @@ class Dataset(object):
     
     def build_vocabulary(self, captions, id, tokfun, do_split, min_occ=0, n_words=0):
         """
-            Vocabulary builder for data of type 'text'
+        Vocabulary builder for data of type 'text'
+        :param captions: Corpus sentences
+        :param id: Dataset id of the text
+        :param tokfun: Tokenization function. (used?)
+        :param do_split: Split sentence by words or use the full sentence as a class.
+        :param min_occ: Minimum occurrences of each word to be included in the dictionary.
+        :param n_words: Maximum number of words to include in the dictionary.
+        :return: None.
         """
         if not self.silence:
             logging.info("Creating vocabulary for data with id '"+id+"'.")
@@ -1064,9 +1123,17 @@ class Dataset(object):
 
     def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far):
         """
-            Text encoder. Transforms samples from a text representation into a numerical one.
-            If fill=='start' the resulting vector will be filled with 0s at the beginning, 
-            if fill=='end' it will be filled with 0s at the end.
+        Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
+        :param X: Text to encode.
+        :param vocabularies: Mapping word -> index
+        :param max_len: Maximum length of the text.
+        :param offset: Shifts the text to the right, adding null symbol at the start
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning,
+                    'end': it will be filled with 0s at the end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch
+                             or sentences with a fixed (max_text_length) length.
+        :param words_so_far: Experimental feature. Use with caution.
+        :return: Text as sequence of number. Mask for each sentence.
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
@@ -1155,8 +1222,8 @@ class Dataset(object):
     def tokenize_basic(self, caption, lowercase=True):
         """
         Basic tokenizer for the input/output data of type 'text':
-            Splits punctuation
-            Optional lowercasing
+           * Splits punctuation
+           * Optional lowercasing
 
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
@@ -1180,8 +1247,8 @@ class Dataset(object):
     def tokenize_aggressive(self, caption, lowercase=True):
         """
         Aggressive tokenizer for the input/output data of type 'text':
-            Removes punctuation
-            Optional lowercasing
+           * Removes punctuation
+           * Optional lowercasing
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption
@@ -1218,8 +1285,8 @@ class Dataset(object):
     def tokenize_montreal(self, caption):
         """
         Similar to tokenize_icann
-            Removes some punctuation
-            Lowercase
+            * Removes some punctuation
+            * Lowercase
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
@@ -1233,8 +1300,8 @@ class Dataset(object):
     def tokenize_soft(self, caption, lowercase=True):
         """
         Tokenization used for the icann paper:
-            Removes very little punctuation
-            Lowercase
+           * Removes very little punctuation
+           * Lowercase
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption
@@ -1456,6 +1523,21 @@ class Dataset(object):
     
     
     def loadVideos(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, meanSubstraction, dataAugmentation):
+        """
+         Loads a set of videos from disk. (Untested!)
+
+        :param n_frames: Number of frames per video
+        :param id: Id to load
+        :param last: Last video loaded
+        :param set_name:  'train', 'val', 'test'
+        :param max_len: Maximum length of videos
+        :param normalization_type:  Type of normalization applied
+        :param normalization: Whether we apply a 0-1 normalization to the images
+        :param meanSubstraction:  Whether we are removing the training mean
+        :param dataAugmentation:  Whether we are applying dataAugmentatino (random cropping and horizontal flip)
+        :return:
+        """
+
         n_videos = len(n_frames)
         V = np.zeros((n_videos, max_len*3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
         
@@ -2245,6 +2327,12 @@ class Dataset(object):
     # ------------------------------------------------------- #
         
     def __isLoaded(self, set_name, pos):
+        """
+        Checks if the data from set_name at pos is already loaded
+        :param set_name:
+        :param pos:
+        :return:
+        """
         if eval('not self.loaded_'+set_name+ '[pos]'):
             if pos==0:
                 raise Exception('Set '+set_name+' samples are not loaded yet.')
@@ -2254,12 +2342,23 @@ class Dataset(object):
     
     
     def __checkSetName(self, set_name):
+        """
+        Checks name of a split.
+        Only "train", "val" or "test" are valid set names.
+        :param set_name: Split name
+        :return: Boolean specifying the validity of the name
+        """
         if set_name != 'train' and set_name != 'val' and set_name != 'test':
             raise Exception('Incorrect set_name specified "'+set_name+ '"\nOnly "train", "val" or "test" are valid set names.')
         return 
         
     
     def __checkLengthSet(self, set_name):
+        """
+        Check that the length of the inputs and outputs match. Only checked if the input is not optional.
+        :param set_name: 
+        :return:
+        """
         if eval('self.loaded_'+set_name+ '[0] and self.loaded_'+set_name+ '[1]'):
             lengths = []
             for id_in in self.ids_inputs:
