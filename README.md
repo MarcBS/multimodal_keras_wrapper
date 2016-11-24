@@ -4,7 +4,7 @@ Wrapper for Keras with support to easy data loading and handling and the creatio
 
 ## Documentation
 
-You can access the library documentation page at [marcbs.github.io/staged_keras_wrapper](http://marcbs.github.io/staged_keras_wrapper).
+You can access the library documentation page at [staged-keras-wrapper.readthedocs.io/](http://staged-keras-wrapper.readthedocs.io/).
 
 Some code examples are available in demo.ipynb and test.py. Additionally, in the section Projects you can see some practical examples of projects using this library.
 
