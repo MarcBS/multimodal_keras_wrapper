@@ -41,16 +41,21 @@ import shutil
 
 def saveModel(model_wrapper, iter, path=None):
     """
-        Saves a backup of the current Model_Wrapper object after being trained for 'iter' iterations.
+    Saves a backup of the current Model_Wrapper object after being trained for 'iter' iterations.
+
+    :param model_wrapper: Object to save
+    :param iter: Number of iterations
+    :param path: Oath to save
+    :return: None
     """
-    if(not path):
+    if not path:
         path = model_wrapper.model_path
 
-    if(not model_wrapper.silence):
+    if not model_wrapper.silence:
         logging.info("<<< Saving model to "+ path +" ... >>>")
 
     # Create models dir
-    if(not os.path.isdir(path)):
+    if not os.path.isdir(path):
         os.makedirs(path)
 
     iter = str(iter)
@@ -78,13 +83,17 @@ def saveModel(model_wrapper, iter, path=None):
     # Save additional information
     cloudpk.dump(model_wrapper, open(path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'wb'))
 
-    if(not model_wrapper.silence):
+    if not model_wrapper.silence:
         logging.info("<<< Model saved >>>")
 
 
 def loadModel(model_path, iter):
     """
-        Loads a previously saved Model_Wrapper object.
+    Loads a previously saved Model_Wrapper object.
+
+    :param model_path: Path to the Model_Wrapper object to load
+    :param iter: Number of iterations
+    :return: Loadaed Model_Wrapper
     """
     t = time.time()
     iter = str(iter)
@@ -179,20 +188,20 @@ class Model_Wrapper(object):
         self.__data_types = ['iteration', 'loss', 'accuracy', 'accuracy top-5']
 
         # Prepare model
-        if(not inheritance):
+        if not inheritance:
             # Set Network name
             self.setName(model_name, plots_path, models_path)
 
-            if(structure_path):
+            if structure_path:
                 # Load a .json model
-                if(not self.silence):
+                if not self.silence:
                     logging.info("<<< Loading model structure from file "+ structure_path +" >>>")
                 self.model = model_from_json(open(structure_path).read())
 
             else:
                 # Build model from scratch
-                if(hasattr(self, type)):
-                    if(not self.silence):
+                if hasattr(self, type):
+                    if not self.silence:
                         logging.info("<<< Building "+ type +" CNN >>>")
                     eval('self.'+type+'(nOutput, input_shape)')
                 else:
@@ -200,7 +209,7 @@ class Model_Wrapper(object):
 
             # Load weights from file
             if weights_path:
-                if(not self.silence):
+                if not self.silence:
                     logging.info("<<< Loading weights from file "+ weights_path +" >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
 
@@ -221,7 +230,7 @@ class Model_Wrapper(object):
             :param outputsMapping: dictionary with the model outputs' identifiers as keys and the dataset outputs' identifiers as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Graph then keys must be str.
             :param acc_output: name of the model's output that will be used for calculating the accuracy of the model (only needed for Graph models)
         """
-        if(isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1):
+        if isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1:
             raise Exception("When using Sequential models only one output can be provided in outputsMapping")
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
@@ -236,32 +245,32 @@ class Model_Wrapper(object):
             :param loss: loss function applied for optimization
         """
         # Pick default parameters
-        if(lr is None):
+        if lr is None:
             lr = self.lr
         else:
             self.lr = lr
-        if(momentum is None):
+        if momentum is None:
             momentum = self.momentum
         else:
             self.momentum = momentum
-        if(loss is None):
+        if loss is None:
             loss = self.loss
         else:
             self.loss = loss
-        if(metrics is None):
+        if metrics is None:
             metrics = []
 
         #sgd = SGD(lr=lr, decay=1e-6, momentum=momentum, nesterov=True)
         sgd = SGD(lr=lr, decay=0.0, momentum=momentum, nesterov=True)
 
-        if(not self.silence):
+        if not self.silence:
             logging.info("Compiling model...")
 
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
-        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+        if isinstance(self.model, Sequential) or isinstance(self.model, Model):
             self.model.compile(loss=loss, optimizer=sgd, metrics=metrics)
-        elif(isinstance(self.model, Graph)):
-            if(not isinstance(loss, dict)):
+        elif isinstance(self.model, Graph):
+            if not isinstance(loss, dict):
                 loss_dict = dict()
                 for out in self.model.output_order:
                     loss_dict[out] = loss
@@ -271,7 +280,7 @@ class Model_Wrapper(object):
         else:
             raise NotImplementedError()
 
-        if(not self.silence):
+        if not self.silence:
             logging.info("Optimizer updated, learning rate set to "+ str(lr))
 
 
@@ -279,35 +288,35 @@ class Model_Wrapper(object):
         """
             Changes the name (identifier) of the Model_Wrapper instance.
         """
-        if(not model_name):
+        if not model_name:
             self.name = time.strftime("%Y-%m-%d") + '_' + time.strftime("%X")
             create_dirs = False
         else:
             self.name = model_name
             create_dirs = True
 
-        if(not plots_path):
+        if not plots_path:
             self.plot_path = 'Plots/' + self.name
         else:
             self.plot_path = plots_path
 
-        if(not models_path):
+        if not models_path:
             self.model_path = 'Models/' + self.name
         else:
             self.model_path = models_path
 
         # Remove directories if existed
-        if(clear_dirs):
-            if(os.path.isdir(self.model_path)):
+        if clear_dirs:
+            if os.path.isdir(self.model_path):
                 shutil.rmtree(self.model_path)
-            if(os.path.isdir(self.plot_path)):
+            if os.path.isdir(self.plot_path):
                 shutil.rmtree(self.plot_path)
 
         # Create new ones
-        if(create_dirs):
-            if(not os.path.isdir(self.model_path)):
+        if create_dirs:
+            if not os.path.isdir(self.model_path):
                 os.makedirs(self.model_path)
-            if(not os.path.isdir(self.plot_path)):
+            if not os.path.isdir(self.plot_path):
                 os.makedirs(self.plot_path)
 
 
@@ -344,13 +353,13 @@ class Model_Wrapper(object):
             Replaces the last 'num_remove' layers in the model by the newly defined in 'new_layers'.
             Function only valid for Sequential models. Use self.removeLayers(...) for Graph models.
         """
-        if(not self.silence):
+        if not self.silence:
             logging.info("Replacing layers...")
 
         removed_layers = []
         removed_params = []
         # If it is a Sequential model
-        if(isinstance(self.model, Sequential)):
+        if isinstance(self.model, Sequential):
             # Remove old layers
             for i in range(num_remove):
                 removed_layers.append(self.model.layers.pop())
@@ -374,7 +383,7 @@ class Model_Wrapper(object):
         """
         removed_layers = []
         removed_params = []
-        if(isinstance(self.model, Graph)):
+        if isinstance(self.model, Graph):
             for layer in layers_names:
                 removed_layers.append(self.model.nodes.pop(layer))
                 self.model.namespace.remove(layer)
@@ -401,10 +410,10 @@ class Model_Wrapper(object):
             Removes the list of outputs whose names are passed by parameter from the current network.
             This function is only valid for Graph models.
         """
-        if(isinstance(self.model, Graph)):
+        if isinstance(self.model, Graph):
             new_outputs = []
             for output in self.model.output_order:
-                if(output not in outputs_names):
+                if output not in outputs_names:
                     new_outputs.append(output)
             self.model.output_order = new_outputs
             detected = []
@@ -427,10 +436,10 @@ class Model_Wrapper(object):
             Removes the list of inputs whose names are passed by parameter from the current network.
             This function is only valid for Graph models.
         """
-        if(isinstance(self.model, Graph)):
+        if isinstance(self.model, Graph):
             new_inputs = []
             for input in self.model.input_order:
-                if(input not in inputs_names):
+                if input not in inputs_names:
                     new_inputs.append(input)
             self.model.input_order = new_inputs
             detected = []
@@ -582,11 +591,11 @@ class Model_Wrapper(object):
                                              mean_substraction=params['mean_substraction'],
                                              shuffle=params['shuffle']).generator()
         # Are we going to validate on 'val' data?
-        if('val' in params['eval_on_sets']):
+        if 'val' in params['eval_on_sets']:
 
             # Calculate how many validation interations are we going to perform per test
             n_valid_samples = ds.len_val
-            if(params['num_iterations_val'] == None):
+            if params['num_iterations_val'] == None:
                 params['num_iterations_val'] = int(math.ceil(float(n_valid_samples)/params['batch_size']))
 
             # prepare data generator
@@ -622,7 +631,7 @@ class Model_Wrapper(object):
         logging.info("Training parameters: "+ str(params))
 
         # Calculate how many iterations are we going to perform
-        if(not state.has_key('n_iterations_per_epoch')):
+        if not state.has_key('n_iterations_per_epoch'):
             state['n_iterations_per_epoch'] = int(math.ceil(float(ds.len_train)/params['batch_size']))
             state['count_iteration'] = 0
             state['epoch'] = 0
@@ -632,7 +641,7 @@ class Model_Wrapper(object):
             state['it'] -= 1
 
         # Calculate how many validation interations are we going to perform per test
-        if(params['num_iterations_val'] == None):
+        if params['num_iterations_val'] == None:
             params['num_iterations_val'] = int(math.ceil(float(ds.len_val)/params['batch_size']))
 
         # Apply params['n_epochs'] for training
@@ -647,7 +656,7 @@ class Model_Wrapper(object):
             for t_ind in range(state['n_iterations_per_epoch']):
                 t = ThreadDataLoader(retrieveXY, ds, 'train', params['batch_size'],
                                 params['normalize'], params['mean_substraction'], params['data_augmentation'])
-                if(t_ind > state['it'] and t_ind < params['n_parallel_loaders'] +state['it']+1):
+                if t_ind > state['it'] and t_ind < params['n_parallel_loaders'] +state['it']+1:
                     t.start()
                 t_queue.append(t)
 
@@ -659,10 +668,10 @@ class Model_Wrapper(object):
                 t = t_queue[state['it']]
                 t.join()
                 time_load = time.time()*1000.0-time_load
-                if(params['verbose'] > 0):
+                if params['verbose'] > 0:
                     logging.info("DEBUG: Batch loaded in %0.8s ms" % str(time_load))
 
-                if(t.resultOK):
+                if t.resultOK:
                     X_batch = t.X
                     Y_batch = t.Y
                 else:
@@ -674,7 +683,7 @@ class Model_Wrapper(object):
                     print exc_trace
                     raise Exception('Exception occurred in ThreadLoader.')
                 t_queue[state['it']] = None
-                if(state['it']+params['n_parallel_loaders'] < state['n_iterations_per_epoch']):
+                if state['it']+params['n_parallel_loaders'] < state['n_iterations_per_epoch']:
                     if params['verbose'] > 1:
                         logging.info("DEBUG: Starting new thread loader.")
                     t = t_queue[state['it']+params['n_parallel_loaders']]
@@ -682,12 +691,12 @@ class Model_Wrapper(object):
 
                 # Forward and backward passes on the current batch
                 time_train = time.time()*1000.0
-                if(isinstance(self.model, Sequential)):
+                if isinstance(self.model, Sequential):
                     [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
                     loss = self.model.train_on_batch(X_batch, Y_batch)
                     loss = loss[0]
                     [score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch)[0])
-                elif(isinstance(self.model, Model)):
+                elif isinstance(self.model, Model):
                     t1 = time.time()*1000.0
                     [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
                     if params['verbose'] > 1:
@@ -707,14 +716,14 @@ class Model_Wrapper(object):
                     score = self._getGraphAccuracy(data, self.model.predict_on_batch(data))
                     top_score = score[1]
                     score = score[0]
-                    if(out_name):
+                    if out_name:
                         score = score[out_name]
                         top_score = top_score[out_name]
                     else:
                         score = score[last_output]
                         top_score = top_score[last_output]
                 time_train = time.time()*1000.0-time_train
-                if(params['verbose'] > 0):
+                if params['verbose'] > 0:
                     logging.info("DEBUG: Train on batch performed in %0.8s ms" % str(time_train))
 
                 scores_train.append(float(score))
@@ -722,7 +731,7 @@ class Model_Wrapper(object):
                 top_scores_train.append(float(top_score))
 
                 # Report train info
-                if(state['count_iteration'] % params['report_iter'] == 0):
+                if state['count_iteration'] % params['report_iter'] == 0:
                     loss = np.mean(losses_train)
                     score = np.mean(scores_train)
                     top_score = np.mean(top_scores_train)
@@ -745,7 +754,7 @@ class Model_Wrapper(object):
                     top_scores_train = []
 
                 # Test network on validation set
-                if(state['count_iteration'] > 0 and state['count_iteration'] % params['iter_for_val'] == 0):
+                if state['count_iteration'] > 0 and state['count_iteration'] % params['iter_for_val'] == 0:
                     logging.info("Applying validation...")
                     scores = []
                     losses = []
@@ -755,7 +764,7 @@ class Model_Wrapper(object):
                     for t_ind in range(params['num_iterations_val']):
                         t = ThreadDataLoader(retrieveXY, ds, 'val', params['batch_size'],
                                         params['normalize'], params['mean_substraction'], False)
-                        if(t_ind < params['n_parallel_loaders']):
+                        if t_ind < params['n_parallel_loaders']:
                             t.start()
                         t_val_queue.append(t)
 
@@ -764,7 +773,7 @@ class Model_Wrapper(object):
                         # Recovers a pre-loaded batch of data
                         t_val = t_val_queue[it_val]
                         t_val.join()
-                        if(t_val.resultOK):
+                        if t_val.resultOK:
                             X_val = t_val.X
                             Y_val = t_val.Y
                         else:
@@ -774,12 +783,12 @@ class Model_Wrapper(object):
                             print exc_trace
                             raise Exception('Exception occurred in ThreadLoader.')
                         t_val_queue[it_val] = None
-                        if(it_val+params['n_parallel_loaders'] < params['num_iterations_val']):
+                        if it_val+params['n_parallel_loaders'] < params['num_iterations_val']:
                             t_val = t_val_queue[it_val+params['n_parallel_loaders']]
                             t_val.start()
 
                         # Forward prediction pass
-                        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+                        if isinstance(self.model, Sequential) or isinstance(self.model, Model):
                             [X_val, Y_val] = self._prepareSequentialData(X_val, Y_val)
                             loss = self.model.test_on_batch(X_val, Y_val, accuracy=False)
                             loss = loss[0]
@@ -791,7 +800,7 @@ class Model_Wrapper(object):
                             score = self._getGraphAccuracy(data, self.model.predict_on_batch(data))
                             top_score = score[1]
                             score = score[0]
-                            if(out_name):
+                            if out_name:
                                 score = score[out_name]
                                 top_score = top_score[out_name]
                             else:
@@ -821,20 +830,20 @@ class Model_Wrapper(object):
                     self.plot()
 
                 # Save the model
-                if(state['count_iteration'] % params['save_model'] == 0):
+                if state['count_iteration'] % params['save_model'] == 0:
                     self.training_state = state
                     saveModel(self, state['count_iteration'])
 
                 # Decrease the current learning rate
-                if(state['count_iteration'] % params['lr_decay'] == 0):
+                if state['count_iteration'] % params['lr_decay'] == 0:
                     # Check if we have a set of rules
-                    if(isinstance(params['lr_gamma'], list)):
+                    if isinstance(params['lr_gamma'], list):
                         # Check if the current lr_gamma rule is still valid
-                        if(params['lr_gamma'][0][0] == None or params['lr_gamma'][0][0] > state['count_iteration']):
+                        if params['lr_gamma'][0][0] == None or params['lr_gamma'][0][0] > state['count_iteration']:
                             lr_gamma = params['lr_gamma'][0][1]
                         else:
                             # Find next valid lr_gamma
-                            while(params['lr_gamma'][0][0] != None and params['lr_gamma'][0][0] <= state['count_iteration']):
+                            while params['lr_gamma'][0][0] != None and params['lr_gamma'][0][0] <= state['count_iteration']:
                                 params['lr_gamma'].pop(0)
                             lr_gamma = params['lr_gamma'][0][1]
                     # Else, we have a single lr_gamma for the whole training
@@ -919,7 +928,7 @@ class Model_Wrapper(object):
         for t_ind in range(numIterationsTest):
             t = ThreadDataLoader(retrieveXY, ds, 'test', params['batch_size'],
                             params['normalize'], params['mean_substraction'], False)
-            if(t_ind < params['n_parallel_loaders']):
+            if t_ind < params['n_parallel_loaders']:
                 t.start()
             t_test_queue.append(t)
 
@@ -927,7 +936,7 @@ class Model_Wrapper(object):
 
             t_test = t_test_queue[it_test]
             t_test.join()
-            if(t_test.resultOK):
+            if t_test.resultOK:
                 X_test = t_test.X
                 Y_test = t_test.Y
             else:
@@ -937,11 +946,11 @@ class Model_Wrapper(object):
                 print exc_trace
                 raise Exception('Exception occurred in ThreadLoader.')
             t_test_queue[it_test] = None
-            if(it_test+params['n_parallel_loaders'] < numIterationsTest):
+            if it_test+params['n_parallel_loaders'] < numIterationsTest:
                 t_test = t_test_queue[it_test+params['n_parallel_loaders']]
                 t_test.start()
 
-            if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+            if isinstance(self.model, Sequential) or isinstance(self.model, Model):
                 # (loss, score) = self.model.evaluate(X_test, Y_test, show_accuracy=True)
                 [X_test, Y_test] = self._prepareSequentialData(X_test, Y_test)
                 loss = self.model.test_on_batch(X_test, Y_test, accuracy=False)
@@ -954,7 +963,7 @@ class Model_Wrapper(object):
                 score = self._getGraphAccuracy(data, self.model.predict_on_batch(data))
                 top_score = score[1]
                 score = score[0]
-                if(out_name):
+                if out_name:
                     score = score[out_name]
                     top_score = top_score[out_name]
                 else:
@@ -988,30 +997,30 @@ class Model_Wrapper(object):
             :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.
         """
         n_samples = X.shape[1]
-        if(isinstance(self.model, Sequential) or isinstance(self.model, Model)):
+        if isinstance(self.model, Sequential) or isinstance(self.model, Model):
             [X, Y] = self._prepareSequentialData(X, Y)
             loss = self.model.test_on_batch(X, Y, accuracy=False)
             loss = loss[0]
-            if(accuracy):
+            if accuracy:
                 [score, top_score] = self._getSequentialAccuracy(Y, self.model.predict_on_batch(X)[0])
-                return (loss, score, top_score, n_samples)
-            return (loss, n_samples)
+                return loss, score, top_score, n_samples
+            return loss, n_samples
         else:
             [data, last_output] = self._prepareGraphData(X, Y)
             loss = self.model.test_on_batch(data)
             loss = loss[0]
-            if(accuracy):
+            if accuracy:
                 score = self._getGraphAccuracy(data, self.model.predict_on_batch(data))
                 top_score = score[1]
                 score = score[0]
-                if(out_name):
+                if out_name:
                     score = score[out_name]
                     top_score = top_score[out_name]
                 else:
                     score = score[last_output]
                     top_score = top_score[last_output]
-                return (loss, score, top_score, n_samples)
-            return (loss, n_samples)
+                return loss, score, top_score, n_samples
+            return loss, n_samples
 
     # ------------------------------------------------------- #
     #       PREDICTION FUNCTIONS
@@ -1080,18 +1089,6 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
 
-        """
-        if ii == 0:
-            print 'iteration',ii
-            print 'IN DATA'
-            for k,v in in_data.iteritems():
-                print k
-                print v.shape
-                if k == 'input_1':
-                    print v[0, :, 50:55, 50:55]
-            print
-        """
-
         ##########################################
         # Recover output identifiers
         ##########################################
@@ -1126,14 +1123,6 @@ class Model_Wrapper(object):
                     else:
                         out_data = np.vstack((out_data, predicted_out))
 
-        """
-        if ii == 0:
-            for v in out_data:
-                print 'right after predict'
-                if v.shape == (1, 512, 7, 7):
-                    print v[0,0,:,:]
-        """
-
         ##########################################
         # Get outputs
         ##########################################
@@ -1146,24 +1135,6 @@ class Model_Wrapper(object):
         else:
             all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
         probs = all_data[output_ids_list[0]]
-
-        """
-        if ii == 0:
-            print 'OUT DATA'
-            for k, v in all_data.iteritems():
-                print k
-                print v.shape
-                if k == 'ctx_CNN':
-                    for s_ in range(n_samples):
-                        print s_
-                        print v[s_,0,:,:]
-                        '''
-                        for w_ in range(2,3):
-                            for h_ in range(2,3):
-                                print v[s_,:30,w_,h_]
-                        '''
-            print
-        """
 
         ##########################################
         # Define returned data
@@ -1178,6 +1149,19 @@ class Model_Wrapper(object):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
+        The algorithm in a nutshell does the following:
+            k = beam_size
+            open_nodes = [[]] * k
+            while k > 0:
+                1. Given the inputs, get (log) probabilities for the outputs.
+                2. Expand each open node with all possible output.
+                3. Prune and keep the k best nodes.
+                4. If a sample has reached the <eos> symbol:
+                    4.1. Mark it as final sample.
+                    4.2. k -= 1
+                5. Build new inputs (state_below) and go to 1.
+            return final_samples, final_scores
+
         :param X: Model inputs
         :param params: Search parameters
         :param null_sym: <null> symbol
@@ -1409,7 +1393,8 @@ class Model_Wrapper(object):
                             references.append(Y[output_id][i])
 
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
-            sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n'%((time.time() - start_time), ((time.time() - start_time))/n_samples))
+            sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
+            time.time() - start_time) / n_samples))
 
             sys.stdout.flush()
 
@@ -1474,12 +1459,12 @@ class Model_Wrapper(object):
             Applies a forward pass and returns the predicted values.
         """
         # Get desired input
-        if(in_name):
+        if in_name:
             X = copy.copy(X[in_name])
 
         # Expand input dimensions to 4
-        if(expand):
-            while(len(X.shape) < 4):
+        if expand:
+            while len(X.shape) < 4:
                 X = np.expand_dims(X, axis=1)
 
         X = self.prepareData(X, None)[0]
@@ -1488,10 +1473,10 @@ class Model_Wrapper(object):
         predictions = self.model.predict_on_batch(X)
 
         # Select output if indicated
-        if(isinstance(self.model, Graph) or isinstance(self.model, Model)): # Graph
-            if(out_name):
+        if isinstance(self.model, Graph) or isinstance(self.model, Model): # Graph
+            if out_name:
                 predictions = predictions[out_name]
-        elif(isinstance(self.model, Sequential)): # Sequential
+        elif isinstance(self.model, Sequential): # Sequential
             predictions = predictions[0]
 
         return predictions
@@ -1504,7 +1489,12 @@ class Model_Wrapper(object):
     # ------------------------------------------------------- #
 
     def sample(self, a, temperature=1.0):
-        # helper function to sample an index from a probability array
+        """
+        Helper function to sample an index from a probability array
+        :param a: Probability array
+        :param temperature: The higher, the flatter probabilities. Hence more random outputs.
+        :return:
+        """
         a = np.log(a) / temperature
         a = np.exp(a) / np.sum(np.exp(a))
         return np.argmax(np.random.multinomial(1, a, 1))
@@ -1514,14 +1504,11 @@ class Model_Wrapper(object):
         """
         Sampling words (each sample is drawn from a categorical distribution).
         Or picks up words that maximize the likelihood.
-        In:
-            scores - array of size #samples x #classes;
+        :param scores: array of size #samples x #classes;
                 every entry determines a score for sample i having class j
-            temperature - temperature for the predictions;
-                the higher the flatter probabilities and hence more random answers
-
-        Out:
-            set of indices chosen as output, a vector of size #samples
+        :param sampling_type:
+        :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
+        :return: set of indices chosen as output, a vector of size #samples
         """
         if isinstance(scores, dict):
             scores = scores['output']
@@ -1548,16 +1535,14 @@ class Model_Wrapper(object):
     def decode_predictions(self, preds, temperature, index2word, sampling_type, verbose=0):
         """
         Decodes predictions
-
-        In:
-            preds - predictions codified as the output of a softmax activation function
-            temperature - temperature for sampling
-            index2word - mapping from word indices into word characters
-            verbose - verbosity level, by default 0
-
-        Out:
-            Answer predictions (list of answers)
+        :param preds: Predictions codified as the output of a softmax activation function.
+        :param temperature: Temperature for sampling.
+        :param index2word: Mapping from word indices into word characters.
+        :param sampling_type: 'max_likelihood' or 'multinomial'.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of decoded predictions.
         """
+
         if verbose > 0:
             logging.info('Decoding prediction ...')
         flattened_preds = preds.reshape(-1, preds.shape[-1])
@@ -1567,7 +1552,6 @@ class Model_Wrapper(object):
         answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:2])
         answer_pred = []
         EOS = '<eos>'
-        BOS = '<bos>'
         PAD = '<pad>'
 
         for a_no in answer_pred_matrix:
@@ -1581,15 +1565,12 @@ class Model_Wrapper(object):
 
     def decode_predictions_beam_search(self, preds, index2word, pad_sequences=False, verbose=0):
         """
-        Decodes predictions
-
-        In:
-            preds - predictions codified as word indices
-            index2word - mapping from word indices into word characters
-            verbose - verbosity level, by default 0
-
-        Out:
-            Answer predictions (list of answers)
+        Decodes predictions from the BeamSearch method.
+        :param preds: Predictions codified as word indices.
+        :param index2word: Mapping from word indices into word characters.
+        :param pad_sequences: Whether we should make a zero-pad on the input sequence.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of decoded predictions
         """
         if verbose > 0:
             logging.info('Decoding beam search prediction ...')
@@ -1607,15 +1588,11 @@ class Model_Wrapper(object):
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
         """
-        Decodes predictions
-
-        In:
-            preds - predictions codified as one hot vectors
-            index2word - mapping from word indices into word characters
-            verbose - verbosity level, by default 0
-
-        Out:
-            Answer predictions (list of answers)
+        Decodes predictions following a one-hot codification.
+        :param preds: Predictions codified as one-hot vectors.
+        :param index2word: Mapping from word indices into word characters.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of decoded predictions
         """
         if verbose > 0:
             logging.info('Decoding one hot prediction ...')
@@ -1633,11 +1610,17 @@ class Model_Wrapper(object):
         return answer_pred
 
     def prepareData(self, X_batch, Y_batch=None):
-        if(isinstance(self.model, Sequential)):
+        """
+        Prepares the data for the model, depending on its type (Sequential, Model, Graph).
+        :param X_batch: Batch of input data.
+        :param Y_batch: Batch output data.
+        :return: Prepared data.
+        """
+        if isinstance(self.model, Sequential):
             data = self._prepareSequentialData(X_batch, Y_batch)
-        elif(isinstance(self.model, Model)):
+        elif isinstance(self.model, Model):
             data = self._prepareModelData(X_batch, Y_batch)
-        elif(isinstance(self.model, Graph)):
+        elif isinstance(self.model, Graph):
             [data, Y_batch] = self._prepareGraphData(X_batch, Y_batch)
         else:
             raise NotImplementedError
@@ -1647,7 +1630,7 @@ class Model_Wrapper(object):
     def _prepareSequentialData(self, X, Y=None,sample_weights=False):
 
         # Format input data
-        if(len(self.inputsMapping.keys()) == 1): # single input
+        if len(self.inputsMapping.keys()) == 1: # single input
             X = X[self.inputsMapping[0]]
         else:
             X_new = [0 for i in range(len(self.inputsMapping.keys()))] # multiple inputs
@@ -1657,8 +1640,8 @@ class Model_Wrapper(object):
 
         # Format output data (only one output possible for Sequential models)
         Y_sample_weights = None
-        if(Y is not None):
-            if(len(self.outputsMapping.keys()) == 1): # single output
+        if Y is not None:
+            if len(self.outputsMapping.keys()) == 1: # single output
                 if isinstance(Y[self.outputsMapping[0]], tuple):
                     Y = Y[self.outputsMapping[0]][0]
                     Y_sample_weights = Y[self.outputsMapping[0]][1]
@@ -1688,7 +1671,7 @@ class Model_Wrapper(object):
             X_new[in_model] = X[in_ds]
 
         # Format output data
-        if(Y is not None):
+        if Y is not None:
             for out_model, out_ds in self.outputsMapping.iteritems():
                 if isinstance(Y[out_ds], tuple):
                     Y_new[out_model] = Y[out_ds][0]
@@ -1712,7 +1695,7 @@ class Model_Wrapper(object):
 
         # Format output data
         for out_model, out_ds in self.outputsMapping.iteritems():
-            if(Y is None):
+            if Y is None:
                 data[out_model] = None
             else:
                 if isinstance(Y[out_ds], tuple):
@@ -1774,7 +1757,7 @@ class Model_Wrapper(object):
 
     def __str__(self):
         """
-            Plot basic model information.
+        Plot basic model information.
         """
 
         #if(isinstance(self.model, Model)):
@@ -1795,7 +1778,7 @@ class Model_Wrapper(object):
         # Print layers structure
         obj_str += "\n::: Layers structure:\n\n"
         obj_str += 'MODEL TYPE: ' + self.model.__class__.__name__ +'\n'
-        if(isinstance(self.model, Sequential)):
+        if isinstance(self.model, Sequential):
             obj_str += "INPUT: "+ str(tuple(self.model.layers[0].input_shape)) +"\n"
             for i, layer in enumerate(self.model.layers):
                 obj_str += str(layer.name) + ' '+ str(layer.output_shape) +'\n'
@@ -1817,20 +1800,20 @@ class Model_Wrapper(object):
 
     def log(self, mode, data_type, value):
         """
-            Stores the train and val information for plotting the training progress.
+        Stores the train and val information for plotting the training progress.
 
-            :param mode: 'train', or 'val'
-            :param data_type: 'iteration', 'loss' or 'accuracy'
-            :param value: numerical value taken by the data_type
+        :param mode: 'train', or 'val'
+        :param data_type: 'iteration', 'loss' or 'accuracy'
+        :param value: numerical value taken by the data_type
         """
-        if(mode not in self.__modes):
+        if mode not in self.__modes:
             raise Exception('The provided mode "'+ mode +'" is not valid.')
-        if(data_type not in self.__data_types):
+        if data_type not in self.__data_types:
             raise Exception('The provided data_type "'+ data_type +'" is not valid.')
 
-        if(mode not in self.__logger):
+        if mode not in self.__logger:
             self.__logger[mode] = dict()
-        if(data_type not in self.__logger[mode]):
+        if data_type not in self.__logger[mode]:
             self.__logger[mode][data_type] = list()
         self.__logger[mode][data_type].append(value)
 
@@ -1847,17 +1830,17 @@ class Model_Wrapper(object):
 
         all_iterations = []
         # Plot train information
-        if('train' in self.__logger):
-            if('iteration' not in self.__logger['train']):
+        if 'train' in self.__logger:
+            if 'iteration' not in self.__logger['train']:
                 raise Exception("The training 'iteration' must be logged into the model for plotting.")
-            if('accuracy' not in self.__logger['train'] and 'loss' not in self.__logger['train']):
+            if 'accuracy' not in self.__logger['train'] and 'loss' not in self.__logger['train']:
                 raise Exception("Either train 'accuracy' and/or 'loss' must be logged into the model for plotting.")
 
             iterations = self.__logger['train']['iteration']
             all_iterations = all_iterations+iterations
 
             # Loss
-            if('loss' in self.__logger['train']):
+            if 'loss' in self.__logger['train']:
                 loss = self.__logger['train']['loss']
                 plt.subplot(211)
                 #plt.plot(iterations, loss, colours['train_loss']+'o')
@@ -1866,7 +1849,7 @@ class Model_Wrapper(object):
                 plt.plot(iterations, loss, colours['train_loss'])
 
             # Accuracy
-            if('accuracy' in self.__logger['train']):
+            if 'accuracy' in self.__logger['train']:
                 accuracy = self.__logger['train']['accuracy']
                 plt.subplot(211)
                 plt.plot(iterations, accuracy, colours['train_accuracy']+'o')
@@ -1876,7 +1859,7 @@ class Model_Wrapper(object):
                 plt.plot(iterations, accuracy, colours['train_accuracy'])
 
             # Accuracy Top-5
-            if('accuracy top-5' in self.__logger['train']):
+            if 'accuracy top-5' in self.__logger['train']:
                 accuracy = self.__logger['train']['accuracy top-5']
                 plt.subplot(211)
                 plt.plot(iterations, accuracy, colours['train_accuracy_top-5']+'.')
@@ -1887,17 +1870,17 @@ class Model_Wrapper(object):
 
 
         # Plot val information
-        if('val' in self.__logger):
-            if('iteration' not in self.__logger['val']):
+        if 'val' in self.__logger:
+            if 'iteration' not in self.__logger['val']:
                 raise Exception("The validation 'iteration' must be logged into the model for plotting.")
-            if('accuracy' not in self.__logger['val'] and 'loss' not in self.__logger['train']):
+            if 'accuracy' not in self.__logger['val'] and 'loss' not in self.__logger['train']:
                 raise Exception("Either val 'accuracy' and/or 'loss' must be logged into the model for plotting.")
 
             iterations = self.__logger['val']['iteration']
             all_iterations = all_iterations+iterations
 
             # Loss
-            if('loss' in self.__logger['val']):
+            if 'loss' in self.__logger['val']:
                 loss = self.__logger['val']['loss']
                 plt.subplot(211)
                 #plt.plot(iterations, loss, colours['val_loss']+'o')
@@ -1906,7 +1889,7 @@ class Model_Wrapper(object):
                 plt.plot(iterations, loss, colours['val_loss'])
 
             # Accuracy
-            if('accuracy' in self.__logger['val']):
+            if 'accuracy' in self.__logger['val']:
                 accuracy = self.__logger['val']['accuracy']
                 plt.subplot(211)
                 plt.plot(iterations, accuracy, colours['val_accuracy']+'o')
@@ -1916,7 +1899,7 @@ class Model_Wrapper(object):
                 plt.plot(iterations, accuracy, colours['val_accuracy'])
 
             # Accuracy Top-5
-            if('accuracy top-5' in self.__logger['val']):
+            if 'accuracy top-5' in self.__logger['val']:
                 accuracy = self.__logger['val']['accuracy top-5']
                 plt.subplot(211)
                 plt.plot(iterations, accuracy, colours['val_accuracy_top-5']+'.')
@@ -1940,13 +1923,13 @@ class Model_Wrapper(object):
         plt.title('Training progress')
 
         # Create plots dir
-        if(not os.path.isdir(self.plot_path)):
+        if not os.path.isdir(self.plot_path):
             os.makedirs(self.plot_path)
 
         # Save figure
         plot_file = self.plot_path+'/iter_'+str(max_iter)+'.jpg'
         plt.savefig(plot_file)
-        if(not self.silence):
+        if not self.silence:
             logging.info("Progress plot saved in " + plot_file)
 
         # Close plot window
@@ -1954,10 +1937,10 @@ class Model_Wrapper(object):
 
 
     # ------------------------------------------------------- #
-    #       MODELS
-    #           Available definitions of CNN models (see basic_model as an example)
-    #           All the models must include the following parameters:
-    #               nOutput, input
+    #   MODELS
+    #       Available definitions of CNN models (see basic_model as an example)
+    #       All the models must include the following parameters:
+    #           nOutput, input
     # ------------------------------------------------------- #
 
 
@@ -1965,7 +1948,7 @@ class Model_Wrapper(object):
         """
             Builds a basic CNN model.
         """
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2024,7 +2007,7 @@ class Model_Wrapper(object):
             Builds a simple One_vs_One network with 3 convolutional layers (useful for ECOC models).
         """
         # default lr=0.1, momentum=0.
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2049,7 +2032,7 @@ class Model_Wrapper(object):
             Builds a VGG model with 16 layers.
         """
         # default lr=0.1, momentum=0.
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2104,7 +2087,7 @@ class Model_Wrapper(object):
             Builds a VGG model with 16 layers and with PReLU activations.
         """
 
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2174,7 +2157,7 @@ class Model_Wrapper(object):
         """
             16-layered VGG model implemented in Keras' Functional API
         """
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2333,7 +2316,7 @@ class Model_Wrapper(object):
 
     def GoogLeNet_FunctionalAPI(self, nOutput, input):
 
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2405,7 +2388,7 @@ class Model_Wrapper(object):
             Builds an dummy Identity_Layer, which should give as output the same as the input.
             Only used for passing the output from a previous stage to the next (see Staged_Network).
         """
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2421,7 +2404,7 @@ class Model_Wrapper(object):
         """
             Network with just a dropout and a softmax layers which is intended to serve as the final layer for an ECOC model
         """
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2436,7 +2419,7 @@ class Model_Wrapper(object):
         """
             Builds a simple One_vs_One_Inception network with 2 inception layers (useful for ECOC models).
         """
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2547,7 +2530,7 @@ class Model_Wrapper(object):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers (useful for ECOC models).
         """
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
@@ -2722,7 +2705,7 @@ class Model_Wrapper(object):
                 'GAP/conv' output of the generated convolutional maps.
         """
 
-        if(len(input) == 3):
+        if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
             input_shape = tuple(input)
