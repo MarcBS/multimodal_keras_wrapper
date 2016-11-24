@@ -1,4 +1,4 @@
-Available Files and Methods
+Available Modules
 **************************
 
 Documentation for the keras_wrapper module.
@@ -10,6 +10,8 @@ dataset.py
 =========================
 
 .. automodule:: keras_wrapper.dataset
+
+.. autoclass:: keras_wrapper.dataset.Dataset
    :members:
 
 
