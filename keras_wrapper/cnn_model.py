@@ -1156,11 +1156,15 @@ class Model_Wrapper(object):
         3. while k > 0:
 
             3.1. Given the inputs, get (log) probabilities for the outputs.
+
             3.2. Expand each open node with all possible output.
+
             3.3. Prune and keep the k best nodes.
+
             3.4. If a sample has reached the <eos> symbol:
 
                 3.4.1. Mark it as final sample.
+
                 3.4.2. k -= 1
 
             3.5. Build new inputs (state_below) and go to 1.
@@ -1272,13 +1276,14 @@ class Model_Wrapper(object):
     def BeamSearchNet(self, ds, parameters):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
+
         :param batch_size: size of the batch
         :param n_parallel_loaders: number of parallel data batch loaders
         :param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
         :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
-        :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate
-        self.model_init and self.model_next models for reusing the information from previous timesteps).
+        :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
+
         The following attributes must be inserted to the model when building an optimized search model:
         
             * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)

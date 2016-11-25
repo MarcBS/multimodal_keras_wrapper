@@ -615,8 +615,8 @@ class Dataset(object):
                  max_video_len=26                                                                 # 'video'
                  ):
         """
-            Loads a list of samples which can contain all samples from the 'train', 'val', or
-            'test' sets (specified by set_name).
+            Loads a list which can contain all samples from either the 'train', 'val', or
+            'test' set splits (specified by set_name).
             
             # General parameters
             
@@ -795,8 +795,10 @@ class Dataset(object):
         """
         Loads the list of classes of the dataset.
         Each line must contain a unique identifier of the class.
+
         :param path_classes: Path to a text file with the classes or an instance of the class list.
         :param id: Dataset id
+
         :return: None
         """
 
@@ -821,7 +823,9 @@ class Dataset(object):
     def preprocessCategorical(self, labels_list):
         """
         Preprocesses categorical data.
+
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         
@@ -844,7 +848,9 @@ class Dataset(object):
     def preprocessBinary(self, labels_list):
         """
         Preprocesses binary classes.
+
         :param labels_list: Binary label list given as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         if isinstance(labels_list, list):
@@ -861,7 +867,9 @@ class Dataset(object):
     def preprocessReal(self, labels_list):
         """
         Preprocesses real classes.
+
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
@@ -885,10 +893,12 @@ class Dataset(object):
         """
         Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file storing a feature vector.
         Alternatively "path_list" can be an instance of the class list.
+
         :param path_list: Path to a text file where each line must contain a path to a .npy file storing a feature vector. Alternatively, instance of the class list.
         :param id: Dataset id
         :param set_name: Used?
         :param feat_len: Length of features. If all features have the same length, given as a number. Otherwise, list.
+
         :return: Preprocessed features
         """
         # file with a list, each line being a path to a .npy file with a feature vector
@@ -960,6 +970,7 @@ class Dataset(object):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
+
         :param annotations_list: Path to the sentences to process.
         :param id: Dataset id of the data.
         :param set_name: Name of the current set ('train', 'val', 'test')
@@ -970,9 +981,9 @@ class Dataset(object):
         :param offset: Text shifting.
         :param fill: Whether we path with zeros at the beginning or at the end of the sentences.
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
-        sentences with a fixed (max_text_length) length.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Should be ignored.
+
         :return: Preprocessed sentences.
         """
         sentences = []
@@ -1132,11 +1143,10 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning,
-        'end': it will be filled with 0s at the end.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch
-        or sentences with a fixed (max_text_length) length.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
+
         :return: Text as sequence of number. Mask for each sentence.
         """
         vocab = vocabularies['words2idx']
@@ -1251,8 +1261,8 @@ class Dataset(object):
     def tokenize_aggressive(self, caption, lowercase=True):
         """
         Aggressive tokenizer for the input/output data of type 'text':
-            * Removes punctuation
-            * Optional lowercasing
+        * Removes punctuation
+        * Optional lowercasing
 
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
@@ -1275,8 +1285,8 @@ class Dataset(object):
     def tokenize_icann(self, caption):
         """
         Tokenization used for the icann paper:
-            * Removes some punctuation (. , ")
-            * Lowercasing
+        * Removes some punctuation (. , ")
+        * Lowercasing
 
         :param caption: String to tokenize
         :return: Tokenized version of caption
@@ -1543,7 +1553,6 @@ class Dataset(object):
         :param normalization: Whether we apply a 0-1 normalization to the images
         :param meanSubstraction:  Whether we are removing the training mean
         :param dataAugmentation:  Whether we are applying dataAugmentatino (random cropping and horizontal flip)
-        :return:
         """
 
         n_videos = len(n_frames)
