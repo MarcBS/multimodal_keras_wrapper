@@ -581,13 +581,13 @@ class Model_Wrapper(object):
         if params['homogeneous_batches']:
             train_gen = Homogeneous_Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
                                              batch_size=params['batch_size'], maxlen=params['maxlen'],
-                                             normalize_images=params['normalize'],
+                                             normalization=params['normalize'],
                                              data_augmentation=params['data_augmentation'],
                                              mean_substraction=params['mean_substraction']).generator()
         else:
             train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
                                              batch_size=params['batch_size'],
-                                             normalize_images=params['normalize'],
+                                             normalization=params['normalize'],
                                              data_augmentation=params['data_augmentation'],
                                              mean_substraction=params['mean_substraction'],
                                              shuffle=params['shuffle']).generator()
@@ -602,7 +602,7 @@ class Model_Wrapper(object):
             # prepare data generator
             val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize'],
+                                         normalization=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction']).generator()
         else:
@@ -876,7 +876,7 @@ class Model_Wrapper(object):
         # We won't use an Homogeneous_Batch_Generator for testing
         data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize'],
+                                         normalization=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction']).generator()
 
@@ -910,7 +910,7 @@ class Model_Wrapper(object):
             ####    Data processing parameters
 
             :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
-            :param normalize_images: boolean indicating if we want to 0-1 normalize the image pixel values
+            :param normalization: boolean indicating if we want to 0-1 normalize the image pixel values
             :param mean_substraction: boolean indicating if we want to substract the training mean
         """
         # Check input parameters and recover default values if needed
@@ -1279,7 +1279,7 @@ class Model_Wrapper(object):
 
         :param batch_size: size of the batch
         :param n_parallel_loaders: number of parallel data batch loaders
-        :param normalize_images: apply data normalization on images/features or not (only if using images/features as input)
+        :param normalization: apply data normalization on images/features or not (only if using images/features as input)
         :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
         :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
@@ -1341,7 +1341,7 @@ class Model_Wrapper(object):
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize'],
+                                         normalization=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction'],
                                          predict=True).generator()
@@ -1352,7 +1352,7 @@ class Model_Wrapper(object):
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                          batch_size=params['batch_size'],
-                                         normalize_images=params['normalize'],
+                                         normalization=params['normalize'],
                                          data_augmentation=False,
                                          mean_substraction=params['mean_substraction'],
                                          predict=False,
@@ -1452,7 +1452,7 @@ class Model_Wrapper(object):
             # Prepare data generator
             data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
                                      batch_size=params['batch_size'],
-                                     normalize_images=params['normalize'],
+                                     normalization=params['normalize'],
                                      data_augmentation=False,
                                      mean_substraction=params['mean_substraction'],
                                      predict=True).generator()
