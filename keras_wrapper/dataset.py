@@ -18,6 +18,7 @@ from operator import add
 import codecs
 import cPickle as pk
 from scipy import misc
+from scipy.sparse import csr_matrix
 from PIL import Image as pilimage
 import numpy as np
 
@@ -391,7 +392,7 @@ class Dataset(object):
 
         # List of implemented input and output data types
         self.__accepted_types_inputs = ['raw-image', 'video', 'image-features', 'video-features', 'text', 'id', 'ghost']
-        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', 'id']
+        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', 'id', '3DLabel']
         #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
         
@@ -768,6 +769,8 @@ class Dataset(object):
             data = self.preprocessReal(path_list)
         elif type == 'id':
             data = self.preprocessIDs(path_list, id)
+        elif(type == '3DLabel'):
+            data = self.preprocess3DLabel(path_list)
             
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data,repeat_set))
@@ -1133,6 +1136,34 @@ class Dataset(object):
                 logging.info('\tThe new total is '+str(self.vocabulary_len[id]) +'.')
         
         
+#==============================================================================
+# 
+#==============================================================================
+
+    def load3DLabels(self, path_list, image_list, nClasses):
+        
+        labels = []  
+            
+        for i in range(len(path_list)):
+            line = path_list[i]
+            h,w = np.shape(misc.imread(self.path+'/'+image_list[i]+'.jpg'))[0:2]
+            label3D = np.zeros((nClasses,w,h), dtype=np.int0)
+           
+            arrayLine = line.split(';')
+            for array in arrayLine:
+                bndbox = eval(array)[0]
+                idxclass = eval(array)[1]
+                bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
+                label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
+            
+            # Resize 3DLabel to image size.    
+            w,h,d =  self.img_size['images']
+            label3D_rs = np.zeros((nClasses,w,h), dtype=np.int0)
+            for i in range(nClasses):
+                label3D_rs[i] = misc.imresize(label3D[i],(w,h))
+
+            labels.append(label3D_rs)
+        return labels
 
 
     def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far):
@@ -1707,6 +1738,21 @@ class Dataset(object):
             raise Exception('Wrong type for "path_list". It must be a path to a text file with an id in each line or an instance of the class list with an id in each position.')
     
         return data
+
+    # ------------------------------------------------------- #
+    #       TYPE '3DLabel' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+    
+    def preprocess3DLabel(self, path_list):
+        print path_list
+        if(isinstance(path_list, str) and os.path.isfile(path_list)):
+            path_list_3DLabel = []
+            with open(path_list, 'r') as list_:
+                for line in list_:
+                    path_list_3DLabel.append(line.strip())
+        else:
+            raise Exception('Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
+        return path_list_3DLabel
     
     # ------------------------------------------------------- #
     #       TYPE 'raw-image' SPECIFIC FUNCTIONS
@@ -2083,6 +2129,8 @@ class Dataset(object):
         
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
         
+	# Save image list
+        image_list = []
         # Recover input samples
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
@@ -2099,7 +2147,8 @@ class Dataset(object):
                     x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
                 else:
                     x = eval('self.X_'+set_name+'[id_in][last:new_last]')
-                
+           
+            image_list = x
             #if(set_name=='val'):
             #    logging.info(x)
                 
@@ -2139,6 +2188,9 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
+                elif(type_out == '3DLabel'):
+                    nClasses = len(self.classes[id_out])
+                    y = self.load3DLabels(y,image_list,nClasses)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],

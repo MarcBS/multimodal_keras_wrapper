@@ -1587,7 +1587,7 @@ class Model_Wrapper(object):
         if verbose > 0:
             logging.info('Decoding beam search prediction ...')
         if pad_sequences:
-            preds = [pred[:sum([int(elem > 0) for elem in pred])] for pred in preds]
+            preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
 
         flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
         answer_pred = []
