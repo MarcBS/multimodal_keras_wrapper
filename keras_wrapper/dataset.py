@@ -715,8 +715,9 @@ class Dataset(object):
 
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0, pad_on_batch=True, words_so_far=False, # 'text'
-                  build_vocabulary=False, max_words=0, sample_weights=False):
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,   # 'text'
+                  pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,       # 'text'
+                  sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
             
@@ -1140,14 +1141,17 @@ class Dataset(object):
 # 
 #==============================================================================
 
-    def load3DLabels(self, path_list, image_list, nClasses):
-        
-        labels = []  
+    def load3DLabels(self, path_list, nClasses, size_crop):
+
+        n_samples = len(path_list)
+        w, h, d = size_crop
+        labels = np.zeros((n_samples, nClasses,w,h), dtype=np.int0)
             
-        for i in range(len(path_list)):
+        for i in range(n_samples):
             line = path_list[i]
-            h,w = np.shape(misc.imread(self.path+'/'+image_list[i]+'.jpg'))[0:2]
-            label3D = np.zeros((nClasses,w,h), dtype=np.int0)
+            #h,w = np.shape(misc.imread(self.path+'/'+image_list[i]))[0:2]
+            # TODO: get original image size w_original,h_original without having to load the image
+            label3D = np.zeros((nClasses,w_original,h_original), dtype=np.int0)
            
             arrayLine = line.split(';')
             for array in arrayLine:
@@ -1156,13 +1160,12 @@ class Dataset(object):
                 bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
                 label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
             
-            # Resize 3DLabel to image size.    
-            w,h,d =  self.img_size['images']
+            # Resize 3DLabel to image size.
             label3D_rs = np.zeros((nClasses,w,h), dtype=np.int0)
             for i in range(nClasses):
                 label3D_rs[i] = misc.imresize(label3D[i],(w,h))
 
-            labels.append(label3D_rs)
+            labels[i] = label3D_rs
         return labels
 
 
@@ -1744,7 +1747,6 @@ class Dataset(object):
     # ------------------------------------------------------- #
     
     def preprocess3DLabel(self, path_list):
-        print path_list
         if(isinstance(path_list, str) and os.path.isfile(path_list)):
             path_list_3DLabel = []
             with open(path_list, 'r') as list_:
@@ -2128,9 +2130,7 @@ class Dataset(object):
         self.__isLoaded(set_name, 1)
         
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
-        
-	# Save image list
-        image_list = []
+
         # Recover input samples
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
@@ -2147,8 +2147,7 @@ class Dataset(object):
                     x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
                 else:
                     x = eval('self.X_'+set_name+'[id_in][last:new_last]')
-           
-            image_list = x
+
             #if(set_name=='val'):
             #    logging.info(x)
                 
@@ -2190,7 +2189,7 @@ class Dataset(object):
                     y = np.array(y).astype(np.float32)
                 elif(type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
-                    y = self.load3DLabels(y,image_list,nClasses)
+                    y = self.load3DLabels(y, nClasses, self.img_size_crop[id_out])
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2301,6 +2300,9 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
+                elif(type_out == '3DLabel'):
+                    nClasses = len(self.classes[id_out])
+                    y = self.load3DLabels(y, nClasses, self.img_size_crop[id_out])
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2376,6 +2378,9 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
+                elif(type_out == '3DLabel'):
+                    nClasses = len(self.classes[id_out])
+                    y = self.load3DLabels(y, nClasses, self.img_size_crop[id_out])
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
