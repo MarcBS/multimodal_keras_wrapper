@@ -1379,6 +1379,26 @@ class Dataset(object):
         return tokenized
 
 
+    def tokenize_CNN_sentence(self, caption):
+        """
+        Tokenization employed in the CNN_sentence package
+        (https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97).
+        """
+        tokenized = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", caption)
+        tokenized = re.sub(r"\'s", " \'s", tokenized)
+        tokenized = re.sub(r"\'ve", " \'ve", tokenized)
+        tokenized = re.sub(r"n\'t", " n\'t", tokenized)
+        tokenized = re.sub(r"\'re", " \'re", tokenized)
+        tokenized = re.sub(r"\'d", " \'d", tokenized)
+        tokenized = re.sub(r"\'ll", " \'ll", tokenized)
+        tokenized = re.sub(r",", " , ", tokenized)
+        tokenized = re.sub(r"!", " ! ", tokenized)
+        tokenized = re.sub(r"\(", " \( ", tokenized)
+        tokenized = re.sub(r"\)", " \) ", tokenized)
+        tokenized = re.sub(r"\?", " \? ", tokenized)
+        tokenized = re.sub(r"\s{2,}", " ", tokenized)
+        return tokenized.strip().lower()
+
     def tokenize_questions(self, caption):
         """
         Basic tokenizer for VQA questions:
