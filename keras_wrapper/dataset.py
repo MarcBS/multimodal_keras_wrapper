@@ -1185,7 +1185,7 @@ class Dataset(object):
         return labels
 
 
-    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far):
+    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far, loading_X=False):
         """
         Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
 
@@ -1196,7 +1196,7 @@ class Dataset(object):
         :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
-
+        :param loading_X: Whether we are loading an input or an output of the model
         :return: Text as sequence of number. Mask for each sentence.
         """
         vocab = vocabularies['words2idx']
@@ -1210,7 +1210,8 @@ class Dataset(object):
                 else:
                     X_out[i] = vocab['<unk>']
             # if the following line is active it fails on VQA (max_len == 0)
-            #X_out = (X_out, None) # This None simulates a mask
+            if loading_X:
+                X_out = (X_out, None) # This None simulates a mask
         else: # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
@@ -2121,10 +2122,10 @@ class Dataset(object):
                     x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif type_in == 'text':
-                    x = self.loadText(x, self.vocabulary[id_in], 
+                    x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in])[0]
+                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
@@ -2201,7 +2202,7 @@ class Dataset(object):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in])[0]
+                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
@@ -2238,10 +2239,10 @@ class Dataset(object):
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
                                           imlist)
                 elif type_out == 'text':
-                    y = self.loadText(y, self.vocabulary[id_out], 
+                    y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
-                                      words_so_far=self.words_so_far[id_out])
+                                      words_so_far=self.words_so_far[id_out], loading_X=False)
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
@@ -2323,7 +2324,7 @@ class Dataset(object):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in])[0]
+                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
@@ -2363,7 +2364,7 @@ class Dataset(object):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
-                                      words_so_far=self.words_so_far[id_out])
+                                      words_so_far=self.words_so_far[id_out], loading_X=False)
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
@@ -2449,7 +2450,7 @@ class Dataset(object):
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
-                                      words_so_far=self.words_so_far[id_out])
+                                      words_so_far=self.words_so_far[id_out], loading_X=False)
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
