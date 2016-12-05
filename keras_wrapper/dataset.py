@@ -445,6 +445,10 @@ class Dataset(object):
         self.dic_classes = dict()
         #################################################
         
+        ############################ Parameters used for outputs of type '3DLabels'
+        self.id_in_3DLabel = dict()
+        #################################################
+        
         # Reset counters to start loading data in batches
         self.resetCounters()
         
@@ -616,8 +620,8 @@ class Dataset(object):
                  max_video_len=26                                                                 # 'video'
                  ):
         """
-            Loads a list of samples which can contain all samples from the 'train', 'val', or
-            'test' sets (specified by set_name).
+            Loads a list which can contain all samples from either the 'train', 'val', or
+            'test' set splits (specified by set_name).
             
             # General parameters
             
@@ -715,8 +719,10 @@ class Dataset(object):
 
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0, pad_on_batch=True, words_so_far=False, # 'text'
-                  build_vocabulary=False, max_words=0, sample_weights=False):
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,   # 'text'
+                  pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,       # 'text'
+                  associated_id_in=None,                                                            # '3DLabel'
+                  sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
             
@@ -739,6 +745,10 @@ class Dataset(object):
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
             :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
+            
+            # '3DLabel'-related parameters
+            
+            :param associated_id_in: id of the input 'raw-image' associated for the inputted 3DLabels
 
         """
         self.__checkSetName(set_name)
@@ -770,7 +780,7 @@ class Dataset(object):
         elif type == 'id':
             data = self.preprocessIDs(path_list, id)
         elif(type == '3DLabel'):
-            data = self.preprocess3DLabel(path_list)
+            data = self.preprocess3DLabel(path_list, id, associated_id_in)
             
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data,repeat_set))
@@ -798,8 +808,10 @@ class Dataset(object):
         """
         Loads the list of classes of the dataset.
         Each line must contain a unique identifier of the class.
+
         :param path_classes: Path to a text file with the classes or an instance of the class list.
         :param id: Dataset id
+
         :return: None
         """
 
@@ -824,7 +836,9 @@ class Dataset(object):
     def preprocessCategorical(self, labels_list):
         """
         Preprocesses categorical data.
+
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         
@@ -847,7 +861,9 @@ class Dataset(object):
     def preprocessBinary(self, labels_list):
         """
         Preprocesses binary classes.
+
         :param labels_list: Binary label list given as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         if isinstance(labels_list, list):
@@ -864,7 +880,9 @@ class Dataset(object):
     def preprocessReal(self, labels_list):
         """
         Preprocesses real classes.
+
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
@@ -888,10 +906,12 @@ class Dataset(object):
         """
         Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file storing a feature vector.
         Alternatively "path_list" can be an instance of the class list.
+
         :param path_list: Path to a text file where each line must contain a path to a .npy file storing a feature vector. Alternatively, instance of the class list.
         :param id: Dataset id
         :param set_name: Used?
         :param feat_len: Length of features. If all features have the same length, given as a number. Otherwise, list.
+
         :return: Preprocessed features
         """
         # file with a list, each line being a path to a .npy file with a feature vector
@@ -963,6 +983,7 @@ class Dataset(object):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
+
         :param annotations_list: Path to the sentences to process.
         :param id: Dataset id of the data.
         :param set_name: Name of the current set ('train', 'val', 'test')
@@ -973,9 +994,9 @@ class Dataset(object):
         :param offset: Text shifting.
         :param fill: Whether we path with zeros at the beginning or at the end of the sentences.
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
-        sentences with a fixed (max_text_length) length.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Should be ignored.
+
         :return: Preprocessed sentences.
         """
         sentences = []
@@ -1129,14 +1150,18 @@ class Dataset(object):
 # 
 #==============================================================================
 
-    def load3DLabels(self, path_list, image_list, nClasses):
-        
-        labels = []  
+    def load3DLabels(self, path_list, nClasses, dataAugmentation, img_size, size_crop, image_list):
+
+        n_samples = len(path_list)
+        w, h, d = img_size
+        w_crop, h_crop, d_crop = size_crop
+        labels = np.zeros((n_samples, nClasses,w_crop,h_crop), dtype=np.int0)
             
-        for i in range(len(path_list)):
+        for i in range(n_samples):
             line = path_list[i]
-            h,w = np.shape(misc.imread(self.path+'/'+image_list[i]+'.jpg'))[0:2]
-            label3D = np.zeros((nClasses,w,h), dtype=np.int0)
+            h_original,w_original = np.shape(misc.imread(self.path+'/'+image_list[i]))[0:2]
+            # TODO: get original image size w_original,h_original without having to load the image
+            label3D = np.zeros((nClasses,w_original,h_original), dtype=np.int0)
            
             arrayLine = line.split(';')
             for array in arrayLine:
@@ -1145,13 +1170,18 @@ class Dataset(object):
                 bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
                 label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
             
-            # Resize 3DLabel to image size.    
-            w,h,d =  self.img_size['images']
-            label3D_rs = np.zeros((nClasses,w,h), dtype=np.int0)
-            for i in range(nClasses):
-                label3D_rs[i] = misc.imresize(label3D[i],(w,h))
-
-            labels.append(label3D_rs)
+            if not dataAugmentation:
+                # Resize 3DLabel to crop size.
+                for j in range(nClasses):
+                    labels[i, j] = misc.imresize(label3D[j],(w_crop,h_crop))
+            else:
+                # Resize 3DLabel to image size.
+                label3D_rs = np.zeros((nClasses,w,h), dtype=np.int0)
+                for j in range(nClasses):
+                    label3D_rs[j] = misc.imresize(label3D[j],(w,h))
+                # TODO: crop
+            
+                labels[i] = label3D_rs
         return labels
 
 
@@ -1163,11 +1193,10 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning,
-        'end': it will be filled with 0s at the end.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch
-        or sentences with a fixed (max_text_length) length.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
+
         :return: Text as sequence of number. Mask for each sentence.
         """
         vocab = vocabularies['words2idx']
@@ -1282,8 +1311,8 @@ class Dataset(object):
     def tokenize_aggressive(self, caption, lowercase=True):
         """
         Aggressive tokenizer for the input/output data of type 'text':
-            * Removes punctuation
-            * Optional lowercasing
+        * Removes punctuation
+        * Optional lowercasing
 
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
@@ -1306,8 +1335,8 @@ class Dataset(object):
     def tokenize_icann(self, caption):
         """
         Tokenization used for the icann paper:
-            * Removes some punctuation (. , ")
-            * Lowercasing
+        * Removes some punctuation (. , ")
+        * Lowercasing
 
         :param caption: String to tokenize
         :return: Tokenized version of caption
@@ -1594,7 +1623,6 @@ class Dataset(object):
         :param normalization: Whether we apply a 0-1 normalization to the images
         :param meanSubstraction:  Whether we are removing the training mean
         :param dataAugmentation:  Whether we are applying dataAugmentatino (random cropping and horizontal flip)
-        :return:
         """
 
         n_videos = len(n_frames)
@@ -1754,8 +1782,7 @@ class Dataset(object):
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocess3DLabel(self, path_list):
-        print path_list
+    def preprocess3DLabel(self, path_list, id, associated_id_in):
         if(isinstance(path_list, str) and os.path.isfile(path_list)):
             path_list_3DLabel = []
             with open(path_list, 'r') as list_:
@@ -1763,6 +1790,9 @@ class Dataset(object):
                     path_list_3DLabel.append(line.strip())
         else:
             raise Exception('Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
+            
+        self.id_in_3DLabel[id] = associated_id_in
+            
         return path_list_3DLabel
     
     # ------------------------------------------------------- #
@@ -2139,9 +2169,7 @@ class Dataset(object):
         self.__isLoaded(set_name, 1)
         
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
-        
-	# Save image list
-        image_list = []
+
         # Recover input samples
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
@@ -2158,8 +2186,7 @@ class Dataset(object):
                     x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
                 else:
                     x = eval('self.X_'+set_name+'[id_in][last:new_last]')
-           
-            image_list = x
+
             #if(set_name=='val'):
             #    logging.info(x)
                 
@@ -2201,7 +2228,15 @@ class Dataset(object):
                     y = np.array(y).astype(np.float32)
                 elif(type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
-                    y = self.load3DLabels(y,image_list,nClasses)
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    # TODO: remove images reloading
+                    if surpassed:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
+                    else:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, 
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out], 
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2273,6 +2308,7 @@ class Dataset(object):
                     ghost_x = True
             else:
                 x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+                
             #if(set_name=='val'):
             #    logging.info(x)
 
@@ -2312,6 +2348,17 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
+                elif(type_out == '3DLabel'):
+                    nClasses = len(self.classes[id_out])
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    # TODO: remove images reloading
+                    if surpassed:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
+                    else:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, 
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2387,6 +2434,17 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
+                elif(type_out == '3DLabel'):
+                    nClasses = len(self.classes[id_out])
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    # TODO: remove images reloading
+                    if surpassed:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
+                    else:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, 
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
