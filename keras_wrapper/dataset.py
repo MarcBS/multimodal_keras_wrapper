@@ -445,6 +445,10 @@ class Dataset(object):
         self.dic_classes = dict()
         #################################################
         
+        ############################ Parameters used for outputs of type '3DLabels'
+        self.id_in_3DLabel = dict()
+        #################################################
+        
         # Reset counters to start loading data in batches
         self.resetCounters()
         
@@ -616,8 +620,8 @@ class Dataset(object):
                  max_video_len=26                                                                 # 'video'
                  ):
         """
-            Loads a list of samples which can contain all samples from the 'train', 'val', or
-            'test' sets (specified by set_name).
+            Loads a list which can contain all samples from either the 'train', 'val', or
+            'test' set splits (specified by set_name).
             
             # General parameters
             
@@ -715,8 +719,10 @@ class Dataset(object):
 
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0, pad_on_batch=True, words_so_far=False, # 'text'
-                  build_vocabulary=False, max_words=0, sample_weights=False):
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,   # 'text'
+                  pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,       # 'text'
+                  associated_id_in=None,                                                            # '3DLabel'
+                  sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
             
@@ -739,6 +745,10 @@ class Dataset(object):
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
             :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
+            
+            # '3DLabel'-related parameters
+            
+            :param associated_id_in: id of the input 'raw-image' associated for the inputted 3DLabels
 
         """
         self.__checkSetName(set_name)
@@ -770,7 +780,7 @@ class Dataset(object):
         elif type == 'id':
             data = self.preprocessIDs(path_list, id)
         elif(type == '3DLabel'):
-            data = self.preprocess3DLabel(path_list)
+            data = self.preprocess3DLabel(path_list, id, associated_id_in)
             
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data,repeat_set))
@@ -798,8 +808,10 @@ class Dataset(object):
         """
         Loads the list of classes of the dataset.
         Each line must contain a unique identifier of the class.
+
         :param path_classes: Path to a text file with the classes or an instance of the class list.
         :param id: Dataset id
+
         :return: None
         """
 
@@ -824,7 +836,9 @@ class Dataset(object):
     def preprocessCategorical(self, labels_list):
         """
         Preprocesses categorical data.
+
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         
@@ -847,7 +861,9 @@ class Dataset(object):
     def preprocessBinary(self, labels_list):
         """
         Preprocesses binary classes.
+
         :param labels_list: Binary label list given as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         if isinstance(labels_list, list):
@@ -864,7 +880,9 @@ class Dataset(object):
     def preprocessReal(self, labels_list):
         """
         Preprocesses real classes.
+
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
+
         :return: Preprocessed labels.
         """
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
@@ -888,10 +906,12 @@ class Dataset(object):
         """
         Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file storing a feature vector.
         Alternatively "path_list" can be an instance of the class list.
+
         :param path_list: Path to a text file where each line must contain a path to a .npy file storing a feature vector. Alternatively, instance of the class list.
         :param id: Dataset id
         :param set_name: Used?
         :param feat_len: Length of features. If all features have the same length, given as a number. Otherwise, list.
+
         :return: Preprocessed features
         """
         # file with a list, each line being a path to a .npy file with a feature vector
@@ -963,6 +983,7 @@ class Dataset(object):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
+
         :param annotations_list: Path to the sentences to process.
         :param id: Dataset id of the data.
         :param set_name: Name of the current set ('train', 'val', 'test')
@@ -973,9 +994,9 @@ class Dataset(object):
         :param offset: Text shifting.
         :param fill: Whether we path with zeros at the beginning or at the end of the sentences.
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
-        sentences with a fixed (max_text_length) length.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Should be ignored.
+
         :return: Preprocessed sentences.
         """
         sentences = []
@@ -1129,33 +1150,61 @@ class Dataset(object):
 # 
 #==============================================================================
 
-    def load3DLabels(self, path_list, image_list, nClasses):
-        
-        labels = []  
+    def load3DLabels(self, path_list, nClasses,dataAugmentation,daRandomParams,img_size, size_crop, image_list):
+
+        n_samples = len(path_list)
+        w, h, d = img_size
+        w_crop, h_crop, d_crop = size_crop
+        labels = np.zeros((n_samples, nClasses,w_crop,h_crop), dtype=np.int0)
             
-        for i in range(len(path_list)):
+        for i in range(n_samples):
             line = path_list[i]
-            h,w = np.shape(misc.imread(self.path+'/'+image_list[i]+'.jpg'))[0:2]
-            label3D = np.zeros((nClasses,w,h), dtype=np.int0)
-           
             arrayLine = line.split(';')
-            for array in arrayLine:
+            arrayBndBox = arrayLine[:-1]
+            w_original,h_original,d_original = eval(arrayLine[-1])
+            
+            label3D = np.zeros((nClasses,w_original,h_original), dtype=np.int0)
+            
+            for array in arrayBndBox:
                 bndbox = eval(array)[0]
                 idxclass = eval(array)[1]
                 bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
                 label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
             
-            # Resize 3DLabel to image size.    
-            w,h,d =  self.img_size['images']
-            label3D_rs = np.zeros((nClasses,w,h), dtype=np.int0)
-            for i in range(nClasses):
-                label3D_rs[i] = misc.imresize(label3D[i],(w,h))
-
-            labels.append(label3D_rs)
+            if not dataAugmentation or daRandomParams==None:
+                # Resize 3DLabel to crop size.
+                for j in range(nClasses):
+                    labels[i, j] = misc.imresize(label3D[j],(w_crop,h_crop))
+            else:
+                label3D_rs = np.zeros((nClasses,w_crop,h_crop), dtype=np.int0)
+                # Crop the labels (random crop)
+                for j in range(nClasses):
+                    label2D = misc.imresize(label3D[j],(w,h))
+                    randomParams = daRandomParams[image_list[i]]
+                    # Take random crop
+                    left = randomParams["left"]
+                    right = np.add(left, size_crop[0:2])
+                    
+                    label2D = label2D[left[0]:right[0], left[1]:right[1]]
+                    
+                    # Randomly flip (with a certain probability)
+                    flip = randomParams["hflip"]
+                    prob_flip_horizontal = randomParams["prob_flip_horizontal"] 
+                    if flip < prob_flip_horizontal: # horizontal flip
+                        label2D = np.fliplr(label2D)
+                    flip = randomParams["vflip"]
+                    prob_flip_vertical = randomParams["prob_flip_vertical"] 
+                    if flip < prob_flip_vertical: # vertical flip
+                        label2D = np.flipud(label2D)
+                    
+                    label3D_rs[j] = label2D
+                    
+                labels[i] = label3D_rs
+                
         return labels
 
 
-    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far):
+    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far, loading_X=False):
         """
         Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
 
@@ -1163,11 +1212,10 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning,
-        'end': it will be filled with 0s at the end.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch
-        or sentences with a fixed (max_text_length) length.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
+        :param loading_X: Whether we are loading an input or an output of the model
         :return: Text as sequence of number. Mask for each sentence.
         """
         vocab = vocabularies['words2idx']
@@ -1180,8 +1228,8 @@ class Dataset(object):
                     X_out[i] = vocab[w]
                 else:
                     X_out[i] = vocab['<unk>']
-            # if the following line is active it fails on VQA (max_len == 0)
-            #X_out = (X_out, None) # This None simulates a mask
+            if loading_X:
+                X_out = (X_out, None) # This None simulates a mask
         else: # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
@@ -1282,8 +1330,8 @@ class Dataset(object):
     def tokenize_aggressive(self, caption, lowercase=True):
         """
         Aggressive tokenizer for the input/output data of type 'text':
-            * Removes punctuation
-            * Optional lowercasing
+        * Removes punctuation
+        * Optional lowercasing
 
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
@@ -1306,8 +1354,8 @@ class Dataset(object):
     def tokenize_icann(self, caption):
         """
         Tokenization used for the icann paper:
-            * Removes some punctuation (. , ")
-            * Lowercasing
+        * Removes some punctuation (. , ")
+        * Lowercasing
 
         :param caption: String to tokenize
         :return: Tokenized version of caption
@@ -1409,6 +1457,26 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
+
+    def tokenize_CNN_sentence(self, caption):
+        """
+        Tokenization employed in the CNN_sentence package
+        (https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97).
+        """
+        tokenized = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", caption)
+        tokenized = re.sub(r"\'s", " \'s", tokenized)
+        tokenized = re.sub(r"\'ve", " \'ve", tokenized)
+        tokenized = re.sub(r"n\'t", " n\'t", tokenized)
+        tokenized = re.sub(r"\'re", " \'re", tokenized)
+        tokenized = re.sub(r"\'d", " \'d", tokenized)
+        tokenized = re.sub(r"\'ll", " \'ll", tokenized)
+        tokenized = re.sub(r",", " , ", tokenized)
+        tokenized = re.sub(r"!", " ! ", tokenized)
+        tokenized = re.sub(r"\(", " \( ", tokenized)
+        tokenized = re.sub(r"\)", " \) ", tokenized)
+        tokenized = re.sub(r"\?", " \? ", tokenized)
+        tokenized = re.sub(r"\s{2,}", " ", tokenized)
+        return tokenized.strip().lower()
 
     def tokenize_questions(self, caption):
         """
@@ -1574,7 +1642,6 @@ class Dataset(object):
         :param normalization: Whether we apply a 0-1 normalization to the images
         :param meanSubstraction:  Whether we are removing the training mean
         :param dataAugmentation:  Whether we are applying dataAugmentatino (random cropping and horizontal flip)
-        :return:
         """
 
         n_videos = len(n_frames)
@@ -1592,8 +1659,10 @@ class Dataset(object):
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
+            if dataAugmentation:
+                daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation,daRandomParams)
             # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
             len_j = images.shape[0]
             offset_j = max_len - len_j
@@ -1697,8 +1766,10 @@ class Dataset(object):
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
+            if dataAugmentation:
+                daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
             # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
             len_j = images.shape[0]
             offset_j = max_len - len_j
@@ -1734,8 +1805,7 @@ class Dataset(object):
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
-    def preprocess3DLabel(self, path_list):
-        print path_list
+    def preprocess3DLabel(self, path_list, id, associated_id_in):
         if(isinstance(path_list, str) and os.path.isfile(path_list)):
             path_list_3DLabel = []
             with open(path_list, 'r') as list_:
@@ -1743,6 +1813,15 @@ class Dataset(object):
                     path_list_3DLabel.append(line.strip())
         else:
             raise Exception('Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
+#==============================================================================
+#==============================================================================
+#==============================================================================
+# # #         
+#==============================================================================
+#==============================================================================
+#==============================================================================
+        self.id_in_3DLabel[id] = associated_id_in
+            
         return path_list_3DLabel
     
     # ------------------------------------------------------- #
@@ -1867,9 +1946,9 @@ class Dataset(object):
     
         
     def loadImages(self, images, id, normalization_type='0-1',
-                   normalization=False, meanSubstraction=True, dataAugmentation=True,
-                   external=False, loaded=False,
-                   prob_flip_horizontal=0.5, prob_flip_vertical = 0.0):
+                   normalization=False, meanSubstraction=True, 
+                   dataAugmentation=True, daRandomParams=None,
+                   external=False, loaded=False):
         """
             Loads a set of images from disk.
             
@@ -1958,12 +2037,12 @@ class Dataset(object):
                 im = im.resize((self.img_size_crop[id][0], self.img_size_crop[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
             else:
+                randomParams = daRandomParams[images[i]]
                 # Resize
                 im = im.resize((self.img_size[id][0], self.img_size[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
                 # Take random crop
-                margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
-                left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
+                left = randomParams["left"]
                 right = np.add(left, self.img_size_crop[id][0:2])
                 if self.use_RGB[id]:
                     im = im[left[0]:right[0], left[1]:right[1], :]
@@ -1971,10 +2050,12 @@ class Dataset(object):
                     im = im[left[0]:right[0], left[1]:right[1]]
                 
                 # Randomly flip (with a certain probability)
-                flip = random.random()
+                flip = randomParams["hflip"]
+                prob_flip_horizontal = randomParams["prob_flip_horizontal"]
                 if flip < prob_flip_horizontal: # horizontal flip
                     im = np.fliplr(im)
-                flip = random.random()
+                prob_flip_vertical = randomParams["prob_flip_vertical"]
+                flip = randomParams["vflip"]
                 if flip < prob_flip_vertical: # vertical flip
                     im = np.flipud(im)
 
@@ -2000,6 +2081,38 @@ class Dataset(object):
 
         return I
     
+#==============================================================================
+#==============================================================================
+#==============================================================================
+# # #             
+#==============================================================================
+#==============================================================================
+#==============================================================================
+    
+    def getDataAugmentationRandomParams(self, images, id, prob_flip_horizontal=0.5, prob_flip_vertical = 0.0):
+        
+        daRandomParams = dict()
+       
+        for i in range(len(images)):
+            # Random crop
+            margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
+            left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
+            
+            # Randomly flip (with a certain probability)
+            hflip = random.random()
+            vflip = random.random()
+            
+            randomParams = dict()
+            randomParams["left"] = left
+            randomParams["hflip"] = hflip
+            randomParams["vflip"] = vflip
+            randomParams["prob_flip_horizontal"] = prob_flip_horizontal
+            randomParams["prob_flip_vertical"] = prob_flip_vertical
+            
+            daRandomParams[images[i]] = randomParams
+
+        return daRandomParams
+        
     
     def getClassID(self, class_name, id):
         """
@@ -2066,15 +2179,17 @@ class Dataset(object):
 
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    if dataAugmentation:
+                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif type_in == 'text':
-                    x = self.loadText(x, self.vocabulary[id_in], 
+                    x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in])[0]
+                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
@@ -2119,9 +2234,7 @@ class Dataset(object):
         self.__isLoaded(set_name, 1)
         
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
-        
-	# Save image list
-        image_list = []
+
         # Recover input samples
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
@@ -2138,15 +2251,16 @@ class Dataset(object):
                     x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
                 else:
                     x = eval('self.X_'+set_name+'[id_in][last:new_last]')
-           
-            image_list = x
+
             #if(set_name=='val'):
             #    logging.info(x)
                 
             # Pre-process inputs
             if not debug:
                 if type_in == 'raw-image':
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    if dataAugmentation:
+                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
@@ -2154,7 +2268,7 @@ class Dataset(object):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in])[0]
+                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
@@ -2181,12 +2295,20 @@ class Dataset(object):
                     y = np.array(y).astype(np.float32)
                 elif(type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
-                    y = self.load3DLabels(y,image_list,nClasses)
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    # TODO: remove images reloading
+                    if surpassed:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
+                    else:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          imlist)
                 elif type_out == 'text':
-                    y = self.loadText(y, self.vocabulary[id_out], 
+                    y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
-                                      words_so_far=self.words_so_far[id_out])
+                                      words_so_far=self.words_so_far[id_out], loading_X=False)
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
@@ -2253,13 +2375,16 @@ class Dataset(object):
                     ghost_x = True
             else:
                 x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+                
             #if(set_name=='val'):
             #    logging.info(x)
 
             # Pre-process inputs
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    if dataAugmentation:
+                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
@@ -2267,7 +2392,7 @@ class Dataset(object):
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in])[0]
+                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
@@ -2292,11 +2417,22 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
+                elif(type_out == '3DLabel'):
+                    nClasses = len(self.classes[id_out])
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    # TODO: remove images reloading
+                    if surpassed:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
+                    else:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
-                                      words_so_far=self.words_so_far[id_out])
+                                      words_so_far=self.words_so_far[id_out], loading_X=False)
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
@@ -2367,11 +2503,22 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
+                elif(type_out == '3DLabel'):
+                    nClasses = len(self.classes[id_out])
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    # TODO: remove images reloading
+                    if surpassed:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
+                    else:
+                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, None,
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
-                                      words_so_far=self.words_so_far[id_out])
+                                      words_so_far=self.words_so_far[id_out], loading_X=False)
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
