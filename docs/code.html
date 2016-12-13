@@ -191,6 +191,36 @@ data splits, image loading, mean calculation, etc.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.convert_3DLabels_to_bboxes">
+<code class="descname">convert_3DLabels_to_bboxes</code><span class="sig-paren">(</span><em>predictions</em>, <em>original_sizes</em>, <em>threshold=0.5</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.convert_3DLabels_to_bboxes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>predictions</strong> &#8211; 3DLabels predicted by Model_Wrapper</li>
+<li><strong>original_sizes</strong> &#8211; original sizes of the predicted images width and height</li>
+<li><strong>threshold</strong> &#8211; minimum overlapping threshold for considering a prediction valid</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">predicted_bboxes, predicted_Y, predicted_scores for each image</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.convert_GT_3DLabels_to_bboxes">
+<code class="descname">convert_GT_3DLabels_to_bboxes</code><span class="sig-paren">(</span><em>gt</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.convert_GT_3DLabels_to_bboxes" title="Permalink to this definition">¶</a></dt>
+<dd><p>Converts a GT list of 3DLabels to a set of bboxes.
+:param gt: list of Dataset output of type 3DLabels
+:return: [out_list, original_sizes], where out_list contains a list of samples with the following info [GT_bboxes, GT_Y], and original_sizes contains the original width and height for each image</p>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.getClassID">
 <code class="descname">getClassID</code><span class="sig-paren">(</span><em>class_name</em>, <em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.getClassID" title="Permalink to this definition">¶</a></dt>
 <dd><table class="docutils field-list" frame="void" rules="none">
@@ -448,7 +478,7 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadImages">
-<code class="descname">loadImages</code><span class="sig-paren">(</span><em>images</em>, <em>id</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>external=False</em>, <em>loaded=False</em>, <em>prob_flip_horizontal=0.5</em>, <em>prob_flip_vertical=0.0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadImages" title="Permalink to this definition">¶</a></dt>
+<code class="descname">loadImages</code><span class="sig-paren">(</span><em>images</em>, <em>id</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>daRandomParams=None</em>, <em>external=False</em>, <em>loaded=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadImages" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of images from disk.</p>
 <p>:param images : list of image string names or list of matrices representing images
 :param normalization_type: type of normalization applied
@@ -463,7 +493,7 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadText">
-<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em>, <em>fill</em>, <em>pad_on_batch</em>, <em>words_so_far</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
+<code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em>, <em>fill</em>, <em>pad_on_batch</em>, <em>words_so_far</em>, <em>loading_X=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
 <dd><p>Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -477,6 +507,7 @@ data splits, image loading, mean calculation, etc.</p>
 <li><strong>fill</strong> &#8211; &#8216;start&#8217;: the resulting vector will be filled with 0s at the beginning, &#8216;end&#8217;: it will be filled with 0s at the end.</li>
 <li><strong>pad_on_batch</strong> &#8211; Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.</li>
 <li><strong>words_so_far</strong> &#8211; Experimental feature. Use with caution.</li>
+<li><strong>loading_X</strong> &#8211; Whether we are loading an input or an output of the model</li>
 </ul>
 </td>
 </tr>
@@ -762,7 +793,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setOutput">
-<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>offset=0</em>, <em>fill='end'</em>, <em>min_occ=0</em>, <em>pad_on_batch=True</em>, <em>words_so_far=False</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em>, <em>sample_weights=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>offset=0</em>, <em>fill='end'</em>, <em>min_occ=0</em>, <em>pad_on_batch=True</em>, <em>words_so_far=False</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em>, <em>associated_id_in=None</em>, <em>sample_weights=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of output data, usually (type==&#8217;categorical&#8217;) referencing values in self.classes (starting from 0)</p>
 <p># General parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
@@ -800,6 +831,15 @@ Each line must contain a unique identifier of the class.</p>
 </tr>
 </tbody>
 </table>
+<p># &#8216;3DLabel&#8217;-related parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>associated_id_in</strong> &#8211; id of the input &#8216;raw-image&#8217; associated for the inputted 3DLabels</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
@@ -831,6 +871,13 @@ Each line must contain a unique identifier of the class.</p>
 <dt id="keras_wrapper.dataset.Dataset.shuffleTraining">
 <code class="descname">shuffleTraining</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.shuffleTraining" title="Permalink to this definition">¶</a></dt>
 <dd><p>Applies a random shuffling to the training samples.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.tokenize_CNN_sentence">
+<code class="descname">tokenize_CNN_sentence</code><span class="sig-paren">(</span><em>caption</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.tokenize_CNN_sentence" title="Permalink to this definition">¶</a></dt>
+<dd><p>Tokenization employed in the CNN_sentence package
+(<a class="reference external" href="https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97">https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97</a>).</p>
 </dd></dl>
 
 <dl class="method">
@@ -1108,7 +1155,7 @@ Parts of the code borrowed from <a class="reference external" href="https://gith
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>batch_size</strong> &#8211; size of the batch</li>
 <li><strong>n_parallel_loaders</strong> &#8211; number of parallel data batch loaders</li>
-<li><strong>normalize_images</strong> &#8211; apply data normalization on images/features or not (only if using images/features as input)</li>
+<li><strong>normalization</strong> &#8211; apply data normalization on images/features or not (only if using images/features as input)</li>
 <li><strong>mean_substraction</strong> &#8211; apply mean data normalization on images or not (only if using images as input)</li>
 <li><strong>predict_on_sets</strong> &#8211; list of set splits for which we want to extract the predictions [&#8216;train&#8217;, &#8216;val&#8217;, &#8216;test&#8217;]</li>
 <li><strong>optimized_search</strong> &#8211; boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).</li>
@@ -1560,7 +1607,7 @@ every entry determines a score for sample i having class j
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>n_parallel_loaders</strong> &#8211; number of parallel data loaders allowed to work at the same time</li>
-<li><strong>normalize_images</strong> &#8211; boolean indicating if we want to 0-1 normalize the image pixel values</li>
+<li><strong>normalization</strong> &#8211; boolean indicating if we want to 0-1 normalize the image pixel values</li>
 <li><strong>mean_substraction</strong> &#8211; boolean indicating if we want to substract the training mean</li>
 </ul>
 </td>
@@ -2229,6 +2276,13 @@ a latter forward-backward pass.</p>
 </div>
 <div class="section" id="module-keras_wrapper.utils">
 <span id="utils-py"></span><h2>utils.py<a class="headerlink" href="#module-keras_wrapper.utils" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="keras_wrapper.utils.bbox">
+<code class="descclassname">keras_wrapper.utils.</code><code class="descname">bbox</code><span class="sig-paren">(</span><em>img</em>, <em>mode='width_height'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.utils.bbox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a bounding box covering all the non-zero area in the image.
+&#8220;mode&#8221; : &#8220;width_height&#8221; returns width in [2] and height in [3], &#8220;max&#8221; returns xmax in [2] and ymax in [3]</p>
+</dd></dl>
+
 <dl class="function">
 <dt id="keras_wrapper.utils.prepareGoogleNet_Food101">
 <code class="descclassname">keras_wrapper.utils.</code><code class="descname">prepareGoogleNet_Food101</code><span class="sig-paren">(</span><em>model_wrapper</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.utils.prepareGoogleNet_Food101" title="Permalink to this definition">¶</a></dt>
