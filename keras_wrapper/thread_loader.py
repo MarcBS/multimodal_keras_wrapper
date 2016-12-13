@@ -1,9 +1,6 @@
-from keras_wrapper.dataset import Dataset
-
-from keras.models import Sequential, Graph, model_from_json
+from keras.models import model_from_json
 
 import threading
-import logging
 import sys
 
 class ThreadDataLoader(threading.Thread):

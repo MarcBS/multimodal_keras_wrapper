@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-# coding: utf-8
-from keras.utils import np_utils, generic_utils
+from keras.utils import np_utils
 import sys
 import random
 import math
@@ -8,20 +7,18 @@ import os
 import copy
 import ntpath
 import fnmatch
-from multiprocessing import Pool
-import time
 import threading
 import logging
 import re
 from collections import Counter
 from operator import add
-import codecs
 import cPickle as pk
 from scipy import misc
-from scipy.sparse import csr_matrix
+from scipy import ndimage
 from PIL import Image as pilimage
 import numpy as np
 
+from .utils import bbox
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
@@ -1162,14 +1159,18 @@ class Dataset(object):
             arrayLine = line.split(';')
             arrayBndBox = arrayLine[:-1]
             w_original,h_original,d_original = eval(arrayLine[-1])
-            
-            label3D = np.zeros((nClasses,w_original,h_original), dtype=np.int0)
+
+            label3D = np.zeros((nClasses,h_original,w_original), dtype=np.int0)
             
             for array in arrayBndBox:
                 bndbox = eval(array)[0]
                 idxclass = eval(array)[1]
-                bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
-                label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
+
+                bndbox_ones = np.ones((bndbox[3] - bndbox[1] + 1, bndbox[2] - bndbox[0] + 1))
+                label3D[idxclass, bndbox[1] - 1:bndbox[3], bndbox[0] - 1:bndbox[2]] = bndbox_ones
+
+                #bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
+                #label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
 
             if not dataAugmentation or daRandomParams==None:
                 # Resize 3DLabel to crop size.
@@ -1659,6 +1660,7 @@ class Dataset(object):
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
+            daRandomParams = None
             if dataAugmentation:
                 daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
@@ -1766,6 +1768,7 @@ class Dataset(object):
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
+            daRandomParams = None
             if dataAugmentation:
                 daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
@@ -1817,7 +1820,110 @@ class Dataset(object):
         self.id_in_3DLabel[id] = associated_id_in
             
         return path_list_3DLabel
-    
+
+
+    def convert_3DLabels_to_bboxes(self, predictions, original_sizes, threshold=0.5):
+        """
+        Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.
+
+        :param predictions: 3DLabels predicted by Model_Wrapper
+        :param original_sizes: original sizes of the predicted images width and height
+        :param threshold: minimum overlapping threshold for considering a prediction valid
+        :return: predicted_bboxes, predicted_Y, predicted_scores for each image
+        """
+        out_list = []
+        n_samples, n_classes, w, h = predictions.shape
+
+        # list of hypotheses with the following info [predicted_bboxes, predicted_Y, predicted_scores]
+        for s in range(n_samples):
+            bboxes = []
+            Y = []
+            scores = []
+            orig_w, orig_h = original_sizes[s]
+            wratio = float(orig_w) / w
+            hratio = float(orig_h) / h
+            for c in range(n_classes):
+                map = predictions[s][c]
+
+                # Compute binary selected region
+                binary_heat = map
+                binary_heat = np.where(binary_heat >= threshold, 255, 0)
+
+                # Get biggest connected component
+                # min_size = new_reshape_size[0] * new_reshape_size[1] * size_restriction
+                labeled, nr_objects = ndimage.label(binary_heat)  # get connected components
+                [objects, counts] = np.unique(labeled, return_counts=True)  # count occurrences
+                # biggest_components = np.argsort(counts[1:])[::-1]
+                # selected_components = [1 if counts[i+1] >= min_size else 0 for i in biggest_components] # check minimum size restriction
+                # selected_components = [1 for i in range(len(objects))]
+                # biggest_components = biggest_components[:min([np.sum(selected_components), 9999])] # get all bboxes
+
+
+                for obj in objects[1:]:
+                    current_obj = np.where(labeled == obj, 255, 0)  # get the biggest
+
+                    # Draw bounding box on original image
+                    box = list(bbox(current_obj))
+
+                    # expand box before final detection
+                    # x_exp = box[2]# * box_expansion
+                    # y_exp = box[3]# * box_expansion
+                    # box[0] = max([0, box[0]-x_exp/2])
+                    # box[1] = max([0, box[1]-y_exp/2])
+                    # change width and height by xmax and ymax
+                    # box[2] += box[0]
+                    # box[3] += box[1]
+                    # box[2] = min([new_reshape_size[1]-1, box[2] + x_exp])
+                    # box[3] = min([new_reshape_size[0]-1, box[3] + y_exp])
+
+                    # get score of the region
+                    score = np.mean([map[point[0], point[1]] for point in np.nonzero(current_obj)])
+
+                    # convert bbox to original size
+                    box = np.array([box[0] * wratio, box[1] * hratio, box[2] * wratio, box[3] * hratio])
+                    box = box.astype(int)
+
+                    bboxes.append(box)
+                    Y.append(c)
+                    scores.append(score)
+
+            out_list.append([bboxes, Y, scores])
+        return out_list
+
+    def convert_GT_3DLabels_to_bboxes(self, gt):
+        '''
+        Converts a GT list of 3DLabels to a set of bboxes.
+        :param gt: list of Dataset output of type 3DLabels
+        :return: [out_list, original_sizes], where out_list contains a list of samples with the following info [GT_bboxes, GT_Y], and original_sizes contains the original width and height for each image
+        '''
+        out_list = []
+        original_sizes = []
+        # extra_vars[split]['references'] - list of samples with the following info [GT_bboxes, GT_Y]
+
+        n_samples = len(gt)
+        for i in range(n_samples):
+            bboxes = []
+            Y = []
+
+            line = gt[i]
+            arrayLine = line.split(';')
+            arrayBndBox = arrayLine[:-1]
+            w_original, h_original, d_original = eval(arrayLine[-1])
+            original_sizes.append([h_original, w_original])
+
+            for array in arrayBndBox:
+                bndbox = eval(array)[0]
+                bndbox = [bndbox[1], bndbox[0], bndbox[3], bndbox[2]]
+                idxclass = eval(array)[1]
+                Y.append(idxclass)
+                bboxes.append(bndbox)
+                # bndbox_ones = np.ones((bndbox[2] - bndbox[0] + 1, bndbox[3] - bndbox[1] + 1))
+                # label3D[idxclass, bndbox[0] - 1:bndbox[2], bndbox[1] - 1:bndbox[3]] = bndbox_ones
+
+            out_list.append([bboxes, Y])
+
+        return [out_list, original_sizes]
+
     # ------------------------------------------------------- #
     #       TYPE 'raw-image' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -2173,6 +2279,7 @@ class Dataset(object):
 
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
+                    daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
@@ -2252,6 +2359,7 @@ class Dataset(object):
             # Pre-process inputs
             if not debug:
                 if type_in == 'raw-image':
+                    daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
@@ -2376,6 +2484,7 @@ class Dataset(object):
             # Pre-process inputs
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
+                    daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)

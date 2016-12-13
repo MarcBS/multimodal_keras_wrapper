@@ -1,13 +1,4 @@
-from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
-from keras_wrapper.cnn_model import CNN_Model, loadModel, saveModel
-from keras_wrapper.ecoc_classifier import ECOC_Classifier
-from keras_wrapper.stage import Stage
-from keras_wrapper.staged_network import Staged_Network, saveStagedModel, loadStagedModel
-
-from keras.layers.core import Dense, Dropout, Activation, Flatten
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
-from keras.layers.advanced_activations import PReLU
-from keras.models import Sequential, Graph
+from keras.layers.convolutional import ZeroPadding2D
 
 import numpy as np
 
@@ -16,6 +7,21 @@ import itertools
 import time
 import logging
 
+
+def bbox(img, mode='width_height'):
+    '''
+        Returns a bounding box covering all the non-zero area in the image.
+        "mode" : "width_height" returns width in [2] and height in [3], "max" returns xmax in [2] and ymax in [3]
+    '''
+    rows = np.any(img, axis=1)
+    cols = np.any(img, axis=0)
+    y, ymax = np.where(rows)[0][[0, -1]]
+    x, xmax = np.where(cols)[0][[0, -1]]
+
+    if(mode == 'width_height'):
+        return x, y, xmax-x, ymax-y
+    elif(mode == 'max'):
+        return x, y, xmax, ymax
 
 
 def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ecoc_version=2):

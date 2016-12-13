@@ -1,11 +1,8 @@
 from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
-from keras_wrapper.dataset import Dataset, Data_Batch_Generator, Homogeneous_Data_Batch_Generator
-from keras_wrapper.ecoc_classifier import ECOC_Classifier
+from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
 from keras_wrapper.callbacks_keras_wrapper import *
 
 from keras.models import Sequential, Graph, model_from_json
-#from keras.layers.core import Dense, Dropout, Activation, Flatten
-#from keras.layers.convolutional import Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D
 from keras.layers.advanced_activations import PReLU
 from keras.optimizers import SGD
 from keras.utils import np_utils
