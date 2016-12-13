@@ -1150,7 +1150,7 @@ class Dataset(object):
 # 
 #==============================================================================
 
-    def load3DLabels(self, path_list, nClasses, dataAugmentation, img_size, size_crop, image_list):
+    def load3DLabels(self, path_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
 
         n_samples = len(path_list)
         w, h, d = img_size
@@ -1159,29 +1159,48 @@ class Dataset(object):
             
         for i in range(n_samples):
             line = path_list[i]
-            h_original,w_original = np.shape(misc.imread(self.path+'/'+image_list[i]))[0:2]
-            # TODO: get original image size w_original,h_original without having to load the image
-            label3D = np.zeros((nClasses,w_original,h_original), dtype=np.int0)
-           
             arrayLine = line.split(';')
-            for array in arrayLine:
+            arrayBndBox = arrayLine[:-1]
+            w_original,h_original,d_original = eval(arrayLine[-1])
+            
+            label3D = np.zeros((nClasses,w_original,h_original), dtype=np.int0)
+            
+            for array in arrayBndBox:
                 bndbox = eval(array)[0]
                 idxclass = eval(array)[1]
                 bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
                 label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
-            
-            if not dataAugmentation:
+
+            if not dataAugmentation or daRandomParams==None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
                     labels[i, j] = misc.imresize(label3D[j],(w_crop,h_crop))
             else:
-                # Resize 3DLabel to image size.
-                label3D_rs = np.zeros((nClasses,w,h), dtype=np.int0)
+                label3D_rs = np.zeros((nClasses,w_crop,h_crop), dtype=np.int0)
+                # Crop the labels (random crop)
                 for j in range(nClasses):
-                    label3D_rs[j] = misc.imresize(label3D[j],(w,h))
-                # TODO: crop
-            
+                    label2D = misc.imresize(label3D[j],(w,h))
+                    randomParams = daRandomParams[image_list[i]]
+                    # Take random crop
+                    left = randomParams["left"]
+                    right = np.add(left, size_crop[0:2])
+                    
+                    label2D = label2D[left[0]:right[0], left[1]:right[1]]
+                    
+                    # Randomly flip (with a certain probability)
+                    flip = randomParams["hflip"]
+                    prob_flip_horizontal = randomParams["prob_flip_horizontal"] 
+                    if flip < prob_flip_horizontal: # horizontal flip
+                        label2D = np.fliplr(label2D)
+                    flip = randomParams["vflip"]
+                    prob_flip_vertical = randomParams["prob_flip_vertical"] 
+                    if flip < prob_flip_vertical: # vertical flip
+                        label2D = np.flipud(label2D)
+                    
+                    label3D_rs[j] = label2D
+                    
                 labels[i] = label3D_rs
+
         return labels
 
 
@@ -1640,8 +1659,10 @@ class Dataset(object):
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
+            if dataAugmentation:
+                daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation,daRandomParams)
             # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
             len_j = images.shape[0]
             offset_j = max_len - len_j
@@ -1745,8 +1766,10 @@ class Dataset(object):
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i+n]
+            if dataAugmentation:
+                daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
             # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
             len_j = images.shape[0]
             offset_j = max_len - len_j
@@ -1790,7 +1813,7 @@ class Dataset(object):
                     path_list_3DLabel.append(line.strip())
         else:
             raise Exception('Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
-            
+
         self.id_in_3DLabel[id] = associated_id_in
             
         return path_list_3DLabel
@@ -1917,9 +1940,9 @@ class Dataset(object):
     
         
     def loadImages(self, images, id, normalization_type='0-1',
-                   normalization=False, meanSubstraction=True, dataAugmentation=True,
-                   external=False, loaded=False,
-                   prob_flip_horizontal=0.5, prob_flip_vertical = 0.0):
+                   normalization=False, meanSubstraction=True, 
+                   dataAugmentation=True, daRandomParams=None,
+                   external=False, loaded=False):
         """
             Loads a set of images from disk.
             
@@ -2008,12 +2031,12 @@ class Dataset(object):
                 im = im.resize((self.img_size_crop[id][0], self.img_size_crop[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
             else:
+                randomParams = daRandomParams[images[i]]
                 # Resize
                 im = im.resize((self.img_size[id][0], self.img_size[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
                 # Take random crop
-                margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
-                left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
+                left = randomParams["left"]
                 right = np.add(left, self.img_size_crop[id][0:2])
                 if self.use_RGB[id]:
                     im = im[left[0]:right[0], left[1]:right[1], :]
@@ -2021,10 +2044,12 @@ class Dataset(object):
                     im = im[left[0]:right[0], left[1]:right[1]]
                 
                 # Randomly flip (with a certain probability)
-                flip = random.random()
+                flip = randomParams["hflip"]
+                prob_flip_horizontal = randomParams["prob_flip_horizontal"]
                 if flip < prob_flip_horizontal: # horizontal flip
                     im = np.fliplr(im)
-                flip = random.random()
+                prob_flip_vertical = randomParams["prob_flip_vertical"]
+                flip = randomParams["vflip"]
                 if flip < prob_flip_vertical: # vertical flip
                     im = np.flipud(im)
 
@@ -2050,6 +2075,38 @@ class Dataset(object):
 
         return I
     
+#==============================================================================
+#==============================================================================
+#==============================================================================
+# # #             
+#==============================================================================
+#==============================================================================
+#==============================================================================
+    
+    def getDataAugmentationRandomParams(self, images, id, prob_flip_horizontal=0.5, prob_flip_vertical = 0.0):
+        
+        daRandomParams = dict()
+       
+        for i in range(len(images)):
+            # Random crop
+            margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
+            left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
+            
+            # Randomly flip (with a certain probability)
+            hflip = random.random()
+            vflip = random.random()
+            
+            randomParams = dict()
+            randomParams["left"] = left
+            randomParams["hflip"] = hflip
+            randomParams["vflip"] = vflip
+            randomParams["prob_flip_horizontal"] = prob_flip_horizontal
+            randomParams["prob_flip_vertical"] = prob_flip_vertical
+            
+            daRandomParams[images[i]] = randomParams
+
+        return daRandomParams
+        
     
     def getClassID(self, class_name, id):
         """
@@ -2116,7 +2173,9 @@ class Dataset(object):
 
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    if dataAugmentation:
+                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
@@ -2193,7 +2252,9 @@ class Dataset(object):
             # Pre-process inputs
             if not debug:
                 if type_in == 'raw-image':
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    if dataAugmentation:
+                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
@@ -2229,12 +2290,12 @@ class Dataset(object):
                 elif(type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    # TODO: remove images reloading
                     if surpassed:
                         imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
                     else:
                         imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
-                    y = self.load3DLabels(y, nClasses, dataAugmentation, 
+
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
                                           imlist)
                 elif type_out == 'text':
@@ -2315,7 +2376,9 @@ class Dataset(object):
             # Pre-process inputs
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    if dataAugmentation:
+                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
@@ -2351,12 +2414,8 @@ class Dataset(object):
                 elif(type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    # TODO: remove images reloading
-                    if surpassed:
-                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
-                    else:
-                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
-                    y = self.load3DLabels(y, nClasses, dataAugmentation, 
+                    imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
                                           imlist)
                 elif type_out == 'text':
@@ -2437,12 +2496,8 @@ class Dataset(object):
                 elif(type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    # TODO: remove images reloading
-                    if surpassed:
-                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
-                    else:
-                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
-                    y = self.load3DLabels(y, nClasses, dataAugmentation, 
+                    imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
+                    y = self.load3DLabels(y, nClasses, dataAugmentation, None,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
                                           imlist)
                 elif type_out == 'text':
