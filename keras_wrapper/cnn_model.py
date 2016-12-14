@@ -36,90 +36,109 @@ import shutil
 #           External functions for saving and loading Model_Wrapper instances
 # ------------------------------------------------------- #
 
-def saveModel(model_wrapper, iter, path=None):
-    """
-    Saves a backup of the current Model_Wrapper object after being trained for 'iter' iterations.
 
-    :param model_wrapper: Object to save
-    :param iter: Number of iterations
-    :param path: Oath to save
+def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=True):
+    """
+    Saves a backup of the current Model_Wrapper object after being trained for 'update_num' iterations/updates/epochs.
+
+    :param model_wrapper: object to save
+    :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :param path: path where the model will be saved
     :return: None
     """
     if not path:
         path = model_wrapper.model_path
 
+    iter = str(update_num)
+
+    if full_path:
+        if store_iter:
+            model_name = path + '_' + iter
+        else:
+            model_name = path
+    else:
+        model_name = path + '/epoch_'+ iter
+
     if not model_wrapper.silence:
-        logging.info("<<< Saving model to "+ path +" ... >>>")
+        logging.info("<<< Saving model to "+ model_name +" ... >>>")
 
     # Create models dir
     if not os.path.isdir(path):
-        os.makedirs(path)
-
-    iter = str(iter)
+        os.makedirs(os.path.dirname(path))
 
     # Save model structure
     json_string = model_wrapper.model.to_json()
-    open(path + '/epoch_'+ iter +'_structure.json', 'w').write(json_string)
+    open(model_name +'_structure.json', 'w').write(json_string)
     # Save model weights
-    model_wrapper.model.save_weights(path + '/epoch_'+ iter +'_weights.h5', overwrite=True)
+    model_wrapper.model.save_weights(model_name +'_weights.h5', overwrite=True)
 
     # Save auxiliar models for optimized search
     if 'model_init' in dir(model_wrapper):
         # Save model structure
         json_string = model_wrapper.model_init.to_json()
-        open(path + '/epoch_' + iter + '_structure_init.json', 'w').write(json_string)
+        open(model_name + '_structure_init.json', 'w').write(json_string)
         # Save model weights
-        model_wrapper.model_init.save_weights(path + '/epoch_' + iter + '_weights_init.h5', overwrite=True)
+        model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
     if 'model_next' in dir(model_wrapper):
         # Save model structure
         json_string = model_wrapper.model_next.to_json()
-        open(path + '/epoch_' + iter + '_structure_next.json', 'w').write(json_string)
+        open(model_name + '_structure_next.json', 'w').write(json_string)
         # Save model weights
-        model_wrapper.model_next.save_weights(path + '/epoch_' + iter + '_weights_next.h5', overwrite=True)
+        model_wrapper.model_next.save_weights(model_name + '_weights_next.h5', overwrite=True)
 
     # Save additional information
-    cloudpk.dump(model_wrapper, open(path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'wb'))
+    cloudpk.dump(model_wrapper, open(model_name + '_Model_Wrapper.pkl', 'wb'))
 
     if not model_wrapper.silence:
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, iter):
+def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     """
     Loads a previously saved Model_Wrapper object.
 
-    :param model_path: Path to the Model_Wrapper object to load
-    :param iter: Number of iterations
-    :return: Loadaed Model_Wrapper
+    :param model_path: path to the Model_Wrapper object to load
+    :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :param custom_objects: dictionary of custom layers (i.e. input to model_from_json)
+    :return: loaded Model_Wrapper
     """
     t = time.time()
-    iter = str(iter)
-    logging.info("<<< Loading model from "+ model_path + "/epoch_" + iter + "_Model_Wrapper.pkl ... >>>")
+    iter = str(update_num)
+
+    if full_path:
+        model_name = model_path
+    else:
+        model_name = model_path + "/epoch_" + iter
+    logging.info("<<< Loading model from "+ model_name + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
-    model = model_from_json(open(model_path + '/epoch_'+ iter +'_structure.json').read())
+    model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
+
     # Load model weights
-    model.load_weights(model_path + '/epoch_'+ iter +'_weights.h5')
+    model.load_weights(model_name +'_weights.h5')
 
     # Load auxiliar models for optimized search
     try:
         # Load model structure
-        model_init = model_from_json(open(model_path + '/epoch_' + iter + '_structure_init.json').read())
+        model_init = model_from_json(open(model_name + '_structure_init.json').read())
         # Load model weights
-        model_init.load_weights(model_path + '/epoch_' + iter + '_weights_init.h5')
+        model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
-        model_next = model_from_json(open(model_path + '/epoch_' + iter + '_structure_next.json').read())
+        model_next = model_from_json(open(model_name + '_structure_next.json').read())
         # Load model weights
-        model_next.load_weights(model_path + '/epoch_' + iter + '_weights_next.h5')
+        model_next.load_weights(model_name + '_weights_next.h5')
         loaded_optimized = True
     except:
         loaded_optimized = False
 
     # Load Model_Wrapper information
     try:
-        model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'rb'))
+        model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except: # backwards compatibility
-        model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_CNN_Model.pkl', 'rb'))
+        try:
+            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
+        except:
+            raise Exception(ValueError)
     model_wrapper.model = model
     if loaded_optimized:
         model_wrapper.model_init = model_init
@@ -1413,7 +1432,7 @@ class Model_Wrapper(object):
         else:
             return predictions, references, sources
 
-    def predictNet(self, ds, parameters, out_name=None):
+    def predictNet(self, ds, parameters=dict(), postprocess_fun=None):
         '''
             Returns the predictions of the net on the dataset splits chosen. The input 'parameters' is a dict()
             which may contain the following parameters:
@@ -1423,6 +1442,10 @@ class Model_Wrapper(object):
             :param normalize: apply data normalization on images/features or not (only if using images/features as input)
             :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
             :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+
+            Additional parameters:
+
+            :param postprocess_fun : post-processing function applied to all predictions before returning the result. The output of the function must be a list of results, one per sample. If postprocess_fun is a list, the second element will be used as an extra input to the function.
 
             :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         '''
@@ -1435,6 +1458,7 @@ class Model_Wrapper(object):
 
         predictions = dict()
         for s in params['predict_on_sets']:
+            predictions[s] = []
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
 
@@ -1455,11 +1479,34 @@ class Model_Wrapper(object):
                                      predict=True).generator()
 
             # Predict on model
-            out = self.model.predict_generator(data_gen,
-                                                val_samples=n_samples,
-                                                max_q_size=params['n_parallel_loaders'])
+            if postprocess_fun is None:
+                out = self.model.predict_generator(data_gen,
+                                                   val_samples=n_samples,
+                                                   max_q_size=params['n_parallel_loaders'])
+                predictions[s] = out
+            else:
+                processed_samples = 0
+                start_time = time.time()
+                while processed_samples < n_samples:
+                    out = self.model.predict_on_batch(data_gen.next())
 
-            predictions[s] = out
+                    # Apply post-processing function
+                    if isinstance(postprocess_fun, list):
+                        last_processed = min(processed_samples+params['batch_size'], n_samples)
+                        out = postprocess_fun[0](out, postprocess_fun[1][processed_samples:last_processed])
+                    else:
+                        out = postprocess_fun(out)
+                    predictions[s] += out
+
+                    # Show progress
+                    processed_samples += params['batch_size']
+                    if processed_samples > n_samples:
+                        processed_samples = n_samples
+                    eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
+                    sys.stdout.flush()
+
         return predictions
 
 
