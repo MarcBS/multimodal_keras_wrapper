@@ -12,7 +12,7 @@ from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_G
 
 class BeamSearchEnsemble():
 
-    def __init__(self, models, dataset, params_prediction):
+    def __init__(self, models, dataset, params_prediction, verbose=False):
         """
 
         :param models:
@@ -22,7 +22,7 @@ class BeamSearchEnsemble():
         self.models = models
         self.dataset = dataset
         self.params = params_prediction
-
+        self.verbose = verbose
     # ------------------------------------------------------- #
     #       PREDICTION FUNCTIONS
     #           Functions for making prediction on input samples
@@ -304,6 +304,14 @@ class BeamSearchEnsemble():
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
                     out.append(best_sample)
+                    if self.verbose:
+                        sys.stdout.write("\n Sample %d/%d: %s\n" % (sampled,
+                                                                     n_samples,
+                                                                     self.decode_sample_beam_search([best_sample],
+                                                                                              self.dataset.vocabulary[params['model_outputs'][0]]['idx2words'],
+                                                                                              pad_sequences=True)))
+                        sys.stdout.flush()
+
                     total_cost += scores[best_score]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
                     if params['n_samples'] > 0:
@@ -344,3 +352,26 @@ class BeamSearchEnsemble():
                 params[key] = default_val
 
         return params
+
+
+    def decode_sample_beam_search(self, preds, index2word, pad_sequences=False, verbose=0):
+        """
+        Decodes predictions from the BeamSearch method.
+        :param preds: Predictions codified as word indices.
+        :param index2word: Mapping from word indices into word characters.
+        :param pad_sequences: Whether we should make a zero-pad on the input sequence.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of decoded predictions
+        """
+        if verbose > 0:
+            logging.info('Decoding beam search prediction ...')
+        if pad_sequences:
+            preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
+
+        flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
+        answer_pred = []
+        for a_no in flattened_answer_pred:
+            init_token_pos = 0
+            tmp = ' '.join(a_no[:-1])
+            answer_pred.append(tmp)
+        return answer_pred
