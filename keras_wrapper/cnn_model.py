@@ -36,13 +36,13 @@ import shutil
 #           External functions for saving and loading Model_Wrapper instances
 # ------------------------------------------------------- #
 
-def saveModel(model_wrapper, iter, path=None):
+def saveModel(model_wrapper, update_num, path=None):
     """
-    Saves a backup of the current Model_Wrapper object after being trained for 'iter' iterations.
+    Saves a backup of the current Model_Wrapper object after being trained for 'update_num' iterations/updates/epochs.
 
-    :param model_wrapper: Object to save
-    :param iter: Number of iterations
-    :param path: Oath to save
+    :param model_wrapper: object to save
+    :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :param path: path where the model will be saved
     :return: None
     """
     if not path:
@@ -55,7 +55,7 @@ def saveModel(model_wrapper, iter, path=None):
     if not os.path.isdir(path):
         os.makedirs(path)
 
-    iter = str(iter)
+    iter = str(update_num)
 
     # Save model structure
     json_string = model_wrapper.model.to_json()
@@ -84,20 +84,21 @@ def saveModel(model_wrapper, iter, path=None):
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, iter):
+def loadModel(model_path, update_num, custom_objects=dict()):
     """
     Loads a previously saved Model_Wrapper object.
 
-    :param model_path: Path to the Model_Wrapper object to load
-    :param iter: Number of iterations
-    :return: Loadaed Model_Wrapper
+    :param model_path: path to the Model_Wrapper object to load
+    :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :param custom_objects: dictionary of custom layers (i.e. input to model_from_json)
+    :return: loaded Model_Wrapper
     """
     t = time.time()
-    iter = str(iter)
+    iter = str(update_num)
     logging.info("<<< Loading model from "+ model_path + "/epoch_" + iter + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
-    model = model_from_json(open(model_path + '/epoch_'+ iter +'_structure.json').read())
+    model = model_from_json(open(model_path + '/epoch_'+ iter +'_structure.json').read(), custom_objects=custom_objects)
     # Load model weights
     model.load_weights(model_path + '/epoch_'+ iter +'_weights.h5')
 
@@ -118,8 +119,11 @@ def loadModel(model_path, iter):
     # Load Model_Wrapper information
     try:
         model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'rb'))
-    except: # backwards compatibility
-        model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_CNN_Model.pkl', 'rb'))
+    except ValueError: # backwards compatibility
+        try:
+            model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_CNN_Model.pkl', 'rb'))
+        except:
+            raise Exception(ValueError)
     model_wrapper.model = model
     if loaded_optimized:
         model_wrapper.model_init = model_init
@@ -1413,7 +1417,7 @@ class Model_Wrapper(object):
         else:
             return predictions, references, sources
 
-    def predictNet(self, ds, parameters, out_name=None):
+    def predictNet(self, ds, parameters=dict(), postprocess_fun=None):
         '''
             Returns the predictions of the net on the dataset splits chosen. The input 'parameters' is a dict()
             which may contain the following parameters:
@@ -1423,6 +1427,10 @@ class Model_Wrapper(object):
             :param normalize: apply data normalization on images/features or not (only if using images/features as input)
             :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
             :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+
+            Additional parameters:
+
+            :param postprocess_fun : post-processing function applied to all predictions before returning the result. The output of the function must be a list of results, one per sample. If postprocess_fun is a list, the second element will be used as an extra input to the function.
 
             :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         '''
@@ -1435,6 +1443,7 @@ class Model_Wrapper(object):
 
         predictions = dict()
         for s in params['predict_on_sets']:
+            predictions[s] = []
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
 
@@ -1455,11 +1464,34 @@ class Model_Wrapper(object):
                                      predict=True).generator()
 
             # Predict on model
-            out = self.model.predict_generator(data_gen,
-                                                val_samples=n_samples,
-                                                max_q_size=params['n_parallel_loaders'])
+            if postprocess_fun is None:
+                out = self.model.predict_generator(data_gen,
+                                                   val_samples=n_samples,
+                                                   max_q_size=params['n_parallel_loaders'])
+                predictions[s] = out
+            else:
+                processed_samples = 0
+                start_time = time.time()
+                while processed_samples < n_samples:
+                    out = self.model.predict_on_batch(data_gen.next())
 
-            predictions[s] = out
+                    # Apply post-processing function
+                    if isinstance(postprocess_fun, list):
+                        last_processed = min(processed_samples+params['batch_size'], n_samples)
+                        out = postprocess_fun[0](out, postprocess_fun[1][processed_samples:last_processed])
+                    else:
+                        out = postprocess_fun(out)
+                    predictions[s] += out
+
+                    # Show progress
+                    processed_samples += params['batch_size']
+                    if processed_samples > n_samples:
+                        processed_samples = n_samples
+                    eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
+                    sys.stdout.flush()
+
         return predictions
 
 

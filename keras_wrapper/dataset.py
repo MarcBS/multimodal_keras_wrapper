@@ -197,8 +197,6 @@ class Data_Batch_Generator(object):
                     #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 1000))
                     #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], 1000))
 
-
-
                     data = self.net.prepareData(X_batch, Y_batch)
 
             yield(data)
@@ -1839,7 +1837,7 @@ class Dataset(object):
             bboxes = []
             Y = []
             scores = []
-            orig_w, orig_h = original_sizes[s]
+            orig_h, orig_w = original_sizes[s]
             wratio = float(orig_w) / w
             hratio = float(orig_h) / h
             for c in range(n_classes):
@@ -1893,6 +1891,7 @@ class Dataset(object):
     def convert_GT_3DLabels_to_bboxes(self, gt):
         '''
         Converts a GT list of 3DLabels to a set of bboxes.
+
         :param gt: list of Dataset output of type 3DLabels
         :return: [out_list, original_sizes], where out_list contains a list of samples with the following info [GT_bboxes, GT_Y], and original_sizes contains the original width and height for each image
         '''
@@ -1913,7 +1912,7 @@ class Dataset(object):
 
             for array in arrayBndBox:
                 bndbox = eval(array)[0]
-                bndbox = [bndbox[1], bndbox[0], bndbox[3], bndbox[2]]
+                # bndbox = [bndbox[1], bndbox[0], bndbox[3], bndbox[2]]
                 idxclass = eval(array)[1]
                 Y.append(idxclass)
                 bboxes.append(bndbox)
@@ -2052,15 +2051,15 @@ class Dataset(object):
         """
             Loads a set of images from disk.
             
-            :param images : list of image string names or list of matrices representing images
+            :param images : list of image string names or list of matrices representing images (only if loaded==True)
+            :param id : identifier in the Dataset object of the data we are loading
             :param normalization_type: type of normalization applied
             :param normalization : whether we applying a 0-1 normalization to the images
             :param meanSubstraction : whether we are removing the training mean
             :param dataAugmentation : whether we are applying dataAugmentatino (random cropping and horizontal flip)
+            :param daRandomParams : dictionary with results of random data augmentation provided by self.getDataAugmentationRandomParams()
             :param external : if True the images will be loaded from an external database, in this case the list of images must be absolute paths
             :param loaded : set this option to True if images is a list of matricies instead of a list of strings
-            :param prob_flip_horizontal: probability of horizontal image flip if applying dataAugmentation
-            :param prob_flip_vertical: probability of vertical image flip if applying dataAugmentation
         """
         # Check if the chosen normalization type exists
         if normalization and normalization_type not in self.__available_norm_im_vid:
@@ -2180,14 +2179,7 @@ class Dataset(object):
             I[i] = im
 
         return I
-    
-#==============================================================================
-#==============================================================================
-#==============================================================================
-# # #             
-#==============================================================================
-#==============================================================================
-#==============================================================================
+
     
     def getDataAugmentationRandomParams(self, images, id, prob_flip_horizontal=0.5, prob_flip_vertical = 0.0):
         
@@ -2458,7 +2450,6 @@ class Dataset(object):
             :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
 
             :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k' samples belonging to the chosen 'set_name'
-            :return: [X, Y, [new_last, last, surpassed]] if debug==True
         """
         
         self.__checkSetName(set_name)
@@ -2546,9 +2537,6 @@ class Dataset(object):
                             y_aux = (y_aux, y[1]) # join data and mask
                     y = y_aux
             Y.append(y)
-
-        if debug:
-            return [X, Y, [k]]
 
         return [X,Y]
 
