@@ -36,7 +36,8 @@ import shutil
 #           External functions for saving and loading Model_Wrapper instances
 # ------------------------------------------------------- #
 
-def saveModel(model_wrapper, update_num, path=None):
+
+def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=True):
     """
     Saves a backup of the current Model_Wrapper object after being trained for 'update_num' iterations/updates/epochs.
 
@@ -48,43 +49,51 @@ def saveModel(model_wrapper, update_num, path=None):
     if not path:
         path = model_wrapper.model_path
 
+    iter = str(update_num)
+
+    if full_path:
+        if store_iter:
+            model_name = path + '_' + iter
+        else:
+            model_name = path
+    else:
+        model_name = path + '/epoch_'+ iter
+
     if not model_wrapper.silence:
-        logging.info("<<< Saving model to "+ path +" ... >>>")
+        logging.info("<<< Saving model to "+ model_name +" ... >>>")
 
     # Create models dir
     if not os.path.isdir(path):
-        os.makedirs(path)
-
-    iter = str(update_num)
+        os.makedirs(os.path.dirname(path))
 
     # Save model structure
     json_string = model_wrapper.model.to_json()
-    open(path + '/epoch_'+ iter +'_structure.json', 'w').write(json_string)
+    open(model_name +'_structure.json', 'w').write(json_string)
     # Save model weights
-    model_wrapper.model.save_weights(path + '/epoch_'+ iter +'_weights.h5', overwrite=True)
+    model_wrapper.model.save_weights(model_name +'_weights.h5', overwrite=True)
 
     # Save auxiliar models for optimized search
     if 'model_init' in dir(model_wrapper):
         # Save model structure
         json_string = model_wrapper.model_init.to_json()
-        open(path + '/epoch_' + iter + '_structure_init.json', 'w').write(json_string)
+        open(model_name + '_structure_init.json', 'w').write(json_string)
         # Save model weights
-        model_wrapper.model_init.save_weights(path + '/epoch_' + iter + '_weights_init.h5', overwrite=True)
+        model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
     if 'model_next' in dir(model_wrapper):
         # Save model structure
         json_string = model_wrapper.model_next.to_json()
-        open(path + '/epoch_' + iter + '_structure_next.json', 'w').write(json_string)
+        open(model_name + '_structure_next.json', 'w').write(json_string)
         # Save model weights
-        model_wrapper.model_next.save_weights(path + '/epoch_' + iter + '_weights_next.h5', overwrite=True)
+        model_wrapper.model_next.save_weights(model_name + '_weights_next.h5', overwrite=True)
 
     # Save additional information
-    cloudpk.dump(model_wrapper, open(path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'wb'))
+    cloudpk.dump(model_wrapper, open(model_name + '_Model_Wrapper.pkl', 'wb'))
 
     if not model_wrapper.silence:
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, custom_objects=dict()):
+def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -95,33 +104,39 @@ def loadModel(model_path, update_num, custom_objects=dict()):
     """
     t = time.time()
     iter = str(update_num)
-    logging.info("<<< Loading model from "+ model_path + "/epoch_" + iter + "_Model_Wrapper.pkl ... >>>")
+
+    if full_path:
+        model_name = model_path
+    else:
+        model_name = model_path + "/epoch_" + iter
+    logging.info("<<< Loading model from "+ model_name + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
-    model = model_from_json(open(model_path + '/epoch_'+ iter +'_structure.json').read(), custom_objects=custom_objects)
+    model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
+
     # Load model weights
-    model.load_weights(model_path + '/epoch_'+ iter +'_weights.h5')
+    model.load_weights(model_name +'_weights.h5')
 
     # Load auxiliar models for optimized search
     try:
         # Load model structure
-        model_init = model_from_json(open(model_path + '/epoch_' + iter + '_structure_init.json').read())
+        model_init = model_from_json(open(model_name + '_structure_init.json').read())
         # Load model weights
-        model_init.load_weights(model_path + '/epoch_' + iter + '_weights_init.h5')
+        model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
-        model_next = model_from_json(open(model_path + '/epoch_' + iter + '_structure_next.json').read())
+        model_next = model_from_json(open(model_name + '_structure_next.json').read())
         # Load model weights
-        model_next.load_weights(model_path + '/epoch_' + iter + '_weights_next.h5')
+        model_next.load_weights(model_name + '_weights_next.h5')
         loaded_optimized = True
     except:
         loaded_optimized = False
 
     # Load Model_Wrapper information
     try:
-        model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_Model_Wrapper.pkl', 'rb'))
-    except ValueError: # backwards compatibility
+        model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
+    except: # backwards compatibility
         try:
-            model_wrapper = pk.load(open(model_path + '/epoch_' + iter + '_CNN_Model.pkl', 'rb'))
+            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
         except:
             raise Exception(ValueError)
     model_wrapper.model = model
