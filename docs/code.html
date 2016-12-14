@@ -215,9 +215,17 @@ data splits, image loading, mean calculation, etc.</p>
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.convert_GT_3DLabels_to_bboxes">
 <code class="descname">convert_GT_3DLabels_to_bboxes</code><span class="sig-paren">(</span><em>gt</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.convert_GT_3DLabels_to_bboxes" title="Permalink to this definition">¶</a></dt>
-<dd><p>Converts a GT list of 3DLabels to a set of bboxes.
-:param gt: list of Dataset output of type 3DLabels
-:return: [out_list, original_sizes], where out_list contains a list of samples with the following info [GT_bboxes, GT_Y], and original_sizes contains the original width and height for each image</p>
+<dd><p>Converts a GT list of 3DLabels to a set of bboxes.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>gt</strong> &#8211; list of Dataset output of type 3DLabels</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">[out_list, original_sizes], where out_list contains a list of samples with the following info [GT_bboxes, GT_Y], and original_sizes contains the original width and height for each image</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">
@@ -391,10 +399,7 @@ data splits, image loading, mean calculation, etc.</p>
 </ul>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">[X,Y], list of input and output data variables of the samples identified by the indices in &#8216;k&#8217; samples belonging to the chosen &#8216;set_name&#8217;</p>
-</td>
-</tr>
-<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">[X, Y, [new_last, last, surpassed]] if debug==True</p>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">[X,Y], list of input and output data variables of the samples identified by the indices in &#8216;k&#8217; samples belonging to the chosen &#8216;set_name&#8217;</p>
 </td>
 </tr>
 </tbody>
@@ -480,15 +485,15 @@ data splits, image loading, mean calculation, etc.</p>
 <dt id="keras_wrapper.dataset.Dataset.loadImages">
 <code class="descname">loadImages</code><span class="sig-paren">(</span><em>images</em>, <em>id</em>, <em>normalization_type='0-1'</em>, <em>normalization=False</em>, <em>meanSubstraction=True</em>, <em>dataAugmentation=True</em>, <em>daRandomParams=None</em>, <em>external=False</em>, <em>loaded=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadImages" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of images from disk.</p>
-<p>:param images : list of image string names or list of matrices representing images
+<p>:param images : list of image string names or list of matrices representing images (only if loaded==True)
+:param id : identifier in the Dataset object of the data we are loading
 :param normalization_type: type of normalization applied
 :param normalization : whether we applying a 0-1 normalization to the images
 :param meanSubstraction : whether we are removing the training mean
 :param dataAugmentation : whether we are applying dataAugmentatino (random cropping and horizontal flip)
+:param daRandomParams : dictionary with results of random data augmentation provided by self.getDataAugmentationRandomParams()
 :param external : if True the images will be loaded from an external database, in this case the list of images must be absolute paths
-:param loaded : set this option to True if images is a list of matricies instead of a list of strings
-:param prob_flip_horizontal: probability of horizontal image flip if applying dataAugmentation
-:param prob_flip_vertical: probability of vertical image flip if applying dataAugmentation</p>
+:param loaded : set this option to True if images is a list of matricies instead of a list of strings</p>
 </dd></dl>
 
 <dl class="method">
@@ -1396,14 +1401,14 @@ The algorithm in a nutshell does the following:</p>
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.predictNet">
-<code class="descname">predictNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predictNet" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predictNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters={}</em>, <em>postprocess_fun=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predictNet" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the predictions of the net on the dataset splits chosen. The input &#8216;parameters&#8217; is a dict()
 which may contain the following parameters:</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
 <li><strong>batch_size</strong> &#8211; size of the batch</li>
 <li><strong>n_parallel_loaders</strong> &#8211; number of parallel data batch loaders</li>
 <li><strong>normalize</strong> &#8211; apply data normalization on images/features or not (only if using images/features as input)</li>
@@ -1412,9 +1417,16 @@ which may contain the following parameters:</p>
 </ul>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name" colspan="2">Returns predictions:</th></tr>
-<tr class="field-even field"><td>&nbsp;</td><td class="field-body"><p class="first last">dictionary with set splits as keys and matrices of predictions as values.</p>
-</td>
+</tbody>
+</table>
+<p>Additional parameters:</p>
+<p>:param postprocess_fun : post-processing function applied to all predictions before returning the result. The output of the function must be a list of results, one per sample. If postprocess_fun is a list, the second element will be used as an extra input to the function.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Returns predictions:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">dictionary with set splits as keys and matrices of predictions as values.</td>
 </tr>
 </tbody>
 </table>
@@ -1703,19 +1715,20 @@ every entry determines a score for sample i having class j
 
 <dl class="function">
 <dt id="keras_wrapper.cnn_model.loadModel">
-<code class="descclassname">keras_wrapper.cnn_model.</code><code class="descname">loadModel</code><span class="sig-paren">(</span><em>model_path</em>, <em>iter</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.loadModel" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">keras_wrapper.cnn_model.</code><code class="descname">loadModel</code><span class="sig-paren">(</span><em>model_path</em>, <em>update_num</em>, <em>custom_objects={}</em>, <em>full_path=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.loadModel" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a previously saved Model_Wrapper object.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>model_path</strong> &#8211; Path to the Model_Wrapper object to load</li>
-<li><strong>iter</strong> &#8211; Number of iterations</li>
+<li><strong>model_path</strong> &#8211; path to the Model_Wrapper object to load</li>
+<li><strong>update_num</strong> &#8211; identifier of the number of iterations/updates/epochs elapsed</li>
+<li><strong>custom_objects</strong> &#8211; dictionary of custom layers (i.e. input to model_from_json)</li>
 </ul>
 </td>
 </tr>
-<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">Loadaed Model_Wrapper</p>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">loaded Model_Wrapper</p>
 </td>
 </tr>
 </tbody>
@@ -1724,16 +1737,16 @@ every entry determines a score for sample i having class j
 
 <dl class="function">
 <dt id="keras_wrapper.cnn_model.saveModel">
-<code class="descclassname">keras_wrapper.cnn_model.</code><code class="descname">saveModel</code><span class="sig-paren">(</span><em>model_wrapper</em>, <em>iter</em>, <em>path=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.saveModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Saves a backup of the current Model_Wrapper object after being trained for &#8216;iter&#8217; iterations.</p>
+<code class="descclassname">keras_wrapper.cnn_model.</code><code class="descname">saveModel</code><span class="sig-paren">(</span><em>model_wrapper</em>, <em>update_num</em>, <em>path=None</em>, <em>full_path=False</em>, <em>store_iter=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.saveModel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves a backup of the current Model_Wrapper object after being trained for &#8216;update_num&#8217; iterations/updates/epochs.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>model_wrapper</strong> &#8211; Object to save</li>
-<li><strong>iter</strong> &#8211; Number of iterations</li>
-<li><strong>path</strong> &#8211; Oath to save</li>
+<li><strong>model_wrapper</strong> &#8211; object to save</li>
+<li><strong>update_num</strong> &#8211; identifier of the number of iterations/updates/epochs elapsed</li>
+<li><strong>path</strong> &#8211; path where the model will be saved</li>
 </ul>
 </td>
 </tr>
