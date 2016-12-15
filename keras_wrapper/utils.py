@@ -8,7 +8,7 @@ import time
 import logging
 
 
-def bbox(img, mode='width_height'):
+def bbox(img, mode='max'):
     '''
         Returns a bounding box covering all the non-zero area in the image.
         "mode" : "width_height" returns width in [2] and height in [3], "max" returns xmax in [2] and ymax in [3]
