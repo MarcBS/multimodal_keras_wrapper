@@ -39,6 +39,8 @@ You can see more practical examples in projects which use this library:
 
 [ABiViRNet for Video Description](https://github.com/lvapeab/ABiViRNet)
 
+[Sentence-SelectioNN for Domain Adaptation in SMT](https://github.com/lvapeab/sentence-selectioNN)
+
 
 ## Keras
 
