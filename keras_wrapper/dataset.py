@@ -402,7 +402,6 @@ class Dataset(object):
         self.vocabulary = dict()     # vocabularies (words2idx and idx2words)
         self.max_text_len = dict()   # number of words accepted in a 'text' sample
         self.vocabulary_len = dict() # number of words in the vocabulary
-        self.n_classes_text = dict() # only used for output text
         self.text_offset = dict()    # number of timesteps that the text is shifted (to the right)
         self.fill_text = dict()      # text padding mode
         self.pad_on_batch = dict()   # text padding mode: If pad_on_batch, the sample will have the maximum length
@@ -1031,7 +1030,6 @@ class Dataset(object):
     
         # Store max text len
         self.max_text_len[id][set_name] = max_text_len
-        self.n_classes_text[id] = len(self.vocabulary[id]['words2idx'])
         self.text_offset[id] = offset
         self.fill_text[id] = fill
         self.pad_on_batch[id] = pad_on_batch
@@ -1140,20 +1138,68 @@ class Dataset(object):
                 logging.info('Appending ' +str(added)+ ' words to dictionary with id "' +id+ '".')
                 logging.info('\tThe new total is '+str(self.vocabulary_len[id]) +'.')
         
-        
-#==============================================================================
-# 
-#==============================================================================
 
-    def load3DLabels(self, path_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
+    def merge_vocabularies(self, ids):
+        '''
+        Merges the vocabularies from a set of text inputs/outputs into a single one.
 
-        n_samples = len(path_list)
+        :param ids: identifiers of the inputs/outputs whose vocabularies will be merged
+        :return: None
+        '''
+        assert isinstance(ids, list), 'ids must be a list of inputs/outputs identifiers of type text'
+        if not self.silence:
+            logging.info('Merging vocabularies of the following ids: '+str(ids))
+
+        # Pick the first vocabulary as reference
+        vocab_ref = self.vocabulary[ids[0]]['words2idx']
+        next_idx = max(vocab_ref.values())+1
+
+        # Merge all vocabularies to the reference
+        for i in range(1, len(ids)):
+            id = ids[i]
+            vocab = self.vocabulary[id]['words2idx']
+            for w in vocab.keys():
+                if w not in vocab_ref.keys():
+                    vocab_ref[w] = next_idx
+                    next_idx += 1
+
+        # Also build idx2words
+        self.vocabulary[ids[0]]['words2idx'] = vocab_ref
+        inv_dictionary = {v: k for k, v in vocab_ref.items()}
+        self.vocabulary[ids[0]]['idx2words'] = inv_dictionary
+        self.vocabulary_len[ids[0]] = len(self.vocabulary[ids[0]]['words2idx'].keys())
+
+        # Insert in all ids
+        for i in range(1, len(ids)):
+            self.vocabulary[ids[i]]['words2idx'] = self.vocabulary[ids[0]]['words2idx']
+            self.vocabulary[ids[i]]['idx2words'] = self.vocabulary[ids[0]]['idx2words']
+            self.vocabulary_len[ids[i]] = self.vocabulary_len[ids[0]]
+
+        if not self.silence:
+            logging.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
+
+
+    def load3DLabels(self, bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
+        '''
+        Loads a set of outputs of the type 3DLabel (used for detection)
+
+        :param bbox_list: list of bboxes, labels and original sizes
+        :param nClasses: number of different classes to be detected
+        :param dataAugmentation: are we applying data augmentation?
+        :param daRandomParams: random parameters applied on data augmentation (vflip, hflip and random crop)
+        :param img_size: resized applied to input images
+        :param size_crop: crop size applied to input images
+        :param image_list: list of input images used as identifiers to 'daRandomParams'
+        :return: 3DLabels with shape (batch_size, width*height, classes)
+        '''
+
+        n_samples = len(bbox_list)
         w, h, d = img_size
         w_crop, h_crop, d_crop = size_crop
         labels = np.zeros((n_samples, nClasses,w_crop,h_crop), dtype=np.float32)
             
         for i in range(n_samples):
-            line = path_list[i]
+            line = bbox_list[i]
             arrayLine = line.split(';')
             arrayBndBox = arrayLine[:-1]
             w_original,h_original,d_original = eval(arrayLine[-1])
@@ -1204,6 +1250,10 @@ class Dataset(object):
                     label3D_rs[j] = label2D
                     
                 labels[i] = label3D_rs
+
+        # Reshape labels to (batch_size, width*height, classes) before returning
+        labels = np.reshape(labels, (n_samples, nClasses,w_crop*h_crop))
+        labels = np.transpose(labels, (0,2,1))
 
         return labels
 
@@ -1842,7 +1892,11 @@ class Dataset(object):
         else:
             predict_3dLabels = predictions
 
-        n_samples, n_classes, w, h = predict_3dLabels.shape
+        # Reshape from (n_samples, width*height, nClasses) to (n_samples, nClasses, width, height)
+        n_samples, wh, n_classes = predict_3dLabels.shape
+        w, h, d = self.img_size_crop[self.id_in_3DLabel[self.ids_outputs[idx_3DLabel]]]
+        predict_3dLabels = np.transpose(predict_3dLabels, (0, 2, 1))
+        predict_3dLabels = np.reshape(predict_3dLabels, (n_samples, n_classes, w, h))
 
         # list of hypotheses with the following info [predicted_bboxes, predicted_Y, predicted_scores]
         for s in range(n_samples):
@@ -2420,13 +2474,13 @@ class Dataset(object):
                                       words_so_far=self.words_so_far[id_out], loading_X=False)
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
 
                     # Use words separately (generator model)
                     else:
-                        y_aux = np.zeros(list(y[0].shape) + [self.n_classes_text[id_out]]).astype(np.uint8)
+                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(np.uint8)
+                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1]) # join data and mask
                     y = y_aux
@@ -2541,12 +2595,12 @@ class Dataset(object):
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     else:
-                        y_aux = np.zeros(list(y[0].shape) + [self.n_classes_text[id_out]]).astype(np.uint8)
+                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(
+                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1]) # join data and mask
@@ -2620,12 +2674,12 @@ class Dataset(object):
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.n_classes_text[id_out]).astype(np.uint8)
+                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     else:
-                        y_aux = np.zeros(list(y[0].shape) + [self.n_classes_text[id_out]]).astype(np.uint8)
+                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.n_classes_text[id_out]).astype(
+                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1]) # join data and mask
