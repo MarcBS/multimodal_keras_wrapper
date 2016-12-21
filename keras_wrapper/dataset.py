@@ -1150,7 +1150,7 @@ class Dataset(object):
         n_samples = len(path_list)
         w, h, d = img_size
         w_crop, h_crop, d_crop = size_crop
-        labels = np.zeros((n_samples, nClasses,w_crop,h_crop), dtype=np.int0)
+        labels = np.zeros((n_samples, nClasses,w_crop,h_crop), dtype=np.float32)
             
         for i in range(n_samples):
             line = path_list[i]
@@ -1158,7 +1158,7 @@ class Dataset(object):
             arrayBndBox = arrayLine[:-1]
             w_original,h_original,d_original = eval(arrayLine[-1])
 
-            label3D = np.zeros((nClasses,h_original,w_original), dtype=np.int0)
+            label3D = np.zeros((nClasses,h_original,w_original), dtype=np.float32)
             
             for array in arrayBndBox:
                 bndbox = eval(array)[0]
@@ -1173,12 +1173,17 @@ class Dataset(object):
             if not dataAugmentation or daRandomParams==None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
-                    labels[i, j] = misc.imresize(label3D[j],(w_crop,h_crop))
+                    label2D = misc.imresize(label3D[j],(w_crop,h_crop))
+                    maxval = np.max(label2D)
+                    if maxval > 0: label2D /= maxval
+                    labels[i, j] = label2D
             else:
-                label3D_rs = np.zeros((nClasses,w_crop,h_crop), dtype=np.int0)
+                label3D_rs = np.zeros((nClasses,w_crop,h_crop), dtype=np.float32)
                 # Crop the labels (random crop)
                 for j in range(nClasses):
                     label2D = misc.imresize(label3D[j],(w,h))
+                    maxval = np.max(label2D)
+                    if maxval > 0: label2D /= maxval
                     randomParams = daRandomParams[image_list[i]]
                     # Take random crop
                     left = randomParams["left"]
@@ -1820,17 +1825,24 @@ class Dataset(object):
         return path_list_3DLabel
 
 
-    def convert_3DLabels_to_bboxes(self, predictions, original_sizes, threshold=0.5):
+    def convert_3DLabels_to_bboxes(self, predictions, original_sizes, threshold=0.5, idx_3DLabel=0, size_restriction=0.001):
         """
         Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.
 
-        :param predictions: 3DLabels predicted by Model_Wrapper
+        :param predictions: 3DLabels predicted by Model_Wrapper. If type is list it will be assumed that position 0 corresponds to 3DLabels
         :param original_sizes: original sizes of the predicted images width and height
         :param threshold: minimum overlapping threshold for considering a prediction valid
         :return: predicted_bboxes, predicted_Y, predicted_scores for each image
         """
         out_list = []
-        n_samples, n_classes, w, h = predictions.shape
+
+        # if type is list it will be assumed that position 0 corresponds to 3DLabels
+        if isinstance(predictions, list):
+            predict_3dLabels = predictions[idx_3DLabel]
+        else:
+            predict_3dLabels = predictions
+
+        n_samples, n_classes, w, h = predict_3dLabels.shape
 
         # list of hypotheses with the following info [predicted_bboxes, predicted_Y, predicted_scores]
         for s in range(n_samples):
@@ -1841,14 +1853,14 @@ class Dataset(object):
             wratio = float(orig_w) / w
             hratio = float(orig_h) / h
             for c in range(n_classes):
-                map = predictions[s][c]
+                map = predict_3dLabels[s][c]
 
                 # Compute binary selected region
                 binary_heat = map
                 binary_heat = np.where(binary_heat >= threshold, 255, 0)
 
                 # Get biggest connected component
-                # min_size = new_reshape_size[0] * new_reshape_size[1] * size_restriction
+                min_size = map.shape[0] * map.shape[1] * size_restriction
                 labeled, nr_objects = ndimage.label(binary_heat)  # get connected components
                 [objects, counts] = np.unique(labeled, return_counts=True)  # count occurrences
                 # biggest_components = np.argsort(counts[1:])[::-1]
@@ -1862,30 +1874,33 @@ class Dataset(object):
 
                     # Draw bounding box on original image
                     box = list(bbox(current_obj))
+                    current_obj = np.nonzero(current_obj)
+                    if len(current_obj) > min_size: # filter too small bboxes
 
-                    # expand box before final detection
-                    # x_exp = box[2]# * box_expansion
-                    # y_exp = box[3]# * box_expansion
-                    # box[0] = max([0, box[0]-x_exp/2])
-                    # box[1] = max([0, box[1]-y_exp/2])
-                    # change width and height by xmax and ymax
-                    # box[2] += box[0]
-                    # box[3] += box[1]
-                    # box[2] = min([new_reshape_size[1]-1, box[2] + x_exp])
-                    # box[3] = min([new_reshape_size[0]-1, box[3] + y_exp])
+                        # expand box before final detection
+                        # x_exp = box[2]# * box_expansion
+                        # y_exp = box[3]# * box_expansion
+                        # box[0] = max([0, box[0]-x_exp/2])
+                        # box[1] = max([0, box[1]-y_exp/2])
+                        # change width and height by xmax and ymax
+                        # box[2] += box[0]
+                        # box[3] += box[1]
+                        # box[2] = min([new_reshape_size[1]-1, box[2] + x_exp])
+                        # box[3] = min([new_reshape_size[0]-1, box[3] + y_exp])
 
-                    # get score of the region
-                    score = np.mean([map[point[0], point[1]] for point in np.nonzero(current_obj)])
+                        # get score of the region
+                        score = np.mean([map[point[0], point[1]] for point in current_obj])
 
-                    # convert bbox to original size
-                    box = np.array([box[0] * wratio, box[1] * hratio, box[2] * wratio, box[3] * hratio])
-                    box = box.astype(int)
+                        # convert bbox to original size
+                        box = np.array([box[0] * wratio, box[1] * hratio, box[2] * wratio, box[3] * hratio])
+                        box = box.astype(int)
 
-                    bboxes.append(box)
-                    Y.append(c)
-                    scores.append(score)
+                        bboxes.append(box)
+                        Y.append(c)
+                        scores.append(score)
 
             out_list.append([bboxes, Y, scores])
+
         return out_list
 
     def convert_GT_3DLabels_to_bboxes(self, gt):
