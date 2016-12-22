@@ -6,8 +6,8 @@ from keras.models import Sequential, model_from_json
 from keras.layers.advanced_activations import PReLU
 from keras.optimizers import SGD
 from keras.utils import np_utils
-from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D
+from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
 from keras.engine.training import Model
 from keras.utils.layer_utils import print_summary
 from keras.regularizers import l2
@@ -2782,6 +2782,95 @@ class Model_Wrapper(object):
         # Output
         self.model.add_output(name='GAP/softmax', input='GAP/classifier_food_vs_nofood')
 
+
+    ##############################
+    #       DENSE NETS
+    ##############################
+
+    def add_dense_block(self, in_layer, nb_layers, k=12, drop=0.2):
+        """
+        Adds a Dense Block.
+
+        # References
+            Jegou S, Drozdzal M, Vazquez D, Romero A, Bengio Y.
+            The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation.
+            arXiv preprint arXiv:1611.09326. 2016 Nov 28.
+
+        :param in_layer: input layer to the dense block.
+        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer() for information about the internal layers).
+        :param k: growth rate. Number of additional feature maps learned at each layer.
+        :param drop: dropout rate.
+        :return: output layer of the dense block
+        """
+        prev_layer = in_layer
+        for n in range(nb_layers):
+            # Insert dense layer
+            new_layer = self.add_dense_layer(prev_layer, k, drop)
+            # Merge with previous layer
+            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=1)
+        return prev_layer
+
+
+    def add_dense_layer(self, in_layer, k, drop):
+        """
+        Adds a Dense Layer inside a Dense Block, which is composed of BN, ReLU, Conv and Dropout
+
+        # References
+            Jegou S, Drozdzal M, Vazquez D, Romero A, Bengio Y.
+            The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation.
+            arXiv preprint arXiv:1611.09326. 2016 Nov 28.
+
+        :param in_layer: input layer to the dense block.
+        :param k: growth rate. Number of additional feature maps learned at each layer.
+        :return: output layer
+        """
+
+        out_layer = BatchNormalization() (in_layer)
+        out_layer = Activation('relu') (out_layer)
+        out_layer = Convolution2D(k, 3, 3, border_mode='same') (out_layer)
+        if drop > 0.0:
+            out_layer = Dropout(drop) (out_layer)
+        return out_layer
+
+
+    def add_transitionup_block(self, x, skip_conn, skip_conn_shapes,
+                               out_dim, nb_filters_deconv,
+                               nb_layers, growth, drop):
+        """
+        Adds a Transition Up Block. Consisting of Deconv, Skip Connection, Dense Block.
+
+        # References
+            Jegou S, Drozdzal M, Vazquez D, Romero A, Bengio Y.
+            The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation.
+            arXiv preprint arXiv:1611.09326. 2016 Nov 28.
+
+        # Input layers parameters
+        :param x: input layer.
+        :param skip_conn: list of layers to be used as skip connections.
+        :param skip_conn_shapes: list of output shapes of the skip connection layers.
+
+        # Deconvolutional layer parameters
+        :param out_dim: output dimensionality of the Deconvolutional layer [width, height]
+        :param nb_filters_deconv: number of deconvolutional filters to learn.
+
+        # Dense Block parameters
+        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer() for information about the internal layers).
+        :param growth: growth rate. Number of additional feature maps learned at each layer.
+        :param drop: dropout rate.
+
+        :return: output layer
+        """
+        # Transition Up
+        x = Deconvolution2D(nb_filters_deconv, 3, 3,
+                            output_shape=tuple([None, nb_filters_deconv]+out_dim),
+                            subsample=(2, 2), border_mode='same')(x)
+        # Skip connection concatenation
+        if out_dim in skip_conn_shapes:
+            skip = skip_conn[skip_conn_shapes.index(out_dim)]
+            x = merge([skip, x], mode='concat', concat_axis=1, name='skip_'+str(out_dim))
+        # Dense Block
+        x = self.add_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
+        return x
 
 
     def Empty(self, nOutput, input):
