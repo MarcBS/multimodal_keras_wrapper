@@ -387,7 +387,7 @@ class Dataset(object):
 
         # List of implemented input and output data types
         self.__accepted_types_inputs = ['raw-image', 'video', 'image-features', 'video-features', 'text', 'id', 'ghost']
-        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', 'id', '3DLabel']
+        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', '3DLabel', 'id']
         #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
         

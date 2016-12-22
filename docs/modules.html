@@ -31,7 +31,7 @@
 
   
     <link rel="top" title="Multimodal Keras Wrapper 0.55 documentation" href="index.html"/>
-        <link rel="prev" title="Multimodal Keras Wrapper" href="intro.html"/> 
+        <link rel="prev" title="Tutorial" href="tutorial.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -81,15 +81,14 @@
             
             
                 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="intro.html">Multimodal Keras Wrapper</a></li>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Available Modules</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.dataset">dataset.py</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.cnn_model">cnn_model.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#staged-network-py">staged_network.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.stage">stage.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.ecoc_classifier">ecoc_classifier.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.callbacks_keras_wrapper">callbacks_keras_wrapper.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.beam_search_ensemble">beam_search_ensemble.py</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.utils">utils.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-keras_wrapper.thread_loader">thread_loader.py</a></li>
 </ul>
 </li>
 </ul>
@@ -1887,231 +1886,18 @@ every entry determines a score for sample i having class j
 </dd></dl>
 
 </div>
-<div class="section" id="staged-network-py">
-<h2>staged_network.py<a class="headerlink" href="#staged-network-py" title="Permalink to this headline">¶</a></h2>
-</div>
-<div class="section" id="module-keras_wrapper.stage">
-<span id="stage-py"></span><h2>stage.py<a class="headerlink" href="#module-keras_wrapper.stage" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-keras_wrapper.callbacks_keras_wrapper">
+<span id="callbacks-keras-wrapper-py"></span><h2>callbacks_keras_wrapper.py<a class="headerlink" href="#module-keras_wrapper.callbacks_keras_wrapper" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
-<dt id="keras_wrapper.stage.Stage">
-<em class="property">class </em><code class="descclassname">keras_wrapper.stage.</code><code class="descname">Stage</code><span class="sig-paren">(</span><em>nInput</em>, <em>nOutput</em>, <em>input_shape</em>, <em>output_shape</em>, <em>type='basic_model'</em>, <em>silence=False</em>, <em>structure_path=None</em>, <em>weights_path=None</em>, <em>model_name=None</em>, <em>plots_path=None</em>, <em>models_path=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage" title="Permalink to this definition">¶</a></dt>
-<dd><p>Class for defining a single stage from a Staged_Network. 
-This class is only intended to be used in conjunction with the Staged_Network class.</p>
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.applyClassMapping">
-<code class="descname">applyClassMapping</code><span class="sig-paren">(</span><em>Y</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.applyClassMapping" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns the corresponding integer identifiers for the current Stage&#8217;s mapping given a set of categorical arrays Y.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.applyMask">
-<code class="descname">applyMask</code><span class="sig-paren">(</span><em>prediction</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.applyMask" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns a prediction matrix after applying the defined output mask.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.defineClassMapping">
-<code class="descname">defineClassMapping</code><span class="sig-paren">(</span><em>mapping</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.defineClassMapping" title="Permalink to this definition">¶</a></dt>
-<dd><p>Defines an input mapping from all the classes available in a Staged_Network to the ones used in this particular Stage instance.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mapping</strong> &#8211; dictionary with all the classes in the Staged_Network as &#8216;keys&#8217; and the corresponding mapped inputs to this Stage as &#8216;values&#8217;. If some &#8216;key&#8217; is not used, its &#8216;value&#8217; should be set to None.</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.defineOutputMask">
-<code class="descname">defineOutputMask</code><span class="sig-paren">(</span><em>mask</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.defineOutputMask" title="Permalink to this definition">¶</a></dt>
-<dd><p>Defines an output mask for redirecting this stage&#8217;s output to the following stage once this stage has been trained (on test mode).</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>mask</strong> &#8211; dictionary with all the Stage&#8217;s output values indices as &#8216;keys&#8217; and the corresponding mapped indices on the final test&#8217;s output as &#8216;values&#8217;. If some &#8216;key&#8217; is not used, its &#8216;value&#8217; should be set to None. E.g. if we have output_shape = [1,1] then mask = {&#8216;[0]&#8217;: [0], &#8216;[1]&#8217;: None} If we want to disable the mask, we can set it to None. The mask is disabled by default.</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.isReadyToTrainOnBatch">
-<code class="descname">isReadyToTrainOnBatch</code><span class="sig-paren">(</span><em>batch_size</em>, <em>balanced</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.isReadyToTrainOnBatch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Checks if the input samples lists have enough samples to train on a batch. 
-In this case returns the first &#8216;batch_size&#8217; samples, else returns False.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>batch_size</strong> &#8211; number of samples retrieved for the next training batch</li>
-<li><strong>balanced</strong> &#8211; wether we want a set of balanced samples or not</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.predictOnBatch">
-<code class="descname">predictOnBatch</code><span class="sig-paren">(</span><em>X</em>, <em>in_name=None</em>, <em>out_name=None</em>, <em>expand=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.predictOnBatch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Applies a forward pass and returns the predicted values after being processed by the output mask.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>in_name</strong> &#8211; name of the input we are asking for (from the previous stage). Only applicable to Graph models.</li>
-<li><strong>out_name</strong> &#8211; name of the output used for prediction (from the current stage).</li>
-<li><strong>expand</strong> &#8211; indicates if we want to expand the input dimensions to 4</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.testOnBatch">
-<code class="descname">testOnBatch</code><span class="sig-paren">(</span><em>X</em>, <em>Y</em>, <em>accuracy=True</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.testOnBatch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Applies a test on the samples provided and returns the resulting loss and accuracy (if True).
-It selects only the samples that are valid for the current Stage (self.mapping[labels] != None).</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>out_name</strong> &#8211; name of the output we are asking for. Only applicable to Graph models.</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.trainOnBatch">
-<code class="descname">trainOnBatch</code><span class="sig-paren">(</span><em>X</em>, <em>Y</em>, <em>batch_size</em>, <em>balanced=True</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.trainOnBatch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Trains the current stage on the last &#8216;batch_size&#8217; samples received. It makes sure the mapping of the
-introduced samples is balanced among all the defined classes. If it isn&#8217;t it keeps storing them for
-a latter forward-backward pass.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>X</strong> &#8211; numpy array with a set of loaded images ready to use for Keras</li>
-<li><strong>Y</strong> &#8211; numpy array with a set of categorical labels ready to use for keras</li>
-<li><strong>batch_size</strong> &#8211; number of samples that we want to use to train on the next batch</li>
-<li><strong>balanced</strong> &#8211; indicates if we want to train on a set of balanced samples (same number of samples from each class)</li>
-<li><strong>out_name</strong> &#8211; name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.trainOnBatch_DEPRECATED_class_weight">
-<code class="descname">trainOnBatch_DEPRECATED_class_weight</code><span class="sig-paren">(</span><em>X</em>, <em>Y</em>, <em>batch_size</em>, <em>balanced=True</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.trainOnBatch_DEPRECATED_class_weight" title="Permalink to this definition">¶</a></dt>
-<dd><p>Trains the current stage on the last &#8216;batch_size&#8217; samples received. It makes sure the mapping of the
-introduced samples is balanced among all the defined classes. If it isn&#8217;t it keeps storing them for
-a latter forward-backward pass.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>X</strong> &#8211; numpy array with a set of loaded images ready to use for Keras</li>
-<li><strong>Y</strong> &#8211; numpy array with a set of categorical labels ready to use for keras</li>
-<li><strong>batch_size</strong> &#8211; number of samples that we want to use to train on the next batch</li>
-<li><strong>balanced</strong> &#8211; indicates if we want to train on a set of balanced samples (same number of samples from each class)</li>
-<li><strong>out_name</strong> &#8211; name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.stage.Stage.trainOnBatch_DEPRECATED_lists">
-<code class="descname">trainOnBatch_DEPRECATED_lists</code><span class="sig-paren">(</span><em>X</em>, <em>Y</em>, <em>batch_size</em>, <em>balanced=True</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.stage.Stage.trainOnBatch_DEPRECATED_lists" title="Permalink to this definition">¶</a></dt>
-<dd><p>Trains the current stage on the last &#8216;batch_size&#8217; samples received. It makes sure the mapping of the
-introduced samples is balanced among all the defined classes. If it isn&#8217;t it keeps storing them for
-a latter forward-backward pass.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>X</strong> &#8211; numpy array with a set of loaded images ready to use for Keras</li>
-<li><strong>Y</strong> &#8211; numpy array with a set of categorical labels ready to use for keras</li>
-<li><strong>batch_size</strong> &#8211; number of samples that we want to use to train on the next batch</li>
-<li><strong>balanced</strong> &#8211; indicates if we want to train on a set of balanced samples (same number of samples from each class)</li>
-<li><strong>out_name</strong> &#8211; name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
-
+<dt id="keras_wrapper.callbacks_keras_wrapper.LearningRateReducerWithEarlyStopping">
+<em class="property">class </em><code class="descclassname">keras_wrapper.callbacks_keras_wrapper.</code><code class="descname">LearningRateReducerWithEarlyStopping</code><span class="sig-paren">(</span><em>patience=0</em>, <em>lr_decay=1</em>, <em>reduce_rate=0.5</em>, <em>reduce_nb=10</em>, <em>is_early_stopping=True</em>, <em>verbose=1</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.callbacks_keras_wrapper.LearningRateReducerWithEarlyStopping" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reduces learning rate during the training.</p>
+<p>Original work: jiumem [<a class="reference external" href="https://github.com/jiumem">https://github.com/jiumem</a>]</p>
 </dd></dl>
 
 </div>
-<div class="section" id="module-keras_wrapper.ecoc_classifier">
-<span id="ecoc-classifier-py"></span><h2>ecoc_classifier.py<a class="headerlink" href="#module-keras_wrapper.ecoc_classifier" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier">
-<em class="property">class </em><code class="descclassname">keras_wrapper.ecoc_classifier.</code><code class="descname">ECOC_Classifier</code><span class="sig-paren">(</span><em>table</em>, <em>distance='hamming'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier" title="Permalink to this definition">¶</a></dt>
-<dd><p>Class for defining a classical ECOC classifier.</p>
-<dl class="method">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier.append">
-<code class="descname">append</code><span class="sig-paren">(</span><em>rows</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier.append" title="Permalink to this definition">¶</a></dt>
-<dd><p>Appends new rows to the ECOC table which will define the code for new classifiers.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier.dist2sim">
-<code class="descname">dist2sim</code><span class="sig-paren">(</span><em>dist</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier.dist2sim" title="Permalink to this definition">¶</a></dt>
-<dd><p>Converts a set of distances into similarities</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier.hammingDistance">
-<code class="descname">hammingDistance</code><span class="sig-paren">(</span><em>X</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier.hammingDistance" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns a matrix of dimensions (n_samples, n_classes) with the distance of each sample to each class.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier.predictOnBatch">
-<code class="descname">predictOnBatch</code><span class="sig-paren">(</span><em>X</em>, <em>in_name=None</em>, <em>out_name=None</em>, <em>expand=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier.predictOnBatch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Predicts the classes for a set of samples.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier.setDistance">
-<code class="descname">setDistance</code><span class="sig-paren">(</span><em>distance</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier.setDistance" title="Permalink to this definition">¶</a></dt>
-<dd><p>Changes the kind of distance used for computing the predictions.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier.softmax">
-<code class="descname">softmax</code><span class="sig-paren">(</span><em>similarities</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier.softmax" title="Permalink to this definition">¶</a></dt>
-<dd><p>Applies the softmax function to a set of similarities for obtaining a normalized vector of probabilities.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.ecoc_classifier.ECOC_Classifier.testOnBatch">
-<code class="descname">testOnBatch</code><span class="sig-paren">(</span><em>X</em>, <em>Y</em>, <em>accuracy=True</em>, <em>out_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.ecoc_classifier.ECOC_Classifier.testOnBatch" title="Permalink to this definition">¶</a></dt>
-<dd><p>Applies a test on the samples provided and returns the resulting loss and accuracy (if True).</p>
-</dd></dl>
-
-</dd></dl>
-
+<div class="section" id="module-keras_wrapper.beam_search_ensemble">
+<span id="beam-search-ensemble-py"></span><h2>beam_search_ensemble.py<a class="headerlink" href="#module-keras_wrapper.beam_search_ensemble" title="Permalink to this headline">¶</a></h2>
 </div>
 <div class="section" id="module-keras_wrapper.utils">
 <span id="utils-py"></span><h2>utils.py<a class="headerlink" href="#module-keras_wrapper.utils" title="Permalink to this headline">¶</a></h2>
@@ -2147,33 +1933,6 @@ a latter forward-backward pass.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="module-keras_wrapper.thread_loader">
-<span id="thread-loader-py"></span><h2>thread_loader.py<a class="headerlink" href="#module-keras_wrapper.thread_loader" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="keras_wrapper.thread_loader.ThreadDataLoader">
-<em class="property">class </em><code class="descclassname">keras_wrapper.thread_loader.</code><code class="descname">ThreadDataLoader</code><span class="sig-paren">(</span><em>target</em>, <em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.thread_loader.ThreadDataLoader" title="Permalink to this definition">¶</a></dt>
-<dd><p>Data loader based on threads (parallel execution)</p>
-</dd></dl>
-
-<dl class="class">
-<dt id="keras_wrapper.thread_loader.ThreadModelLoader">
-<em class="property">class </em><code class="descclassname">keras_wrapper.thread_loader.</code><code class="descname">ThreadModelLoader</code><span class="sig-paren">(</span><em>target</em>, <em>*args</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.thread_loader.ThreadModelLoader" title="Permalink to this definition">¶</a></dt>
-<dd><p>Model loader based on threads (parallel execution)</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="keras_wrapper.thread_loader.retrieveModel">
-<code class="descclassname">keras_wrapper.thread_loader.</code><code class="descname">retrieveModel</code><span class="sig-paren">(</span><em>path_json</em>, <em>path_h5</em>, <em>path_pkl</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.thread_loader.retrieveModel" title="Permalink to this definition">¶</a></dt>
-<dd><p>Loads a model using a parallel thread.</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="keras_wrapper.thread_loader.retrieveXY">
-<code class="descclassname">keras_wrapper.thread_loader.</code><code class="descname">retrieveXY</code><span class="sig-paren">(</span><em>dataset</em>, <em>set_name</em>, <em>batchSize</em>, <em>normalization</em>, <em>meanSubstraction</em>, <em>dataAugmentation</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.thread_loader.retrieveXY" title="Permalink to this definition">¶</a></dt>
-<dd><p>Retrieves a set of samples from the given dataset and the given set name</p>
-</dd></dl>
-
-</div>
 </div>
 
 
@@ -2184,7 +1943,7 @@ a latter forward-backward pass.</p>
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
       
-        <a href="intro.html" class="btn btn-neutral" title="Multimodal Keras Wrapper" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="tutorial.html" class="btn btn-neutral" title="Tutorial" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

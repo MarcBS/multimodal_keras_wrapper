@@ -1,20 +1,18 @@
-from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
-from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
-from keras_wrapper.callbacks_keras_wrapper import *
-
-from keras.models import Sequential, model_from_json
-from keras.layers.advanced_activations import PReLU
-from keras.optimizers import SGD
-from keras.utils import np_utils
-from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
-from keras.engine.training import Model
-from keras.utils.layer_utils import print_summary
-from keras.regularizers import l2
-
-#from keras.caffe.extra_layers import LRN2D
-
 import matplotlib as mpl
+from keras.engine.training import Model
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
+from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
+from keras.layers.advanced_activations import PReLU
+from keras.models import Sequential, model_from_json
+from keras.optimizers import SGD
+from keras.regularizers import l2
+from keras.utils import np_utils
+from keras.utils.layer_utils import print_summary
+
+from keras_wrapper.callbacks_keras_wrapper import *
+from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
+from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
+
 mpl.use('Agg') # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 
@@ -218,10 +216,10 @@ class Model_Wrapper(object):
                 # Build model from scratch
                 if hasattr(self, type):
                     if not self.silence:
-                        logging.info("<<< Building "+ type +" CNN >>>")
+                        logging.info("<<< Building "+ type +" Model_Wrapper >>>")
                     eval('self.'+type+'(nOutput, input_shape)')
                 else:
-                    raise Exception('CNN type "'+ type +'" is not implemented.')
+                    raise Exception('Model_Wrapper type "'+ type +'" is not implemented.')
 
             # Load weights from file
             if weights_path:

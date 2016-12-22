@@ -1,10 +1,10 @@
-# Staged Keras Wrapper
-Wrapper for Keras with support to easy data and models loading and handling.
+# Multimodal Keras Wrapper
+Wrapper for Keras with support to easy multimodal data and models loading and handling.
 
 
 ## Documentation
 
-You can access the library documentation page at [marcbs.github.io/staged_keras_wrapper/](http://marcbs.github.io/staged_keras_wrapper/)
+You can access the library documentation page at [marcbs.github.io/multimodal_keras_wrapper/](http://marcbs.github.io/multimodal_keras_wrapper/)
 
 Some code examples are available in demo.ipynb and test.py. Additionally, in the section Projects you can see some practical examples of projects using this library.
 
@@ -24,11 +24,11 @@ In order to install the library you just have to follow these steps:
 
 1) Clone this repository:
 ```
-git clone https://github.com/MarcBS/staged_keras_wrapper.git
+git clone https://github.com/MarcBS/multimodal_keras_wrapper.git
 ```
 2) Include the repository path into your PYTHONPATH:
 ```
-export PYTHONPATH=$PYTHONPATH:/path/to/staged_keras_wrapper
+export PYTHONPATH=$PYTHONPATH:/path/to/multimodal_keras_wrapper
 ```
 
 ## Projects

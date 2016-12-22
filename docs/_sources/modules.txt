@@ -5,49 +5,35 @@ List of all files, classes and methods available in the library.
 
 
 dataset.py
-=========================
+=============================
 
 .. automodule:: keras_wrapper.dataset
    :members:
 
 
 cnn_model.py
-=========================
+=============================
 
 .. automodule:: keras_wrapper.cnn_model
    :members:
 
 
-staged_network.py
-=========================
+callbacks_keras_wrapper.py
+=============================
 
-.. automodule:: keras_wrapper.staged_network
+.. automodule:: keras_wrapper.callbacks_keras_wrapper
    :members:
 
 
-stage.py
-=========================
+beam_search_ensemble.py
+=============================
 
-.. automodule:: keras_wrapper.stage
-   :members:
-
-
-ecoc_classifier.py
-=========================
-
-.. automodule:: keras_wrapper.ecoc_classifier
+.. automodule:: keras_wrapper.beam_search_ensemble
    :members:
 
 
 utils.py
-=========================
+=============================
 
 .. automodule:: keras_wrapper.utils
-   :members:
-
-
-thread_loader.py
-=========================
-
-.. automodule:: keras_wrapper.thread_loader
    :members:

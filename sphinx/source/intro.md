@@ -1,8 +1,7 @@
-Introduction
-**************************
+# Introduction
 
-# Multimodal Keras Wrapper
-Wrapper for Keras with support to easy data and models loading and handling.
+## Multimodal Keras Wrapper
+Wrapper for Keras with support to easy multimodal data and models loading and handling.
 
 
 ## Documentation
