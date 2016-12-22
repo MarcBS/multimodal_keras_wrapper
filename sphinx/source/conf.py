@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# staged_keras_wrapper documentation build configuration file, created by
+# multimodal_keras_wrapper documentation build configuration file, created by
 # sphinx-quickstart on Tue Apr 26 10:43:19 2016.
 #
 # This file is execfile()d with the current directory set to its
@@ -37,7 +37,7 @@ extensions = [
     'edit_on_github'
 ]
 
-edit_on_github_project = 'MarcBS/staged_keras_wrapper'
+edit_on_github_project = 'MarcBS/multimodal_keras_wrapper'
 edit_on_github_branch = 'master'
 
 # Add any paths that contain templates here, relative to this directory.
@@ -55,7 +55,7 @@ source_suffix = ['.rst', '.md']
 master_doc = 'index'
 
 # General information about the project.
-project = u'Staged Keras Wrapper'
+project = u'Multimodal Keras Wrapper'
 copyright = u'2016, Marc Bolaños'
 author = u'Marc Bolaños'
 
@@ -131,7 +131,7 @@ html_theme_path = ["_themes", ]
 
 # The name for this set of Sphinx documents.
 # "<project> v<release> documentation" by default.
-#html_title = u'staged_keras_wrapper v0.1'
+#html_title = u'multimodal_keras_wrapper v0.1'
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
 #html_short_title = None
@@ -213,7 +213,7 @@ html_static_path = ['_static']
 #html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'staged_keras_wrapperdoc'
+htmlhelp_basename = 'multimodal_keras_wrapperdoc'
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -235,7 +235,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'staged_keras_wrapper.tex', u'staged\\_keras\\_wrapper Documentation',
+    (master_doc, 'multimodal_keras_wrapper.tex', u'multimodal\\_keras\\_wrapper Documentation',
      u'Marc Bolaños', 'manual'),
 ]
 
@@ -265,7 +265,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'staged_keras_wrapper', u'staged_keras_wrapper Documentation',
+    (master_doc, 'multimodal_keras_wrapper', u'multimodal_keras_wrapper Documentation',
      [author], 1)
 ]
 
@@ -279,8 +279,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'staged_keras_wrapper', u'staged_keras_wrapper Documentation',
-     author, 'staged_keras_wrapper', 'One line description of project.',
+    (master_doc, 'multimodal_keras_wrapper', u'multimodal_keras_wrapper Documentation',
+     author, 'multimodal_keras_wrapper', 'One line description of project.',
      'Miscellaneous'),
 ]
 

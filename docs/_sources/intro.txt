@@ -1,3 +1,6 @@
+Introduction
+**************************
+
 # Staged Keras Wrapper
 Wrapper for Keras with support to easy data and models loading and handling.
 
