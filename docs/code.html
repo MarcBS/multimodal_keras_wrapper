@@ -192,14 +192,14 @@ data splits, image loading, mean calculation, etc.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.convert_3DLabels_to_bboxes">
-<code class="descname">convert_3DLabels_to_bboxes</code><span class="sig-paren">(</span><em>predictions</em>, <em>original_sizes</em>, <em>threshold=0.5</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.convert_3DLabels_to_bboxes" title="Permalink to this definition">¶</a></dt>
+<code class="descname">convert_3DLabels_to_bboxes</code><span class="sig-paren">(</span><em>predictions</em>, <em>original_sizes</em>, <em>threshold=0.5</em>, <em>idx_3DLabel=0</em>, <em>size_restriction=0.001</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.convert_3DLabels_to_bboxes" title="Permalink to this definition">¶</a></dt>
 <dd><p>Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
-<li><strong>predictions</strong> &#8211; 3DLabels predicted by Model_Wrapper</li>
+<li><strong>predictions</strong> &#8211; 3DLabels predicted by Model_Wrapper. If type is list it will be assumed that position 0 corresponds to 3DLabels</li>
 <li><strong>original_sizes</strong> &#8211; original sizes of the predicted images width and height</li>
 <li><strong>threshold</strong> &#8211; minimum overlapping threshold for considering a prediction valid</li>
 </ul>
@@ -456,6 +456,32 @@ data splits, image loading, mean calculation, etc.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.load3DLabels">
+<code class="descname">load3DLabels</code><span class="sig-paren">(</span><em>bbox_list</em>, <em>nClasses</em>, <em>dataAugmentation</em>, <em>daRandomParams</em>, <em>img_size</em>, <em>size_crop</em>, <em>image_list</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.load3DLabels" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a set of outputs of the type 3DLabel (used for detection)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>bbox_list</strong> &#8211; list of bboxes, labels and original sizes</li>
+<li><strong>nClasses</strong> &#8211; number of different classes to be detected</li>
+<li><strong>dataAugmentation</strong> &#8211; are we applying data augmentation?</li>
+<li><strong>daRandomParams</strong> &#8211; random parameters applied on data augmentation (vflip, hflip and random crop)</li>
+<li><strong>img_size</strong> &#8211; resized applied to input images</li>
+<li><strong>size_crop</strong> &#8211; crop size applied to input images</li>
+<li><strong>image_list</strong> &#8211; list of input images used as identifiers to &#8216;daRandomParams&#8217;</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">3DLabels with shape (batch_size, width*height, classes)</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadFeatures">
 <code class="descname">loadFeatures</code><span class="sig-paren">(</span><em>X</em>, <em>feat_len</em>, <em>normalization_type='L2'</em>, <em>normalization=False</em>, <em>loaded=False</em>, <em>external=False</em>, <em>data_augmentation=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadFeatures" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads and normalizes features.</p>
@@ -544,6 +570,22 @@ data splits, image loading, mean calculation, etc.</p>
 <li><strong>dataAugmentation</strong> &#8211; Whether we are applying dataAugmentatino (random cropping and horizontal flip)</li>
 </ul>
 </td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.merge_vocabularies">
+<code class="descname">merge_vocabularies</code><span class="sig-paren">(</span><em>ids</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.merge_vocabularies" title="Permalink to this definition">¶</a></dt>
+<dd><p>Merges the vocabularies from a set of text inputs/outputs into a single one.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>ids</strong> &#8211; identifiers of the inputs/outputs whose vocabularies will be merged</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">None</td>
 </tr>
 </tbody>
 </table>
@@ -2291,7 +2333,7 @@ a latter forward-backward pass.</p>
 <span id="utils-py"></span><h2>utils.py<a class="headerlink" href="#module-keras_wrapper.utils" title="Permalink to this headline">¶</a></h2>
 <dl class="function">
 <dt id="keras_wrapper.utils.bbox">
-<code class="descclassname">keras_wrapper.utils.</code><code class="descname">bbox</code><span class="sig-paren">(</span><em>img</em>, <em>mode='width_height'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.utils.bbox" title="Permalink to this definition">¶</a></dt>
+<code class="descclassname">keras_wrapper.utils.</code><code class="descname">bbox</code><span class="sig-paren">(</span><em>img</em>, <em>mode='max'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.utils.bbox" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns a bounding box covering all the non-zero area in the image.
 &#8220;mode&#8221; : &#8220;width_height&#8221; returns width in [2] and height in [3], &#8220;max&#8221; returns xmax in [2] and ymax in [3]</p>
 </dd></dl>

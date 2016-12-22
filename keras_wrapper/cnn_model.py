@@ -634,7 +634,7 @@ class Model_Wrapper(object):
                                  max_q_size=params['n_parallel_loaders'],
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
-                                 epoch_offset=params['epoch_offset'])
+                                 initial_epoch=params['epoch_offset'])
 
 
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
