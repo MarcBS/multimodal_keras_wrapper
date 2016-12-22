@@ -2,7 +2,7 @@ from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
 from keras_wrapper.callbacks_keras_wrapper import *
 
-from keras.models import Sequential, Graph, model_from_json
+from keras.models import Sequential, model_from_json
 from keras.layers.advanced_activations import PReLU
 from keras.optimizers import SGD
 from keras.utils import np_utils
