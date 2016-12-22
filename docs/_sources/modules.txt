@@ -1,9 +1,7 @@
 Available Modules
 **************************
 
-Documentation for the keras_wrapper module.
-
-See code examples in demo.ipynb and test.py
+List of all files, classes and methods available in the library.
 
 
 dataset.py
