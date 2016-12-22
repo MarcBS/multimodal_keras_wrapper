@@ -3,7 +3,7 @@ from keras_wrapper.ecoc_classifier import ECOC_Classifier
 from keras_wrapper.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.dataset import Dataset
 
-from keras.models import Sequential, Graph, model_from_json
+from keras.models import Sequential, model_from_json
 from keras.layers.core import Dense, Dropout, Activation, Flatten
 from keras.layers.convolutional import Convolution2D, MaxPooling2D, AveragePooling2D, ZeroPadding2D
 from keras.layers.advanced_activations import PReLU

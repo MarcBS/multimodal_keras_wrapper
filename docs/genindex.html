@@ -81,7 +81,7 @@
             
             
                 <ul>
-<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Multimodal Keras Wrapper</a></li>
 <li class="toctree-l1"><a class="reference internal" href="modules.html">Available Modules</a></li>
 </ul>
 
@@ -168,18 +168,26 @@
   <dt><a href="modules.html#keras_wrapper.cnn_model.Model_Wrapper.add_One_vs_One_Inception_Functional">add_One_vs_One_Inception_Functional() (keras_wrapper.cnn_model.Model_Wrapper method)</a>
   </dt>
 
-  </dl></td>
-  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.cnn_model.Model_Wrapper.add_One_vs_One_Inception_v2">add_One_vs_One_Inception_v2() (keras_wrapper.cnn_model.Model_Wrapper method)</a>
   </dt>
 
+  </dl></td>
+  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.cnn_model.Model_Wrapper.add_transitionup_block">add_transitionup_block() (keras_wrapper.cnn_model.Model_Wrapper method)</a>
   </dt>
 
       
   <dt><a href="modules.html#keras_wrapper.ecoc_classifier.ECOC_Classifier.append">append() (keras_wrapper.ecoc_classifier.ECOC_Classifier method)</a>
+  </dt>
+
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.applyClassMapping">applyClassMapping() (keras_wrapper.stage.Stage method)</a>
+  </dt>
+
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.applyMask">applyMask() (keras_wrapper.stage.Stage method)</a>
   </dt>
 
   </dl></td>
@@ -260,14 +268,22 @@
   <dt><a href="modules.html#keras_wrapper.cnn_model.Model_Wrapper.decode_predictions">decode_predictions() (keras_wrapper.cnn_model.Model_Wrapper method)</a>
   </dt>
 
-  </dl></td>
-  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.cnn_model.Model_Wrapper.decode_predictions_beam_search">decode_predictions_beam_search() (keras_wrapper.cnn_model.Model_Wrapper method)</a>
   </dt>
 
+  </dl></td>
+  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.cnn_model.Model_Wrapper.decode_predictions_one_hot">decode_predictions_one_hot() (keras_wrapper.cnn_model.Model_Wrapper method)</a>
+  </dt>
+
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.defineClassMapping">defineClassMapping() (keras_wrapper.stage.Stage method)</a>
+  </dt>
+
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.defineOutputMask">defineOutputMask() (keras_wrapper.stage.Stage method)</a>
   </dt>
 
       
@@ -357,6 +373,12 @@
   </dt>
 
   </dl></td>
+  <td style="width: 33%" valign="top"><dl>
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.isReadyToTrainOnBatch">isReadyToTrainOnBatch() (keras_wrapper.stage.Stage method)</a>
+  </dt>
+
+  </dl></td>
 </tr></table>
 
 <h2 id="K">K</h2>
@@ -376,6 +398,10 @@
 
   </dl></td>
   <td style="width: 33%" valign="top"><dl>
+      
+  <dt><a href="modules.html#module-keras_wrapper.stage">keras_wrapper.stage (module)</a>
+  </dt>
+
       
   <dt><a href="modules.html#module-keras_wrapper.thread_loader">keras_wrapper.thread_loader (module)</a>
   </dt>
@@ -485,6 +511,10 @@
       <dd><dl>
         
   <dt><a href="modules.html#keras_wrapper.ecoc_classifier.ECOC_Classifier.predictOnBatch">(keras_wrapper.ecoc_classifier.ECOC_Classifier method)</a>
+  </dt>
+
+        
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.predictOnBatch">(keras_wrapper.stage.Stage method)</a>
   </dt>
 
       </dl></dd>
@@ -616,12 +646,12 @@
   <dt><a href="modules.html#keras_wrapper.dataset.Dataset.setLabels">setLabels() (keras_wrapper.dataset.Dataset method)</a>
   </dt>
 
-  </dl></td>
-  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.dataset.Dataset.setList">setList() (keras_wrapper.dataset.Dataset method)</a>
   </dt>
 
+  </dl></td>
+  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.dataset.Dataset.setListGeneral">setListGeneral() (keras_wrapper.dataset.Dataset method)</a>
   </dt>
@@ -658,6 +688,10 @@
   <dt><a href="modules.html#keras_wrapper.ecoc_classifier.ECOC_Classifier.softmax">softmax() (keras_wrapper.ecoc_classifier.ECOC_Classifier method)</a>
   </dt>
 
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage">Stage (class in keras_wrapper.stage)</a>
+  </dt>
+
   </dl></td>
 </tr></table>
 
@@ -681,6 +715,10 @@
   <dt><a href="modules.html#keras_wrapper.ecoc_classifier.ECOC_Classifier.testOnBatch">(keras_wrapper.ecoc_classifier.ECOC_Classifier method)</a>
   </dt>
 
+        
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.testOnBatch">(keras_wrapper.stage.Stage method)</a>
+  </dt>
+
       </dl></dd>
       
   <dt><a href="modules.html#keras_wrapper.thread_loader.ThreadDataLoader">ThreadDataLoader (class in keras_wrapper.thread_loader)</a>
@@ -702,12 +740,12 @@
   <dt><a href="modules.html#keras_wrapper.dataset.Dataset.tokenize_CNN_sentence">tokenize_CNN_sentence() (keras_wrapper.dataset.Dataset method)</a>
   </dt>
 
-  </dl></td>
-  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.dataset.Dataset.tokenize_icann">tokenize_icann() (keras_wrapper.dataset.Dataset method)</a>
   </dt>
 
+  </dl></td>
+  <td style="width: 33%" valign="top"><dl>
       
   <dt><a href="modules.html#keras_wrapper.dataset.Dataset.tokenize_montreal">tokenize_montreal() (keras_wrapper.dataset.Dataset method)</a>
   </dt>
@@ -730,6 +768,18 @@
 
       
   <dt><a href="modules.html#keras_wrapper.cnn_model.Model_Wrapper.trainNet">trainNet() (keras_wrapper.cnn_model.Model_Wrapper method)</a>
+  </dt>
+
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.trainOnBatch">trainOnBatch() (keras_wrapper.stage.Stage method)</a>
+  </dt>
+
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.trainOnBatch_DEPRECATED_class_weight">trainOnBatch_DEPRECATED_class_weight() (keras_wrapper.stage.Stage method)</a>
+  </dt>
+
+      
+  <dt><a href="modules.html#keras_wrapper.stage.Stage.trainOnBatch_DEPRECATED_lists">trainOnBatch_DEPRECATED_lists() (keras_wrapper.stage.Stage method)</a>
   </dt>
 
   </dl></td>
