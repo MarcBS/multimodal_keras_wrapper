@@ -1178,7 +1178,7 @@ class Model_Wrapper(object):
             if params['optimized_search']: # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
                 if params['pos_unk']:
-                    hyp_alphas = prev_out[-1][0] # Shape: (k, n_steps)
+                    alphas = prev_out[-1][0] # Shape: (k, n_steps)
                     prev_out = prev_out[:-1]
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
@@ -1187,13 +1187,11 @@ class Model_Wrapper(object):
             cand_flat = cand_scores.flatten()
             # Find the best options by calling argsort of flatten array
             ranks_flat = cand_flat.argsort()[:(k-dead_k)]
-
             # Decypher flatten indices
             voc_size = probs.shape[1]
             trans_indices = ranks_flat / voc_size # index of row
             word_indices = ranks_flat % voc_size # index of col
             costs = cand_flat[ranks_flat]
-
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_hyp_scores = np.zeros(k-dead_k).astype('float32')
@@ -1203,7 +1201,7 @@ class Model_Wrapper(object):
                 new_hyp_samples.append(hyp_samples[ti]+[wi])
                 new_hyp_scores[idx] = copy.copy(costs[idx])
                 if params['pos_unk']:
-                    new_hyp_alphas.append(hyp_alphas[ti]+[wi])
+                    new_hyp_alphas.append(hyp_alphas[ti]+[alphas[ti]])
 
             # check the finished samples
             new_live_k = 0
@@ -1407,9 +1405,9 @@ class Model_Wrapper(object):
                     best_sample = samples[best_score]
                     best_samples.append(best_sample)
                     if params['pos_unk']:
-                        best_alphas.append(alphas[best_score])
+                        best_alphas.append(np.asarray(alphas[best_score]))
                     total_cost += scores[best_score]
-                    eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
+                    eta = (n_samples - sampled) * (time.time() - start_time) / sampled
                     if params['n_samples'] > 0:
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
@@ -1615,8 +1613,48 @@ class Model_Wrapper(object):
         return answer_pred
 
 
+    def replace_unknown_words(self, src_word_seq, trg_word_seq,
+                              hard_alignment, unk_symbol, heuristic=0, mapping=dict(), verbose=0):
+
+        trans_words = trg_word_seq
+        new_trans_words = []
+        if verbose == 1:
+            print "Input sentence:", " ".join(src_word_seq)
+        for j in xrange(len(trans_words)): # -1 : Don't write <eos>
+            if trans_words[j] == unk_symbol:
+                UNK_src = src_word_seq[hard_alignment[j]]
+                if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
+                    new_trans_words.append(UNK_src)
+                    if verbose == 1:
+                        print UNK_src, "to position", j
+                elif heuristic == 1:
+                    # Use the most likely translation (with t-table). If not found, copy the source word.
+                    # Ok for small vocabulary (~30k) models
+                    raise NotImplementedError
+                    if mapping.get(UNK_src) is not None:
+                        new_trans_words.append(mapping[UNK_src])
+                    else:
+                        new_trans_words.append(UNK_src)
+                elif heuristic == 2:
+                    # Use t-table if the source word starts with a lowercase letter. Otherwise copy
+                    # Sometimes works better than other heuristics
+                    raise NotImplementedError
+                    if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
+                        new_trans_words.append(mapping[UNK_src])
+                    else:
+                        new_trans_words.append(UNK_src)
+            else:
+                new_trans_words.append(trans_words[j])
+        to_write = ''
+        for j, word in enumerate(new_trans_words):
+            to_write = to_write + word
+            if j < len(new_trans_words):
+                to_write += ' '
+        return to_write
+
     def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
-                                       x_text=None, index2word_src=None, pad_sequences=False, verbose=0):
+                                       x_text=None, unk_symbol='<unk>', pad_sequences=False,
+                                       mapping=None, verbose=0):
         """
         Decodes predictions from the BeamSearch method.
         :param preds: Predictions codified as word indices.
@@ -1629,19 +1667,35 @@ class Model_Wrapper(object):
             logging.info('Decoding beam search prediction ...')
 
         if alphas is not None:
-            assert x_text is not None and index2word_src is not None, 'When using POS_UNK, you must provide the input' \
-                                                                      'text and the corresponding index2word mapping ' \
-                                                                      'to decode_predictions_beam_search!'
-
+            assert x_text is not None, 'When using POS_UNK, you must provide the input ' \
+                                       'text to decode_predictions_beam_search!'
         if pad_sequences:
-            preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
-
+                preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
         flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
         answer_pred = []
-        for a_no in flattened_answer_pred:
-            init_token_pos = 0
-            tmp = ' '.join(a_no[:-1])
-            answer_pred.append(tmp)
+
+        if alphas is not None:
+            hard_alignments = map(lambda x: np.argmax(x, axis=1), alphas)  # num_samples x trg_len
+            for i, a_no in enumerate(flattened_answer_pred):
+                if unk_symbol in a_no:
+                    if verbose == 1:
+                        print unk_symbol, "at sentence number", i
+                        print "hypothesis:", a_no
+                    a_no = self.replace_unknown_words(x_text[i].split(),
+                                                      a_no,
+                                                      hard_alignments[i],
+                                                      unk_symbol,
+                                                      heuristic=heuristic,
+                                                      mapping=mapping,
+                                                      verbose=verbose)
+                    if verbose == 1:
+                        print "After unk_replace:", a_no
+                tmp = ' '.join(a_no[:-1])
+                answer_pred.append(tmp)
+        else:
+            for a_no in flattened_answer_pred:
+                tmp = ' '.join(a_no[:-1])
+                answer_pred.append(tmp)
         return answer_pred
 
 
