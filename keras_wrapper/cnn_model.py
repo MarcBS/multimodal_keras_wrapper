@@ -1136,7 +1136,12 @@ class Model_Wrapper(object):
         ##########################################
         # Get inputs
         ##########################################
-        if ii == 1: # optimized search model and timestep == 1 (model_init to model_next)
+        if ii == 0: # not optimized search model or first timestep
+            for model_input in params['model_inputs'][:-1]:
+                if X[model_input].shape[0] == 1:
+                    in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+            in_data[params['model_inputs'][-1]] = states_below
+        elif ii == 1: # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:,-1]
@@ -1147,7 +1152,7 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
 
-        elif ii > 1:  # optimized search model and timestep > 1 (model_next to model_next)
+        elif ii > 1:  # timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:, -1]
@@ -1247,7 +1252,6 @@ class Model_Wrapper(object):
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
-
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
             if k > params['maxlen']:
