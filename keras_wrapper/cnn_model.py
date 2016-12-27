@@ -1360,6 +1360,8 @@ class Model_Wrapper(object):
             best_samples = []
             if params['pos_unk']:
                 best_alphas = []
+                sources = []
+
             total_cost = 0
             sampled = 0
             start_time = time.time()
@@ -1378,8 +1380,13 @@ class Model_Wrapper(object):
                     for output_id in params['model_outputs']:
                         Y[output_id] = data[1][output_id]
                 else:
+                    s_dict = {}
                     for input_id in params['model_inputs']:
                         X[input_id] = data[input_id]
+                        if params['pos_unk']:
+                            s_dict[input_id] = X[input_id]
+                    if params['pos_unk']:
+                        sources.append(s_dict)
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
@@ -1414,7 +1421,7 @@ class Model_Wrapper(object):
             sys.stdout.flush()
 
             if params['pos_unk']:
-                predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas))
+                predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
             else:
                 predictions[s] = np.asarray(best_samples)
 
@@ -1452,8 +1459,6 @@ class Model_Wrapper(object):
             predictions[s] = []
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
-
-
             # Calculate how many interations are we going to perform
             if default_params['n_samples'] is None:
                 n_samples = eval("ds.len_"+s)
@@ -1610,8 +1615,8 @@ class Model_Wrapper(object):
         return answer_pred
 
 
-    def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=None,
-                                       pad_sequences=False, verbose=0):
+    def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
+                                       x_text=None, index2word_src=None, pad_sequences=False, verbose=0):
         """
         Decodes predictions from the BeamSearch method.
         :param preds: Predictions codified as word indices.
@@ -1622,6 +1627,12 @@ class Model_Wrapper(object):
         """
         if verbose > 0:
             logging.info('Decoding beam search prediction ...')
+
+        if alphas is not None:
+            assert x_text is not None and index2word_src is not None, 'When using POS_UNK, you must provide the input' \
+                                                                      'text and the corresponding index2word mapping ' \
+                                                                      'to decode_predictions_beam_search!'
+
         if pad_sequences:
             preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
 
