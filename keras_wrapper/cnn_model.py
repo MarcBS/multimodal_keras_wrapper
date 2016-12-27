@@ -1041,8 +1041,7 @@ class Model_Wrapper(object):
     #       PREDICTION FUNCTIONS
     #           Functions for making prediction on input samples
     # ------------------------------------------------------- #
-
-    def predict_cond(self, X, states_below, params, ii, optimized_search=False, prev_out=None):
+    def predict_cond(self, X, states_below, params, ii):
         """
         Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
         WARNING!: It's assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
@@ -1050,8 +1049,75 @@ class Model_Wrapper(object):
         :param states_below: Batch of partial hypotheses
         :param params: Decoding parameters
         :param ii: Decoding time-step
-        :param optimized_search: indicates if we are using optimized search
-        (only applicable if beam search specific models self.model_init and self.model_next models are defined)
+        :return: Network predictions at time-step ii
+        """
+        in_data = {}
+        n_samples = states_below.shape[0]
+
+        ##########################################
+        # Choose model to use for sampling
+        ##########################################
+        model = self.model
+        for model_input in params['model_inputs'][:-1]:
+            if X[model_input].shape[0] == 1:
+                in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+        in_data[params['model_inputs'][-1]] = states_below
+
+        ##########################################
+        # Recover output identifiers
+        ##########################################
+        # in any case, the first output of the models must be the next words' probabilities
+        pick_idx = -1
+        output_ids_list = params['model_outputs']
+        pick_idx = ii
+
+        ##########################################
+        # Apply prediction on current timestep
+        ##########################################
+        if params['batch_size'] >= n_samples: # The model inputs beam will fit into one batch in memory
+            out_data = model.predict_on_batch(in_data)
+        else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
+            for i in range(n_samples):
+                aux_in_data = {}
+                for k,v in in_data.iteritems():
+                    aux_in_data[k] = np.expand_dims(v[i], axis=0)
+                predicted_out = model.predict_on_batch(aux_in_data)
+                if i == 0:
+                    out_data = predicted_out
+                else:
+                    if len(output_ids_list) > 1:
+                        for iout in range(len(output_ids_list)):
+                            out_data[iout] = np.vstack((out_data[iout], predicted_out[iout]))
+                    else:
+                        out_data = np.vstack((out_data, predicted_out))
+
+        ##########################################
+        # Get outputs
+        ##########################################
+
+        if len(output_ids_list) > 1:
+            all_data = {}
+            for output_id in range(len(output_ids_list)):
+                all_data[output_ids_list[output_id]] = out_data[output_id]
+            all_data[output_ids_list[0]] = np.array(all_data[output_ids_list[0]])[:, pick_idx, :]
+        else:
+            all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
+        probs = all_data[output_ids_list[0]]
+
+        ##########################################
+        # Define returned data
+        ##########################################
+        return probs
+
+
+    def predict_cond_optimized(self, X, states_below, params, ii, prev_out):
+        """
+        Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
+        WARNING!: It's assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
+        :param X: Input context
+        :param states_below: Batch of partial hypotheses
+        :param params: Decoding parameters
+        :param ii: Decoding time-step
         :param prev_out: output from the previous timestep, which will be reused by self.model_next
         (only applicable if beam search specific models self.model_init and self.model_next models are defined)
         :return: Network predictions at time-step ii
@@ -1062,9 +1128,7 @@ class Model_Wrapper(object):
         ##########################################
         # Choose model to use for sampling
         ##########################################
-        if not optimized_search:
-            model = self.model
-        elif ii == 0:
+        if ii == 0:
             model = self.model_init
         else:
             model = self.model_next
@@ -1072,15 +1136,7 @@ class Model_Wrapper(object):
         ##########################################
         # Get inputs
         ##########################################
-        if ii == 0 or not optimized_search: # not optimized search model or first timestep
-
-            for model_input in params['model_inputs'][:-1]:
-                if X[model_input].shape[0] == 1:
-                    in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
-            in_data[params['model_inputs'][-1]] = states_below
-
-        elif ii == 1 and optimized_search: # optimized search model and timestep == 1 (model_init to model_next)
-
+        if ii == 1: # optimized search model and timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:,-1]
@@ -1091,8 +1147,7 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
 
-        elif ii > 1 and optimized_search:  # optimized search model and timestep > 1 (model_next to model_next)
-
+        elif ii > 1:  # optimized search model and timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:, -1]
@@ -1108,12 +1163,9 @@ class Model_Wrapper(object):
         ##########################################
         # in any case, the first output of the models must be the next words' probabilities
         pick_idx = -1
-        if not optimized_search:  # not optimized search model
-            output_ids_list = params['model_outputs']
-            pick_idx = ii
-        elif ii == 0 and optimized_search:  # optimized search model (model_init case)
+        if ii == 0:  # optimized search model (model_init case)
             output_ids_list = self.ids_outputs_init
-        elif ii > 0 and optimized_search:  # optimized search model (model_next case)
+        elif ii > 0:  # optimized search model (model_next case)
             output_ids_list = self.ids_outputs_next
 
 
@@ -1153,10 +1205,7 @@ class Model_Wrapper(object):
         ##########################################
         # Define returned data
         ##########################################
-        if not optimized_search:
-            return probs
-        else:
-            return [probs, out_data]
+        return [probs, out_data]
 
 
     def beam_search(self, X, params, null_sym=2):
@@ -1211,8 +1260,7 @@ class Model_Wrapper(object):
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']: # use optimized search model if available
-                [probs, prev_out] = self.predict_cond(X, state_below, params, ii,
-                                                        optimized_search=True, prev_out=prev_out)
+                [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
