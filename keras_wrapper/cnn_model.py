@@ -283,14 +283,6 @@ class Model_Wrapper(object):
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
             self.model.compile(loss=loss, optimizer=sgd, metrics=metrics)
-        elif isinstance(self.model, Graph):
-            if not isinstance(loss, dict):
-                loss_dict = dict()
-                for out in self.model.output_order:
-                    loss_dict[out] = loss
-            else:
-                loss_dict = loss
-            self.model.compile(loss=loss_dict, optimizer=sgd, metrics=metrics)
         else:
             raise NotImplementedError()
 
@@ -388,89 +380,6 @@ class Model_Wrapper(object):
             raise NotImplementedError("Try using self.removeLayers(...) instead.")
 
         return [removed_layers, removed_params]
-
-
-    def removeLayers(self, layers_names):
-        """
-            Removes the list of layers whose names are passed by parameter from the current network.
-            Function only valid for Graph models. Use self.replaceLastLayers(...) for Sequential models.
-        """
-        removed_layers = []
-        removed_params = []
-        if isinstance(self.model, Graph):
-            for layer in layers_names:
-                removed_layers.append(self.model.nodes.pop(layer))
-                self.model.namespace.remove(layer)
-            detected = []
-            for i, layers in enumerate(self.model.node_config):
-                try:
-                    pos = layers_names.index(layers['name'])
-                    detected.append(i)
-                    layers_names.pop(pos)
-                except:
-                    pass
-            n_detected = len(detected)
-            for i in range(n_detected):
-                removed_params.append(self.model.node_config.pop(detected.pop()))
-
-        else:
-            raise NotImplementedError("Try using self.replaceLastLayers(...) instead.")
-
-        return [removed_layers, removed_params[::-1]]
-
-
-    def removeOutputs(self, outputs_names):
-        """
-            Removes the list of outputs whose names are passed by parameter from the current network.
-            This function is only valid for Graph models.
-        """
-        if isinstance(self.model, Graph):
-            new_outputs = []
-            for output in self.model.output_order:
-                if output not in outputs_names:
-                    new_outputs.append(output)
-            self.model.output_order = new_outputs
-            detected = []
-            for i, outputs in enumerate(self.model.output_config):
-                try:
-                    pos = outputs_names.index(outputs['name'])
-                    detected.append(i)
-                    outputs_names.pop(pos)
-                except:
-                    pass
-            n_detected = len(detected)
-            for i in range(n_detected):
-                self.model.output_config.pop(detected.pop())
-            return True
-        return False
-
-
-    def removeInputs(self, inputs_names):
-        """
-            Removes the list of inputs whose names are passed by parameter from the current network.
-            This function is only valid for Graph models.
-        """
-        if isinstance(self.model, Graph):
-            new_inputs = []
-            for input in self.model.input_order:
-                if input not in inputs_names:
-                    new_inputs.append(input)
-            self.model.input_order = new_inputs
-            detected = []
-            for i, inputs in enumerate(self.model.input_config):
-                try:
-                    pos = inputs_names.index(inputs['name'])
-                    detected.append(i)
-                    inputs_names.pop(pos)
-                except:
-                    pass
-            n_detected = len(detected)
-            for i in range(n_detected):
-                inp = self.model.input_config.pop(detected.pop())
-                self.model.namespace.remove(inp['name'])
-            return True
-        return False
-
 
     # ------------------------------------------------------- #
     #       TRAINING/TEST
@@ -1252,6 +1161,9 @@ class Model_Wrapper(object):
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
+        if params['pos_unk']:
+            sample_alphas = []
+            hyp_alphas = [[]] * live_k
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
             if k > params['maxlen']:
@@ -1265,6 +1177,9 @@ class Model_Wrapper(object):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']: # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
+                if params['pos_unk']:
+                    hyp_alphas = prev_out[-1][0] # Shape: (k, n_steps)
+                    prev_out = prev_out[:-1]
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
@@ -1282,25 +1197,34 @@ class Model_Wrapper(object):
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_hyp_scores = np.zeros(k-dead_k).astype('float32')
+            if params['pos_unk']:
+                new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                 new_hyp_samples.append(hyp_samples[ti]+[wi])
                 new_hyp_scores[idx] = copy.copy(costs[idx])
+                if params['pos_unk']:
+                    new_hyp_alphas.append(hyp_alphas[ti]+[wi])
 
             # check the finished samples
             new_live_k = 0
             hyp_samples = []
             hyp_scores = []
+            hyp_alphas = []
             indices_alive = []
             for idx in xrange(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == 0:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
+                    if params['pos_unk']:
+                        sample_alphas.append(new_hyp_alphas[idx])
                     dead_k += 1
                 else:
                     indices_alive.append(idx)
                     new_live_k += 1
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
+                    if params['pos_unk']:
+                        hyp_alphas.append(new_hyp_alphas[idx])
             hyp_scores = np.array(hyp_scores)
             live_k = new_live_k
 
@@ -1335,9 +1259,12 @@ class Model_Wrapper(object):
             for idx in xrange(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
-
-        return samples, sample_scores
-
+                if params['pos_unk']:
+                    sample_alphas.append(hyp_alphas[idx])
+        if params['pos_unk']:
+            return samples, sample_scores, sample_alphas
+        else:
+            return samples, sample_scores
 
     def BeamSearchNet(self, ds, parameters):
         """
@@ -1373,7 +1300,9 @@ class Model_Wrapper(object):
                           'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
                           'words_so_far': False,
-                          'optimized_search': False
+                          'optimized_search': False,
+                          'pos_unk': False,
+                          'heuristic': 0
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -1398,6 +1327,8 @@ class Model_Wrapper(object):
         for s in params['predict_on_sets']:
             logging.info("<<< Predicting outputs of "+s+" set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if not params['optimized_search']: # use optimized search model if available
+                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
             params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
@@ -1426,7 +1357,9 @@ class Model_Wrapper(object):
             if params['n_samples'] > 0:
                 references = []
                 sources = []
-            out = []
+            best_samples = []
+            if params['pos_unk']:
+                best_alphas = []
             total_cost = 0
             sampled = 0
             start_time = time.time()
@@ -1456,13 +1389,18 @@ class Model_Wrapper(object):
                     x = dict()
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
-                    samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+                    if params['pos_unk']:
+                        samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+                    else:
+                        samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                     if params['normalize']:
                         counts = [len(sample)**params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
-                    out.append(best_sample)
+                    best_samples.append(best_sample)
+                    if params['pos_unk']:
+                        best_alphas.append(alphas[best_score])
                     total_cost += scores[best_score]
                     eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
                     if params['n_samples'] > 0:
@@ -1475,7 +1413,10 @@ class Model_Wrapper(object):
 
             sys.stdout.flush()
 
-            predictions[s] = np.asarray(out)
+            if params['pos_unk']:
+                predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas))
+            else:
+                predictions[s] = np.asarray(best_samples)
 
         if params['n_samples'] < 1:
             return predictions
@@ -1579,7 +1520,7 @@ class Model_Wrapper(object):
         predictions = self.model.predict_on_batch(X)
 
         # Select output if indicated
-        if isinstance(self.model, Graph) or isinstance(self.model, Model): # Graph
+        if isinstance(self.model, Model): # Graph
             if out_name:
                 predictions = predictions[out_name]
         elif isinstance(self.model, Sequential): # Sequential
@@ -1669,7 +1610,8 @@ class Model_Wrapper(object):
         return answer_pred
 
 
-    def decode_predictions_beam_search(self, preds, index2word, pad_sequences=False, verbose=0):
+    def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=None,
+                                       pad_sequences=False, verbose=0):
         """
         Decodes predictions from the BeamSearch method.
         :param preds: Predictions codified as word indices.
@@ -1726,8 +1668,6 @@ class Model_Wrapper(object):
             data = self._prepareSequentialData(X_batch, Y_batch)
         elif isinstance(self.model, Model):
             data = self._prepareModelData(X_batch, Y_batch)
-        elif isinstance(self.model, Graph):
-            [data, Y_batch] = self._prepareGraphData(X_batch, Y_batch)
         else:
             raise NotImplementedError
         return data
