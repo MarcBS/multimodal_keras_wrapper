@@ -1615,7 +1615,18 @@ class Model_Wrapper(object):
 
     def replace_unknown_words(self, src_word_seq, trg_word_seq,
                               hard_alignment, unk_symbol, heuristic=0, mapping=dict(), verbose=0):
-
+        """
+        Replaces unknown words from the target sentence according to some heuristic.
+        Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
+        :param src_word_seq: Source sentence words
+        :param trg_word_seq: Hypothesis words
+        :param hard_alignment: Target-Source alignments
+        :param unk_symbol: Symbol in trg_word_seq to replace
+        :param heuristic: Heuristic (0, 1, 2)
+        :param mapping: External alignment dictionary
+        :param verbose: Verbosity level
+        :return: trg_word_seq with replaced unknown words
+        """
         trans_words = trg_word_seq
         new_trans_words = []
         if verbose == 1:
@@ -1675,7 +1686,7 @@ class Model_Wrapper(object):
         answer_pred = []
 
         if alphas is not None:
-            hard_alignments = map(lambda x: np.argmax(x, axis=1), alphas)  # num_samples x trg_len
+            hard_alignments = map(lambda x: np.argmax(x, axis=1), alphas)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
                     if verbose == 1:
