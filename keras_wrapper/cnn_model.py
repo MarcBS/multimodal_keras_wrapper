@@ -1614,8 +1614,8 @@ class Model_Wrapper(object):
         return answer_pred
 
 
-    def replace_unknown_words(self, src_word_seq, trg_word_seq,
-                              hard_alignment, unk_symbol, heuristic=0, mapping=None, verbose=0):
+    def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
+                              heuristic=0, mapping=None, verbose=0):
         """
         Replaces unknown words from the target sentence according to some heuristic.
         Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
@@ -1630,7 +1630,7 @@ class Model_Wrapper(object):
         """
         trans_words = trg_word_seq
         new_trans_words = []
-        if verbose == 2:
+        if verbose > 1:
             print "Input sentence:", src_word_seq
             print "Hard alignments", hard_alignment
         for j in xrange(len(trans_words)):
@@ -1638,30 +1638,30 @@ class Model_Wrapper(object):
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
                     new_trans_words.append(UNK_src)
-                    if verbose == 1:
+                    if verbose > 0:
                         print UNK_src, "to position", j
                 elif heuristic == 1:
                     # Use the most likely translation (with t-table). If not found, copy the source word.
                     # Ok for small vocabulary (~30k) models
                     if mapping.get(UNK_src) is not None:
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose == 1:
-                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Copying to position", j
+                        if verbose > 0:
+                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose == 1:
-                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Copying to position", j
+                        if verbose > 0:
+                            print UNK_src, "not found in mapping. Copying source to position", j
                 elif heuristic == 2:
                     # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                     # Sometimes works better than other heuristics
                     if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose == 1:
-                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Copying to position", j
+                        if verbose > 0:
+                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose == 1:
-                            print UNK_src, "not in mapping. Copying to position", j
+                        if verbose > 0:
+                            print UNK_src, "not found in mapping. Copying source to position", j
             else:
                 new_trans_words.append(trans_words[j])
         to_write = ''
@@ -1688,13 +1688,16 @@ class Model_Wrapper(object):
         if alphas is not None:
             assert x_text is not None, 'When using POS_UNK, you must provide the input ' \
                                        'text to decode_predictions_beam_search!'
+            if verbose > 0:
+                logging.info('Using heuristic %d'%heuristic)
         if pad_sequences:
                 preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
         flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
         answer_pred = []
 
         if alphas is not None:
-            hard_alignments = map(lambda x: np.argmax(x, axis=1), alphas)
+            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :len(x_sentence)], axis=1),
+                                  alphas, x_text)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
                     if verbose > 0:
@@ -1710,7 +1713,7 @@ class Model_Wrapper(object):
                                                       heuristic=heuristic,
                                                       mapping=mapping,
                                                       verbose=verbose)
-                    if verbose == 1:
+                    if verbose > 0:
                         print "After unk_replace:", a_no
                 tmp = ' '.join(a_no[:-1])
                 answer_pred.append(tmp)
