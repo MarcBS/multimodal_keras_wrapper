@@ -1614,7 +1614,7 @@ class Model_Wrapper(object):
 
 
     def replace_unknown_words(self, src_word_seq, trg_word_seq,
-                              hard_alignment, unk_symbol, heuristic=0, mapping=dict(), verbose=0):
+                              hard_alignment, unk_symbol, heuristic=0, mapping=None, verbose=0):
         """
         Replaces unknown words from the target sentence according to some heuristic.
         Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
@@ -1630,8 +1630,10 @@ class Model_Wrapper(object):
         trans_words = trg_word_seq
         new_trans_words = []
         if verbose == 1:
-            print "Input sentence:", " ".join(src_word_seq)
-        for j in xrange(len(trans_words)): # -1 : Don't write <eos>
+            #print "Input sentence:", " ".join(src_word_seq)
+            print "Input sentence:", src_word_seq
+            print "Hard alignments", hard_alignment
+        for j in xrange(len(trans_words)):
             if trans_words[j] == unk_symbol:
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
@@ -1641,19 +1643,25 @@ class Model_Wrapper(object):
                 elif heuristic == 1:
                     # Use the most likely translation (with t-table). If not found, copy the source word.
                     # Ok for small vocabulary (~30k) models
-                    raise NotImplementedError
                     if mapping.get(UNK_src) is not None:
                         new_trans_words.append(mapping[UNK_src])
+                        if verbose == 1:
+                            print mapping[UNK_src], "to position", j
                     else:
                         new_trans_words.append(UNK_src)
+                        if verbose == 1:
+                            print UNK_src, "to position", j
                 elif heuristic == 2:
                     # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                     # Sometimes works better than other heuristics
-                    raise NotImplementedError
                     if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                         new_trans_words.append(mapping[UNK_src])
+                        if verbose == 1:
+                            print mapping[UNK_src], "to position", j
                     else:
                         new_trans_words.append(UNK_src)
+                        if verbose == 1:
+                            print UNK_src, "to position", j
             else:
                 new_trans_words.append(trans_words[j])
         to_write = ''
@@ -1692,6 +1700,8 @@ class Model_Wrapper(object):
                     if verbose == 1:
                         print unk_symbol, "at sentence number", i
                         print "hypothesis:", a_no
+                        print "alphas:", alphas[i]
+
                     a_no = self.replace_unknown_words(x_text[i].split(),
                                                       a_no,
                                                       hard_alignments[i],
