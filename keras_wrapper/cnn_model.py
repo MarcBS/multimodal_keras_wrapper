@@ -1300,7 +1300,8 @@ class Model_Wrapper(object):
                           'words_so_far': False,
                           'optimized_search': False,
                           'pos_unk': False,
-                          'heuristic': 0
+                          'heuristic': 0,
+                          'mapping': None
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -1629,8 +1630,7 @@ class Model_Wrapper(object):
         """
         trans_words = trg_word_seq
         new_trans_words = []
-        if verbose == 1:
-            #print "Input sentence:", " ".join(src_word_seq)
+        if verbose == 2:
             print "Input sentence:", src_word_seq
             print "Hard alignments", hard_alignment
         for j in xrange(len(trans_words)):
@@ -1646,22 +1646,22 @@ class Model_Wrapper(object):
                     if mapping.get(UNK_src) is not None:
                         new_trans_words.append(mapping[UNK_src])
                         if verbose == 1:
-                            print mapping[UNK_src], "to position", j
+                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Copying to position", j
                     else:
                         new_trans_words.append(UNK_src)
                         if verbose == 1:
-                            print UNK_src, "to position", j
+                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Copying to position", j
                 elif heuristic == 2:
                     # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                     # Sometimes works better than other heuristics
                     if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                         new_trans_words.append(mapping[UNK_src])
                         if verbose == 1:
-                            print mapping[UNK_src], "to position", j
+                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Copying to position", j
                     else:
                         new_trans_words.append(UNK_src)
                         if verbose == 1:
-                            print UNK_src, "to position", j
+                            print UNK_src, "not in mapping. Copying to position", j
             else:
                 new_trans_words.append(trans_words[j])
         to_write = ''
@@ -1697,10 +1697,11 @@ class Model_Wrapper(object):
             hard_alignments = map(lambda x: np.argmax(x, axis=1), alphas)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
-                    if verbose == 1:
+                    if verbose > 0:
                         print unk_symbol, "at sentence number", i
                         print "hypothesis:", a_no
-                        print "alphas:", alphas[i]
+                        if verbose > 1:
+                            print "alphas:", alphas[i]
 
                     a_no = self.replace_unknown_words(x_text[i].split(),
                                                       a_no,
