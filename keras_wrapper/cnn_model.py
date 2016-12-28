@@ -283,14 +283,6 @@ class Model_Wrapper(object):
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
             self.model.compile(loss=loss, optimizer=sgd, metrics=metrics)
-        elif isinstance(self.model, Graph):
-            if not isinstance(loss, dict):
-                loss_dict = dict()
-                for out in self.model.output_order:
-                    loss_dict[out] = loss
-            else:
-                loss_dict = loss
-            self.model.compile(loss=loss_dict, optimizer=sgd, metrics=metrics)
         else:
             raise NotImplementedError()
 
@@ -388,89 +380,6 @@ class Model_Wrapper(object):
             raise NotImplementedError("Try using self.removeLayers(...) instead.")
 
         return [removed_layers, removed_params]
-
-
-    def removeLayers(self, layers_names):
-        """
-            Removes the list of layers whose names are passed by parameter from the current network.
-            Function only valid for Graph models. Use self.replaceLastLayers(...) for Sequential models.
-        """
-        removed_layers = []
-        removed_params = []
-        if isinstance(self.model, Graph):
-            for layer in layers_names:
-                removed_layers.append(self.model.nodes.pop(layer))
-                self.model.namespace.remove(layer)
-            detected = []
-            for i, layers in enumerate(self.model.node_config):
-                try:
-                    pos = layers_names.index(layers['name'])
-                    detected.append(i)
-                    layers_names.pop(pos)
-                except:
-                    pass
-            n_detected = len(detected)
-            for i in range(n_detected):
-                removed_params.append(self.model.node_config.pop(detected.pop()))
-
-        else:
-            raise NotImplementedError("Try using self.replaceLastLayers(...) instead.")
-
-        return [removed_layers, removed_params[::-1]]
-
-
-    def removeOutputs(self, outputs_names):
-        """
-            Removes the list of outputs whose names are passed by parameter from the current network.
-            This function is only valid for Graph models.
-        """
-        if isinstance(self.model, Graph):
-            new_outputs = []
-            for output in self.model.output_order:
-                if output not in outputs_names:
-                    new_outputs.append(output)
-            self.model.output_order = new_outputs
-            detected = []
-            for i, outputs in enumerate(self.model.output_config):
-                try:
-                    pos = outputs_names.index(outputs['name'])
-                    detected.append(i)
-                    outputs_names.pop(pos)
-                except:
-                    pass
-            n_detected = len(detected)
-            for i in range(n_detected):
-                self.model.output_config.pop(detected.pop())
-            return True
-        return False
-
-
-    def removeInputs(self, inputs_names):
-        """
-            Removes the list of inputs whose names are passed by parameter from the current network.
-            This function is only valid for Graph models.
-        """
-        if isinstance(self.model, Graph):
-            new_inputs = []
-            for input in self.model.input_order:
-                if input not in inputs_names:
-                    new_inputs.append(input)
-            self.model.input_order = new_inputs
-            detected = []
-            for i, inputs in enumerate(self.model.input_config):
-                try:
-                    pos = inputs_names.index(inputs['name'])
-                    detected.append(i)
-                    inputs_names.pop(pos)
-                except:
-                    pass
-            n_detected = len(detected)
-            for i in range(n_detected):
-                inp = self.model.input_config.pop(detected.pop())
-                self.model.namespace.remove(inp['name'])
-            return True
-        return False
-
 
     # ------------------------------------------------------- #
     #       TRAINING/TEST
@@ -1041,8 +950,7 @@ class Model_Wrapper(object):
     #       PREDICTION FUNCTIONS
     #           Functions for making prediction on input samples
     # ------------------------------------------------------- #
-
-    def predict_cond(self, X, states_below, params, ii, optimized_search=False, prev_out=None):
+    def predict_cond(self, X, states_below, params, ii):
         """
         Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
         WARNING!: It's assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
@@ -1050,8 +958,75 @@ class Model_Wrapper(object):
         :param states_below: Batch of partial hypotheses
         :param params: Decoding parameters
         :param ii: Decoding time-step
-        :param optimized_search: indicates if we are using optimized search
-        (only applicable if beam search specific models self.model_init and self.model_next models are defined)
+        :return: Network predictions at time-step ii
+        """
+        in_data = {}
+        n_samples = states_below.shape[0]
+
+        ##########################################
+        # Choose model to use for sampling
+        ##########################################
+        model = self.model
+        for model_input in params['model_inputs'][:-1]:
+            if X[model_input].shape[0] == 1:
+                in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+        in_data[params['model_inputs'][-1]] = states_below
+
+        ##########################################
+        # Recover output identifiers
+        ##########################################
+        # in any case, the first output of the models must be the next words' probabilities
+        pick_idx = -1
+        output_ids_list = params['model_outputs']
+        pick_idx = ii
+
+        ##########################################
+        # Apply prediction on current timestep
+        ##########################################
+        if params['batch_size'] >= n_samples: # The model inputs beam will fit into one batch in memory
+            out_data = model.predict_on_batch(in_data)
+        else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
+            for i in range(n_samples):
+                aux_in_data = {}
+                for k,v in in_data.iteritems():
+                    aux_in_data[k] = np.expand_dims(v[i], axis=0)
+                predicted_out = model.predict_on_batch(aux_in_data)
+                if i == 0:
+                    out_data = predicted_out
+                else:
+                    if len(output_ids_list) > 1:
+                        for iout in range(len(output_ids_list)):
+                            out_data[iout] = np.vstack((out_data[iout], predicted_out[iout]))
+                    else:
+                        out_data = np.vstack((out_data, predicted_out))
+
+        ##########################################
+        # Get outputs
+        ##########################################
+
+        if len(output_ids_list) > 1:
+            all_data = {}
+            for output_id in range(len(output_ids_list)):
+                all_data[output_ids_list[output_id]] = out_data[output_id]
+            all_data[output_ids_list[0]] = np.array(all_data[output_ids_list[0]])[:, pick_idx, :]
+        else:
+            all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
+        probs = all_data[output_ids_list[0]]
+
+        ##########################################
+        # Define returned data
+        ##########################################
+        return probs
+
+
+    def predict_cond_optimized(self, X, states_below, params, ii, prev_out):
+        """
+        Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
+        WARNING!: It's assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
+        :param X: Input context
+        :param states_below: Batch of partial hypotheses
+        :param params: Decoding parameters
+        :param ii: Decoding time-step
         :param prev_out: output from the previous timestep, which will be reused by self.model_next
         (only applicable if beam search specific models self.model_init and self.model_next models are defined)
         :return: Network predictions at time-step ii
@@ -1062,9 +1037,7 @@ class Model_Wrapper(object):
         ##########################################
         # Choose model to use for sampling
         ##########################################
-        if not optimized_search:
-            model = self.model
-        elif ii == 0:
+        if ii == 0:
             model = self.model_init
         else:
             model = self.model_next
@@ -1072,15 +1045,12 @@ class Model_Wrapper(object):
         ##########################################
         # Get inputs
         ##########################################
-        if ii == 0 or not optimized_search: # not optimized search model or first timestep
-
+        if ii == 0: # not optimized search model or first timestep
             for model_input in params['model_inputs'][:-1]:
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             in_data[params['model_inputs'][-1]] = states_below
-
-        elif ii == 1 and optimized_search: # optimized search model and timestep == 1 (model_init to model_next)
-
+        elif ii == 1: # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:,-1]
@@ -1091,8 +1061,7 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
 
-        elif ii > 1 and optimized_search:  # optimized search model and timestep > 1 (model_next to model_next)
-
+        elif ii > 1:  # timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
                     in_data[self.ids_inputs_next[0]] = states_below[:, -1]
@@ -1108,12 +1077,9 @@ class Model_Wrapper(object):
         ##########################################
         # in any case, the first output of the models must be the next words' probabilities
         pick_idx = -1
-        if not optimized_search:  # not optimized search model
-            output_ids_list = params['model_outputs']
-            pick_idx = ii
-        elif ii == 0 and optimized_search:  # optimized search model (model_init case)
+        if ii == 0:  # optimized search model (model_init case)
             output_ids_list = self.ids_outputs_init
-        elif ii > 0 and optimized_search:  # optimized search model (model_next case)
+        elif ii > 0:  # optimized search model (model_next case)
             output_ids_list = self.ids_outputs_next
 
 
@@ -1153,10 +1119,7 @@ class Model_Wrapper(object):
         ##########################################
         # Define returned data
         ##########################################
-        if not optimized_search:
-            return probs
-        else:
-            return [probs, out_data]
+        return [probs, out_data]
 
 
     def beam_search(self, X, params, null_sym=2):
@@ -1198,7 +1161,9 @@ class Model_Wrapper(object):
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores  = np.zeros(live_k).astype('float32')
-
+        if params['pos_unk']:
+            sample_alphas = []
+            hyp_alphas = [[]] * live_k
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
             if k > params['maxlen']:
@@ -1211,8 +1176,10 @@ class Model_Wrapper(object):
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']: # use optimized search model if available
-                [probs, prev_out] = self.predict_cond(X, state_below, params, ii,
-                                                        optimized_search=True, prev_out=prev_out)
+                [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
+                if params['pos_unk']:
+                    alphas = prev_out[-1][0] # Shape: (k, n_steps)
+                    prev_out = prev_out[:-1]
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
@@ -1220,35 +1187,42 @@ class Model_Wrapper(object):
             cand_flat = cand_scores.flatten()
             # Find the best options by calling argsort of flatten array
             ranks_flat = cand_flat.argsort()[:(k-dead_k)]
-
             # Decypher flatten indices
             voc_size = probs.shape[1]
             trans_indices = ranks_flat / voc_size # index of row
             word_indices = ranks_flat % voc_size # index of col
             costs = cand_flat[ranks_flat]
-
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_hyp_scores = np.zeros(k-dead_k).astype('float32')
+            if params['pos_unk']:
+                new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                 new_hyp_samples.append(hyp_samples[ti]+[wi])
                 new_hyp_scores[idx] = copy.copy(costs[idx])
+                if params['pos_unk']:
+                    new_hyp_alphas.append(hyp_alphas[ti]+[alphas[ti]])
 
             # check the finished samples
             new_live_k = 0
             hyp_samples = []
             hyp_scores = []
+            hyp_alphas = []
             indices_alive = []
             for idx in xrange(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == 0:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
+                    if params['pos_unk']:
+                        sample_alphas.append(new_hyp_alphas[idx])
                     dead_k += 1
                 else:
                     indices_alive.append(idx)
                     new_live_k += 1
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
+                    if params['pos_unk']:
+                        hyp_alphas.append(new_hyp_alphas[idx])
             hyp_scores = np.array(hyp_scores)
             live_k = new_live_k
 
@@ -1283,9 +1257,12 @@ class Model_Wrapper(object):
             for idx in xrange(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
-
-        return samples, sample_scores
-
+                if params['pos_unk']:
+                    sample_alphas.append(hyp_alphas[idx])
+        if params['pos_unk']:
+            return samples, sample_scores, sample_alphas
+        else:
+            return samples, sample_scores
 
     def BeamSearchNet(self, ds, parameters):
         """
@@ -1321,7 +1298,10 @@ class Model_Wrapper(object):
                           'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
                           'words_so_far': False,
-                          'optimized_search': False
+                          'optimized_search': False,
+                          'pos_unk': False,
+                          'heuristic': 0,
+                          'mapping': None
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -1346,6 +1326,8 @@ class Model_Wrapper(object):
         for s in params['predict_on_sets']:
             logging.info("<<< Predicting outputs of "+s+" set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if not params['optimized_search']: # use optimized search model if available
+                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
             params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
@@ -1374,7 +1356,11 @@ class Model_Wrapper(object):
             if params['n_samples'] > 0:
                 references = []
                 sources = []
-            out = []
+            best_samples = []
+            if params['pos_unk']:
+                best_alphas = []
+                sources = []
+
             total_cost = 0
             sampled = 0
             start_time = time.time()
@@ -1393,8 +1379,13 @@ class Model_Wrapper(object):
                     for output_id in params['model_outputs']:
                         Y[output_id] = data[1][output_id]
                 else:
+                    s_dict = {}
                     for input_id in params['model_inputs']:
                         X[input_id] = data[input_id]
+                        if params['pos_unk']:
+                            s_dict[input_id] = X[input_id]
+                    if params['pos_unk']:
+                        sources.append(s_dict)
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
@@ -1404,15 +1395,20 @@ class Model_Wrapper(object):
                     x = dict()
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
-                    samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+                    if params['pos_unk']:
+                        samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+                    else:
+                        samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                     if params['normalize']:
                         counts = [len(sample)**params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
-                    out.append(best_sample)
+                    best_samples.append(best_sample)
+                    if params['pos_unk']:
+                        best_alphas.append(np.asarray(alphas[best_score]))
                     total_cost += scores[best_score]
-                    eta = (n_samples - sampled) *  (time.time() - start_time) / sampled
+                    eta = (n_samples - sampled) * (time.time() - start_time) / sampled
                     if params['n_samples'] > 0:
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
@@ -1423,7 +1419,10 @@ class Model_Wrapper(object):
 
             sys.stdout.flush()
 
-            predictions[s] = np.asarray(out)
+            if params['pos_unk']:
+                predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
+            else:
+                predictions[s] = np.asarray(best_samples)
 
         if params['n_samples'] < 1:
             return predictions
@@ -1459,8 +1458,6 @@ class Model_Wrapper(object):
             predictions[s] = []
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
-
-
             # Calculate how many interations are we going to perform
             if default_params['n_samples'] is None:
                 n_samples = eval("ds.len_"+s)
@@ -1527,7 +1524,7 @@ class Model_Wrapper(object):
         predictions = self.model.predict_on_batch(X)
 
         # Select output if indicated
-        if isinstance(self.model, Graph) or isinstance(self.model, Model): # Graph
+        if isinstance(self.model, Model): # Graph
             if out_name:
                 predictions = predictions[out_name]
         elif isinstance(self.model, Sequential): # Sequential
@@ -1617,7 +1614,66 @@ class Model_Wrapper(object):
         return answer_pred
 
 
-    def decode_predictions_beam_search(self, preds, index2word, pad_sequences=False, verbose=0):
+    def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
+                              heuristic=0, mapping=None, verbose=0):
+        """
+        Replaces unknown words from the target sentence according to some heuristic.
+        Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
+        :param src_word_seq: Source sentence words
+        :param trg_word_seq: Hypothesis words
+        :param hard_alignment: Target-Source alignments
+        :param unk_symbol: Symbol in trg_word_seq to replace
+        :param heuristic: Heuristic (0, 1, 2)
+        :param mapping: External alignment dictionary
+        :param verbose: Verbosity level
+        :return: trg_word_seq with replaced unknown words
+        """
+        trans_words = trg_word_seq
+        new_trans_words = []
+        if verbose > 1:
+            print "Input sentence:", src_word_seq
+            print "Hard alignments", hard_alignment
+        for j in xrange(len(trans_words)):
+            if trans_words[j] == unk_symbol:
+                UNK_src = src_word_seq[hard_alignment[j]]
+                if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
+                    new_trans_words.append(UNK_src)
+                    if verbose > 0:
+                        print UNK_src, "to position", j
+                elif heuristic == 1:
+                    # Use the most likely translation (with t-table). If not found, copy the source word.
+                    # Ok for small vocabulary (~30k) models
+                    if mapping.get(UNK_src) is not None:
+                        new_trans_words.append(mapping[UNK_src])
+                        if verbose > 0:
+                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
+                    else:
+                        new_trans_words.append(UNK_src)
+                        if verbose > 0:
+                            print UNK_src, "not found in mapping. Copying source to position", j
+                elif heuristic == 2:
+                    # Use t-table if the source word starts with a lowercase letter. Otherwise copy
+                    # Sometimes works better than other heuristics
+                    if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
+                        new_trans_words.append(mapping[UNK_src])
+                        if verbose > 0:
+                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
+                    else:
+                        new_trans_words.append(UNK_src)
+                        if verbose > 0:
+                            print UNK_src, "not found in mapping. Copying source to position", j
+            else:
+                new_trans_words.append(trans_words[j])
+        to_write = ''
+        for j, word in enumerate(new_trans_words):
+            to_write = to_write + word
+            if j < len(new_trans_words):
+                to_write += ' '
+        return to_write
+
+    def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
+                                       x_text=None, unk_symbol='<unk>', pad_sequences=False,
+                                       mapping=None, verbose=0):
         """
         Decodes predictions from the BeamSearch method.
         :param preds: Predictions codified as word indices.
@@ -1628,15 +1684,43 @@ class Model_Wrapper(object):
         """
         if verbose > 0:
             logging.info('Decoding beam search prediction ...')
-        if pad_sequences:
-            preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
 
+        if alphas is not None:
+            assert x_text is not None, 'When using POS_UNK, you must provide the input ' \
+                                       'text to decode_predictions_beam_search!'
+            if verbose > 0:
+                logging.info('Using heuristic %d'%heuristic)
+        if pad_sequences:
+                preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
         flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
         answer_pred = []
-        for a_no in flattened_answer_pred:
-            init_token_pos = 0
-            tmp = ' '.join(a_no[:-1])
-            answer_pred.append(tmp)
+
+        if alphas is not None:
+            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :len(x_sentence)], axis=1),
+                                  alphas, x_text)
+            for i, a_no in enumerate(flattened_answer_pred):
+                if unk_symbol in a_no:
+                    if verbose > 0:
+                        print unk_symbol, "at sentence number", i
+                        print "hypothesis:", a_no
+                        if verbose > 1:
+                            print "alphas:", alphas[i]
+
+                    a_no = self.replace_unknown_words(x_text[i].split(),
+                                                      a_no,
+                                                      hard_alignments[i],
+                                                      unk_symbol,
+                                                      heuristic=heuristic,
+                                                      mapping=mapping,
+                                                      verbose=verbose)
+                    if verbose > 0:
+                        print "After unk_replace:", a_no
+                tmp = ' '.join(a_no[:-1])
+                answer_pred.append(tmp)
+        else:
+            for a_no in flattened_answer_pred:
+                tmp = ' '.join(a_no[:-1])
+                answer_pred.append(tmp)
         return answer_pred
 
 
@@ -1674,8 +1758,6 @@ class Model_Wrapper(object):
             data = self._prepareSequentialData(X_batch, Y_batch)
         elif isinstance(self.model, Model):
             data = self._prepareModelData(X_batch, Y_batch)
-        elif isinstance(self.model, Graph):
-            [data, Y_batch] = self._prepareGraphData(X_batch, Y_batch)
         else:
             raise NotImplementedError
         return data
