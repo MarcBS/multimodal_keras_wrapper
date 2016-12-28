@@ -409,7 +409,7 @@ class Dataset(object):
         self.words_so_far = dict()   # if True, each sample will be represented as the complete set of words until
                                      # the point defined by the timestep dimension
                                      # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
-
+        self.mapping = dict()        # Source -- Target predefined word mapping
         #################################################
         
         
@@ -1351,7 +1351,18 @@ class Dataset(object):
 
         return X_out
 
-    
+    def loadMapping(self, path_list):
+        """
+        Loads a mapping of Source -- Target words.
+        :param path_list: Pickle object with the mapping
+        :return: None
+        """
+        if not self.silence:
+            logging.info("Loading source -- target mapping.")
+        self.mapping = pk.load(open(path_list, 'rb'))
+        if not self.silence:
+            logging.info("Source -- target mapping loaded with a total of %d words." % len(self.mapping.keys()))
+
     # ------------------------------------------------------- #
     #       Tokenization functions
     # ------------------------------------------------------- #
