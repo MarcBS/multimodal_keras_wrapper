@@ -1692,7 +1692,7 @@ class Model_Wrapper(object):
         answer_pred = []
 
         if alphas is not None:
-            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :len(x_sentence)-1], axis=1),
+            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence)-1)], axis=1),
                                   alphas, x_text)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
