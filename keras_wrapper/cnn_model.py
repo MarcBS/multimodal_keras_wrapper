@@ -1633,7 +1633,7 @@ class Model_Wrapper(object):
         if verbose > 1:
             print "Input sentence:", src_word_seq
             print "Hard alignments", hard_alignment
-        for j in xrange(len(trans_words)):
+        for j in xrange(len(trans_words) - 1):
             if trans_words[j] == unk_symbol:
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
@@ -1692,7 +1692,8 @@ class Model_Wrapper(object):
         answer_pred = []
 
         if alphas is not None:
-            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence)-1)], axis=1),
+            x_text = map(lambda x: x.split(), x_text)
+            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
                                   alphas, x_text)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
@@ -1702,7 +1703,7 @@ class Model_Wrapper(object):
                         if verbose > 1:
                             print "alphas:", alphas[i]
 
-                    a_no = self.replace_unknown_words(x_text[i].split(),
+                    a_no = self.replace_unknown_words(x_text[i],
                                                       a_no,
                                                       hard_alignments[i],
                                                       unk_symbol,
