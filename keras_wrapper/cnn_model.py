@@ -1664,12 +1664,8 @@ class Model_Wrapper(object):
                             print UNK_src, "not found in mapping. Copying source to position", j
             else:
                 new_trans_words.append(trans_words[j])
-        to_write = ''
-        for j, word in enumerate(new_trans_words):
-            to_write = to_write + word
-            if j < len(new_trans_words):
-                to_write += ' '
-        return to_write
+
+        return new_trans_words
 
     def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
                                        x_text=None, unk_symbol='<unk>', pad_sequences=False,
