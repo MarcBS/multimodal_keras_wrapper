@@ -116,7 +116,15 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     model.load_weights(model_name +'_weights.h5')
 
     # Load auxiliar models for optimized search
-    try:
+    if os.path.exists(model_name + '_structure_init.json') and \
+            os.path.exists(model_name + '_weights_init.h5') and \
+            os.path.exists(model_name + '_structure_next.json') and \
+            os.path.exists(model_name + '_weights_next.h5'):
+        loaded_optimized = True
+    else:
+        loaded_optimized = False
+
+    if loaded_optimized:
         # Load model structure
         model_init = model_from_json(open(model_name + '_structure_init.json').read())
         # Load model weights
@@ -125,9 +133,6 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
         model_next = model_from_json(open(model_name + '_structure_next.json').read())
         # Load model weights
         model_next.load_weights(model_name + '_weights_next.h5')
-        loaded_optimized = True
-    except:
-        loaded_optimized = False
 
     # Load Model_Wrapper information
     try:
@@ -141,6 +146,7 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     if loaded_optimized:
         model_wrapper.model_init = model_init
         model_wrapper.model_next = model_next
+        logging.info("<<< Optimized model loaded. >>>" % str(time.time()-t))
 
     logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time()-t))
     return model_wrapper
