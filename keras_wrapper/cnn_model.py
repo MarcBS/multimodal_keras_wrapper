@@ -1355,7 +1355,7 @@ class Model_Wrapper(object):
                                          random_samples=n_samples).generator()
             if params['n_samples'] > 0:
                 references = []
-                sources = []
+                sources_sampling = []
             best_samples = []
             if params['pos_unk']:
                 best_alphas = []
@@ -1373,7 +1373,7 @@ class Model_Wrapper(object):
                     for input_id in params['model_inputs']:
                         X[input_id] = data[0][input_id]
                         s_dict[input_id] = X[input_id]
-                    sources.append(s_dict)
+                    sources_sampling.append(s_dict)
 
                     Y = dict()
                     for output_id in params['model_outputs']:
@@ -1427,7 +1427,7 @@ class Model_Wrapper(object):
         if params['n_samples'] < 1:
             return predictions
         else:
-            return predictions, references, sources
+            return predictions, references, sources_sampling
 
     def predictNet(self, ds, parameters=dict(), postprocess_fun=None):
         '''
@@ -1696,7 +1696,7 @@ class Model_Wrapper(object):
         answer_pred = []
 
         if alphas is not None:
-            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :len(x_sentence)], axis=1),
+            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :len(x_sentence)-1], axis=1),
                                   alphas, x_text)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
