@@ -295,9 +295,15 @@ class Model_Wrapper(object):
             logging.info("Optimizer updated, learning rate set to "+ str(lr))
 
 
-    def setName(self, model_name, plots_path=None, models_path=None, clear_dirs=True):
+    def setName(self, model_name, plots_path=None, models_path=None, create_plots=False, clear_dirs=True):
         """
-            Changes the name (identifier) of the Model_Wrapper instance.
+                    Changes the name (identifier) of the Model_Wrapper instance.
+        :param model_name:  New model name
+        :param plots_path: Path where to store the plots
+        :param models_path: Path where to store the model
+        :param create_plots: Whether we'll store plots or not
+        :param clear_dirs: Whether the store_path directory will be erased or not
+        :return: None
         """
         if not model_name:
             self.name = time.strftime("%Y-%m-%d") + '_' + time.strftime("%X")
@@ -306,10 +312,11 @@ class Model_Wrapper(object):
             self.name = model_name
             create_dirs = True
 
-        if not plots_path:
-            self.plot_path = 'Plots/' + self.name
-        else:
-            self.plot_path = plots_path
+        if create_plots:
+            if not plots_path:
+                self.plot_path = 'Plots/' + self.name
+            else:
+                self.plot_path = plots_path
 
         if not models_path:
             self.model_path = 'Models/' + self.name
@@ -320,15 +327,17 @@ class Model_Wrapper(object):
         if clear_dirs:
             if os.path.isdir(self.model_path):
                 shutil.rmtree(self.model_path)
-            if os.path.isdir(self.plot_path):
-                shutil.rmtree(self.plot_path)
+            if create_plots:
+                if os.path.isdir(self.plot_path):
+                    shutil.rmtree(self.plot_path)
 
         # Create new ones
         if create_dirs:
             if not os.path.isdir(self.model_path):
                 os.makedirs(self.model_path)
-            if not os.path.isdir(self.plot_path):
-                os.makedirs(self.plot_path)
+            if create_plots:
+                if not os.path.isdir(self.plot_path):
+                    os.makedirs(self.plot_path)
 
 
     def checkParameters(self, input_params, default_params):
