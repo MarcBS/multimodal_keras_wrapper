@@ -146,8 +146,7 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     if loaded_optimized:
         model_wrapper.model_init = model_init
         model_wrapper.model_next = model_next
-        logging.info("<<< Optimized model loaded. >>>" % str(time.time()-t))
-
+        logging.info("<<< Optimized model loaded. >>>")
     logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time()-t))
     return model_wrapper
 
