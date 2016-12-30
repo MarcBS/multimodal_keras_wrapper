@@ -11,6 +11,7 @@ from keras.utils.layer_utils import print_summary
 
 from keras_wrapper.callbacks_keras_wrapper import *
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
+from keras_wrapper.read_write import file2list
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 
 mpl.use('Agg') # run matplotlib without X server (GUI)
@@ -1398,7 +1399,7 @@ class Model_Wrapper(object):
                         X[input_id] = data[input_id]
                         if params['pos_unk']:
                             s_dict[input_id] = X[input_id]
-                    if params['pos_unk']:
+                    if params['pos_unk'] and not eval('ds.loaded_raw_'+ s +'[0]'):
                         sources.append(s_dict)
 
                 for i in range(len(X[params['model_inputs'][0]])):
@@ -1434,6 +1435,8 @@ class Model_Wrapper(object):
             sys.stdout.flush()
 
             if params['pos_unk']:
+                if eval('ds.loaded_raw_'+ s +'[0]'):
+                    sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'))
                 predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
             else:
                 predictions[s] = np.asarray(best_samples)
@@ -1652,29 +1655,29 @@ class Model_Wrapper(object):
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
                     new_trans_words.append(UNK_src)
-                    if verbose > 0:
+                    if verbose > 1:
                         print UNK_src, "to position", j
                 elif heuristic == 1:
                     # Use the most likely translation (with t-table). If not found, copy the source word.
                     # Ok for small vocabulary (~30k) models
                     if mapping.get(UNK_src) is not None:
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "not found in mapping. Copying source to position", j
                 elif heuristic == 2:
                     # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                     # Sometimes works better than other heuristics
                     if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "not found in mapping. Copying source to position", j
             else:
                 new_trans_words.append(trans_words[j])
@@ -1711,10 +1714,10 @@ class Model_Wrapper(object):
                                   alphas, x_text)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
-                    if verbose > 0:
+                    if verbose > 1:
                         print unk_symbol, "at sentence number", i
                         print "hypothesis:", a_no
-                        if verbose > 1:
+                        if verbose > 2:
                             print "alphas:", alphas[i]
 
                     a_no = self.replace_unknown_words(x_text[i],
