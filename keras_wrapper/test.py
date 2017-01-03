@@ -1,5 +1,4 @@
 from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
-from keras_wrapper.cnn_model import CNN_Model, saveModel, loadModel
 
 from keras.layers import Dense
 from keras.engine.training import Model
@@ -10,6 +9,39 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 
+def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, atol=1e-08):
+    if isinstance(model, str):
+        from keras_wrapper.cnn_model import loadModel
+        model = loadModel(model, -1, full_path=True)
+        model_init = model.model_init
+        model_next =  model.model_next
+        model = model.model
+    logging.info("Checking all models are close")
+    model_names = map(lambda x: str(x), model.weights)
+    if model_init is None and model_next is None:
+        logging.warning("Checking of models_allclose won't be performed, because model_init and model_next are None")
+        return True
+
+
+    if model_next is not None:
+        model_next_names = map(lambda x: str(x), model_next.weights)
+        for (index_next, name) in enumerate(model_next_names):
+            index_model = model_names.index(name)
+            assert np.allclose(model.weights[index_model].get_value(), model_next.weights[index_next].get_value(), rtol=rtol, atol=atol), \
+                'Parameters ' + name + ' are not close! (model index: ' + str(index_model) + ' model_next index ' + \
+                str(index_next) + ')'
+
+    if model_init is not None:
+        model_init_names = map(lambda x: str(x), model_init.weights)
+        for (index_init, name) in enumerate(model_init_names):
+            index_model = model_names.index(name)
+            assert np.allclose(model.weights[index_model].get_value(), model_init.weights[index_init].get_value(), rtol=rtol, atol=atol), \
+                'Parameters ' + name + ' are not close! (model index: ' + str(index_model) + ' model_init index ' + \
+                str(index_init) + ')'
+
+    return True
+
+
 def main_test():
     
     #loadFlickr8k() # load Flickr8k dataset for Image Description
@@ -18,8 +50,6 @@ def main_test():
 
     loadFood101() # load Food101 dataset for Image Classification
 
-    
-    
     # Build basic model for image classification
     classifyFood101()
     
@@ -279,4 +309,4 @@ def loadFood101():
     
     
     
-main_test()
+#main_test()

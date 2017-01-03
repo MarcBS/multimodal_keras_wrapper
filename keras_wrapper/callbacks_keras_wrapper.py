@@ -37,15 +37,6 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
 ###
 
 ###
-# Printing callbacks
-###
-
-
-
-                            
-###
-
-###
 # Learning modifiers callbacks
 ###
 class LearningRateReducerWithEarlyStopping(KerasCallback):
