@@ -24,6 +24,10 @@ class BeamSearchEnsemble:
         self.optimized_search = params_prediction['optimized_search'] if \
             params_prediction.get('optimized_search') is not None else False
         self.verbose = verbose
+        if self.verbose > 0:
+            print "Using optimized_search=", self.optimized_search
+
+
     # ------------------------------------------------------- #
     #       PREDICTION FUNCTIONS
     #           Functions for making prediction on input samples
@@ -87,7 +91,7 @@ class BeamSearchEnsemble:
         :param null_sym: <null> symbol
         :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
         """
-        k = params['beam_size'] + 1
+        k = params['beam_size']
         samples = []
         sample_scores = []
         pad_on_batch = params['pad_on_batch']
@@ -114,9 +118,9 @@ class BeamSearchEnsemble:
             if self.optimized_search:  # use optimized search model if available
                 [probs, prev_outs, alphas] = self.predict_cond(self.models, X, state_below, params, ii,
                                                                prev_outs=prev_outs)
-
             else:
                 probs = self.predict_cond(self.models, X, state_below, params, ii)
+
             # total score for every sample is sum of -log of word prb
             cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
@@ -187,12 +191,10 @@ class BeamSearchEnsemble:
                                                        state_below.shape[2]))))
 
             if params['optimized_search'] and ii > 0:
-                i = 0
-                for prev_out in prev_outs:
+                for n_model in  range(len(self.models)):
                     # filter next search inputs w.r.t. remaining samples
-                    for idx_vars in range(len(prev_out)):
-                        prev_outs[i][idx_vars] = prev_out[idx_vars][indices_alive]
-                    i += 1
+                    for idx_vars in range(len(prev_outs[n_model])):
+                        prev_outs[n_model][idx_vars] = prev_outs[n_model][idx_vars][indices_alive]
 
         # dump every remaining one
         if live_k > 0:
@@ -204,7 +206,7 @@ class BeamSearchEnsemble:
         if params['pos_unk']:
             return samples, sample_scores, sample_alphas
         else:
-            return samples, sample_scores
+            return samples, sample_scores, None
 
     def BeamSearchNet(self):
         """
@@ -249,24 +251,6 @@ class BeamSearchEnsemble:
                           }
         params = self.checkParameters(self.params, default_params)
 
-        # Check if the model is ready for applying an optimized search
-        """
-        if params['optimized_search']:
-            if 'matchings_init_to_next' not in dir(self) or \
-                            'matchings_next_to_next' not in dir(self) or \
-                            'ids_inputs_init' not in dir(self) or \
-                            'ids_outputs_init' not in dir(self) or \
-                            'ids_inputs_next' not in dir(self) or \
-                            'ids_outputs_next' not in dir(self):
-                raise Exception(
-                    "The following attributes must be inserted to the model when building an optimized search model:\n",
-                    "- matchings_init_to_next\n",
-                    "- matchings_next_to_next\n",
-                    "- ids_inputs_init\n",
-                    "- ids_outputs_init\n",
-                    "- ids_inputs_next\n",
-                    "- ids_outputs_next\n")
-        """
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("<<< Predicting outputs of "+s+" set >>>")
@@ -347,12 +331,7 @@ class BeamSearchEnsemble:
                     x = dict()
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
-                    if params['pos_unk']:
-                        samples, scores, alphas = self.beam_search(x, params,
-                                                                   null_sym=self.dataset.extra_words['<null>'])
-                    else:
-                        samples, scores = self.beam_search(x, params,
-                                                           null_sym=self.dataset.extra_words['<null>'])
+                    samples, scores, alphas = self.beam_search(x, params, null_sym=self.dataset.extra_words['<null>'])
                     if params['normalize']:
                         counts = [len(sample)**params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
