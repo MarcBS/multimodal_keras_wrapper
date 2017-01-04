@@ -371,6 +371,20 @@ class Dataset(object):
         self.Y_train = dict()
         self.Y_val = dict()
         self.Y_test = dict()
+
+        # Optionally, we point to the raw files. Note that these are not inputs/outputs of the dataset.
+        # That means, we won't pre/post process the content of these files in the Dataset class.
+        self.loaded_raw_train = [False, False]
+        self.loaded_raw_val = [False, False]
+        self.loaded_raw_test = [False, False]
+
+        self.X_raw_train = dict()
+        self.X_raw_val = dict()
+        self.X_raw_test = dict()
+        self.Y_raw_train = dict()
+        self.Y_raw_val = dict()
+        self.Y_raw_test = dict()
+
         #################################################
         
         
@@ -386,8 +400,11 @@ class Dataset(object):
         self.sample_weights = dict() # Choose whether we should compute output masks or not
 
         # List of implemented input and output data types
-        self.__accepted_types_inputs = ['raw-image', 'video', 'image-features', 'video-features', 'text', 'id', 'ghost']
-        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', '3DLabel', 'id']
+        self.__accepted_types_inputs = ['raw-image', 'image-features',
+                                        'video',  'video-features',
+                                        'text',
+                                        'id', 'ghost', 'file-name']
+        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', '3DLabel', 'id', 'file-name']
         #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
         
@@ -595,17 +612,50 @@ class Dataset(object):
             # Insert into the corresponding list
             if len(set_split[i]) > 0:
                 self.__setInput([set[elem] for elem in set_split[i]], order[i], id=id)
-        
-    
-    
+
+
     def setList(self, path_list, set_name, type='raw-image', id='image'):
         """
             DEPRECATED
         """
         logging.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
         self.setInput(path_list, set_name, type, id)
-    
-    
+
+
+    def setRawInput(self, path_list, set_name, type='file-name', id='raw-text'):
+        """
+            Loads a list which can contain all samples from either the 'train', 'val', or
+            'test' set splits (specified by set_name).
+
+            # General parameters
+
+            :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
+            :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
+            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
+            :param id: identifier of the input data loaded
+            :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
+            :param required: flag for optional inputs
+        """
+        self.__checkSetName(set_name)
+
+        # Insert type and id of input data
+        keys_X_set = eval('self.X_raw_'+set_name+'.keys()')
+        if id not in self.ids_inputs:
+            self.ids_inputs.append(id)
+            self.types_inputs.append(type)
+            self.optional_inputs.append(id) # This is always optional
+        elif id in keys_X_set:
+            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+
+        if type not in self.__accepted_types_inputs:
+            raise NotImplementedError('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
+
+        exec('self.X_raw_'+set_name+'[id] = path_list')
+        exec('self.loaded_raw_'+set_name+'[0] = True')
+        if not self.silence:
+            logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id + '".')
+
+
     def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,               # 'raw-image' / 'video'
                  max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
@@ -711,6 +761,40 @@ class Dataset(object):
         logging.info("WARNING: The method setLabels() is deprecated, consider using () instead.")
         self.setOutput(self, labels_list, set_name, type, id)
 
+    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text'):
+        """
+            Loads a list which can contain all samples from either the 'train', 'val', or
+            'test' set splits (specified by set_name).
+
+            # General parameters
+
+            :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
+            :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
+            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
+            :param id: identifier of the input data loaded
+            :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
+            :param required: flag for optional inputs
+        """
+        self.__checkSetName(set_name)
+
+        # Insert type and id of input data
+        keys_Y_set = eval('self.Y_raw_'+set_name+'.keys()')
+        if id not in self.ids_inputs:
+            self.ids_inputs.append(id)
+            self.types_inputs.append(type)
+            self.optional_inputs.append(id) # This is always optional
+
+        elif id in keys_Y_set:
+            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+
+        if type not in self.__accepted_types_inputs:
+            raise NotImplementedError('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
+
+        exec('self.Y_raw_'+set_name+'[id] = path_list')
+        exec('self.loaded_raw_'+set_name+'[1] = True')
+
+        if not self.silence:
+            logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id + '".')
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,   # 'text'
@@ -1743,7 +1827,10 @@ class Dataset(object):
     
     def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len, external=False, data_augmentation=True):
         
+
         n_videos = len(idx_videos)
+        if isinstance(feat_len, list):
+            feat_len = feat_len[0]
         features = np.zeros((n_videos, max_len, feat_len))
         
         n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
@@ -2446,8 +2533,8 @@ class Dataset(object):
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
-                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], 
-                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
+                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], normalization_type,
+                                               normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
             X.append(x)
             
         # Recover output samples

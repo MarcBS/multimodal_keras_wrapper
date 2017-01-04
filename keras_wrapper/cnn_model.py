@@ -11,6 +11,7 @@ from keras.utils.layer_utils import print_summary
 
 from keras_wrapper.callbacks_keras_wrapper import *
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
+from keras_wrapper.read_write import file2list
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 
 mpl.use('Agg') # run matplotlib without X server (GUI)
@@ -116,7 +117,15 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     model.load_weights(model_name +'_weights.h5')
 
     # Load auxiliar models for optimized search
-    try:
+    if os.path.exists(model_name + '_structure_init.json') and \
+            os.path.exists(model_name + '_weights_init.h5') and \
+            os.path.exists(model_name + '_structure_next.json') and \
+            os.path.exists(model_name + '_weights_next.h5'):
+        loaded_optimized = True
+    else:
+        loaded_optimized = False
+
+    if loaded_optimized:
         # Load model structure
         model_init = model_from_json(open(model_name + '_structure_init.json').read())
         # Load model weights
@@ -125,9 +134,6 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
         model_next = model_from_json(open(model_name + '_structure_next.json').read())
         # Load model weights
         model_next.load_weights(model_name + '_weights_next.h5')
-        loaded_optimized = True
-    except:
-        loaded_optimized = False
 
     # Load Model_Wrapper information
     try:
@@ -141,7 +147,7 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     if loaded_optimized:
         model_wrapper.model_init = model_init
         model_wrapper.model_next = model_next
-
+        logging.info("<<< Optimized model loaded. >>>")
     logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time()-t))
     return model_wrapper
 
@@ -290,9 +296,15 @@ class Model_Wrapper(object):
             logging.info("Optimizer updated, learning rate set to "+ str(lr))
 
 
-    def setName(self, model_name, plots_path=None, models_path=None, clear_dirs=True):
+    def setName(self, model_name, plots_path=None, models_path=None, create_plots=False, clear_dirs=True):
         """
-            Changes the name (identifier) of the Model_Wrapper instance.
+                    Changes the name (identifier) of the Model_Wrapper instance.
+        :param model_name:  New model name
+        :param plots_path: Path where to store the plots
+        :param models_path: Path where to store the model
+        :param create_plots: Whether we'll store plots or not
+        :param clear_dirs: Whether the store_path directory will be erased or not
+        :return: None
         """
         if not model_name:
             self.name = time.strftime("%Y-%m-%d") + '_' + time.strftime("%X")
@@ -301,10 +313,11 @@ class Model_Wrapper(object):
             self.name = model_name
             create_dirs = True
 
-        if not plots_path:
-            self.plot_path = 'Plots/' + self.name
-        else:
-            self.plot_path = plots_path
+        if create_plots:
+            if not plots_path:
+                self.plot_path = 'Plots/' + self.name
+            else:
+                self.plot_path = plots_path
 
         if not models_path:
             self.model_path = 'Models/' + self.name
@@ -315,15 +328,17 @@ class Model_Wrapper(object):
         if clear_dirs:
             if os.path.isdir(self.model_path):
                 shutil.rmtree(self.model_path)
-            if os.path.isdir(self.plot_path):
-                shutil.rmtree(self.plot_path)
+            if create_plots:
+                if os.path.isdir(self.plot_path):
+                    shutil.rmtree(self.plot_path)
 
         # Create new ones
         if create_dirs:
             if not os.path.isdir(self.model_path):
                 os.makedirs(self.model_path)
-            if not os.path.isdir(self.plot_path):
-                os.makedirs(self.plot_path)
+            if create_plots:
+                if not os.path.isdir(self.plot_path):
+                    os.makedirs(self.plot_path)
 
 
     def checkParameters(self, input_params, default_params):
@@ -1355,7 +1370,7 @@ class Model_Wrapper(object):
                                          random_samples=n_samples).generator()
             if params['n_samples'] > 0:
                 references = []
-                sources = []
+                sources_sampling = []
             best_samples = []
             if params['pos_unk']:
                 best_alphas = []
@@ -1373,7 +1388,7 @@ class Model_Wrapper(object):
                     for input_id in params['model_inputs']:
                         X[input_id] = data[0][input_id]
                         s_dict[input_id] = X[input_id]
-                    sources.append(s_dict)
+                    sources_sampling.append(s_dict)
 
                     Y = dict()
                     for output_id in params['model_outputs']:
@@ -1384,7 +1399,7 @@ class Model_Wrapper(object):
                         X[input_id] = data[input_id]
                         if params['pos_unk']:
                             s_dict[input_id] = X[input_id]
-                    if params['pos_unk']:
+                    if params['pos_unk'] and not eval('ds.loaded_raw_'+ s +'[0]'):
                         sources.append(s_dict)
 
                 for i in range(len(X[params['model_inputs'][0]])):
@@ -1420,6 +1435,8 @@ class Model_Wrapper(object):
             sys.stdout.flush()
 
             if params['pos_unk']:
+                if eval('ds.loaded_raw_'+ s +'[0]'):
+                    sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'))
                 predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
             else:
                 predictions[s] = np.asarray(best_samples)
@@ -1427,7 +1444,7 @@ class Model_Wrapper(object):
         if params['n_samples'] < 1:
             return predictions
         else:
-            return predictions, references, sources
+            return predictions, references, sources_sampling
 
     def predictNet(self, ds, parameters=dict(), postprocess_fun=None):
         '''
@@ -1633,43 +1650,39 @@ class Model_Wrapper(object):
         if verbose > 1:
             print "Input sentence:", src_word_seq
             print "Hard alignments", hard_alignment
-        for j in xrange(len(trans_words)):
+        for j in xrange(len(trans_words) - 1):
             if trans_words[j] == unk_symbol:
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
                     new_trans_words.append(UNK_src)
-                    if verbose > 0:
+                    if verbose > 1:
                         print UNK_src, "to position", j
                 elif heuristic == 1:
                     # Use the most likely translation (with t-table). If not found, copy the source word.
                     # Ok for small vocabulary (~30k) models
                     if mapping.get(UNK_src) is not None:
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "not found in mapping. Copying source to position", j
                 elif heuristic == 2:
                     # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                     # Sometimes works better than other heuristics
                     if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 0:
+                        if verbose > 1:
                             print UNK_src, "not found in mapping. Copying source to position", j
             else:
                 new_trans_words.append(trans_words[j])
-        to_write = ''
-        for j, word in enumerate(new_trans_words):
-            to_write = to_write + word
-            if j < len(new_trans_words):
-                to_write += ' '
-        return to_write
+
+        return new_trans_words
 
     def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
                                        x_text=None, unk_symbol='<unk>', pad_sequences=False,
@@ -1696,17 +1709,18 @@ class Model_Wrapper(object):
         answer_pred = []
 
         if alphas is not None:
-            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :len(x_sentence)], axis=1),
+            x_text = map(lambda x: x.split(), x_text)
+            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
                                   alphas, x_text)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
-                    if verbose > 0:
+                    if verbose > 1:
                         print unk_symbol, "at sentence number", i
                         print "hypothesis:", a_no
-                        if verbose > 1:
+                        if verbose > 2:
                             print "alphas:", alphas[i]
 
-                    a_no = self.replace_unknown_words(x_text[i].split(),
+                    a_no = self.replace_unknown_words(x_text[i],
                                                       a_no,
                                                       hard_alignments[i],
                                                       unk_symbol,
