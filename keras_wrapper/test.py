@@ -9,7 +9,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 
-def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, atol=1e-08):
+def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, atol=1e-08, verbose=0):
     if isinstance(model, str):
         from keras_wrapper.cnn_model import loadModel
         model = loadModel(model, -1, full_path=True)
@@ -22,6 +22,8 @@ def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, at
         logging.warning("Checking of models_allclose won't be performed, because model_init and model_next are None")
         return True
 
+    if verbose > 0:
+        print "Checking model next weights"
 
     if model_next is not None:
         model_next_names = map(lambda x: str(x), model_next.weights)
@@ -30,6 +32,11 @@ def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, at
             assert np.allclose(model.weights[index_model].get_value(), model_next.weights[index_next].get_value(), rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model index: ' + str(index_model) + ' model_next index ' + \
                 str(index_next) + ')'
+            if verbose > 0:
+                print "Weights", name, "(position ", index_next,"at model_next - position", index_model, "at model are close"
+    if verbose > 0:
+        print "==========================="
+        print "Checking model init weights"
 
     if model_init is not None:
         model_init_names = map(lambda x: str(x), model_init.weights)
@@ -38,7 +45,8 @@ def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, at
             assert np.allclose(model.weights[index_model].get_value(), model_init.weights[index_init].get_value(), rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model index: ' + str(index_model) + ' model_init index ' + \
                 str(index_init) + ')'
-
+            if verbose > 0:
+                print "Weights", name, "(position ", index_init, "at model_init - position", index_model, "at model are close"
     return True
 
 
