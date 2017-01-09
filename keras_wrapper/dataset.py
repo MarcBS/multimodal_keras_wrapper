@@ -1827,7 +1827,10 @@ class Dataset(object):
     
     def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len, external=False, data_augmentation=True):
         
+
         n_videos = len(idx_videos)
+        if isinstance(feat_len, list):
+            feat_len = feat_len[0]
         features = np.zeros((n_videos, max_len, feat_len))
         
         n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
@@ -2530,8 +2533,8 @@ class Dataset(object):
                 elif type_in == 'image-features':
                     x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
-                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], 
-                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
+                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], normalization_type,
+                                               normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
             X.append(x)
             
         # Recover output samples
