@@ -1188,14 +1188,14 @@ class Model_Wrapper(object):
         :param null_sym: <null> symbol
         :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
         """
-        k = params['beam_size'] + 1
+        k = params['beam_size']
         samples = []
         sample_scores = []
         pad_on_batch = params['pad_on_batch']
         dead_k = 0  # samples that reached eos
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
-        hyp_scores  = np.zeros(live_k).astype('float32')
+        hyp_scores = np.zeros(live_k).astype('float32')
         if params['pos_unk']:
             sample_alphas = []
             hyp_alphas = [[]] * live_k

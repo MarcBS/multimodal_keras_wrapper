@@ -27,13 +27,19 @@ class BeamSearchEnsemble:
         if self.verbose > 0:
             print "Using optimized_search=", self.optimized_search
 
-
-    # ------------------------------------------------------- #
-    #       PREDICTION FUNCTIONS
-    #           Functions for making prediction on input samples
-    # ------------------------------------------------------- #
+    # PREDICTION FUNCTIONS: Functions for making prediction on input samples
 
     def predict_cond(self, models, X, states_below, params, ii, prev_outs=None):
+        """
+        Call the prediction functions of all models, according to their inputs
+        :param models: List of models in the ensemble
+        :param X: Input data
+        :param states_below: Previously generated words (in case of conditional models)
+        :param params: Model parameters
+        :param ii: Decoding time-step
+        :param prev_outs: Only for optimized models. Outputs from the previous time-step.
+        :return: Combined outputs from the ensemble
+        """
 
         probs_list = []
         prev_outs_list = []
