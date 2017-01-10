@@ -43,7 +43,7 @@ label_id = 'output_label'
 images_size = [256, 256, 3]
 images_crop_size = [224, 224, 3]
 train_mean = [103.939, 116.779, 123.68]
-base_path = '/absolute/path/to/multimodal_keras_wrapper/data/sample_data'
+base_path = '</absolute/path/to/multimodal_keras_wrapper>/data/sample_data'
 ```
 
 Empty dataset instance creation
@@ -90,12 +90,12 @@ ds.setOutput(base_path+'/test_labels.txt', 'test',
            type='categorical', id=label_id)
 ```
 
-## Saving or Loading a Dataset
+## Saving or loading a Dataset
 
 ```
 from keras_wrapper.dataset import saveDataset, loadDataset
 
-save_path = '/absolute/path/to/multimodal_keras_wrapper/Datasets'
+save_path = '</absolute/path/to/multimodal_keras_wrapper>/Datasets'
 
 # Save dataset
 saveDataset(ds, save_path)
@@ -104,6 +104,11 @@ saveDataset(ds, save_path)
 ds = loadDataset(save_path+'/Dataset_'+dataset_name+'.pkl')
 ```
 
+In addition, we can print some basic information of the data stored in the dataset:
+
+```
+print ds
+```
 
 ## Creating a Model_Wrapper
 
@@ -113,23 +118,24 @@ Model_Wrapper parameters definition.
 from keras_wrapper.cnn_model import Model_Wrapper
 
 model_name = 'our_model'
-type = 'basic_model'
-save_path = '/absolute/path/to/multimodal_keras_wrapper/Models/'
+type = 'VGG_19_ImageNet'
+save_path = '</absolute/path/to/multimodal_keras_wrapper>/Models/'
 ```
 
 Create a basic CNN model
 
 ```
 net = Model_Wrapper(nOutput=2, type=type, model_name=model_name, input_shape=images_crop_size)
+net.setOptimizer(lr=0.001, metrics=['accuracy']) # compile it
 ```
 
-By default, the model type built is the one definied in [Model_Wrapper.basic_model()](https://github.com/MarcBS/multimodal_keras_wrapper/blob/6d0b11248fd353cc189f674dc30beaf9689da182/keras_wrapper/cnn_model.py#L2003).
+By default, the model type built is the one defined in [Model_Wrapper.basic_model()](https://github.com/MarcBS/multimodal_keras_wrapper/blob/6d0b11248fd353cc189f674dc30beaf9689da182/keras_wrapper/cnn_model.py#L2003).
 Although, any kind of custom model can be defined just by:
 - Defining a new method for the class Model_Wrapper which builds the model and stores it in self.model.
 - Referencing it with type='method_name' when creating a new Model_Wrapper instance.
 
 
-## Saving or Loading a Model_Wrapper
+## Saving or loading a Model_Wrapper
 
 ```
 from keras_wrapper.cnn_model import saveModel, loadModel
@@ -144,14 +150,34 @@ net = loadModel(save_path+'/'+model_name, save_epoch)
 ```
 
 
-## Connecting Dataset->Model_Wrapper
+## Connecting a Dataset to a Model_Wrapper
 
-TODO
+In order to provide a correct communication between the Dataset and the Model_Wrapper objects, we have to provide the links between the Dataset ids positions and their corresponding layer identifiers in the Keras' Model as a dictionary.
+
+In this case we only have one input and one output, for this reason both ids are mapped to position 0 of our Dataset.
+
+```
+net.setInputsMapping({net.ids_inputs[0]: 0})
+net.setOutputsMapping({net.ids_outputs[0]: 0})
+```
+
 
 ## Training
 
-TODO
+We can specify several options for training our model, which are [summarized here](http://marcbs.github.io/multimodal_keras_wrapper/modules.html#keras_wrapper.cnn_model.Model_Wrapper.trainNet). If any of them is overriden then the [default values](https://github.com/MarcBS/multimodal_keras_wrapper/blob/011393580b2253a01c168d638b8c0bd06fe6d522/keras_wrapper/cnn_model.py#L454-L458) will be used.
+
+```
+train_overriden_parameters = {'n_epochs': 2, 'batch_size': 10}
+
+net.trainNet(ds, train_overriden_parameters)
+```
 
 ## Prediction
 
-TODO
+The same applies to the prediction method. We can find the [available parameters here](http://marcbs.github.io/multimodal_keras_wrapper/modules.html#keras_wrapper.cnn_model.Model_Wrapper.predictNet) and the [default values here](https://github.com/MarcBS/multimodal_keras_wrapper/blob/011393580b2253a01c168d638b8c0bd06fe6d522/keras_wrapper/cnn_model.py#L1468-L1470).
+
+```
+predict_overriden_parameters = {'batch_size': 10, 'predict_on_sets': ['test']}
+
+net.predictNet(ds, predict_overriden_parameters)
+```

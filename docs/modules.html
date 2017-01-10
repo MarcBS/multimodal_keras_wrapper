@@ -1413,6 +1413,12 @@ arXiv preprint arXiv:1611.09326. 2016 Nov 28.</dd>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.cnn_model.Model_Wrapper.basic_model_seq">
+<code class="descname">basic_model_seq</code><span class="sig-paren">(</span><em>nOutput</em>, <em>input</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.basic_model_seq" title="Permalink to this definition">¶</a></dt>
+<dd><p>Builds a basic CNN model.</p>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.beam_search">
 <code class="descname">beam_search</code><span class="sig-paren">(</span><em>X</em>, <em>params</em>, <em>null_sym=2</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.beam_search" title="Permalink to this definition">¶</a></dt>
 <dd><p>Beam search method for Cond models.
@@ -1664,7 +1670,7 @@ every entry determines a score for sample i having class j
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>inputsMapping</strong> &#8211; dictionary with the model inputs&#8217; identifiers as keys and the dataset inputs&#8217; identifiers as values. If the current model is Sequential then keys must be ints with the desired input order (starting from 0). If it is Graph then keys must be str.</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>inputsMapping</strong> &#8211; dictionary with the model inputs&#8217; identifiers as keys and the dataset inputs identifiers&#8217; position as values. If the current model is Sequential then keys must be ints with the desired input order (starting from 0). If it is Model then keys must be str.</td>
 </tr>
 </tbody>
 </table>
@@ -1678,7 +1684,7 @@ every entry determines a score for sample i having class j
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.setOptimizer">
-<code class="descname">setOptimizer</code><span class="sig-paren">(</span><em>lr=None</em>, <em>momentum=None</em>, <em>loss=None</em>, <em>metrics=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.setOptimizer" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setOptimizer</code><span class="sig-paren">(</span><em>lr=None</em>, <em>momentum=None</em>, <em>loss=None</em>, <em>metrics=None</em>, <em>decay=0.0</em>, <em>clipnorm=10.0</em>, <em>optimizer=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.setOptimizer" title="Permalink to this definition">¶</a></dt>
 <dd><p>Sets a new optimizer for the CNN model.</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
@@ -1688,6 +1694,10 @@ every entry determines a score for sample i having class j
 <li><strong>lr</strong> &#8211; learning rate of the network</li>
 <li><strong>momentum</strong> &#8211; momentum of the network (if None, then momentum = 1-lr)</li>
 <li><strong>loss</strong> &#8211; loss function applied for optimization</li>
+<li><strong>metrics</strong> &#8211; list of Keras&#8217; metrics used for evaluating the model. To specify different metrics for different outputs of a multi-output model, you could also pass a dictionary, such as <cite>metrics={&#8216;output_a&#8217;: &#8216;accuracy&#8217;}</cite>.</li>
+<li><strong>decay</strong> &#8211; lr decay</li>
+<li><strong>clipnorm</strong> &#8211; gradients&#8217; clip norm</li>
+<li><strong>optimizer</strong> &#8211; string identifying the type of optimizer used (default: SGD)</li>
 </ul>
 </td>
 </tr>
@@ -1704,7 +1714,7 @@ every entry determines a score for sample i having class j
 <col class="field-body" />
 <tbody valign="top">
 <tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>outputsMapping</strong> &#8211; dictionary with the model outputs&#8217; identifiers as keys and the dataset outputs&#8217; identifiers as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Graph then keys must be str.</li>
+<li><strong>outputsMapping</strong> &#8211; dictionary with the model outputs&#8217; identifiers as keys and the dataset outputs identifiers&#8217; position as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Model then keys must be str.</li>
 <li><strong>acc_output</strong> &#8211; name of the model&#8217;s output that will be used for calculating the accuracy of the model (only needed for Graph models)</li>
 </ul>
 </td>

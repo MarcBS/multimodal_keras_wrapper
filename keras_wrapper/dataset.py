@@ -2694,7 +2694,37 @@ class Dataset(object):
     #       AUXILIARY FUNCTIONS
     #           
     # ------------------------------------------------------- #
-        
+
+
+    def __str__(self):
+        """
+        Prints the basic input-output information of the Dataset instance.
+
+        :return: String representation of the Dataset.
+        """
+
+        str_ = '---------------------------------------------\n'
+        str_ += '\tDataset '+self.name+'\n'
+        str_ += '---------------------------------------------\n'
+        str_ += 'store path: '+self.path+'\n'
+        str_ += 'data length: '+'\n'
+        str_ += '\ttrain - '+str(self.len_train)+'\n'
+        str_ += '\tval   - ' + str(self.len_val) + '\n'
+        str_ += '\ttest  - ' + str(self.len_test) + '\n'
+
+        str_ += '\n'
+        str_ += '[ INPUTS ]\n'
+        for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
+            str_ += type_in + ': ' + id_in + '\n'
+
+        str_ += '\n'
+        str_ += '[ OUTPUTS ]\n'
+        for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
+            str_ += type_out + ': ' + id_out + '\n'
+
+        str_ += '---------------------------------------------\n'
+        return str_
+
     def __isLoaded(self, set_name, pos):
         """
         Checks if the data from set_name at pos is already loaded
