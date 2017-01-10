@@ -1304,7 +1304,7 @@ class Model_Wrapper(object):
         DEPRECATED, use predictBeamSearchNet() instead.
         """
         print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
-        self.predictBeamSearchNet(ds, parameters)
+        return self.predictBeamSearchNet(ds, parameters)
 
 
     def predictBeamSearchNet(self, ds, parameters):
