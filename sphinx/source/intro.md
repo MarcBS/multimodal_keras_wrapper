@@ -3,6 +3,8 @@
 ## Multimodal Keras Wrapper
 Wrapper for Keras with support to easy multimodal data and models loading and handling.
 
+You can download and contribute to the code downloading [this repository](https://github.com/MarcBS/multimodal_keras_wrapper).
+
 
 ## Documentation
 

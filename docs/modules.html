@@ -522,6 +522,14 @@ data splits, image loading, mean calculation, etc.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.loadMapping">
+<code class="descname">loadMapping</code><span class="sig-paren">(</span><em>path_list</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadMapping" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a mapping of Source &#8211; Target words.
+:param path_list: Pickle object with the mapping
+:return: None</p>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadText">
 <code class="descname">loadText</code><span class="sig-paren">(</span><em>X</em>, <em>vocabularies</em>, <em>max_len</em>, <em>offset</em>, <em>fill</em>, <em>pad_on_batch</em>, <em>words_so_far</em>, <em>loading_X=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadText" title="Permalink to this definition">¶</a></dt>
 <dd><p>Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.</p>
@@ -889,6 +897,54 @@ Each line must contain a unique identifier of the class.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.setRawInput">
+<code class="descname">setRawInput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='file-name'</em>, <em>id='raw-text'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setRawInput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a list which can contain all samples from either the &#8216;train&#8217;, &#8216;val&#8217;, or
+&#8216;test&#8217; set splits (specified by set_name).</p>
+<p># General parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>path_list</strong> &#8211; can either be a path to a text file containing the paths to the images or a python list of paths</li>
+<li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;)</li>
+<li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)</li>
+<li><strong>id</strong> &#8211; identifier of the input data loaded</li>
+<li><strong>repeat_set</strong> &#8211; repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
+<li><strong>required</strong> &#8211; flag for optional inputs</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.setRawOutput">
+<code class="descname">setRawOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='file-name'</em>, <em>id='raw-text'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setRawOutput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a list which can contain all samples from either the &#8216;train&#8217;, &#8216;val&#8217;, or
+&#8216;test&#8217; set splits (specified by set_name).</p>
+<p># General parameters</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>path_list</strong> &#8211; can either be a path to a text file containing the paths to the images or a python list of paths</li>
+<li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;)</li>
+<li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)</li>
+<li><strong>id</strong> &#8211; identifier of the input data loaded</li>
+<li><strong>repeat_set</strong> &#8211; repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
+<li><strong>required</strong> &#8211; flag for optional inputs</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setSilence">
 <code class="descname">setSilence</code><span class="sig-paren">(</span><em>silence</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setSilence" title="Permalink to this definition">¶</a></dt>
 <dd><p>Changes the silence mode of the &#8216;Dataset&#8217; instance.</p>
@@ -1193,43 +1249,7 @@ Parts of the code borrowed from <a class="reference external" href="https://gith
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.BeamSearchNet">
 <code class="descname">BeamSearchNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.BeamSearchNet" title="Permalink to this definition">¶</a></dt>
-<dd><p>Approximates by beam search the best predictions of the net on the dataset splits chosen.</p>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
-<li><strong>batch_size</strong> &#8211; size of the batch</li>
-<li><strong>n_parallel_loaders</strong> &#8211; number of parallel data batch loaders</li>
-<li><strong>normalization</strong> &#8211; apply data normalization on images/features or not (only if using images/features as input)</li>
-<li><strong>mean_substraction</strong> &#8211; apply mean data normalization on images or not (only if using images as input)</li>
-<li><strong>predict_on_sets</strong> &#8211; list of set splits for which we want to extract the predictions [&#8216;train&#8217;, &#8216;val&#8217;, &#8216;test&#8217;]</li>
-<li><strong>optimized_search</strong> &#8211; boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).</li>
-</ul>
-</td>
-</tr>
-</tbody>
-</table>
-<p>The following attributes must be inserted to the model when building an optimized search model:</p>
-<blockquote>
-<div><ul class="simple">
-<li>ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)</li>
-<li>ids_outputs_init: list of output variables of model_init (model probs must be the first output)</li>
-<li>ids_inputs_next: list of input variables to model_next (previous word must be the first input)</li>
-<li>ids_outputs_next: list of output variables of model_next (model probs must be the first output and the number of out variables must match the number of in variables)</li>
-<li>matchings_init_to_next: dictionary from &#8216;ids_outputs_init&#8217; to &#8216;ids_inputs_next&#8217;</li>
-<li>matchings_next_to_next: dictionary from &#8216;ids_outputs_next&#8217; to &#8216;ids_inputs_next&#8217;</li>
-</ul>
-</div></blockquote>
-<table class="docutils field-list" frame="void" rules="none">
-<col class="field-name" />
-<col class="field-body" />
-<tbody valign="top">
-<tr class="field-odd field"><th class="field-name" colspan="2">Returns predictions:</th></tr>
-<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">dictionary with set splits as keys and matrices of predictions as values.</td>
-</tr>
-</tbody>
-</table>
+<dd><p>DEPRECATED, use predictBeamSearchNet() instead.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1483,7 +1503,7 @@ The algorithm in a nutshell does the following:</p>
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.decode_predictions_beam_search">
-<code class="descname">decode_predictions_beam_search</code><span class="sig-paren">(</span><em>preds</em>, <em>index2word</em>, <em>pad_sequences=False</em>, <em>verbose=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.decode_predictions_beam_search" title="Permalink to this definition">¶</a></dt>
+<code class="descname">decode_predictions_beam_search</code><span class="sig-paren">(</span><em>preds</em>, <em>index2word</em>, <em>alphas=None</em>, <em>heuristic=0</em>, <em>x_text=None</em>, <em>unk_symbol='&lt;unk&gt;'</em>, <em>pad_sequences=False</em>, <em>mapping=None</em>, <em>verbose=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.decode_predictions_beam_search" title="Permalink to this definition">¶</a></dt>
 <dd><p>Decodes predictions from the BeamSearch method.
 :param preds: Predictions codified as word indices.
 :param index2word: Mapping from word indices into word characters.
@@ -1534,6 +1554,48 @@ The algorithm in a nutshell does the following:</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.cnn_model.Model_Wrapper.predictBeamSearchNet">
+<code class="descname">predictBeamSearchNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predictBeamSearchNet" title="Permalink to this definition">¶</a></dt>
+<dd><p>Approximates by beam search the best predictions of the net on the dataset splits chosen.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<li><strong>batch_size</strong> &#8211; size of the batch</li>
+<li><strong>n_parallel_loaders</strong> &#8211; number of parallel data batch loaders</li>
+<li><strong>normalization</strong> &#8211; apply data normalization on images/features or not (only if using images/features as input)</li>
+<li><strong>mean_substraction</strong> &#8211; apply mean data normalization on images or not (only if using images as input)</li>
+<li><strong>predict_on_sets</strong> &#8211; list of set splits for which we want to extract the predictions [&#8216;train&#8217;, &#8216;val&#8217;, &#8216;test&#8217;]</li>
+<li><strong>optimized_search</strong> &#8211; boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).</li>
+</ul>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The following attributes must be inserted to the model when building an optimized search model:</p>
+<blockquote>
+<div><ul class="simple">
+<li>ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)</li>
+<li>ids_outputs_init: list of output variables of model_init (model probs must be the first output)</li>
+<li>ids_inputs_next: list of input variables to model_next (previous word must be the first input)</li>
+<li>ids_outputs_next: list of output variables of model_next (model probs must be the first output and the number of out variables must match the number of in variables)</li>
+<li>matchings_init_to_next: dictionary from &#8216;ids_outputs_init&#8217; to &#8216;ids_inputs_next&#8217;</li>
+<li>matchings_next_to_next: dictionary from &#8216;ids_outputs_next&#8217; to &#8216;ids_inputs_next&#8217;</li>
+</ul>
+</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name" colspan="2">Returns predictions:</th></tr>
+<tr class="field-odd field"><td>&nbsp;</td><td class="field-body">dictionary with set splits as keys and matrices of predictions as values.</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.predictNet">
 <code class="descname">predictNet</code><span class="sig-paren">(</span><em>ds</em>, <em>parameters={}</em>, <em>postprocess_fun=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predictNet" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns the predictions of the net on the dataset splits chosen. The input &#8216;parameters&#8217; is a dict()
@@ -1574,15 +1636,25 @@ which may contain the following parameters:</p>
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.predict_cond">
-<code class="descname">predict_cond</code><span class="sig-paren">(</span><em>X</em>, <em>states_below</em>, <em>params</em>, <em>ii</em>, <em>optimized_search=False</em>, <em>prev_out=None</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predict_cond" title="Permalink to this definition">¶</a></dt>
+<code class="descname">predict_cond</code><span class="sig-paren">(</span><em>X</em>, <em>states_below</em>, <em>params</em>, <em>ii</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predict_cond" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
 WARNING!: It&#8217;s assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
 :param X: Input context
 :param states_below: Batch of partial hypotheses
 :param params: Decoding parameters
 :param ii: Decoding time-step
-:param optimized_search: indicates if we are using optimized search
-(only applicable if beam search specific models self.model_init and self.model_next models are defined)
+:return: Network predictions at time-step ii</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.cnn_model.Model_Wrapper.predict_cond_optimized">
+<code class="descname">predict_cond_optimized</code><span class="sig-paren">(</span><em>X</em>, <em>states_below</em>, <em>params</em>, <em>ii</em>, <em>prev_out</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predict_cond_optimized" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
+WARNING!: It&#8217;s assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
+:param X: Input context
+:param states_below: Batch of partial hypotheses
+:param params: Decoding parameters
+:param ii: Decoding time-step
 :param prev_out: output from the previous timestep, which will be reused by self.model_next
 (only applicable if beam search specific models self.model_init and self.model_next models are defined)
 :return: Network predictions at time-step ii</p>
@@ -1598,31 +1670,25 @@ WARNING!: It&#8217;s assumed that the current history (state_below) is the last 
 </dd></dl>
 
 <dl class="method">
-<dt id="keras_wrapper.cnn_model.Model_Wrapper.removeInputs">
-<code class="descname">removeInputs</code><span class="sig-paren">(</span><em>inputs_names</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.removeInputs" title="Permalink to this definition">¶</a></dt>
-<dd><p>Removes the list of inputs whose names are passed by parameter from the current network.
-This function is only valid for Graph models.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.cnn_model.Model_Wrapper.removeLayers">
-<code class="descname">removeLayers</code><span class="sig-paren">(</span><em>layers_names</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.removeLayers" title="Permalink to this definition">¶</a></dt>
-<dd><p>Removes the list of layers whose names are passed by parameter from the current network.
-Function only valid for Graph models. Use self.replaceLastLayers(...) for Sequential models.</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="keras_wrapper.cnn_model.Model_Wrapper.removeOutputs">
-<code class="descname">removeOutputs</code><span class="sig-paren">(</span><em>outputs_names</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.removeOutputs" title="Permalink to this definition">¶</a></dt>
-<dd><p>Removes the list of outputs whose names are passed by parameter from the current network.
-This function is only valid for Graph models.</p>
-</dd></dl>
-
-<dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.replaceLastLayers">
 <code class="descname">replaceLastLayers</code><span class="sig-paren">(</span><em>num_remove</em>, <em>new_layers</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.replaceLastLayers" title="Permalink to this definition">¶</a></dt>
 <dd><p>Replaces the last &#8216;num_remove&#8217; layers in the model by the newly defined in &#8216;new_layers&#8217;.
 Function only valid for Sequential models. Use self.removeLayers(...) for Graph models.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.cnn_model.Model_Wrapper.replace_unknown_words">
+<code class="descname">replace_unknown_words</code><span class="sig-paren">(</span><em>src_word_seq</em>, <em>trg_word_seq</em>, <em>hard_alignment</em>, <em>unk_symbol</em>, <em>heuristic=0</em>, <em>mapping=None</em>, <em>verbose=0</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.replace_unknown_words" title="Permalink to this definition">¶</a></dt>
+<dd><p>Replaces unknown words from the target sentence according to some heuristic.
+Borrowed from: <a class="reference external" href="https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py">https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py</a>
+:param src_word_seq: Source sentence words
+:param trg_word_seq: Hypothesis words
+:param hard_alignment: Target-Source alignments
+:param unk_symbol: Symbol in trg_word_seq to replace
+:param heuristic: Heuristic (0, 1, 2)
+:param mapping: External alignment dictionary
+:param verbose: Verbosity level
+:return: trg_word_seq with replaced unknown words</p>
 </dd></dl>
 
 <dl class="method">
@@ -1678,8 +1744,27 @@ every entry determines a score for sample i having class j
 
 <dl class="method">
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.setName">
-<code class="descname">setName</code><span class="sig-paren">(</span><em>model_name</em>, <em>plots_path=None</em>, <em>models_path=None</em>, <em>clear_dirs=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.setName" title="Permalink to this definition">¶</a></dt>
-<dd><p>Changes the name (identifier) of the Model_Wrapper instance.</p>
+<code class="descname">setName</code><span class="sig-paren">(</span><em>model_name</em>, <em>plots_path=None</em>, <em>models_path=None</em>, <em>create_plots=False</em>, <em>clear_dirs=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.setName" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div>Changes the name (identifier) of the Model_Wrapper instance.</div></blockquote>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>model_name</strong> &#8211; New model name</li>
+<li><strong>plots_path</strong> &#8211; Path where to store the plots</li>
+<li><strong>models_path</strong> &#8211; Path where to store the model</li>
+<li><strong>create_plots</strong> &#8211; Whether we&#8217;ll store plots or not</li>
+<li><strong>clear_dirs</strong> &#8211; Whether the store_path directory will be erased or not</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">None</p>
+</td>
+</tr>
+</tbody>
+</table>
 </dd></dl>
 
 <dl class="method">

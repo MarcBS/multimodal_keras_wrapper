@@ -1301,6 +1301,14 @@ class Model_Wrapper(object):
 
     def BeamSearchNet(self, ds, parameters):
         """
+        DEPRECATED, use predictBeamSearchNet() instead.
+        """
+        print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
+        self.predictBeamSearchNet(ds, parameters)
+
+
+    def predictBeamSearchNet(self, ds, parameters):
+        """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
         :param batch_size: size of the batch
