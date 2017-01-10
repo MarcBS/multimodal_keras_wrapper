@@ -29,6 +29,12 @@ import copy
 import logging
 import shutil
 
+import logging
+logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
+
+from keras.optimizers import Adam, RMSprop, Nadam, Adadelta
+from keras.applications.vgg19 import VGG19
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
@@ -238,7 +244,7 @@ class Model_Wrapper(object):
         """
             Sets the mapping of the inputs from the format given by the dataset to the format received by the model.
 
-            :param inputsMapping: dictionary with the model inputs' identifiers as keys and the dataset inputs' identifiers as values. If the current model is Sequential then keys must be ints with the desired input order (starting from 0). If it is Graph then keys must be str.
+            :param inputsMapping: dictionary with the model inputs' identifiers as keys and the dataset inputs identifiers' position as values. If the current model is Sequential then keys must be ints with the desired input order (starting from 0). If it is Model then keys must be str.
         """
         self.inputsMapping = inputsMapping
 
@@ -247,7 +253,7 @@ class Model_Wrapper(object):
         """
             Sets the mapping of the outputs from the format given by the dataset to the format received by the model.
 
-            :param outputsMapping: dictionary with the model outputs' identifiers as keys and the dataset outputs' identifiers as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Graph then keys must be str.
+            :param outputsMapping: dictionary with the model outputs' identifiers as keys and the dataset outputs identifiers' position as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Model then keys must be str.
             :param acc_output: name of the model's output that will be used for calculating the accuracy of the model (only needed for Graph models)
         """
         if isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1:
@@ -256,13 +262,17 @@ class Model_Wrapper(object):
         self.acc_output = acc_output
 
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None):
+    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None, decay=0.0, clipnorm=10., optimizer=None):
         """
             Sets a new optimizer for the CNN model.
 
             :param lr: learning rate of the network
             :param momentum: momentum of the network (if None, then momentum = 1-lr)
             :param loss: loss function applied for optimization
+            :param metrics: list of Keras' metrics used for evaluating the model. To specify different metrics for different outputs of a multi-output model, you could also pass a dictionary, such as `metrics={'output_a': 'accuracy'}`.
+            :param decay: lr decay
+            :param clipnorm: gradients' clip norm
+            :param optimizer: string identifying the type of optimizer used (default: SGD)
         """
         # Pick default parameters
         if lr is None:
@@ -280,15 +290,25 @@ class Model_Wrapper(object):
         if metrics is None:
             metrics = []
 
-        #sgd = SGD(lr=lr, decay=1e-6, momentum=momentum, nesterov=True)
-        sgd = SGD(lr=lr, decay=0.0, momentum=momentum, nesterov=True)
+        if optimizer is None or optimizer.lower() == 'sgd':
+            optimizer = SGD(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum, nesterov=True)
+        elif optimizer.lower() == 'adam':
+            optimizer = Adam(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+        elif optimizer.lower() == 'rmsprop':
+            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+        elif optimizer.lower() == 'nadam':
+            optimizer = Nadam(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+        elif optimizer.lower() == 'adadelta':
+            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+        else:
+            raise Exception('\tThe chosen optimizer is not implemented.')
 
         if not self.silence:
             logging.info("Compiling model...")
 
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
-            self.model.compile(loss=loss, optimizer=sgd, metrics=metrics)
+            self.model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
         else:
             raise NotImplementedError()
 
@@ -1281,6 +1301,14 @@ class Model_Wrapper(object):
 
     def BeamSearchNet(self, ds, parameters):
         """
+        DEPRECATED, use predictBeamSearchNet() instead.
+        """
+        print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
+        self.predictBeamSearchNet(ds, parameters)
+
+
+    def predictBeamSearchNet(self, ds, parameters):
+        """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
         :param batch_size: size of the batch
@@ -2098,6 +2126,71 @@ class Model_Wrapper(object):
         """
             Builds a basic CNN model.
         """
+
+        # Define inputs and outputs IDs
+        self.ids_inputs = ['input']
+        self.ids_outputs = ['output']
+
+        if len(input) == 3:
+            input_shape = tuple([input[2]] + input[0:2])
+        else:
+            input_shape = tuple(input)
+
+        inp = Input(shape=input_shape, name='input')
+
+        # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
+        # this applies 32 convolution filters of size 3x3 each.
+        x = Convolution2D(32, 3, 3, border_mode='valid')(inp)
+        x = Activation('relu')(x)
+        x = Convolution2D(32, 3, 3)(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Convolution2D(64, 3, 3, border_mode='valid')(x)
+        x = Activation('relu')(x)
+        x = Convolution2D(64, 3, 3)(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Convolution2D(128, 3, 3, border_mode='valid')(x)
+        x = Activation('relu')(x)
+        x = Convolution2D(64, 3, 3)(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Convolution2D(256, 3, 3, border_mode='valid')(x)
+        x = Activation('relu')(x)
+        x = Convolution2D(64, 3, 3)(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Convolution2D(256, 3, 3, border_mode='valid')(x)
+        x = Activation('relu')(x)
+        x = Convolution2D(64, 3, 3)(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Flatten()(x)
+        # Note: Keras does automatic shape inference.
+        x = Dense(1024)(x)
+        x = Activation('relu')(x)
+        x = Dropout(0.5)(x)
+
+        x = Dense(nOutput)(x)
+        out = Activation('softmax', name='output')(x)
+
+        self.model = Model(input=inp, output=out)
+
+
+    def basic_model_seq(self, nOutput, input):
+        """
+            Builds a basic CNN model.
+        """
         if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
@@ -2149,7 +2242,6 @@ class Model_Wrapper(object):
 
         self.model.add(Dense(nOutput))
         self.model.add(Activation('softmax'))
-
 
 
     def One_vs_One(self, nOutput, input):
@@ -2359,6 +2451,44 @@ class Model_Wrapper(object):
         x = Dense(nOutput, activation='softmax', name='output')   (x) # nOutput=1000 by default
 
         self.model = Model(input=vis_input, output=x)
+
+
+    def VGG_19(self, nOutput, input):
+
+        # Define inputs and outputs IDs
+        self.ids_inputs = ['input_1']
+        self.ids_outputs = ['predictions']
+
+        # Load VGG19 model pre-trained on ImageNet
+        self.model = VGG19()
+
+        # Recover input layer
+        image = self.model.get_layer(self.ids_inputs[0]).output
+
+        # Recover last layer kept from original model
+        out = self.model.get_layer('fc2').output
+        out = Dense(nOutput, name=self.ids_outputs[0], activation='softmax')(out)
+
+        self.model = Model(input=image, output=out)
+
+
+    def VGG_19_ImageNet(self, nOutput, input):
+
+        # Define inputs and outputs IDs
+        self.ids_inputs = ['input_1']
+        self.ids_outputs = ['predictions']
+
+        # Load VGG19 model pre-trained on ImageNet
+        self.model = VGG19(weights='imagenet', layers_lr=0)
+
+        # Recover input layer
+        image = self.model.get_layer(self.ids_inputs[0]).output
+
+        # Recover last layer kept from original model
+        out = self.model.get_layer('fc2').output
+        out = Dense(nOutput, name=self.ids_outputs[0], activation='softmax')(out)
+
+        self.model = Model(input=image, output=out)
 
     ########################################
     # GoogLeNet implementation from http://dandxy89.github.io/ImageModels/googlenet/
