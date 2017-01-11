@@ -1678,7 +1678,7 @@ class Model_Wrapper(object):
         """
         trans_words = trg_word_seq
         new_trans_words = []
-        if verbose > 1:
+        if verbose > 2:
             print "Input sentence:", src_word_seq
             print "Hard alignments", hard_alignment
         for j in xrange(len(trans_words) - 1):
@@ -1686,30 +1686,20 @@ class Model_Wrapper(object):
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
                     new_trans_words.append(UNK_src)
-                    if verbose > 1:
-                        print UNK_src, "to position", j
                 elif heuristic == 1:
                     # Use the most likely translation (with t-table). If not found, copy the source word.
                     # Ok for small vocabulary (~30k) models
                     if mapping.get(UNK_src) is not None:
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 1:
-                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 1:
-                            print UNK_src, "not found in mapping. Copying source to position", j
                 elif heuristic == 2:
                     # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                     # Sometimes works better than other heuristics
                     if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 1:
-                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 1:
-                            print UNK_src, "not found in mapping. Copying source to position", j
             else:
                 new_trans_words.append(trans_words[j])
 
@@ -1758,7 +1748,7 @@ class Model_Wrapper(object):
                                                       heuristic=heuristic,
                                                       mapping=mapping,
                                                       verbose=verbose)
-                    if verbose > 0:
+                    if verbose > 1:
                         print "After unk_replace:", a_no
                 tmp = ' '.join(a_no[:-1])
                 answer_pred.append(tmp)
