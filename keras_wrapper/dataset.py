@@ -753,7 +753,19 @@ class Dataset(object):
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
         
-
+    def removeInput(self, set_name, id='label', type='categorical'):
+        # Ensure that the output exists before removing it
+        keys_X_set = eval('self.X_'+set_name+'.keys()')
+        if id in self.ids_inputs:
+            self.ids_inputs.remove(id)
+            self.types_inputs.remove(type)
+            exec('self.X_'+set_name+'[id] = dict()')
+            exec('self.loaded_'+set_name+'[0] = False')
+            exec('self.len_'+set_name+' = 0')
+        elif id not in keys_X_set:
+            raise Exception('An input with id "'+id+'" does not exist in the Database.')
+        if not self.silence:
+            logging.info('Removed "' + set_name + '" set input of type "' + type + '" with id "'+ id + '.')
     def setLabels(self, labels_list, set_name, type='categorical', id='label'):
         """
             DEPRECATED
@@ -876,8 +888,21 @@ class Dataset(object):
         
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set outputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
-           
-        
+
+    def removeOutput(self, set_name, id='label', type='categorical'):
+        # Ensure that the output exists before removing it
+        keys_Y_set = eval('self.Y_'+set_name+'.keys()')
+        if id in self.ids_outputs:
+            self.ids_outputs.remove(id)
+            self.types_outputs.remove(type)
+            exec('self.Y_'+set_name+'[id] = dict()')
+            exec('self.loaded_'+set_name+'[1] = False')
+            exec('self.len_'+set_name+' = 0')
+        elif id not in keys_Y_set:
+            raise Exception('An output with id "'+id+'" does not exist in the Database.')
+        if not self.silence:
+            logging.info('Removed "' + set_name + '" set outputs of type "' + type + '" with id "'+ id + '.')
+
     # ------------------------------------------------------- #
     #       TYPE 'categorical' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
