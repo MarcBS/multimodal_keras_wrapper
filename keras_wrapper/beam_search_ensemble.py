@@ -215,7 +215,7 @@ class BeamSearchEnsemble:
         else:
             return samples, sample_scores, None
 
-    def BeamSearchNet(self):
+    def predictBeamSearchNet(self):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
         Params from config that affect the sarch process:
@@ -369,6 +369,14 @@ class BeamSearchEnsemble:
             return predictions
         else:
             return predictions, references, sources_sampling
+
+
+    def BeamSearchNet(self):
+        """
+        DEPRECATED, use predictBeamSearchNet() instead.
+        """
+        print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
+        return self.predictBeamSearchNet()
 
     @staticmethod
     def checkParameters(input_params, default_params):
