@@ -25,7 +25,7 @@ class BeamSearchEnsemble:
             params_prediction.get('optimized_search') is not None else False
         self.verbose = verbose
         if self.verbose > 0:
-            print "Using optimized_search =", self.optimized_search
+            logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
 
     # PREDICTION FUNCTIONS: Functions for making prediction on input samples
 
