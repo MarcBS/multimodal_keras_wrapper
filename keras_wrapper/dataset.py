@@ -404,7 +404,7 @@ class Dataset(object):
                                         'video',  'video-features',
                                         'text',
                                         'id', 'ghost', 'file-name']
-        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', '3DLabel', 'id', 'file-name']
+        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', '3DLabel', '3DSemanticLabel', 'id', 'file-name']
         #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
         
@@ -451,13 +451,17 @@ class Dataset(object):
         self.use_RGB = dict()
         #################################################
         
-        ############################ Parameters used for outputs of type 'categorical'
+        ############################ Parameters used for outputs of type 'categorical', '3DLabels' or '3DSemanticLabel'
         self.classes = dict()
         self.dic_classes = dict()
         #################################################
         
-        ############################ Parameters used for outputs of type '3DLabels'
+        ############################ Parameters used for outputs of type '3DLabels' or '3DSemanticLabel'
         self.id_in_3DLabel = dict()
+        #################################################
+
+        ############################ Parameters used for outputs of type '3DSemanticLabel'
+        self.semantic_classes = dict()
         #################################################
         
         # Reset counters to start loading data in batches
@@ -657,7 +661,7 @@ class Dataset(object):
 
 
     def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
-                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,               # 'raw-image' / 'video'
+                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,               # 'raw-image' / 'video'   (height, width, depth)
                  max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,      # 'text'
                  feat_len = 1024,                                                                 # 'image-features' / 'video-features'
@@ -796,10 +800,11 @@ class Dataset(object):
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id + '".')
 
+
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,   # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,       # 'text'
-                  associated_id_in=None,                                                            # '3DLabel'
+                  associated_id_in=None,                                                            # '3DLabel' or '3DSemanticLabel'
                   sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -824,9 +829,9 @@ class Dataset(object):
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
             :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
             
-            # '3DLabel'-related parameters
+            # '3DLabel' or '3DSemanticLabel'-related parameters
             
-            :param associated_id_in: id of the input 'raw-image' associated for the inputted 3DLabels
+            :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
 
         """
         self.__checkSetName(set_name)
@@ -859,7 +864,9 @@ class Dataset(object):
             data = self.preprocessIDs(path_list, id)
         elif(type == '3DLabel'):
             data = self.preprocess3DLabel(path_list, id, associated_id_in)
-            
+        elif(type == '3DSemanticLabel'):
+            data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in)
+
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data,repeat_set))
         if self.sample_weights.get(id) is None:
@@ -1278,9 +1285,9 @@ class Dataset(object):
         '''
 
         n_samples = len(bbox_list)
-        w, h, d = img_size
-        w_crop, h_crop, d_crop = size_crop
-        labels = np.zeros((n_samples, nClasses,w_crop,h_crop), dtype=np.float32)
+        h, w, d = img_size
+        h_crop, w_crop, d_crop = size_crop
+        labels = np.zeros((n_samples, nClasses,h_crop,w_crop), dtype=np.float32)
             
         for i in range(n_samples):
             line = bbox_list[i]
@@ -1294,24 +1301,24 @@ class Dataset(object):
                 bndbox = eval(array)[0]
                 idxclass = eval(array)[1]
 
-                bndbox_ones = np.ones((bndbox[3] - bndbox[1] + 1, bndbox[2] - bndbox[0] + 1))
-                label3D[idxclass, bndbox[1] - 1:bndbox[3], bndbox[0] - 1:bndbox[2]] = bndbox_ones
+                #bndbox_ones = np.ones((bndbox[3] - bndbox[1] + 1, bndbox[2] - bndbox[0] + 1))
+                #label3D[idxclass, bndbox[1] - 1:bndbox[3], bndbox[0] - 1:bndbox[2]] = bndbox_ones
 
-                #bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
-                #label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
+                bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
+                label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
 
             if not dataAugmentation or daRandomParams==None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
-                    label2D = misc.imresize(label3D[j],(w_crop,h_crop))
+                    label2D = misc.imresize(label3D[j],(h_crop,w_crop))
                     maxval = np.max(label2D)
                     if maxval > 0: label2D /= maxval
                     labels[i, j] = label2D
             else:
-                label3D_rs = np.zeros((nClasses,w_crop,h_crop), dtype=np.float32)
+                label3D_rs = np.zeros((nClasses,h_crop,w_crop), dtype=np.float32)
                 # Crop the labels (random crop)
                 for j in range(nClasses):
-                    label2D = misc.imresize(label3D[j],(w,h))
+                    label2D = misc.imresize(label3D[j],(h,w))
                     maxval = np.max(label2D)
                     if maxval > 0: label2D /= maxval
                     randomParams = daRandomParams[image_list[i]]
@@ -1338,6 +1345,108 @@ class Dataset(object):
         # Reshape labels to (batch_size, width*height, classes) before returning
         labels = np.reshape(labels, (n_samples, nClasses,w_crop*h_crop))
         labels = np.transpose(labels, (0,2,1))
+
+        return labels
+
+
+    def load3DSemanticLabels(self, labeled_images_list, nClasses, classes_to_colour, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
+        '''
+        Loads a set of outputs of the type 3DSemanticLabel (used for semantic segmentation)
+
+        :param labeled_images_list: list of labeled images
+        :param nClasses: number of different classes to be detected
+        :param classes_to_colour: dictionary relating each class id to their corresponding colour in the labeled image
+        :param dataAugmentation: are we applying data augmentation?
+        :param daRandomParams: random parameters applied on data augmentation (vflip, hflip and random crop)
+        :param img_size: resized applied to input images
+        :param size_crop: crop size applied to input images
+        :param image_list: list of input images used as identifiers to 'daRandomParams'
+        :return: 3DSemanticLabels with shape (batch_size, width*height, classes)
+        '''
+
+        n_samples = len(labeled_images_list)
+        h, w, d = img_size
+        h_crop, w_crop, d_crop = size_crop
+        labels = np.zeros((n_samples, nClasses, h_crop, w_crop), dtype=np.float32)
+
+        for i in range(n_samples):
+            line = labeled_images_list[i].rstrip('\n')
+
+            ### Load labeled GT image
+            labeled_im = self.path +'/'+ line
+            # Check if the filename includes the extension
+            [path, filename] = ntpath.split(labeled_im)
+            [filename, ext] = os.path.splitext(filename)
+            # If it doesn't then we find it
+            if not ext:
+                filename = fnmatch.filter(os.listdir(path), filename + '*')
+                if not filename:
+                    raise Exception('Non existent image ' + labeled_im)
+                else:
+                    labeled_im = path + '/' + filename[0]
+            # Read image
+            try:
+                logging.disable(logging.CRITICAL)
+                labeled_im = pilimage.open(labeled_im)
+                labeled_im = np.asarray(labeled_im)
+                logging.disable(logging.NOTSET)
+                labeled_im = misc.imresize(labeled_im, (h, w))
+            except:
+                logging.warning("WARNING!")
+                logging.warning("Can't load image " + labeled_im)
+                labeled_im = np.zeros((h, w))
+
+
+            label3D = np.zeros((nClasses, h, w), dtype=np.float32)
+
+            # Insert 1s in the corresponding positions for each class
+            for class_id, colour in classes_to_colour.iteritems():
+                #indices = np.where(np.all(labeled_im == colour, axis=-1))
+                indices = np.where(labeled_im == class_id)
+                num_vals = len(indices[0])
+                if num_vals > 0:
+                    for idx_pos in range(num_vals):
+                        x, y = indices[0][idx_pos], indices[1][idx_pos]
+                        label3D[class_id, x, y] = 1.
+
+            if not dataAugmentation or daRandomParams == None:
+                # Resize 3DLabel to crop size.
+                for j in range(nClasses):
+                    label2D = misc.imresize(label3D[j], (h_crop, w_crop))
+                    maxval = np.max(label2D)
+                    if maxval > 0: label2D /= maxval
+                    labels[i, j] = label2D
+            else:
+                label3D_rs = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
+                # Crop the labels (random crop)
+                for j in range(nClasses):
+                    label2D = misc.imresize(label3D[j], (h, w))
+                    maxval = np.max(label2D)
+                    if maxval > 0: label2D /= maxval
+                    randomParams = daRandomParams[image_list[i]]
+                    # Take random crop
+                    left = randomParams["left"]
+                    right = np.add(left, size_crop[0:2])
+
+                    label2D = label2D[left[0]:right[0], left[1]:right[1]]
+
+                    # Randomly flip (with a certain probability)
+                    flip = randomParams["hflip"]
+                    prob_flip_horizontal = randomParams["prob_flip_horizontal"]
+                    if flip < prob_flip_horizontal:  # horizontal flip
+                        label2D = np.fliplr(label2D)
+                    flip = randomParams["vflip"]
+                    prob_flip_vertical = randomParams["prob_flip_vertical"]
+                    if flip < prob_flip_vertical:  # vertical flip
+                        label2D = np.flipud(label2D)
+
+                    label3D_rs[j] = label2D
+
+                labels[i] = label3D_rs
+
+        # Reshape labels to (batch_size, width*height, classes) before returning
+        labels = np.reshape(labels, (n_samples, nClasses, w_crop * h_crop))
+        labels = np.transpose(labels, (0, 2, 1))
 
         return labels
 
@@ -1956,6 +2065,96 @@ class Dataset(object):
         return data
 
     # ------------------------------------------------------- #
+    #       TYPE '3DSemanticLabel' SPECIFIC FUNCTIONS
+    # ------------------------------------------------------- #
+
+    def preprocess3DSemanticLabel(self, path_list, id, associated_id_in):
+        return self.preprocess3DLabel(path_list, id, associated_id_in)
+
+
+    def setSemanticClasses(self, path_classes, id):
+        """
+        Loads the list of semantic classes of the dataset together with their corresponding colours in the GT image.
+        Each line must contain a unique identifier of the class and its associated RGB colour representation separated by commas.
+
+        :param path_classes: Path to a text file with the classes and their colours.
+        :param id: input/output id
+
+        :return: None
+        """
+        if isinstance(path_classes, str) and os.path.isfile(path_classes):
+            semantic_classes = dict()
+            with open(path_classes, 'r') as list_:
+                for line in list_:
+                    line = line.rstrip('\n').split(',')
+                    if len(line) != 4:
+                        raise Exception('Wrong format for semantic classes. Must contain a class name followed by the RGB colour values separated by commas.')
+                    class_id = self.dic_classes[id][line[0]]
+                    semantic_classes[int(class_id)] = [int(line[1]), int(line[2]), int(line[3])]
+            self.semantic_classes[id] = semantic_classes
+        else:
+            raise Exception(
+                'Wrong type for "path_classes". It must be a path to a text file with the classes and their associated colour in the GT image.')
+
+        if not self.silence:
+            logging.info('Loaded semantic classes list for data with id: '+id)
+
+
+    def load_GT_3DSemanticLabels(self, gt, id):
+        '''
+        Loads a GT list of 3DSemanticLabels in a 2D matrix and reshapes them to an Nx1 array
+
+        :param gt: list of Dataset output of type 3DSemanticLabels
+        :param id: id of the input/output we are processing
+        :return: out_list: containing a list of label images reshaped as an Nx1 array
+        '''
+        out_list = []
+
+        assoc_id_in = self.id_in_3DLabel[id]
+        img_size = self.img_size[assoc_id_in]
+        size_crop = self.img_size_crop[assoc_id_in]
+
+        n_samples = len(gt)
+        h, w, d = img_size
+        h_crop, w_crop, d_crop = size_crop
+
+        for i in range(n_samples):
+            labels = np.zeros((h_crop, w_crop), dtype=np.float32)
+            line = gt[i]
+
+            ### Load labeled GT image
+            labeled_im = self.path + '/' + line
+            # Check if the filename includes the extension
+            [path, filename] = ntpath.split(labeled_im)
+            [filename, ext] = os.path.splitext(filename)
+            # If it doesn't then we find it
+            if not ext:
+                filename = fnmatch.filter(os.listdir(path), filename + '*')
+                if not filename:
+                    raise Exception('Non existent image ' + labeled_im)
+                else:
+                    labeled_im = path + '/' + filename[0]
+            # Read image
+            try:
+                logging.disable(logging.CRITICAL)
+                labeled_im = pilimage.open(labeled_im)
+                labeled_im = np.asarray(labeled_im)
+                logging.disable(logging.NOTSET)
+                labeled_im = misc.imresize(labeled_im, (h, w))
+            except:
+                logging.warning("WARNING!")
+                logging.warning("Can't load image " + labeled_im)
+                labeled_im = np.zeros((h, w))
+
+            labeled_im = misc.imresize(labeled_im, (h_crop, w_crop))
+
+            # Reshape labels to (width*height, classes) before returning
+            labels = np.reshape(labeled_im, (w_crop * h_crop))
+            out_list.append(labels)
+
+        return out_list
+
+    # ------------------------------------------------------- #
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
     
@@ -2283,7 +2482,9 @@ class Dataset(object):
                 
                 # Read image
                 try:
+                    logging.disable(logging.CRITICAL)
                     im = pilimage.open(im)
+                    logging.disable(logging.NOTSET)
 
                 except:
                     logging.warning("WARNING!")
@@ -2296,17 +2497,18 @@ class Dataset(object):
                     im = im.convert('RGB')
                 else:
                     im = im.convert('L')
-                
+
             # Data augmentation
             if not dataAugmentation:
                 # Use whole image
-                im = im.resize((self.img_size_crop[id][0], self.img_size_crop[id][1]))
+                im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
                 im = np.asarray(im, dtype=type_imgs)
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
-                im = im.resize((self.img_size[id][0], self.img_size[id][1]))
+                im = im.resize((self.img_size[id][1], self.img_size[id][0]))
                 im = np.asarray(im, dtype=type_imgs)
+
                 # Take random crop
                 left = randomParams["left"]
                 right = np.add(left, self.img_size_crop[id][0:2])
@@ -2565,6 +2767,19 @@ class Dataset(object):
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
                                           imlist)
+                elif (type_out == '3DSemanticLabel'):
+                    nClasses = len(self.classes[id_out])
+                    classes_to_colour = self.semantic_classes[id_out]
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    if surpassed:
+                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:]') + eval(
+                            'self.X_' + set_name + '[assoc_id_in][0:new_last]')
+                    else:
+                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:new_last]')
+
+                    y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
+                                          imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2685,6 +2900,14 @@ class Dataset(object):
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
                                           imlist)
+                elif (type_out == '3DSemanticLabel'):
+                    nClasses = len(self.classes[id_out])
+                    classes_to_colour = self.semantic_classes[id_out]
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
+                    y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
+                                                  self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
+                                                  imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2764,6 +2987,14 @@ class Dataset(object):
                     y = self.load3DLabels(y, nClasses, dataAugmentation, None,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
                                           imlist)
+                elif (type_out == '3DSemanticLabel'):
+                    nClasses = len(self.classes[id_out])
+                    classes_to_colour = self.semantic_classes[id_out]
+                    assoc_id_in = self.id_in_3DLabel[id_out]
+                    imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
+                    y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
+                                                  self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
+                                                  imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],

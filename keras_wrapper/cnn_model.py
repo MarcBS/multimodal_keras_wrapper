@@ -1494,7 +1494,7 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
-                          'normalize': False, 'mean_substraction': True, 'n_samples':None,
+                          'normalize': False, 'mean_substraction': True, 'n_samples': None,
                           'predict_on_sets': ['val']}
         params = self.checkParameters(parameters, default_params)
 
@@ -2479,7 +2479,7 @@ class Model_Wrapper(object):
         self.ids_outputs = ['predictions']
 
         # Load VGG19 model pre-trained on ImageNet
-        self.model = VGG19(weights='imagenet', layers_lr=0)
+        self.model = VGG19(weights='imagenet', layers_lr=0.001)
 
         # Recover input layer
         image = self.model.get_layer(self.ids_inputs[0]).output
