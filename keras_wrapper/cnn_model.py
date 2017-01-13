@@ -9,10 +9,10 @@ from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
 
-from keras_wrapper.callbacks_keras_wrapper import *
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
-from keras_wrapper.read_write import file2list
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
+from keras_wrapper.extra.callbacks import *
+from keras_wrapper.extra.read_write import file2list
 
 mpl.use('Agg') # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
@@ -26,7 +26,6 @@ import time
 import os
 import math
 import copy
-import logging
 import shutil
 
 import logging
