@@ -622,7 +622,7 @@ class Dataset(object):
         self.setInput(path_list, set_name, type, id)
 
 
-    def setRawInput(self, path_list, set_name, type='file-name', id='raw-text'):
+    def setRawInput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
         """
             Loads a list which can contain all samples from either the 'train', 'val', or
             'test' set splits (specified by set_name).
@@ -640,11 +640,11 @@ class Dataset(object):
 
         # Insert type and id of input data
         keys_X_set = eval('self.X_raw_'+set_name+'.keys()')
-        if id not in self.ids_inputs:
+        if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
             self.optional_inputs.append(id) # This is always optional
-        elif id in keys_X_set:
+        elif id in keys_X_set and not overwrite_split:
             raise Exception('An input with id "'+id+'" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
@@ -656,7 +656,7 @@ class Dataset(object):
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id + '".')
 
 
-    def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
+    def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True, overwrite_split=False,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,               # 'raw-image' / 'video'
                  max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,      # 'text'
@@ -708,12 +708,12 @@ class Dataset(object):
         
         # Insert type and id of input data
         keys_X_set = eval('self.X_'+set_name+'.keys()')
-        if id not in self.ids_inputs:
+        if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
             if not required:
                 self.optional_inputs.append(id)
-        elif id in keys_X_set:
+        elif id in keys_X_set and not overwrite_split:
             raise Exception('An input with id "'+id+'" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
@@ -753,7 +753,18 @@ class Dataset(object):
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
         
-
+    def removeInput(self, set_name, id='label', type='categorical'):
+        # Ensure that the output exists before removing it
+        keys_X_set = eval('self.X_'+set_name+'.keys()')
+        if id in self.ids_inputs:
+            ind_remove = self.ids_inputs.index(id)
+            del self.ids_inputs[ind_remove]
+            del self.types_inputs[ind_remove]
+            eval('del self.X_'+set_name+'[id]')
+        elif id not in keys_X_set:
+            raise Exception('An input with id "'+id+'" does not exist in the Database.')
+        if not self.silence:
+            logging.info('Removed "' + set_name + '" set input of type "' + type + '" with id "'+ id + '.')
     def setLabels(self, labels_list, set_name, type='categorical', id='label'):
         """
             DEPRECATED
@@ -761,7 +772,7 @@ class Dataset(object):
         logging.info("WARNING: The method setLabels() is deprecated, consider using () instead.")
         self.setOutput(self, labels_list, set_name, type, id)
 
-    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text'):
+    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
         """
             Loads a list which can contain all samples from either the 'train', 'val', or
             'test' set splits (specified by set_name).
@@ -779,12 +790,12 @@ class Dataset(object):
 
         # Insert type and id of input data
         keys_Y_set = eval('self.Y_raw_'+set_name+'.keys()')
-        if id not in self.ids_inputs:
+        if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
             self.optional_inputs.append(id) # This is always optional
 
-        elif id in keys_Y_set:
+        elif id in keys_Y_set and not overwrite_split:
             raise Exception('An input with id "'+id+'" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
@@ -796,7 +807,7 @@ class Dataset(object):
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id + '".')
 
-    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1,
+    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,   # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,       # 'text'
                   associated_id_in=None,                                                            # '3DLabel'
@@ -833,11 +844,11 @@ class Dataset(object):
 
         # Insert type and id of output data
         keys_Y_set = eval('self.Y_'+set_name+'.keys()')
-        if id not in self.ids_outputs:
+        if id not in self.ids_outputs or overwrite_split:
             self.ids_outputs.append(id)
             self.types_outputs.append(type)
-        elif id in keys_Y_set:
-            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+        elif id in keys_Y_set and not overwrite_split:
+            raise Exception('An output with id "'+id+'" is already loaded into the Database.')
         
         if type not in self.__accepted_types_outputs:
             raise NotImplementedError('The output type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_outputs))
@@ -876,8 +887,20 @@ class Dataset(object):
         
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set outputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
-           
-        
+
+    def removeOutput(self, set_name, id='label', type='categorical'):
+        # Ensure that the output exists before removing it
+        keys_Y_set = eval('self.Y_'+set_name+'.keys()')
+        if id in self.ids_outputs:
+            ind_remove = self.ids_outputs.index(id)
+            del self.ids_outputs[ind_remove]
+            del self.types_outputs[ind_remove]
+            eval('del self.Y_'+set_name+'[id]')
+        elif id not in keys_Y_set:
+            raise Exception('An output with id "'+id+'" does not exist in the Database.')
+        if not self.silence:
+            logging.info('Removed "' + set_name + '" set outputs of type "' + type + '" with id "'+ id + '.')
+
     # ------------------------------------------------------- #
     #       TYPE 'categorical' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
