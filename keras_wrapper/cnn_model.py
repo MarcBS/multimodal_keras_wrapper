@@ -49,6 +49,8 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     :param model_wrapper: object to save
     :param update_num: identifier of the number of iterations/updates/epochs elapsed
     :param path: path where the model will be saved
+    :param full_path: Whether we save to the path of from path + '/epoch_' + update_num
+    :param store_iter: Whether we store the current update_num
     :return: None
     """
     if not path:
@@ -62,7 +64,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         else:
             model_name = path
     else:
-        model_name = path + '/epoch_'+ iter
+        model_name = path + '/epoch_' + iter
 
     if not model_wrapper.silence:
         logging.info("<<< Saving model to "+ model_name +" ... >>>")
@@ -78,13 +80,15 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     model_wrapper.model.save_weights(model_name +'_weights.h5', overwrite=True)
 
     # Save auxiliar models for optimized search
-    if 'model_init' in dir(model_wrapper):
+    if model_wrapper.model_init is not None:
+        logging.info("<<< Saving model_init to "+ model_name +"_structure_init.json... >>>")
         # Save model structure
         json_string = model_wrapper.model_init.to_json()
         open(model_name + '_structure_init.json', 'w').write(json_string)
         # Save model weights
         model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
-    if 'model_next' in dir(model_wrapper):
+    if model_wrapper.model_next is not None:
+        logging.info("<<< Saving model_next to "+ model_name +"_structure_next.json... >>>")
         # Save model structure
         json_string = model_wrapper.model_next.to_json()
         open(model_name + '_structure_next.json', 'w').write(json_string)
@@ -133,10 +137,13 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
 
     if loaded_optimized:
         # Load model structure
+        logging.info("<<< Loading optimized model... >>>")
+        logging.info("\t <<< Loading model_init from " + model_name + "_structure_init.json ... >>>")
         model_init = model_from_json(open(model_name + '_structure_init.json').read())
         # Load model weights
         model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
+        logging.info("\t <<< Loading model_next from " + model_name + "_structure_next.json ... >>>")
         model_next = model_from_json(open(model_name + '_structure_next.json').read())
         # Load model weights
         model_next.load_weights(model_name + '_weights_next.h5')
@@ -144,7 +151,7 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     # Load Model_Wrapper information
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
-    except: # backwards compatibility
+    except:  # backwards compatibility
         try:
             model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
         except:
@@ -194,9 +201,9 @@ class Model_Wrapper(object):
 
         self.silence = silence
         self.net_type = type
-        self.lr = 0.01 # insert default learning rate
-        self.momentum = 1.0-self.lr # insert default momentum
-        self.loss='categorical_crossentropy' # default loss function
+        self.lr = 0.01  # insert default learning rate
+        self.momentum = 1.0-self.lr  # insert default momentum
+        self.loss='categorical_crossentropy'  # default loss function
         self.training_parameters = []
         self.testing_parameters = []
         self.training_state = dict()
@@ -204,9 +211,24 @@ class Model_Wrapper(object):
         # Dictionary for storing any additional data needed
         self.additional_data = dict()
 
+        # Model containers
+        self.model = None
+        self.model_init = None
+        self.model_next = None
+
         # Inputs and outputs names for models of class Model
         self.ids_inputs = list()
         self.ids_outputs = list()
+
+        # Inputs and outputs names for models for optimized search
+        self.ids_inputs_init = list()
+        self.ids_outputs_init = list()
+        self.ids_inputs_next = list()
+        self.ids_outputs_next = list()
+
+        # Matchings from model_init to mode_next:
+        self.matchings_init_to_next = None
+        self.matchings_next_to_next = None
 
         # Prepare logger
         self.__logger = dict()
@@ -239,7 +261,6 @@ class Model_Wrapper(object):
                     logging.info("<<< Loading weights from file "+ weights_path +" >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
 
-
     def setInputsMapping(self, inputsMapping):
         """
             Sets the mapping of the inputs from the format given by the dataset to the format received by the model.
@@ -247,7 +268,6 @@ class Model_Wrapper(object):
             :param inputsMapping: dictionary with the model inputs' identifiers as keys and the dataset inputs identifiers' position as values. If the current model is Sequential then keys must be ints with the desired input order (starting from 0). If it is Model then keys must be str.
         """
         self.inputsMapping = inputsMapping
-
 
     def setOutputsMapping(self, outputsMapping, acc_output=None):
         """
@@ -382,12 +402,10 @@ class Model_Wrapper(object):
 
         return params
 
-
     # ------------------------------------------------------- #
     #       MODEL MODIFICATION
     #           Methods for modifying specific layers of the network
     # ------------------------------------------------------- #
-
 
     def replaceLastLayers(self, num_remove, new_layers):
         """
@@ -489,7 +507,6 @@ class Model_Wrapper(object):
 
         logging.info("<<< Finished training model >>>")
 
-
     def resumeTrainNet(self, ds, parameters, out_name=None):
         """
             DEPRECATED
@@ -515,7 +532,6 @@ class Model_Wrapper(object):
         self.__train(ds, params, state)
 
         logging.info("<<< Finished training Model_Wrapper >>>")
-
 
     def __train(self, ds, params, state=dict()):
 
@@ -577,7 +593,6 @@ class Model_Wrapper(object):
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
                                  initial_epoch=params['epoch_offset'])
-
 
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
         """
@@ -815,7 +830,6 @@ class Model_Wrapper(object):
             self.training_state = state
             state['it'] = -1 # start again from the first iteration of the next epoch
 
-
     def testNet(self, ds, parameters, out_name=None):
 
         # Check input parameters and recover default values if needed
@@ -853,7 +867,6 @@ class Model_Wrapper(object):
         #acc_final = out[4]
         #logging.info('Test loss: %0.8s' % loss_final)
         #logging.info('Test accuracy: %0.8s' % acc_final)
-
 
     def testNet_deprecated(self, ds, parameters, out_name=None):
         """
@@ -937,8 +950,6 @@ class Model_Wrapper(object):
         logging.info("\tTest accuracy: "+ str(np.mean(scores)))
         logging.info("\tTest accuracy top-5: "+ str(np.mean(top_scores)))
 
-
-
     def testNetSamples(self, X, batch_size=50):
         """
             Applies a forward pass on the samples provided and returns the predicted classes and probabilities.
@@ -947,7 +958,6 @@ class Model_Wrapper(object):
         probs = self.model.predict_proba(X, batch_size=batch_size)
 
         return [classes, probs]
-
 
     def testOnBatch(self, X, Y, accuracy=True, out_name=None):
         """
@@ -1053,11 +1063,11 @@ class Model_Wrapper(object):
         ##########################################
         return probs
 
-
     def predict_cond_optimized(self, X, states_below, params, ii, prev_out):
         """
         Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
-        WARNING!: It's assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
+        WARNING!: It's assumed that the current history (state_below) is the last input of the model!
+        See Dataset class for more information
         :param X: Input context
         :param states_below: Batch of partial hypotheses
         :param params: Decoding parameters
@@ -1076,33 +1086,32 @@ class Model_Wrapper(object):
             model = self.model_init
         else:
             model = self.model_next
-
         ##########################################
         # Get inputs
         ##########################################
-        if ii == 0: # not optimized search model or first timestep
-            for model_input in params['model_inputs'][:-1]:
-                if X[model_input].shape[0] == 1:
-                    in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
-            in_data[params['model_inputs'][-1]] = states_below
-        elif ii == 1: # timestep == 1 (model_init to model_next)
-            for idx, init_out_name in enumerate(self.ids_outputs_init):
-                if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:,-1]
-                if idx > 0: # first output must be the output probs.
-                    if init_out_name in self.matchings_init_to_next.keys():
-                        next_in_name = self.matchings_init_to_next[init_out_name]
-                        if prev_out[idx].shape[0] == 1:
-                            prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
-                        in_data[next_in_name] = prev_out[idx]
 
-        elif ii > 1:  # timestep > 1 (model_next to model_next)
+        if ii > 1:  # timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1]
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, 1)
                 if idx > 0:  # first output must be the output probs.
                     if next_out_name in self.matchings_next_to_next.keys():
                         next_in_name = self.matchings_next_to_next[next_out_name]
+                        if prev_out[idx].shape[0] == 1:
+                            prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
+                        in_data[next_in_name] = prev_out[idx]
+        elif ii == 0:  # first timestep
+            for model_input in params['model_inputs'][:-1]:
+                if X[model_input].shape[0] == 1:
+                    in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
+            in_data[params['model_inputs'][-1]] = states_below.reshape(n_samples, 1)
+        elif ii == 1:  # timestep == 1 (model_init to model_next)
+            for idx, init_out_name in enumerate(self.ids_outputs_init):
+                if idx == 0:
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, 1)
+                if idx > 0:  # first output must be the output probs.
+                    if init_out_name in self.matchings_init_to_next.keys():
+                        next_in_name = self.matchings_init_to_next[init_out_name]
                         if prev_out[idx].shape[0] == 1:
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
@@ -1111,12 +1120,11 @@ class Model_Wrapper(object):
         # Recover output identifiers
         ##########################################
         # in any case, the first output of the models must be the next words' probabilities
-        pick_idx = -1
+        pick_idx = 0
         if ii == 0:  # optimized search model (model_init case)
             output_ids_list = self.ids_outputs_init
-        elif ii > 0:  # optimized search model (model_next case)
+        else:  # optimized search model (model_next case)
             output_ids_list = self.ids_outputs_next
-
 
         ##########################################
         # Apply prediction on current timestep
@@ -1126,7 +1134,7 @@ class Model_Wrapper(object):
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
                 aux_in_data = {}
-                for k,v in in_data.iteritems():
+                for k, v in in_data.iteritems():
                     aux_in_data[k] = np.expand_dims(v[i], axis=0)
                 predicted_out = model.predict_on_batch(aux_in_data)
                 if i == 0:
@@ -1137,7 +1145,6 @@ class Model_Wrapper(object):
                             out_data[iout] = np.vstack((out_data[iout], predicted_out[iout]))
                     else:
                         out_data = np.vstack((out_data, predicted_out))
-
         ##########################################
         # Get outputs
         ##########################################
@@ -1155,7 +1162,6 @@ class Model_Wrapper(object):
         # Define returned data
         ##########################################
         return [probs, out_data]
-
 
     def beam_search(self, X, params, null_sym=2):
         """
@@ -1229,11 +1235,13 @@ class Model_Wrapper(object):
             costs = cand_flat[ranks_flat]
             # Form a beam for the next iteration
             new_hyp_samples = []
+            new_trans_indices = []
             new_hyp_scores = np.zeros(k-dead_k).astype('float32')
             if params['pos_unk']:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                 new_hyp_samples.append(hyp_samples[ti]+[wi])
+                new_trans_indices.append(ti)
                 new_hyp_scores[idx] = copy.copy(costs[idx])
                 if params['pos_unk']:
                     new_hyp_alphas.append(hyp_alphas[ti]+[alphas[ti]])
@@ -1252,7 +1260,7 @@ class Model_Wrapper(object):
                         sample_alphas.append(new_hyp_alphas[idx])
                     dead_k += 1
                 else:
-                    indices_alive.append(idx)
+                    indices_alive.append(new_trans_indices[idx])
                     new_live_k += 1
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
@@ -1468,7 +1476,7 @@ class Model_Wrapper(object):
                 predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
             else:
                 predictions[s] = np.asarray(best_samples)
-
+        del data_gen
         if params['n_samples'] < 1:
             return predictions
         else:
@@ -1549,7 +1557,6 @@ class Model_Wrapper(object):
 
         return predictions
 
-
     def predictOnBatch(self, X, in_name=None, out_name=None, expand=False):
         """
             Applies a forward pass and returns the predicted values.
@@ -1577,8 +1584,6 @@ class Model_Wrapper(object):
 
         return predictions
 
-
-
     # ------------------------------------------------------- #
     #       DECODING FUNCTIONS
     #           Functions for decoding predictions
@@ -1594,7 +1599,6 @@ class Model_Wrapper(object):
         a = np.log(a) / temperature
         a = np.exp(a) / np.sum(np.exp(a))
         return np.argmax(np.random.multinomial(1, a, 1))
-
 
     def sampling(self, scores, sampling_type='max_likelihood', temperature=1.0):
         """
@@ -1642,7 +1646,7 @@ class Model_Wrapper(object):
         if verbose > 0:
             logging.info('Decoding prediction ...')
         flattened_preds = preds.reshape(-1, preds.shape[-1])
-        flattened_answer_pred = map(lambda x: index2word[x],self.sampling(scores=flattened_preds,
+        flattened_answer_pred = map(lambda x: index2word[x], self.sampling(scores=flattened_preds,
                                                                           sampling_type=sampling_type,
                                                                           temperature=temperature))
         answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:2])
@@ -1657,7 +1661,6 @@ class Model_Wrapper(object):
             tmp = ' '.join(a_no[init_token_pos:end_token_pos])
             answer_pred.append(tmp)
         return answer_pred
-
 
     def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                               heuristic=0, mapping=None, verbose=0):
@@ -1675,7 +1678,7 @@ class Model_Wrapper(object):
         """
         trans_words = trg_word_seq
         new_trans_words = []
-        if verbose > 1:
+        if verbose > 2:
             print "Input sentence:", src_word_seq
             print "Hard alignments", hard_alignment
         for j in xrange(len(trans_words) - 1):
@@ -1683,30 +1686,20 @@ class Model_Wrapper(object):
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
                     new_trans_words.append(UNK_src)
-                    if verbose > 1:
-                        print UNK_src, "to position", j
                 elif heuristic == 1:
                     # Use the most likely translation (with t-table). If not found, copy the source word.
                     # Ok for small vocabulary (~30k) models
                     if mapping.get(UNK_src) is not None:
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 1:
-                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 1:
-                            print UNK_src, "not found in mapping. Copying source to position", j
                 elif heuristic == 2:
                     # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                     # Sometimes works better than other heuristics
                     if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                         new_trans_words.append(mapping[UNK_src])
-                        if verbose > 1:
-                            print UNK_src, "found in mapping:", mapping[UNK_src], ". Inserting in position", j
                     else:
                         new_trans_words.append(UNK_src)
-                        if verbose > 1:
-                            print UNK_src, "not found in mapping. Copying source to position", j
             else:
                 new_trans_words.append(trans_words[j])
 
@@ -1755,7 +1748,7 @@ class Model_Wrapper(object):
                                                       heuristic=heuristic,
                                                       mapping=mapping,
                                                       verbose=verbose)
-                    if verbose > 0:
+                    if verbose > 1:
                         print "After unk_replace:", a_no
                 tmp = ' '.join(a_no[:-1])
                 answer_pred.append(tmp)
@@ -1764,7 +1757,6 @@ class Model_Wrapper(object):
                 tmp = ' '.join(a_no[:-1])
                 answer_pred.append(tmp)
         return answer_pred
-
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
         """
@@ -1804,7 +1796,6 @@ class Model_Wrapper(object):
             raise NotImplementedError
         return data
 
-
     def _prepareSequentialData(self, X, Y=None,sample_weights=False):
 
         # Format input data
@@ -1838,7 +1829,6 @@ class Model_Wrapper(object):
 
         return [X, Y] if Y_sample_weights is None else [X, Y, Y_sample_weights]
 
-
     def _prepareModelData(self, X, Y=None):
         X_new = dict()
         Y_new = dict()
@@ -1858,7 +1848,6 @@ class Model_Wrapper(object):
                     Y_new[out_model] = Y[out_ds]
 
         return [X_new, Y_new] if Y_sample_weights == dict() else [X_new, Y_new, Y_sample_weights]
-
 
     def _prepareGraphData(self, X, Y=None):
 
@@ -1885,7 +1874,6 @@ class Model_Wrapper(object):
 
         return [(data, data_sample_weight), last_out] if any_sample_weight else [data, last_out]
 
-
     def _getGraphAccuracy(self, data, prediction, topN=5):
         """
             Calculates the accuracy obtained from a set of samples on a Graph model.
@@ -1908,7 +1896,6 @@ class Model_Wrapper(object):
 
         return [accuracies, top_accuracies]
 
-
     def _getSequentialAccuracy(self, GT, pred, topN=5):
         """
             Calculates the topN accuracy obtained from a set of samples on a Sequential model.
@@ -1926,7 +1913,6 @@ class Model_Wrapper(object):
         top_accuracies = float(np.sum(top_correct)) / float(len(top_correct))
 
         return [accuracies, top_accuracies]
-
 
     # ------------------------------------------------------- #
     #       VISUALIZATION
@@ -1975,7 +1961,6 @@ class Model_Wrapper(object):
 
         return obj_str
 
-
     def log(self, mode, data_type, value):
         """
         Stores the train and val information for plotting the training progress.
@@ -1994,7 +1979,6 @@ class Model_Wrapper(object):
         if data_type not in self.__logger[mode]:
             self.__logger[mode][data_type] = list()
         self.__logger[mode][data_type].append(value)
-
 
     def plot(self):
         """
@@ -2113,14 +2097,12 @@ class Model_Wrapper(object):
         # Close plot window
         plt.close()
 
-
     # ------------------------------------------------------- #
     #   MODELS
     #       Available definitions of CNN models (see basic_model as an example)
     #       All the models must include the following parameters:
     #           nOutput, input
     # ------------------------------------------------------- #
-
 
     def basic_model(self, nOutput, input):
         """
@@ -2191,6 +2173,7 @@ class Model_Wrapper(object):
         """
             Builds a basic CNN model.
         """
+
         if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
@@ -2267,8 +2250,6 @@ class Model_Wrapper(object):
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax')) # default nOutput=1000
 
-
-
     def VGG_16(self, nOutput, input):
         """
             Builds a VGG model with 16 layers.
@@ -2322,7 +2303,6 @@ class Model_Wrapper(object):
         self.model.add(Dense(4096, activation='relu'))
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax')) # default nOutput=1000
-
 
     def VGG_16_PReLU(self, nOutput, input):
         """
@@ -2392,8 +2372,6 @@ class Model_Wrapper(object):
         self.model.add(PReLU())
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax')) # default nOutput=1000
-
-
 
     def VGG_16_FunctionalAPI(self, nOutput, input):
         """
@@ -2566,7 +2544,6 @@ class Model_Wrapper(object):
         return merge([pathway1, pathway2, pathway3, pathway4],
                      mode='concat', concat_axis=concat_axis)
 
-
     def conv_layer(self, x, nb_filter, nb_row, nb_col, dim_ordering,
                    subsample=(1, 1), activation='relu',
                    border_mode='same', weight_decay=None, padding=None):
@@ -2592,7 +2569,6 @@ class Model_Wrapper(object):
                 x = ZeroPadding2D(padding=(1, 1), dim_ordering=dim_ordering)(x)
 
         return x
-
 
     def GoogLeNet_FunctionalAPI(self, nOutput, input):
 
@@ -2660,7 +2636,6 @@ class Model_Wrapper(object):
 
         self.model = Model(input=img_input, output=[x])
 
-
     ########################################
 
     def Identity_Layer(self, nOutput, input):
@@ -2679,7 +2654,6 @@ class Model_Wrapper(object):
         # Output
         self.model.add_output(name='output', input='input')
 
-
     def Union_Layer(self, nOutput, input):
         """
             Network with just a dropout and a softmax layers which is intended to serve as the final layer for an ECOC model
@@ -2693,7 +2667,6 @@ class Model_Wrapper(object):
         self.model.add(Flatten(input_shape=input_shape))
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax'))
-
 
     def One_vs_One_Inception(self, nOutput=2, input=[224,224,3]):
         """
@@ -2719,8 +2692,7 @@ class Model_Wrapper(object):
         self.model.add_node(Dense(nOutput, activation='softmax'), name='loss_OnevsOne', input='loss_OnevsOne/drop')
         # Output
         self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
-    
-    
+
     def add_One_vs_One_Inception(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
@@ -2743,7 +2715,6 @@ class Model_Wrapper(object):
 
         return output_name
         
-        
     def add_One_vs_One_Inception_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
@@ -2765,9 +2736,7 @@ class Model_Wrapper(object):
         out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
         
         return out_node
-    
-    
-    
+
     def add_One_vs_One_3x3_Functional(self, input, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
@@ -2783,8 +2752,7 @@ class Model_Wrapper(object):
         out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
         
         return out_node
-    
-    
+
     def add_One_vs_One_3x3_double_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
@@ -2803,8 +2771,6 @@ class Model_Wrapper(object):
         out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
         
         return out_node
-
-
 
     def One_vs_One_Inception_v2(self, nOutput=2, input=[224,224,3]):
         """
@@ -2831,8 +2797,6 @@ class Model_Wrapper(object):
         # Output
         self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
     
-    
-    
     def add_One_vs_One_Inception_v2(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
@@ -2854,8 +2818,6 @@ class Model_Wrapper(object):
                             name=output_name, input='fc_OnevsOne_'+str(id_branch)+'/drop')
 
         return output_name
-
-
 
     def __addInception(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
         """
@@ -2901,7 +2863,6 @@ class Model_Wrapper(object):
 
         return out_name
 
-
     def __addInception_Functional(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
@@ -2940,7 +2901,6 @@ class Model_Wrapper(object):
 
         return [out_node, out_name]
     
-    
     def add_One_vs_One_Merge(self, inputs_list, nOutput, activation='softmax'):
         
         self.model.add_node(Flatten(), name='ecoc_loss', inputs=inputs_list, merge_mode='concat') # join outputs from OneVsOne classifers
@@ -2952,8 +2912,6 @@ class Model_Wrapper(object):
         self.model.add_output(name='final_loss/output', input='final_loss')
 
         return ['ecoc_loss/output', 'final_loss/output']
-    
-    
     
     def add_One_vs_One_Merge_Functional(self, inputs_list, nOutput, activation='softmax'):
         
@@ -2971,8 +2929,6 @@ class Model_Wrapper(object):
         #self.model = Model(input=in_node, output=['ecoc_loss', 'final_loss'])
 
         return [ecoc_loss_name, final_loss_name]
-
-
 
     def GAP(self, nOutput, input):
         """
@@ -3006,7 +2962,6 @@ class Model_Wrapper(object):
         # Output
         self.model.add_output(name='GAP/softmax', input='GAP/classifier_food_vs_nofood')
 
-
     ##############################
     #       DENSE NETS
     ##############################
@@ -3034,7 +2989,6 @@ class Model_Wrapper(object):
             prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=1)
         return prev_layer
 
-
     def add_dense_layer(self, in_layer, k, drop):
         """
         Adds a Dense Layer inside a Dense Block, which is composed of BN, ReLU, Conv and Dropout
@@ -3055,7 +3009,6 @@ class Model_Wrapper(object):
         if drop > 0.0:
             out_layer = Dropout(drop) (out_layer)
         return out_layer
-
 
     def add_transitionup_block(self, x, skip_conn, skip_conn_shapes,
                                out_dim, nb_filters_deconv,
@@ -3096,7 +3049,6 @@ class Model_Wrapper(object):
         x = self.add_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
         return x
 
-
     def Empty(self, nOutput, input):
         """
             Creates an empty Model_Wrapper (can be externally defined)
@@ -3119,8 +3071,6 @@ class Model_Wrapper(object):
             del obj_dict['model_init']
             del obj_dict['model_next']
         return obj_dict
-
-
 
 # Backwards compatibility
 CNN_Model = Model_Wrapper

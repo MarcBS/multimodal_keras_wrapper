@@ -481,6 +481,33 @@ data splits, image loading, mean calculation, etc.</p>
 </dd></dl>
 
 <dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.load3DSemanticLabels">
+<code class="descname">load3DSemanticLabels</code><span class="sig-paren">(</span><em>labeled_images_list</em>, <em>nClasses</em>, <em>classes_to_colour</em>, <em>dataAugmentation</em>, <em>daRandomParams</em>, <em>img_size</em>, <em>size_crop</em>, <em>image_list</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.load3DSemanticLabels" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a set of outputs of the type 3DSemanticLabel (used for semantic segmentation)</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>labeled_images_list</strong> &#8211; list of labeled images</li>
+<li><strong>nClasses</strong> &#8211; number of different classes to be detected</li>
+<li><strong>classes_to_colour</strong> &#8211; dictionary relating each class id to their corresponding colour in the labeled image</li>
+<li><strong>dataAugmentation</strong> &#8211; are we applying data augmentation?</li>
+<li><strong>daRandomParams</strong> &#8211; random parameters applied on data augmentation (vflip, hflip and random crop)</li>
+<li><strong>img_size</strong> &#8211; resized applied to input images</li>
+<li><strong>size_crop</strong> &#8211; crop size applied to input images</li>
+<li><strong>image_list</strong> &#8211; list of input images used as identifiers to &#8216;daRandomParams&#8217;</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">3DSemanticLabels with shape (batch_size, width*height, classes)</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.loadFeatures">
 <code class="descname">loadFeatures</code><span class="sig-paren">(</span><em>X</em>, <em>feat_len</em>, <em>normalization_type='L2'</em>, <em>normalization=False</em>, <em>loaded=False</em>, <em>external=False</em>, <em>data_augmentation=True</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.loadFeatures" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads and normalizes features.</p>
@@ -576,6 +603,27 @@ data splits, image loading, mean calculation, etc.</p>
 <li><strong>meanSubstraction</strong> &#8211; Whether we are removing the training mean</li>
 <li><strong>dataAugmentation</strong> &#8211; Whether we are applying dataAugmentatino (random cropping and horizontal flip)</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.load_GT_3DSemanticLabels">
+<code class="descname">load_GT_3DSemanticLabels</code><span class="sig-paren">(</span><em>gt</em>, <em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.load_GT_3DSemanticLabels" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads a GT list of 3DSemanticLabels in a 2D matrix and reshapes them to an Nx1 array</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>gt</strong> &#8211; list of Dataset output of type 3DSemanticLabels</li>
+<li><strong>id</strong> &#8211; id of the input/output we are processing</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">out_list: containing a list of label images reshaped as an Nx1 array</p>
 </td>
 </tr>
 </tbody>
@@ -732,7 +780,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setInput">
-<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True, max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0, pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setInput</code><span class="sig-paren">(</span><em>path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True, overwrite_split=False, img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True, max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0, pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False, feat_len=1024, max_video_len=26</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setInput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a list which can contain all samples from either the &#8216;train&#8217;, &#8216;val&#8217;, or
 &#8216;test&#8217; set splits (specified by set_name).</p>
 <p># General parameters</p>
@@ -740,7 +788,7 @@ Each line must contain a unique identifier of the class.</p>
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
 <li><strong>path_list</strong> &#8211; can either be a path to a text file containing the paths to the images or a python list of paths</li>
 <li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;)</li>
 <li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)</li>
@@ -748,6 +796,9 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>repeat_set</strong> &#8211; repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
 <li><strong>required</strong> &#8211; flag for optional inputs</li>
 </ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Param:</th><td class="field-body"><p class="first last">overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset</p>
 </td>
 </tr>
 </tbody>
@@ -847,20 +898,23 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setOutput">
-<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>offset=0</em>, <em>fill='end'</em>, <em>min_occ=0</em>, <em>pad_on_batch=True</em>, <em>words_so_far=False</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em>, <em>associated_id_in=None</em>, <em>sample_weights=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='categorical'</em>, <em>id='label'</em>, <em>repeat_set=1</em>, <em>overwrite_split=False</em>, <em>tokenization='tokenize_basic'</em>, <em>max_text_len=0</em>, <em>offset=0</em>, <em>fill='end'</em>, <em>min_occ=0</em>, <em>pad_on_batch=True</em>, <em>words_so_far=False</em>, <em>build_vocabulary=False</em>, <em>max_words=0</em>, <em>associated_id_in=None</em>, <em>sample_weights=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setOutput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a set of output data, usually (type==&#8217;categorical&#8217;) referencing values in self.classes (starting from 0)</p>
 <p># General parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first last simple">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
 <li><strong>path_list</strong> &#8211; can either be a path to a text file containing the labels or a python list of labels.</li>
 <li><strong>set_name</strong> &#8211; identifier of the set split loaded (&#8216;train&#8217;, &#8216;val&#8217; or &#8216;test&#8217;).</li>
 <li><strong>type</strong> &#8211; identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).</li>
 <li><strong>id</strong> &#8211; identifier of the input data loaded.</li>
 <li><strong>repeat_set</strong> &#8211; repeats the outputs given (useful when we have more inputs than outputs). Int or array of ints.</li>
 </ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Param:</th><td class="field-body"><p class="first last">overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset</p>
 </td>
 </tr>
 </tbody>
@@ -885,12 +939,12 @@ Each line must contain a unique identifier of the class.</p>
 </tr>
 </tbody>
 </table>
-<p># &#8216;3DLabel&#8217;-related parameters</p>
+<p># &#8216;3DLabel&#8217; or &#8216;3DSemanticLabel&#8217;-related parameters</p>
 <table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
-<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>associated_id_in</strong> &#8211; id of the input &#8216;raw-image&#8217; associated for the inputted 3DLabels</td>
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>associated_id_in</strong> &#8211; id of the input &#8216;raw-image&#8217; associated to the inputted 3DLabels or 3DSemanticLabel</td>
 </tr>
 </tbody>
 </table>
@@ -898,7 +952,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setRawInput">
-<code class="descname">setRawInput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='file-name'</em>, <em>id='raw-text'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setRawInput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setRawInput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='file-name'</em>, <em>id='raw-text'</em>, <em>overwrite_split=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setRawInput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a list which can contain all samples from either the &#8216;train&#8217;, &#8216;val&#8217;, or
 &#8216;test&#8217; set splits (specified by set_name).</p>
 <p># General parameters</p>
@@ -922,7 +976,7 @@ Each line must contain a unique identifier of the class.</p>
 
 <dl class="method">
 <dt id="keras_wrapper.dataset.Dataset.setRawOutput">
-<code class="descname">setRawOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='file-name'</em>, <em>id='raw-text'</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setRawOutput" title="Permalink to this definition">¶</a></dt>
+<code class="descname">setRawOutput</code><span class="sig-paren">(</span><em>path_list</em>, <em>set_name</em>, <em>type='file-name'</em>, <em>id='raw-text'</em>, <em>overwrite_split=False</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setRawOutput" title="Permalink to this definition">¶</a></dt>
 <dd><p>Loads a list which can contain all samples from either the &#8216;train&#8217;, &#8216;val&#8217;, or
 &#8216;test&#8217; set splits (specified by set_name).</p>
 <p># General parameters</p>
@@ -938,6 +992,28 @@ Each line must contain a unique identifier of the class.</p>
 <li><strong>repeat_set</strong> &#8211; repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.</li>
 <li><strong>required</strong> &#8211; flag for optional inputs</li>
 </ul>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="method">
+<dt id="keras_wrapper.dataset.Dataset.setSemanticClasses">
+<code class="descname">setSemanticClasses</code><span class="sig-paren">(</span><em>path_classes</em>, <em>id</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.dataset.Dataset.setSemanticClasses" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads the list of semantic classes of the dataset together with their corresponding colours in the GT image.
+Each line must contain a unique identifier of the class and its associated RGB colour representation separated by commas.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>path_classes</strong> &#8211; Path to a text file with the classes and their colours.</li>
+<li><strong>id</strong> &#8211; input/output id</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">None</p>
 </td>
 </tr>
 </tbody>
@@ -1650,7 +1726,8 @@ WARNING!: It&#8217;s assumed that the current history (state_below) is the last 
 <dt id="keras_wrapper.cnn_model.Model_Wrapper.predict_cond_optimized">
 <code class="descname">predict_cond_optimized</code><span class="sig-paren">(</span><em>X</em>, <em>states_below</em>, <em>params</em>, <em>ii</em>, <em>prev_out</em><span class="sig-paren">)</span><a class="headerlink" href="#keras_wrapper.cnn_model.Model_Wrapper.predict_cond_optimized" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
-WARNING!: It&#8217;s assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
+WARNING!: It&#8217;s assumed that the current history (state_below) is the last input of the model!
+See Dataset class for more information
 :param X: Input context
 :param states_below: Batch of partial hypotheses
 :param params: Decoding parameters
@@ -1970,6 +2047,8 @@ every entry determines a score for sample i having class j
 <li><strong>model_wrapper</strong> &#8211; object to save</li>
 <li><strong>update_num</strong> &#8211; identifier of the number of iterations/updates/epochs elapsed</li>
 <li><strong>path</strong> &#8211; path where the model will be saved</li>
+<li><strong>full_path</strong> &#8211; Whether we save to the path of from path + &#8216;/<a href="#id1"><span class="problematic" id="id2">epoch_</span></a>&#8216; + update_num</li>
+<li><strong>store_iter</strong> &#8211; Whether we store the current update_num</li>
 </ul>
 </td>
 </tr>
