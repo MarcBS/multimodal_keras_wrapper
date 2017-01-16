@@ -38,7 +38,7 @@ def checkDefaultParamsBeamSearch(params):
 class PrintPerformanceMetricOnEpochEnd(KerasCallback):
     def __init__(self, model, dataset, gt_id, metric_name, set_name, batch_size, each_n_epochs=1, extra_vars=dict(),
                  is_text=False, is_3DLabel=False, index2word_y=None, sampling='max_likelihood', beam_search=False,
-                 write_samples=False, save_path='logs/pgerformance.', reload_epoch=0,
+                 write_samples=False, save_path='logs/performance.', reload_epoch=0,
                  start_eval_on_epoch=0, write_type='list', sampling_type='max_likelihood',
                  out_pred_idx=None, early_stop=False, patience=5, stop_metric='Bleu-4', verbose=1):
         """
@@ -385,6 +385,12 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
         if(epoch%self.epochs_for_save==0):
             print('')
             self.store_function(self.model_to_save, epoch)
+
+    #def on_batch_end(self, n_update, logs={}):
+    #    n_update += 1
+    #    if (n_update % self.epochs_for_save == 0):
+    #        print('')
+    #        self.store_function(self.model_to_save, n_update)
 ###
 
 ###################################################
