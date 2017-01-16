@@ -7,8 +7,7 @@ from scipy import misc
 from skimage.transform import resize
 from scipy import ndimage
 
-from nms.gpu_nms import gpu_nms
-from nms.cpu_nms import cpu_nms
+
 
 ################################################################################
 #
@@ -203,7 +202,8 @@ def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_r
         :return: [predicted_bboxes, predicted_scores], containing a list of bboxes coordinates on the first position
                 and a list of their corresponding scores on the second position
     '''
-
+    from nms.gpu_nms import gpu_nms
+    from nms.cpu_nms import cpu_nms
     predicted_bboxes = []
     predicted_scores = []
 
