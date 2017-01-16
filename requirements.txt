@@ -1,0 +1,12 @@
+numpy
+six
+toolz
+cloud
+matplotlib
+scipy
+cpickle
+
+--allow-external keras
+--allow-unverified keras
+git+https://github.com/MarcBS/keras#egg=keras
+
