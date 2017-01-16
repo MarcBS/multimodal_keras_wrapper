@@ -20,11 +20,8 @@ def _dirac(pred, gt):
 # Main functions
 ###
 def file2list(filepath):
-    with open(filepath,'r') as f:
-        lines =[k for k in 
-            [k.strip() for k in f.readlines()] 
-        if len(k) > 0]
-
+    with open(filepath, 'r') as f:
+        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0]
     return lines
 
 def numpy2file(filepath, mylist, permission='w'):
@@ -82,15 +79,15 @@ def pickle_model(
         index2word_y):
     import sys
     import cPickle as pickle
-    modifier=10
+    modifier = 10
     tmp = sys.getrecursionlimit()
     sys.setrecursionlimit(tmp*modifier)
     with open(path, 'wb') as f:
-        p_dict = {'model':model,
-                'word2index_x':word2index_x,
-                'word2index_y':word2index_y,
-                'index2word_x':index2word_x,
-                'index2word_y':index2word_y}
+        p_dict = {'model': model,
+                  'word2index_x': word2index_x,
+                  'word2index_y': word2index_y,
+                  'index2word_x': index2word_x,
+                  'index2word_y': index2word_y}
         pickle.dump(p_dict, f, protocol=2)
     sys.setrecursionlimit(tmp)
 
@@ -216,10 +213,27 @@ def dict2file(mydict, path, title=None):
 
 def dict2pkl(mydict, path):
     """
-    In:
-        mydict - dictionary to save in a file
-        path - path where dict is stored
+    Saves a dictionary object into a pkl file.
+    :param mydict: dictionary to save in a file
+    :param path: path where my_dict is stored
+    :return:
     """
     import cPickle
-    with open(path + '.pkl', 'w') as f:
+    if path[-4:] == '.pkl':
+        extension = ''
+    else:
+        extension = '.pkl'
+    with open(path + extension, 'w') as f:
         cPickle.dump(mydict, f, protocol=cPickle.HIGHEST_PROTOCOL)
+
+
+def pkl2dict(path):
+    """
+    Loads a dictionary object from a pkl file.
+
+    :param path: Path to the pkl file to load
+    :return: Dict() containing the loaded pkl
+    """
+    import cPickle
+    return cPickle.load(open(path))
+
