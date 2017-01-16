@@ -155,7 +155,12 @@
 <ul class="simple">
 <li><a class="reference external" href="https://www.continuum.io/downloads">Anaconda</a></li>
 <li>Keras - <a class="reference external" href="https://github.com/MarcBS/keras">custom fork</a> or <a class="reference external" href="https://github.com/fchollet/keras">original version</a></li>
-<li><a class="reference external" href="https://pypi.python.org/pypi/cloud/2.7.2">cloud</a> &gt;= 2.8.5</li>
+<li><a class="reference external" href="https://pypi.python.org/pypi/cloud/2.8.5">cloud</a> &gt;= 2.8.5</li>
+<li><a class="reference external" href="https://pypi.python.org/pypi/scipy/0.7.0">scipy</a></li>
+</ul>
+<p>Only when using NMS for certain localization utilities:</p>
+<ul class="simple">
+<li><a class="reference external" href="https://pypi.python.org/pypi/Cython/0.25.2">cython</a> &gt;= 0.23.4</li>
 </ul>
 </div>
 <div class="section" id="installation">
@@ -171,6 +176,12 @@
 <li>Include the repository path into your PYTHONPATH:</li>
 </ol>
 <div class="highlight-default"><div class="highlight"><pre><span></span>export PYTHONPATH=$PYTHONPATH:/path/to/multimodal_keras_wrapper
+</pre></div>
+</div>
+<ol class="simple">
+<li>If you wish to install the dependencies (it will install our <a class="reference external" href="https://github.com/MarcBS/keras">custom Keras fork</a>):</li>
+</ol>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">r</span> <span class="n">requirements</span><span class="o">.</span><span class="n">txt</span>
 </pre></div>
 </div>
 </div>

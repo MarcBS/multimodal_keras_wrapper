@@ -17,6 +17,9 @@ from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
 from localization_utilities import *
 
+########################################
+# EVALUATION FUNCTIONS SELECTOR
+########################################
 
 def get_coco_score(pred_list, verbose, extra_vars, split):
     """
@@ -36,7 +39,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
 
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
-        #(Meteor(language=extra_vars['language']),"METEOR"),
+        (Meteor(language=extra_vars['language']),"METEOR"),
         (Rouge(), "ROUGE_L"),
         (Cider(), "CIDEr")
     ]
@@ -57,7 +60,6 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
             logging.info(metric +': ' + str(value))
 
     return final_scores
-
 
 
 def eval_vqa(pred_list, verbose, extra_vars, split):
@@ -104,7 +106,6 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
             'other accuracy': acc_other}
 
 
-
 def eval_multiclass_metrics(pred_list, verbose, extra_vars, split):
     '''
     Multiclass classification metrics
@@ -147,6 +148,7 @@ def eval_multiclass_metrics(pred_list, verbose, extra_vars, split):
     return {'coverage error': coverr,
             'average precision': avgprec,
             'ranking loss': rankloss}
+
 
 def multilabel_metrics(pred_list, verbose, extra_vars, split):
     '''
@@ -530,21 +532,7 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
 
     return [TP, FP, FN, TP_classes, FP_classes, FN_classes]
         
-########################################
-# EVALUATION FUNCTIONS SELECTOR
-########################################
 
-# List of evaluation functions and their identifiers (will be used in params['METRICS'])
-select = {
-         'vqa': eval_vqa,                        # Metric for the VQA challenge
-         'coco': get_coco_score,                 # MS COCO evaluation library (BLEU, METEOR and CIDEr scores)
-         'multiclass': eval_multiclass_metrics,  # Set of multiclass classification metrics from sklearn
-         'multilabel_metrics': multilabel_metrics,  # Set of multilabel classification metrics from sklearn
-         'AP': averagePrecision,
-         'sem_seg_acc': semantic_segmentation_accuracy,
-         }
-                
-                
 ########################################
 # AUXILIARY FUNCTIONS
 ########################################
@@ -570,5 +558,13 @@ def caption_store(samples, path):
     with open(path, 'w') as f:
             print >>f, '\n'.join(samples)
 
+# List of evaluation functions and their identifiers (will be used in params['METRICS'])
+select = {
+    'vqa': eval_vqa,  # Metric for the VQA challenge
+    'coco': get_coco_score,  # MS COCO evaluation library (BLEU, METEOR and CIDEr scores)
+    'multiclass': eval_multiclass_metrics,  # Set of multiclass classification metrics from sklearn
+    'multilabel_metrics': multilabel_metrics,  # Set of multilabel classification metrics from sklearn
+    'AP': averagePrecision,
+    'sem_seg_acc': semantic_segmentation_accuracy,
+}
 
-            
