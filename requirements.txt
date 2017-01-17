@@ -5,6 +5,7 @@ cloud
 matplotlib
 scipy
 cpickle
+cython
 
 --allow-external keras
 --allow-unverified keras

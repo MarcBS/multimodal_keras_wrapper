@@ -18,6 +18,9 @@ The following dependencies are required for using this library:
  - [cloud](https://pypi.python.org/pypi/cloud/2.8.5) >= 2.8.5
  - [scipy](https://pypi.python.org/pypi/scipy/0.7.0)
 
+Only when using NMS for certain localization utilities:
+ - [cython](https://pypi.python.org/pypi/Cython/0.25.2) >= 0.23.4
+
 
 ## Installation
 
@@ -27,6 +30,7 @@ In order to install the library you just have to follow these steps:
 ```
 git clone https://github.com/MarcBS/multimodal_keras_wrapper.git
 ```
+
 2) Include the repository path into your PYTHONPATH:
 ```
 export PYTHONPATH=$PYTHONPATH:/path/to/multimodal_keras_wrapper
