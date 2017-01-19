@@ -17,7 +17,7 @@ The following dependencies are required for using this library:
  - Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
  - [cloud](https://pypi.python.org/pypi/cloud/2.8.5) >= 2.8.5
  - [scipy](https://pypi.python.org/pypi/scipy/0.7.0)
- - [coco-eval](ihttps://github.com/lvapeab/coco-caption.git)
+ - [coco-caption](https://github.com/lvapeab/coco-caption.git)
 
 Only when using NMS for certain localization utilities:
  - [cython](https://pypi.python.org/pypi/Cython/0.25.2) >= 0.23.4
