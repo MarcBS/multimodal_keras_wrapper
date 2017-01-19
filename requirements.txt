@@ -4,7 +4,7 @@ toolz
 cloud
 matplotlib
 scipy
-cpickle
+#cpickle
 cython
 
 --allow-external keras
