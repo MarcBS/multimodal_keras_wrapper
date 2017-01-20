@@ -2983,13 +2983,16 @@ class Model_Wrapper(object):
         :param drop: dropout rate.
         :return: output layer of the dense block
         """
+        list_outputs = []
         prev_layer = in_layer
         for n in range(nb_layers):
             # Insert dense layer
             new_layer = self.add_dense_layer(prev_layer, k, drop)
+            list_outputs.append(new_layer)
             # Merge with previous layer
             prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=1)
-        return prev_layer
+        return merge(list_outputs, mode='concat', concat_axis=1)
+
 
     def add_dense_layer(self, in_layer, k, drop):
         """
@@ -3011,6 +3014,50 @@ class Model_Wrapper(object):
         if drop > 0.0:
             out_layer = Dropout(drop) (out_layer)
         return out_layer
+
+
+    def add_transitiondown_block(self, x, skip_dim,
+                               nb_filters_conv, pool_size,
+                               nb_layers, growth, drop):
+        """
+        Adds a Transition Down Block. Consisting of BN, ReLU, Conv and Dropout, Pooling, Dense Block.
+
+        # References
+            Jegou S, Drozdzal M, Vazquez D, Romero A, Bengio Y.
+            The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation.
+            arXiv preprint arXiv:1611.09326. 2016 Nov 28.
+
+        # Input layers parameters
+        :param x: input layer.
+        :param skip_dim: dimensions of the output skip connection
+
+        # Convolutional layer parameters
+        :param nb_filters_conv: number of convolutional filters to learn.
+        :param pool_size: size of the max pooling operation (2 in reference paper)
+
+        # Dense Block parameters
+        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer() for information about the internal layers).
+        :param growth: growth rate. Number of additional feature maps learned at each layer.
+        :param drop: dropout rate.
+
+        :return: [output layer, skip connection name]
+        """
+        # Dense Block
+        x_dense = self.add_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
+
+        # Concatenation and skip connection recovery for upsampling path
+        skip = merge([x, x_dense], mode='concat', concat_axis=1, name='down_skip_'+str(skip_dim))
+
+        # Transition Down
+        x_out = BatchNormalization()(skip)
+        x_out = Activation('relu')(x_out)
+        x_out = Convolution2D(nb_filters_conv, 1, 1, border_mode='same')(x_out)
+        if drop > 0.0:
+            x_out = Dropout(drop)(x_out)
+        x_out = MaxPooling2D(pool_size=(pool_size,pool_size), name='transitiondown_'+str(skip_dim))(x_out)
+
+        return [x_out, skip]
+
 
     def add_transitionup_block(self, x, skip_conn, skip_conn_shapes,
                                out_dim, nb_filters_deconv,
