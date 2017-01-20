@@ -138,12 +138,12 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
         # Load model structure
         logging.info("<<< Loading optimized model... >>>")
         logging.info("\t <<< Loading model_init from " + model_name + "_structure_init.json ... >>>")
-        model_init = model_from_json(open(model_name + '_structure_init.json').read())
+        model_init = model_from_json(open(model_name + '_structure_init.json').read(), custom_objects=custom_objects)
         # Load model weights
         model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
         logging.info("\t <<< Loading model_next from " + model_name + "_structure_next.json ... >>>")
-        model_next = model_from_json(open(model_name + '_structure_next.json').read())
+        model_next = model_from_json(open(model_name + '_structure_next.json').read(), custom_objects=custom_objects)
         # Load model weights
         model_next.load_weights(model_name + '_weights_next.h5')
 
