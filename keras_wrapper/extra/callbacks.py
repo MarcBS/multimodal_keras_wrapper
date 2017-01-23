@@ -762,8 +762,8 @@ class EarlyStopping(KerasCallback):
         # Get last metric value from logs
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         if current_score is None:
-            warnings.warn('validation score is off; ' +
-                    'this reducer works only with the validation score on')
+            warnings.warn('The chosen metric'+str(self.metric_check)+' does not exist;'
+                          ' this reducer works only with a valid metric.')
             return
 
         # Check if the best score has been outperformed in the current epoch

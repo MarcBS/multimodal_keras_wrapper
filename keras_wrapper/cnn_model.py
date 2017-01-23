@@ -551,15 +551,20 @@ class Model_Wrapper(object):
         state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch'])/params['batch_size']))
 
         # Prepare callbacks
-        callbacks = []
         callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
         callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
         callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
 
+        callbacks = []
+        ## Callbacks order:
+        # Store dmoel
         callbacks.append(callback_store_model)
-        callbacks.append(callback_lr_reducer)
-        callbacks.append(callback_early_stop)
+        # Extra callbacks (e.g. evaluation)
         callbacks += params['extra_callbacks']
+        # LR reducer
+        callbacks.append(callback_lr_reducer)
+        # Early stopper
+        callbacks.append(callback_early_stop)
 
         # Prepare data generators
         if params['homogeneous_batches']:
@@ -2001,7 +2006,7 @@ class Model_Wrapper(object):
         """
         if mode not in self.__logger:
             return [None]
-        elif data_type not in self.__logger:
+        elif data_type not in self.__logger[mode]:
             return [None]
         else:
             return self.__logger[mode][data_type]

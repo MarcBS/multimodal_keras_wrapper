@@ -186,7 +186,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
         logging.info('Accuracy: %f' %
                      (accuracy))
 
-    return {'accuracy': accuracy}
+    return {'multilabel accuracy': accuracy}
 
     """
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
@@ -204,7 +204,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
 
 def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
     '''
-    Semantic Segmentatino Accuracy metric
+    Semantic Segmentation Accuracy metric
     # Arguments
         pred_list, list of predictions
         verbose - if greater than 0 the metric measures are printed out
@@ -242,7 +242,7 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
         logging.info('Accuracy: %f' %
                      (accuracy))
 
-    return {'accuracy': accuracy}
+    return {'semantic global accuracy': accuracy}
 
     """
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
