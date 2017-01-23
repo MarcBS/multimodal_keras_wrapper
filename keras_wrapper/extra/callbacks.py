@@ -171,16 +171,21 @@ class PrintPerformanceMetricOnEpochEnd(KerasCallback):
                 with open(filepath, 'a') as f:
                     header = 'epoch,'
                     line = str(epoch) + ','
+                    # Store in model log
+                    self.model.log(s, 'epoch', epoch)
                     for metric_ in sorted(metrics):
                         value = metrics[metric_]
                         header += metric_ + ','
                         line += str(value) + ','
+                        # Store in model log
+                        self.model.log(s, metric_, value)
                     if (epoch == 1 or epoch == self.start_eval_on_epoch):
                         f.write(header + '\n')
                     f.write(line + '\n')
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
+            """
             # Early stop check
             if self.early_stop and s in ['val', 'validation', 'dev', 'development']:
                 current_score = metrics[self.stop_metric]
@@ -189,17 +194,17 @@ class PrintPerformanceMetricOnEpochEnd(KerasCallback):
                     self.best_epoch = epoch
                     self.wait = 0
                     if self.verbose > 0:
-                        logging.info('---current best %s accuracy: %.4f' % (self.stop_metric, current_score))
+                        logging.info('---current best %s: %.4f' % (self.stop_metric, current_score))
                 else:
                     if self.wait >= self.patience:
                         if self.verbose > 0:
-                            logging.info("Epoch %d: early stopping. Best %s value found at epoch %d: %.4f" %
+                            logging.info('Epoch %d: early stopping. Best %s value found at epoch %d: %.4f' %
                                          (epoch, self.stop_metric, self.best_epoch, self.best_score))
                             self.model.stop_training = True
                     self.wait += 1.
                     if self.verbose > 0:
                         logging.info('----bad counter: %d/%d' % (self.wait, self.patience))
-
+            """
 
 class PrintPerformanceMetricEachNUpdates(KerasCallback):
     def __init__(self, model, dataset, gt_id, metric_name, set_name, batch_size, extra_vars=dict(),
@@ -337,16 +342,21 @@ class PrintPerformanceMetricEachNUpdates(KerasCallback):
                 with open(filepath, 'a') as f:
                     header = 'Update,'
                     line = str(self.cum_update) + ','
+                    # Store in model log
+                    self.model.log(s, 'iteration', self.cum_update)
                     for metric_ in sorted(metrics):
                         value = metrics[metric_]
                         header += metric_ + ','
                         line += str(value) + ','
+                        # Store in model log
+                        self.model.log(s, metric_, value)
                     if (self.cum_update == 0 or self.cum_update == self.each_n_updates):
                         f.write(header + '\n')
                     f.write(line + '\n')
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
+            """
             # Early stop check
             if self.early_stop and s in ['val', 'validation', 'dev', 'development']:
                 current_score = metrics[self.stop_metric]
@@ -355,17 +365,17 @@ class PrintPerformanceMetricEachNUpdates(KerasCallback):
                     self.best_update = self.cum_update
                     self.wait = 0
                     if self.verbose > 0:
-                        logging.info('---current best %s accuracy: %.4f' % (self.stop_metric, current_score))
+                        logging.info('---current best %s: %.4f' % (self.stop_metric, current_score))
                 else:
                     if self.wait >= self.patience:
                         if self.verbose > 0:
-                            logging.info("Update %d: early stopping. Best %s value found at update %d: %.4f" %
+                            logging.info('Update %d: early stopping. Best %s value found at update %d: %.4f' %
                                          (self.cum_update, self.stop_metric, self.best_update, self.best_score))
                             self.model.stop_training = True
                     self.wait += 1
                     if self.verbose > 0:
                         logging.info('----bad counter: %d/%d' % (self.wait, self.patience))
-
+            """
 
 class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
 
@@ -462,7 +472,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
             return
         if self.epoch < self.start_eval_on_epoch:
             return
-        self.evaluate(self.cum_update, counter_name='update')
+        self.evaluate(self.cum_update, counter_name='iteration')
 
     def evaluate(self, epoch, counter_name='epoch'):
         # Evaluate on each set separately
@@ -559,20 +569,25 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     extra_vars=self.extra_vars,
                     split=s)
 
-                # Print results to file
+                # Print results to file and store in model log
                 with open(filepath, 'a') as f:
                     header = counter_name + ','
                     line = str(epoch) + ','
+                    # Store in model log
+                    self.model.log(s, counter_name, epoch)
                     for metric_ in sorted(metrics):
                         value = metrics[metric_]
                         header += metric_ + ', '
                         line += str(value) + ', '
+                        # Store in model log
+                        self.model.log(s, metric_, value)
                     if epoch == 1 or epoch == self.start_eval_on_epoch:
                         f.write(header + '\n')
                     f.write(line + '\n')
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
+            """
             # Early stop check
             if self.early_stop and s in ['val', 'validation', 'dev', 'development']:
                 current_score = metrics[self.stop_metric]
@@ -582,19 +597,19 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     self.wait = 0
                     if self.verbose > 0:
                         logging.info(
-                            '---current best %s accuracy: %.4f' % (self.stop_metric, current_score))
+                            '---current best %s: %.4f' % (self.stop_metric, current_score))
                 else:
                     if self.wait >= self.patience:
                         if self.verbose > 0:
                             logging.info(
-                                "%s %d: early stopping. Best %s value found at %s %d: %.4f" %
+                                '%s %d: early stopping. Best %s value found at %s %d: %.4f' %
                                 (str(counter_name), epoch, self.stop_metric, str(counter_name),
                                  self.best_epoch, self.best_score))
                             self.model.stop_training = True
                     self.wait += 1
                     if self.verbose > 0:
                         logging.info('----bad counter: %d/%d' % (self.wait, self.patience))
-
+            """
 
 ###################################################
 # Storing callbacks
@@ -718,28 +733,25 @@ class SampleEachNUpdates(KerasCallback):
                 print ("Hypothesis (%d): %s"%(i, sample))
                 print ("Reference  (%d): %s"%(i, truth))
 
+
 ###################################################
 # Learning modifiers callbacks
 ###################################################
 class LearningRateReducerWithEarlyStopping(KerasCallback):
     """
-    Reduces learning rate during the training.
-
-    Original work: jiumem [https://github.com/jiumem]
+    Reduces learning rate during the training and applies early stopping if performance has not improved for some epochs.
     """
     def __init__(self,
-            patience=0, lr_decay=1, reduce_rate=0.5, reduce_nb=10,
-            is_early_stopping=True, verbose=1):
+            patience=0, lr_decay=1, reduce_rate=0.5, reduce_nb=99999,
+            check_split='val', metric_check='acc', verbose=1):
         """
-        In:
-            patience - number of beginning epochs without reduction;
-                by default 0
-            lr_decay - minimum number of epochs passed before the last reduction
-            reduce_rate - multiplicative rate reducer; by default 0.5
-            reduce_nb - maximal number of reductions performed; by default 10
-            is_early_stopping - if true then early stopping is applied when
-                reduce_nb is reached; by default True
-            verbose - verbosity level; by default 1
+        :param patience: number of beginning epochs without reduction; by default 0 (disabled)
+        :param lr_decay: minimum number of epochs passed before the last reduction
+        :param reduce_rate: multiplicative rate reducer; by default 0.5
+        :param reduce_nb: maximal number of reductions performed; by default 99999
+        :param check_split: data split used to check metric value improvement
+        :param metric_check: name of the metric to check
+        :param verbose: verbosity level; by default 1
         """
         super(KerasCallback, self).__init__()
         self.patience = patience
@@ -748,13 +760,17 @@ class LearningRateReducerWithEarlyStopping(KerasCallback):
         self.reduce_rate = reduce_rate
         self.current_reduce_nb = 0
         self.reduce_nb = reduce_nb
-        self.is_early_stopping = is_early_stopping
+        self.check_split = check_split
+        self.metric_check = metric_check
         self.verbose = verbose
         self.epsilon = 0.1e-10
         self.lr_decay = lr_decay
+        self.last_lr_decrease = 0
 
     def on_epoch_end(self, epoch, logs={}):
-        current_score = logs.get('val_acc')
+        # Get last metric value from logs
+        # current_score = logs.get('val_acc')
+        current_score = self.model.getLog(self.check_split, self.metric_check)[-1]
         if current_score is None:
             warnings.warn('validation score is off; ' +
                     'this reducer works only with the validation score on')
@@ -763,70 +779,27 @@ class LearningRateReducerWithEarlyStopping(KerasCallback):
             self.best_score = current_score
             self.wait = 0
             if self.verbose > 0:
-                logging.info('---current best val accuracy: %.3f' % current_score)
-        else:
-            if self.wait >= self.patience and self.wait >= self.lr_decay:
-                self.current_reduce_nb += 1
-                if self.current_reduce_nb <= self.reduce_nb:
-                    lr = self.model.optimizer.lr.get_value()
-                    self.model.optimizer.lr.set_value(np.float32(lr*self.reduce_rate))
+                logging.info('---current best %s %s: %.3f' % (self.check_split, self.metric_check, current_score))
+
+        # Decrease LR if self.lr_decay epochs have passed sice the last decrease
+        self.last_lr_decrease += 1
+        if self.last_lr_decrease >= self.lr_decay:
+            self.current_reduce_nb += 1
+            if self.current_reduce_nb <= self.reduce_nb:
+                lr = self.model.optimizer.lr.get_value()
+                self.model.optimizer.lr.set_value(np.float32(lr*self.reduce_rate))
+                if self.verbose > 0:
+                    logging.info("LR reduction from {0:0.6f} to {1:0.6f}".\
+                            format(float(lr), float(lr*self.reduce_rate)))
+                if float(lr) <= self.epsilon:
                     if self.verbose > 0:
-                        logging.info("LR reduction from {0:0.6f} to {1:0.6f}".\
-                                format(float(lr), float(lr*self.reduce_rate)))
-                    if float(lr) <= self.epsilon:
-                        if self.verbose > 0:
-                            logging.info('Learning rate too small, learning stops now')
-                        self.model.stop_training = True
-                else:
-                    if self.is_early_stopping:
-                        if self.verbose > 0:
-                            logging.info("Epoch %d: early stopping" % (epoch))
-                        self.model.stop_training = True
-            self.wait += 1
-
-class ReduceLearningRate(KerasCallback):
-    """
-    Reduces learning rate during the training.
-
-    Original work: jiumem [https://github.com/jiumem]
-    """
-    def __init__(self, patience=0, reduce_nb=10, is_early_stopping=True, verbose=1):
-        """
-        In:
-            patience - number of beginning epochs without reduction;
-                by default 0
-            reduce_rate - multiplicative rate reducer; by default 0.5
-            reduce_nb - maximal number of reductions performed; by default 10
-            is_early_stopping - if true then early stopping is applied when
-                reduce_nb is reached; by default True
-            verbose - verbosity level; by default 1
-        """
-        super(KerasCallback, self).__init__()
-        self.patience = patience
-        self.wait = 0
-        self.best_score = -1.
-        self.current_reduce_nb = 0
-        self.reduce_nb = reduce_nb
-        self.is_early_stopping = is_early_stopping
-        self.verbose = verbose
-        self.epsilon = 0.1e-10
-
-    def on_epoch_end(self, epoch, logs={}):
-        current_score = logs.get('val_acc')
-        if current_score is None:
-            warnings.warn('validation score is off; ' +
-                    'this reducer works only with the validation score on')
-            return
-        if current_score > self.best_score:
-            self.best_score = current_score
-            self.wait = 0
-            if self.verbose > 0:
-                print('---current best val accuracy: %.3f' % current_score)
-        else:
-            if self.wait >= self.patience:
-                self.current_reduce_nb += 1
-                if self.is_early_stopping:
-                    if self.verbose > 0:
-                        print("Epoch %d: early stopping" % (epoch))
+                        logging.info('Learning rate too small, learning stops now')
                     self.model.stop_training = True
-            self.wait += 1
+
+        # Stop training if performance has not improved for self.patience epochs
+        if self.patience > 0 and self.wait >= self.patience:
+            logging.info('---bad counter: %d/%d' % (self.wait, self.patience))
+            if self.verbose > 0:
+                logging.info("Epoch %d: early stopping" % (epoch))
+            self.model.stop_training = True
+        self.wait += 1

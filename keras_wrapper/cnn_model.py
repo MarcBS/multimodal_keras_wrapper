@@ -234,7 +234,7 @@ class Model_Wrapper(object):
 
         # Prepare logger
         self.__logger = dict()
-        self.__modes = ['train', 'val']
+        self.__modes = ['train', 'val', 'test']
         self.__data_types = ['iteration', 'loss', 'accuracy', 'accuracy top-5']
 
         # Prepare model
@@ -475,6 +475,8 @@ class Model_Wrapper(object):
             :param batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
             :param lr_decay: number of iterations passed for decreasing the learning rate
             :param lr_gamma: proportion of learning rate kept at each decrease. It can also be a set of rules defined by a list, e.g. lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration 3000, ..., 0.8 until the end.
+            :param patience: number of epochs waiting for a possible performance increase before stopping training
+            :param metric_check: name of the metric checked for early stoppping and LR decrease
 
             ####    Data processing parameters
 
@@ -491,11 +493,16 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
 
-        default_params = {'n_epochs': 1, 'batch_size': 50, 'lr_decay': 1, 'lr_gamma':0.1, 'maxlen':100,
-                          'homogeneous_batches': False, 'epochs_for_save': 1, 'num_iterations_val': None,
+        default_params = {'n_epochs': 1, 'batch_size': 50,
+                          'maxlen':100,  # sequence learning parameters (BeamSearch)
+                          'homogeneous_batches': False,
+                          'epochs_for_save': 1,
+                          'num_iterations_val': None,
                           'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0}
+                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0,
+                          'patience': 0, 'metric_check': 'acc',    # early stopping parameters
+                          'lr_decay': 1, 'lr_gamma':0.1} # LR decay parameters
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -546,7 +553,8 @@ class Model_Wrapper(object):
         # Prepare callbacks
         callbacks = []
         callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-        callback_lr_reducer = LearningRateReducerWithEarlyStopping(patience=0,
+        callback_lr_reducer = LearningRateReducerWithEarlyStopping(patience=params['patience'],
+                                                                   metric_check=params['metric_check'],
                                                                    lr_decay=params['lr_decay'],
                                                                    reduce_rate=params['lr_gamma'])
         callbacks.append(callback_store_model)
@@ -1967,20 +1975,36 @@ class Model_Wrapper(object):
         """
         Stores the train and val information for plotting the training progress.
 
-        :param mode: 'train', or 'val'
-        :param data_type: 'iteration', 'loss' or 'accuracy'
+        :param mode: 'train', 'val' or 'test'
+        :param data_type: 'iteration', 'loss', 'accuracy', etc.
         :param value: numerical value taken by the data_type
         """
         if mode not in self.__modes:
             raise Exception('The provided mode "'+ mode +'" is not valid.')
-        if data_type not in self.__data_types:
-            raise Exception('The provided data_type "'+ data_type +'" is not valid.')
+        #if data_type not in self.__data_types:
+        #    raise Exception('The provided data_type "'+ data_type +'" is not valid.')
 
         if mode not in self.__logger:
             self.__logger[mode] = dict()
         if data_type not in self.__logger[mode]:
             self.__logger[mode][data_type] = list()
         self.__logger[mode][data_type].append(value)
+
+
+    def getLog(self, mode, data_type):
+        """
+        Returns the all logged values for a given mode and a given data_type
+
+        :param mode: 'train', 'val' or 'test'
+        :param data_type: 'iteration', 'loss', 'accuracy', etc.
+        :return: list of values logged
+        """
+        if mode not in self.__logger:
+            return [None]
+        elif data_type not in self.__logger:
+            return [None]
+        else:
+            return self.__logger[mode][data_type]
 
     def plot(self):
         """
