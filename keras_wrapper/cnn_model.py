@@ -553,12 +553,12 @@ class Model_Wrapper(object):
         # Prepare callbacks
         callbacks = []
         callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-        callback_lr_reducer = LearningRateReducerWithEarlyStopping(self, patience=params['patience'],
-                                                                   metric_check=params['metric_check'],
-                                                                   lr_decay=params['lr_decay'],
-                                                                   reduce_rate=params['lr_gamma'])
+        callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+        callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
+
         callbacks.append(callback_store_model)
         callbacks.append(callback_lr_reducer)
+        callbacks.append(callback_early_stop)
         callbacks += params['extra_callbacks']
 
         # Prepare data generators
