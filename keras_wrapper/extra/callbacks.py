@@ -172,13 +172,13 @@ class PrintPerformanceMetricOnEpochEnd(KerasCallback):
                     header = 'epoch,'
                     line = str(epoch) + ','
                     # Store in model log
-                    self.model.log(s, 'epoch', epoch)
+                    self.model_to_eval.log(s, 'epoch', epoch)
                     for metric_ in sorted(metrics):
                         value = metrics[metric_]
                         header += metric_ + ','
                         line += str(value) + ','
                         # Store in model log
-                        self.model.log(s, metric_, value)
+                        self.model_to_eval.log(s, metric_, value)
                     if (epoch == 1 or epoch == self.start_eval_on_epoch):
                         f.write(header + '\n')
                     f.write(line + '\n')
@@ -343,13 +343,13 @@ class PrintPerformanceMetricEachNUpdates(KerasCallback):
                     header = 'Update,'
                     line = str(self.cum_update) + ','
                     # Store in model log
-                    self.model.log(s, 'iteration', self.cum_update)
+                    self.model_to_eval.log(s, 'iteration', self.cum_update)
                     for metric_ in sorted(metrics):
                         value = metrics[metric_]
                         header += metric_ + ','
                         line += str(value) + ','
                         # Store in model log
-                        self.model.log(s, metric_, value)
+                        self.model_to_eval.log(s, metric_, value)
                     if (self.cum_update == 0 or self.cum_update == self.each_n_updates):
                         f.write(header + '\n')
                     f.write(line + '\n')
@@ -574,13 +574,13 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     header = counter_name + ','
                     line = str(epoch) + ','
                     # Store in model log
-                    self.model.log(s, counter_name, epoch)
+                    self.model_to_eval.log(s, counter_name, epoch)
                     for metric_ in sorted(metrics):
                         value = metrics[metric_]
                         header += metric_ + ', '
                         line += str(value) + ', '
                         # Store in model log
-                        self.model.log(s, metric_, value)
+                        self.model_to_eval.log(s, metric_, value)
                     if epoch == 1 or epoch == self.start_eval_on_epoch:
                         f.write(header + '\n')
                     f.write(line + '\n')
@@ -741,10 +741,11 @@ class LearningRateReducerWithEarlyStopping(KerasCallback):
     """
     Reduces learning rate during the training and applies early stopping if performance has not improved for some epochs.
     """
-    def __init__(self,
+    def __init__(self, model,
             patience=0, lr_decay=1, reduce_rate=0.5, reduce_nb=99999,
             check_split='val', metric_check='acc', verbose=1):
         """
+        :param model: model to check performance
         :param patience: number of beginning epochs without reduction; by default 0 (disabled)
         :param lr_decay: minimum number of epochs passed before the last reduction
         :param reduce_rate: multiplicative rate reducer; by default 0.5
@@ -754,6 +755,7 @@ class LearningRateReducerWithEarlyStopping(KerasCallback):
         :param verbose: verbosity level; by default 1
         """
         super(KerasCallback, self).__init__()
+        self.model_to_eval = model
         self.patience = patience
         self.wait = 0
         self.best_score = -1.
@@ -770,7 +772,7 @@ class LearningRateReducerWithEarlyStopping(KerasCallback):
     def on_epoch_end(self, epoch, logs={}):
         # Get last metric value from logs
         # current_score = logs.get('val_acc')
-        current_score = self.model.getLog(self.check_split, self.metric_check)[-1]
+        current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         if current_score is None:
             warnings.warn('validation score is off; ' +
                     'this reducer works only with the validation score on')
