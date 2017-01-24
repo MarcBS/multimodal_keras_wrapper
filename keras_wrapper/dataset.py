@@ -3119,8 +3119,11 @@ class Dataset(object):
             for id_out in self.ids_outputs:
                 exec('lengths.append(len(self.Y_'+ set_name +'[id_out]))')
             if lengths[1:] != lengths[:-1]:
-                raise Exception('Inputs and outputs size ('+str(lengths)+') for "' +set_name+ '" set do not match.')
-            
+                raise Exception('Inputs and outputs size '
+                                '('+str(lengths)+') for "'+set_name+ '" set do not match.\n'
+                                                                     '\t Inputs:' + str(self.ids_inputs)+''
+                                                                                                         '\t Outputs:' + str(self.ids_outputs))
+
                 
     def __getNextSamples(self, k, set_name):
         """

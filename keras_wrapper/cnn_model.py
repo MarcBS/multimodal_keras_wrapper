@@ -501,8 +501,8 @@ class Model_Wrapper(object):
                           'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0,
-                          'patience': 0, 'metric_check': 'acc',    # early stopping parameters
-                          'lr_decay': 1, 'lr_gamma':0.1} # LR decay parameters
+                          'patience': 0, 'metric_check': None,    # early stopping parameters
+                          'lr_decay': None, 'lr_gamma':0.1} # LR decay parameters
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -551,20 +551,25 @@ class Model_Wrapper(object):
         state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch'])/params['batch_size']))
 
         # Prepare callbacks
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-        callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
-        callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
-
         callbacks = []
         ## Callbacks order:
+
         # Store dmoel
+        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
         callbacks.append(callback_store_model)
         # Extra callbacks (e.g. evaluation)
         callbacks += params['extra_callbacks']
+
         # LR reducer
-        callbacks.append(callback_lr_reducer)
+        if params.get('lr_decay') is not None:
+            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            callbacks.append(callback_lr_reducer)
+
         # Early stopper
-        callbacks.append(callback_early_stop)
+        if params.get('metric_check') is not None:
+            callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
+            callbacks.append(callback_early_stop)
+
 
         # Prepare data generators
         if params['homogeneous_batches']:
