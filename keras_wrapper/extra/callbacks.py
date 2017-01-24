@@ -754,11 +754,13 @@ class EarlyStopping(KerasCallback):
         self.patience = patience
         self.wait = 0
         self.best_score = -1.
+        self.best_epoch = -1
         self.check_split = check_split
         self.metric_check = metric_check
         self.verbose = verbose
 
     def on_epoch_end(self, epoch, logs={}):
+        epoch += 1  # start by index 1
         # Get last metric value from logs
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         if current_score is None:
@@ -768,6 +770,7 @@ class EarlyStopping(KerasCallback):
 
         # Check if the best score has been outperformed in the current epoch
         if current_score > self.best_score:
+            self.best_epoch = epoch
             self.best_score = current_score
             self.wait = 0
             if self.verbose > 0:
@@ -779,7 +782,7 @@ class EarlyStopping(KerasCallback):
             logging.info('---bad counter: %d/%d' % (self.wait, self.patience))
             if self.wait >= self.patience:
                 if self.verbose > 0:
-                    logging.info("---epoch %d: early stopping" % (epoch))
+                    logging.info("---epoch %d: early stopping. Best %s found at epoch %d: %f" % (epoch, self.metric_check, self.best_epoch, self.best_score))
                 self.model.stop_training = True
 
 
