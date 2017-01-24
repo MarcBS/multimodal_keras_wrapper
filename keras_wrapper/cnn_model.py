@@ -502,7 +502,7 @@ class Model_Wrapper(object):
                           'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0,
                           'patience': 0, 'metric_check': None,    # early stopping parameters
-                          'lr_decay': 1, 'lr_gamma':0.1} # LR decay parameters
+                          'lr_decay': None, 'lr_gamma':0.1} # LR decay parameters
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -561,12 +561,12 @@ class Model_Wrapper(object):
         callbacks += params['extra_callbacks']
 
         # LR reducer
-        if params.get('lr_decay'):
+        if params.get('lr_decay') is not None:
             callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
             callbacks.append(callback_lr_reducer)
 
         # Early stopper
-        if params.get('metric_check'):
+        if params.get('metric_check') is not None:
             callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
             callbacks.append(callback_early_stop)
 
