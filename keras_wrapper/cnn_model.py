@@ -1701,7 +1701,7 @@ class Model_Wrapper(object):
         if verbose > 2:
             print "Input sentence:", src_word_seq
             print "Hard alignments", hard_alignment
-        for j in xrange(len(trans_words) - 1):
+        for j in xrange(len(trans_words)):
             if trans_words[j] == unk_symbol:
                 UNK_src = src_word_seq[hard_alignment[j]]
                 if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
@@ -1770,7 +1770,7 @@ class Model_Wrapper(object):
                                                       verbose=verbose)
                     if verbose > 1:
                         print "After unk_replace:", a_no
-                tmp = ' '.join(a_no)
+                tmp = ' '.join(a_no[:-1])
                 answer_pred.append(tmp)
         else:
             for a_no in flattened_answer_pred:
