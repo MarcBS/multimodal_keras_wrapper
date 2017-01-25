@@ -3004,7 +3004,7 @@ class Model_Wrapper(object):
 
     def add_dense_block(self, in_layer, nb_layers, k=12, drop=0.2):
         """
-        Adds a Dense Block.
+        Adds a Dense Block for the transition down path.
 
         # References
             Jegou S, Drozdzal M, Vazquez D, Romero A, Bengio Y.
@@ -3026,6 +3026,29 @@ class Model_Wrapper(object):
             # Merge with previous layer
             prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=1)
         return merge(list_outputs, mode='concat', concat_axis=1)
+
+    def add_down_dense_block(self, in_layer, nb_layers, k=12, drop=0.2):
+        """
+        Adds a Dense Block for the transition up path.
+
+        # References
+            Jegou S, Drozdzal M, Vazquez D, Romero A, Bengio Y.
+            The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation.
+            arXiv preprint arXiv:1611.09326. 2016 Nov 28.
+
+        :param in_layer: input layer to the dense block.
+        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer() for information about the internal layers).
+        :param k: growth rate. Number of additional feature maps learned at each layer.
+        :param drop: dropout rate.
+        :return: output layer of the dense block
+        """
+        prev_layer = in_layer
+        for n in range(nb_layers):
+            # Insert dense layer
+            new_layer = self.add_dense_layer(prev_layer, k, drop)
+            # Merge with previous layer
+            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=1)
+        return prev_layer
 
 
     def add_dense_layer(self, in_layer, k, drop):
@@ -3079,8 +3102,9 @@ class Model_Wrapper(object):
         # Dense Block
         x_dense = self.add_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
 
-        # Concatenation and skip connection recovery for upsampling path
+        ## Concatenation and skip connection recovery for upsampling path
         skip = merge([x, x_dense], mode='concat', concat_axis=1, name='down_skip_'+str(skip_dim))
+        #skip = x_dense
 
         # Transition Down
         x_out = BatchNormalization()(skip)
