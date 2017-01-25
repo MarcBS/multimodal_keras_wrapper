@@ -3002,7 +3002,7 @@ class Model_Wrapper(object):
     #       DENSE NETS
     ##############################
 
-    def add_up_dense_block(self, in_layer, nb_layers, k=12, drop=0.2):
+    def add_dense_block(self, in_layer, nb_layers, k=12, drop=0.2):
         """
         Adds a Dense Block for the transition down path.
 
@@ -3100,11 +3100,11 @@ class Model_Wrapper(object):
         :return: [output layer, skip connection name]
         """
         # Dense Block
-        x_dense = self.add_down_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
+        x_dense = self.add_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
 
         ## Concatenation and skip connection recovery for upsampling path
-        #skip = merge([x, x_dense], mode='concat', concat_axis=1, name='down_skip_'+str(skip_dim))
-        skip = x_dense
+        skip = merge([x, x_dense], mode='concat', concat_axis=1, name='down_skip_'+str(skip_dim))
+        #skip = x_dense
 
         # Transition Down
         x_out = BatchNormalization()(skip)
@@ -3153,7 +3153,7 @@ class Model_Wrapper(object):
             skip = skip_conn[skip_conn_shapes.index(out_dim)]
             x = merge([skip, x], mode='concat', concat_axis=1, name='skip_'+str(out_dim))
         # Dense Block
-        x = self.add_up_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
+        x = self.add_dense_block(x, nb_layers, k=growth, drop=drop)  # (growth*nb_layers) feature maps added
         return x
 
     def Empty(self, nOutput, input):
