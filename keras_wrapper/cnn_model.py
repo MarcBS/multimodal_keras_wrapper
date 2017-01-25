@@ -1770,7 +1770,7 @@ class Model_Wrapper(object):
                                                       verbose=verbose)
                     if verbose > 1:
                         print "After unk_replace:", a_no
-                tmp = ' '.join(a_no[:-1])
+                tmp = ' '.join(a_no)
                 answer_pred.append(tmp)
         else:
             for a_no in flattened_answer_pred:
