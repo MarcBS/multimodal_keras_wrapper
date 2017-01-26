@@ -478,15 +478,17 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
         # Evaluate on each set separately
         for s in self.set_name:
             # Apply model predictions
-            params_prediction = {'batch_size': self.batch_size,
-                                 'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                                 'predict_on_sets': [s],
-                                 'pos_unk': False, 'heuristic': 0, 'mapping': None}
-
             if self.beam_search:
+                params_prediction = {'batch_size': self.batch_size,
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'predict_on_sets': [s],
+                                     'pos_unk': False, 'heuristic': 0, 'mapping': None}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
+                params_prediction = {'batch_size': self.batch_size,
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'predict_on_sets': [s]}
                 # Convert predictions
                 postprocess_fun = None
                 if (self.is_3DLabel):
@@ -495,7 +497,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 
             if (self.is_text):
-                if params_prediction['pos_unk']:
+                if params_prediction.get('pos_unk', False):
                     samples = predictions[0]
                     alphas = predictions[1]
 
@@ -753,11 +755,19 @@ class EarlyStopping(KerasCallback):
         self.model_to_eval = model
         self.patience = patience
         self.wait = 0
-        self.best_score = -1.
-        self.best_epoch = -1
         self.check_split = check_split
         self.metric_check = metric_check
         self.verbose = verbose
+
+        # check already stored scores in case we have loaded a pre-trained model
+        all_scores = self.model_to_eval.getLog(self.check_split, self.metric_check)
+        if all_scores[-1] is not None:
+            self.best_score = max(all_scores)
+            self.best_epoch = all_scores.index(self.best_score)+1
+        else:
+            self.best_score = -1.
+            self.best_epoch = -1
+
 
     def on_epoch_end(self, epoch, logs={}):
         epoch += 1  # start by index 1

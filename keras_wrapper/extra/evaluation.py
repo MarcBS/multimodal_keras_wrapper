@@ -106,7 +106,7 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
             'other accuracy': acc_other}
 
 
-def eval_multiclass_metrics(pred_list, verbose, extra_vars, split):
+def multilabel_metrics(pred_list, verbose, extra_vars, split):
     '''
     Multiclass classification metrics
     see multilabel ranking metrics in sklearn library for more info:
@@ -150,7 +150,7 @@ def eval_multiclass_metrics(pred_list, verbose, extra_vars, split):
             'ranking loss': rankloss}
 
 
-def multilabel_metrics(pred_list, verbose, extra_vars, split):
+def multiclass_metrics(pred_list, verbose, extra_vars, split):
     '''
     Multiclass classification metrics
     see multilabel ranking metrics in sklearn library for more info:
@@ -186,7 +186,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
         logging.info('Accuracy: %f' %
                      (accuracy))
 
-    return {'multilabel accuracy': accuracy}
+    return {'accuracy': accuracy}
 
     """
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
@@ -562,8 +562,8 @@ def caption_store(samples, path):
 select = {
     'vqa': eval_vqa,  # Metric for the VQA challenge
     'coco': get_coco_score,  # MS COCO evaluation library (BLEU, METEOR and CIDEr scores)
-    'multiclass': eval_multiclass_metrics,  # Set of multiclass classification metrics from sklearn
     'multilabel_metrics': multilabel_metrics,  # Set of multilabel classification metrics from sklearn
+    'multiclass_metrics': multiclass_metrics,  # Set of multiclass classification metrics from sklearn
     'AP': averagePrecision,
     'sem_seg_acc': semantic_segmentation_accuracy,
 }
