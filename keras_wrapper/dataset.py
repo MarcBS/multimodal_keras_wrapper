@@ -765,7 +765,7 @@ class Dataset(object):
             ind_remove = self.ids_inputs.index(id)
             del self.ids_inputs[ind_remove]
             del self.types_inputs[ind_remove]
-            eval('del self.X_'+set_name+'[id]')
+            exec('del self.X_'+set_name+'[id]')
         elif id not in keys_X_set:
             raise Exception('An input with id "'+id+'" does not exist in the Database.')
         if not self.silence:
@@ -903,7 +903,7 @@ class Dataset(object):
             ind_remove = self.ids_outputs.index(id)
             del self.ids_outputs[ind_remove]
             del self.types_outputs[ind_remove]
-            eval('del self.Y_'+set_name+'[id]')
+            exec('del self.Y_'+set_name+'[id]')
         elif id not in keys_Y_set:
             raise Exception('An output with id "'+id+'" does not exist in the Database.')
         if not self.silence:
