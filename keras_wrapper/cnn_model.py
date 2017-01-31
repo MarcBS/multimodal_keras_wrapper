@@ -1,6 +1,6 @@
 import matplotlib as mpl
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, ArbitraryDeconvolution2D
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -8,6 +8,7 @@ from keras.optimizers import SGD
 from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
+from keras import backend as K
 
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
@@ -3018,6 +3019,11 @@ class Model_Wrapper(object):
         :param init_weights: weights initialization function
         :return: output layer of the dense block
         """
+        if K.image_dim_ordering() == 'tf':
+            axis = -1
+        else:
+            axis = 1
+
         list_outputs = []
         prev_layer = in_layer
         for n in range(nb_layers):
@@ -3025,8 +3031,8 @@ class Model_Wrapper(object):
             new_layer = self.add_dense_layer(prev_layer, k, drop, init_weights)
             list_outputs.append(new_layer)
             # Merge with previous layer
-            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=1)
-        return merge(list_outputs, mode='concat', concat_axis=1)
+            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=axis)
+        return merge(list_outputs, mode='concat', concat_axis=axis)
 
 
     def add_dense_layer(self, in_layer, k, drop, init_weights):
@@ -3080,11 +3086,16 @@ class Model_Wrapper(object):
 
         :return: [output layer, skip connection name]
         """
+        if K.image_dim_ordering() == 'tf':
+            axis = -1
+        else:
+            axis = 1
+
         # Dense Block
         x_dense = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
 
         ## Concatenation and skip connection recovery for upsampling path
-        skip = merge([x, x_dense], mode='concat', concat_axis=1, name='down_skip_'+str(skip_dim))
+        skip = merge([x, x_dense], mode='concat', concat_axis=axis, name='down_skip_'+str(skip_dim))
         #skip = x_dense
 
         # Transition Down
@@ -3126,14 +3137,22 @@ class Model_Wrapper(object):
 
         :return: output layer
         """
+        if K.image_dim_ordering() == 'tf':
+            axis = -1
+        else:
+            axis = 1
+
         # Transition Up
-        x = Deconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
-                            output_shape=tuple([None, nb_filters_deconv]+out_dim),
-                            subsample=(2, 2), border_mode='same')(x)
+        x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
+                                     subsample=(2, 2), border_mode='same')(x)
+        # x = Deconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
+        #                     output_shape=tuple([None, nb_filters_deconv]+out_dim),
+        #                     subsample=(2, 2), border_mode='same')(x)
+
         # Skip connection concatenation
         if out_dim in skip_conn_shapes:
             skip = skip_conn[skip_conn_shapes.index(out_dim)]
-            x = merge([skip, x], mode='concat', concat_axis=1, name='skip_'+str(out_dim))
+            x = merge([skip, x], mode='concat', concat_axis=axis, name='skip_'+str(out_dim))
         # Dense Block
         x = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
         return x

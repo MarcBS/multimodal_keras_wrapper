@@ -763,7 +763,7 @@ class EarlyStopping(KerasCallback):
         if all_scores[-1] is not None:
             self.best_score = max(all_scores)
             self.best_epoch = all_scores.index(self.best_score)+1
-            self.wait =  len(all_scores) - self.best_epoch
+            self.wait = len(all_scores) - self.best_epoch
         else:
             self.best_score = -1.
             self.best_epoch = -1
