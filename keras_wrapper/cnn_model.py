@@ -554,9 +554,6 @@ class Model_Wrapper(object):
         callbacks = []
         ## Callbacks order:
 
-        # Store dmoel
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-        callbacks.append(callback_store_model)
         # Extra callbacks (e.g. evaluation)
         callbacks += params['extra_callbacks']
 
@@ -570,6 +567,9 @@ class Model_Wrapper(object):
             callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
             callbacks.append(callback_early_stop)
 
+        # Store model
+        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+        callbacks.append(callback_store_model)
 
         # Prepare data generators
         if params['homogeneous_batches']:

@@ -754,7 +754,6 @@ class EarlyStopping(KerasCallback):
         super(KerasCallback, self).__init__()
         self.model_to_eval = model
         self.patience = patience
-        self.wait = 0
         self.check_split = check_split
         self.metric_check = metric_check
         self.verbose = verbose
@@ -764,9 +763,11 @@ class EarlyStopping(KerasCallback):
         if all_scores[-1] is not None:
             self.best_score = max(all_scores)
             self.best_epoch = all_scores.index(self.best_score)+1
+            self.wait = len(all_scores) - self.best_epoch
         else:
             self.best_score = -1.
             self.best_epoch = -1
+            self.wait = 0
 
 
     def on_epoch_end(self, epoch, logs={}):
