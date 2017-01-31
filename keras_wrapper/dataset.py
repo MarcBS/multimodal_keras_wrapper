@@ -2461,13 +2461,7 @@ class Dataset(object):
             if id not in self.train_mean:
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "'+id+'".')
             train_mean = copy.copy(self.train_mean[id])
-
-            '''
-            # Take central part
-            left = np.round(np.divide([self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]], 2.0))
-            right = left + self.img_size_crop[id][0:2]
-            train_mean = train_mean[left[0]:right[0], left[1]:right[1], :]
-            '''
+            train_mean = misc.imresize(train_mean, self.img_size_crop[id][0:2])
 
             # Transpose dimensions
             if len(self.img_size[id]) == 3: # if it is a 3D image
@@ -2581,8 +2575,15 @@ class Dataset(object):
         for i in range(len(images)):
             # Random crop
             margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
-            left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
-            
+            if margin[0] > 0:
+                left = random.sample([k_ for k_ in range(margin[0])], 1)
+            else:
+                left = [0]
+            if margin[1] > 0:
+                left += random.sample([k for k in range(margin[1])], 1)
+            else:
+                left += [0]
+
             # Randomly flip (with a certain probability)
             hflip = random.random()
             vflip = random.random()
