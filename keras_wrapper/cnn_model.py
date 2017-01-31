@@ -3051,7 +3051,7 @@ class Model_Wrapper(object):
         :return: output layer
         """
 
-        out_layer = BatchNormalization() (in_layer)
+        out_layer = BatchNormalization(mode=2) (in_layer)
         out_layer = Activation('relu') (out_layer)
         out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same') (out_layer)
         if drop > 0.0:
@@ -3059,7 +3059,7 @@ class Model_Wrapper(object):
         return out_layer
 
 
-    def add_transitiondown_block(self, x, skip_dim,
+    def add_transitiondown_block(self, x,
                                nb_filters_conv, pool_size, init_weights,
                                nb_layers, growth, drop):
         """
@@ -3072,7 +3072,6 @@ class Model_Wrapper(object):
 
         # Input layers parameters
         :param x: input layer.
-        :param skip_dim: dimensions of the output skip connection
 
         # Convolutional layer parameters
         :param nb_filters_conv: number of convolutional filters to learn.
@@ -3095,22 +3094,21 @@ class Model_Wrapper(object):
         x_dense = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
 
         ## Concatenation and skip connection recovery for upsampling path
-        skip = merge([x, x_dense], mode='concat', concat_axis=axis, name='down_skip_'+str(skip_dim))
-        #skip = x_dense
+        skip = merge([x, x_dense], mode='concat', concat_axis=axis)
 
         # Transition Down
-        x_out = BatchNormalization()(skip)
+        x_out = BatchNormalization(mode=2)(skip)
         x_out = Activation('relu')(x_out)
         x_out = Convolution2D(nb_filters_conv, 1, 1, init=init_weights, border_mode='same')(x_out)
         if drop > 0.0:
             x_out = Dropout(drop)(x_out)
-        x_out = MaxPooling2D(pool_size=(pool_size,pool_size), name='transitiondown_'+str(skip_dim))(x_out)
+        x_out = MaxPooling2D(pool_size=(pool_size,pool_size)) (x_out)
 
         return [x_out, skip]
 
 
-    def add_transitionup_block(self, x, skip_conn, skip_conn_shapes,
-                               out_dim, nb_filters_deconv, init_weights,
+    def add_transitionup_block(self, x, skip_conn,
+                               nb_filters_deconv, init_weights,
                                nb_layers, growth, drop):
         """
         Adds a Transition Up Block. Consisting of Deconv, Skip Connection, Dense Block.
@@ -3123,10 +3121,8 @@ class Model_Wrapper(object):
         # Input layers parameters
         :param x: input layer.
         :param skip_conn: list of layers to be used as skip connections.
-        :param skip_conn_shapes: list of output shapes of the skip connection layers.
 
         # Deconvolutional layer parameters
-        :param out_dim: output dimensionality of the Deconvolutional layer [width, height]
         :param nb_filters_deconv: number of deconvolutional filters to learn.
         :param init_weights: weights initialization function
 
@@ -3150,9 +3146,7 @@ class Model_Wrapper(object):
         #                     subsample=(2, 2), border_mode='same')(x)
 
         # Skip connection concatenation
-        if out_dim in skip_conn_shapes:
-            skip = skip_conn[skip_conn_shapes.index(out_dim)]
-            x = merge([skip, x], mode='concat', concat_axis=axis, name='skip_'+str(out_dim))
+        x = merge([skip_conn, x], mode='concat', concat_axis=axis)
         # Dense Block
         x = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
         return x
