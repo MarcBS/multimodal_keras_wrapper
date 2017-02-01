@@ -356,26 +356,6 @@ class PrintPerformanceMetricEachNUpdates(KerasCallback):
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
-            """
-            # Early stop check
-            if self.early_stop and s in ['val', 'validation', 'dev', 'development']:
-                current_score = metrics[self.stop_metric]
-                if current_score > self.best_score:
-                    self.best_score = current_score
-                    self.best_update = self.cum_update
-                    self.wait = 0
-                    if self.verbose > 0:
-                        logging.info('---current best %s: %.4f' % (self.stop_metric, current_score))
-                else:
-                    if self.wait >= self.patience:
-                        if self.verbose > 0:
-                            logging.info('Update %d: early stopping. Best %s value found at update %d: %.4f' %
-                                         (self.cum_update, self.stop_metric, self.best_update, self.best_score))
-                            self.model.stop_training = True
-                    self.wait += 1
-                    if self.verbose > 0:
-                        logging.info('----bad counter: %d/%d' % (self.wait, self.patience))
-            """
 
 class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
 
@@ -694,14 +674,14 @@ class SampleEachNUpdates(KerasCallback):
         self.sampling_type = sampling_type
         self.out_pred_idx = out_pred_idx
         self.in_pred_idx = in_pred_idx
+        self.cum_update = 0
         self.verbose = verbose
 
     def on_batch_end(self, n_update, logs={}):
-        n_update += 1  # start by index 1
-        n_update += self.reload_epoch
-        if n_update < self.start_sampling_on_epoch:
+        self.cum_update += 1
+        if n_update < self.start_sampling_on_epoch + self.reload_epoch:
             return
-        elif n_update % self.each_n_updates != 0:
+        elif self.cum_update % self.each_n_updates != 0:
             return
 
         # Evaluate on each set separately
