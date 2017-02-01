@@ -527,9 +527,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                                                                                     alphas=alphas,
                                                                                     x_text=sources,
                                                                                     heuristic=heuristic,
-                                                                                    mapping=
-                                                                                    params_prediction[
-                                                                                        'mapping'],
+                                                                                    mapping=params_prediction['mapping'],
                                                                                     verbose=self.verbose)
                 else:
                     predictions = self.model_to_eval.decode_predictions(predictions, 1,

@@ -156,6 +156,10 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
             model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
         except:
             raise Exception(ValueError)
+
+    # Add logger for backwards compatibility (old pre-trained models) if it does not exist
+    model_wrapper.updateLogger()
+
     model_wrapper.model = model
     if loaded_optimized:
         model_wrapper.model_init = model_init
@@ -234,9 +238,7 @@ class Model_Wrapper(object):
         self.matchings_next_to_next = None
 
         # Prepare logger
-        self.__logger = dict()
-        self.__modes = ['train', 'val', 'test']
-        self.__data_types = ['iteration', 'loss', 'accuracy', 'accuracy top-5']
+        self.updateLogger()
 
         # Prepare model
         if not inheritance:
@@ -263,6 +265,23 @@ class Model_Wrapper(object):
                 if not self.silence:
                     logging.info("<<< Loading weights from file "+ weights_path +" >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
+
+    def updateLogger(self):
+        """
+            Checks if the model contains an updated logger.
+            If it doesn't then it updates it, which will store evaluation results.
+        """
+        compulsory_data_types = ['iteration', 'loss', 'accuracy', 'accuracy top-5']
+        if '_Model_Wrapper__logger' not in self.__dict__:
+            self.__logger = dict()
+        if '_Model_Wrapper__data_types' not in self.__dict__:
+            self.__data_types = compulsory_data_types
+        else:
+            for d in compulsory_data_types:
+                if d not in self.__data_types:
+                    self.__data_types.append(d)
+
+        self.__modes = ['train', 'val', 'test']
 
     def setInputsMapping(self, inputsMapping):
         """
