@@ -356,26 +356,6 @@ class PrintPerformanceMetricEachNUpdates(KerasCallback):
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
-            """
-            # Early stop check
-            if self.early_stop and s in ['val', 'validation', 'dev', 'development']:
-                current_score = metrics[self.stop_metric]
-                if current_score > self.best_score:
-                    self.best_score = current_score
-                    self.best_update = self.cum_update
-                    self.wait = 0
-                    if self.verbose > 0:
-                        logging.info('---current best %s: %.4f' % (self.stop_metric, current_score))
-                else:
-                    if self.wait >= self.patience:
-                        if self.verbose > 0:
-                            logging.info('Update %d: early stopping. Best %s value found at update %d: %.4f' %
-                                         (self.cum_update, self.stop_metric, self.best_update, self.best_score))
-                            self.model.stop_training = True
-                    self.wait += 1
-                    if self.verbose > 0:
-                        logging.info('----bad counter: %d/%d' % (self.wait, self.patience))
-            """
 
 class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
 
@@ -649,7 +629,7 @@ class SampleEachNUpdates(KerasCallback):
 
     def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=dict(),
                  is_text=False, index2word_y=None, input_text_id=None, sampling='max_likelihood',
-                 beam_search=False, batch_size=50, reload_epoch=0, start_sampling_on_epoch=0,
+                 beam_search=False, batch_size=50, reload_epoch=0, start_sampling_on_epoch=0, is_3DLabel=False,
                  write_type='list', sampling_type='max_likelihood', out_pred_idx=None, in_pred_idx=None, verbose=1):
         """
             :param model: model to evaluate
@@ -662,6 +642,8 @@ class SampleEachNUpdates(KerasCallback):
             :param extra_vars: dictionary of extra variables
             :param is_text: defines if the predicted info is of type text
                             (in that case the data will be converted from values into a textual representation)
+            :param is_3DLabel: defines if the predicted info is of type 3DLabels
+
             :param index2word_y: mapping from the indices to words (only needed if is_text==True)
             :param sampling: sampling mechanism used (only used if is_text==True)
             :param out_pred_idx: index of the output prediction used for evaluation
@@ -684,6 +666,7 @@ class SampleEachNUpdates(KerasCallback):
         self.set_name = set_name
         self.n_samples = n_samples
         self.each_n_updates = each_n_updates
+        self.is_3DLabel = is_3DLabel
         self.extra_vars = extra_vars
         self.reload_epoch = reload_epoch
         self.start_sampling_on_epoch = start_sampling_on_epoch
@@ -691,32 +674,34 @@ class SampleEachNUpdates(KerasCallback):
         self.sampling_type = sampling_type
         self.out_pred_idx = out_pred_idx
         self.in_pred_idx = in_pred_idx
+        self.cum_update = 0
         self.verbose = verbose
 
     def on_batch_end(self, n_update, logs={}):
-        n_update += 1  # start by index 1
-        n_update += self.reload_epoch
-        if n_update < self.start_sampling_on_epoch:
+        self.cum_update += 1
+        if n_update < self.start_sampling_on_epoch + self.reload_epoch:
             return
-        elif n_update % self.each_n_updates != 0:
+        elif self.cum_update % self.each_n_updates != 0:
             return
 
         # Evaluate on each set separately
         for s in self.set_name:
-
             # Apply model predictions
             params_prediction = {'batch_size': self.batch_size,
                                  'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                  'predict_on_sets': [s],
                                  'n_samples': self.n_samples}
-
             if self.beam_search:
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions, truths, data = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
-                raise NotImplementedError()
-
-            gt_y = eval('self.ds.Y_'+s+'["'+self.gt_id+'"]')
+                # Convert predictions
+                postprocess_fun = None
+                if (self.is_3DLabel):
+                    postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
+                predictions = \
+                    self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
+            truths = eval('self.ds.Y_'+s+'["'+self.gt_id+'"]')
             predictions = predictions[s]
             if(self.is_text):
                 if self.out_pred_idx is not None:
@@ -726,14 +711,15 @@ class SampleEachNUpdates(KerasCallback):
                     predictions = self.model_to_eval.decode_predictions_beam_search(predictions,
                                                       self.index2word_y,
                                                       verbose=self.verbose)
+                    truths = self.model_to_eval.decode_predictions_one_hot(truths,
+                                          self.index2word_y,
+                                          verbose=self.verbose)
                 else:
                     predictions = self.model_to_eval.decode_predictions(predictions, 1, # always set temperature to 1
                                                       self.index2word_y,
                                                       self.sampling_type,
                                                       verbose=self.verbose)
-                truths = self.model_to_eval.decode_predictions_one_hot(truths,
-                                                      self.index2word_y,
-                                                      verbose=self.verbose)
+
             # Write samples
             for i, (sample, truth) in enumerate(zip(predictions, truths)):
                 print ("Hypothesis (%d): %s"%(i, sample))

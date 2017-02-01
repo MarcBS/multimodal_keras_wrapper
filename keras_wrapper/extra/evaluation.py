@@ -4,7 +4,6 @@
 import json
 import logging
 
-import numpy as np
 from sklearn import metrics as sklearn_metrics
 
 from pycocoevalcap.bleu.bleu import Bleu
@@ -13,6 +12,7 @@ from pycocoevalcap.cider.cider import Cider
 from pycocoevalcap.rouge.rouge import Rouge
 from pycocoevalcap.vqa import vqaEval, visual_qa
 from read_write import list2vqa
+import numpy as np
 from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
 from localization_utilities import *
@@ -55,9 +55,9 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
 
     if verbose > 0:
         logging.info('Computing coco scores on the %s split...' %(split))
-        for metric in sorted(final_scores):
-            value = final_scores[metric]
-            logging.info(metric +': ' + str(value))
+    for metric in sorted(final_scores):
+        value = final_scores[metric]
+        logging.info(metric +': ' + str(value))
 
     return final_scores
 
@@ -533,6 +533,32 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
     return [TP, FP, FN, TP_classes, FP_classes, FN_classes]
         
 
+def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
+    """
+
+    :param pred_list:
+    :param verbose:
+    :param extra_vars:
+    :param split:
+    :return:
+    """
+
+    if mask is not None:
+        y_pred /= np.sum(y_pred, axis=-1, keepdims=True)
+        mask = np.reshape(mask, y_true.shape[:-1])[:,:,None]
+        truth_mask = (y_true*mask).flatten().nonzero()[0]
+        predictions = y_pred.flatten()[truth_mask]
+        ppl = np.power(2, np.mean(-np.log2(predictions)))
+        if verbose > 0:
+            logging.info('Computing perplexity scores on the %s split...' %(split))
+            logging.info('PPL: ' + str(ppl))
+        return ppl
+    else:
+        ppl = np.power(2, np.mean(-np.log2(y_pred)))
+        if verbose > 0:
+            logging.info('Computing perplexity scores on the %s split...' %(split))
+            logging.info('PPL: ' + str(ppl))
+        return ppl
 ########################################
 # AUXILIARY FUNCTIONS
 ########################################
@@ -566,5 +592,7 @@ select = {
     'multiclass_metrics': multiclass_metrics,  # Set of multiclass classification metrics from sklearn
     'AP': averagePrecision,
     'sem_seg_acc': semantic_segmentation_accuracy,
+    'ppl': compute_perplexity,
+
 }
 

@@ -75,6 +75,7 @@ def loadDataset(dataset_path):
 #       DATA BATCH GENERATOR CLASS
 # ------------------------------------------------------- #
 
+
 class Data_Batch_Generator(object):
     """
     Batch generator class. Retrieves batches of data.
@@ -129,7 +130,8 @@ class Data_Batch_Generator(object):
         it = 0
         while 1:
 
-            if self.set_split == 'train' and it%self.params['num_iterations']==0 and not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+            if self.set_split == 'train' and it%self.params['num_iterations']==0 and \
+                    not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
                 silence = self.dataset.silence
                 self.dataset.silence = True
                 self.dataset.shuffleTraining()
@@ -150,53 +152,40 @@ class Data_Batch_Generator(object):
             
             # Recovers a batch of data
             if self.params['random_samples'] > 0:
-                # At sampling from train/val, we always have Y
                 indices = np.random.randint(0, n_samples_split, self.params['random_samples'])
+                # At sampling from train/val, we always have Y
 
-                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, indices,
-                                             normalization=self.params['normalization'],
-                                             meanSubstraction=self.params['mean_substraction'],
-                                             dataAugmentation=data_augmentation)
-                data = self.net.prepareData(X_batch, Y_batch)
+                if self.predict:
+                    X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                            indices,
+                                                            normalization=self.params['normalization'],
+                                                            meanSubstraction=self.params['mean_substraction'],
+                                                            dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, None)[0]
 
+                else:
+                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                      indices,
+                                                                      normalization=self.params['normalization'],
+                                                                      meanSubstraction=self.params['mean_substraction'],
+                                                                      dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
 
             else:
                 if self.predict:
-                    X_batch = self.dataset.getX(self.set_split, init_sample, final_sample,
-                                                 normalization=self.params['normalization'],
-                                                 meanSubstraction=self.params['mean_substraction'],
-                                                 dataAugmentation=False)
-                    """
-                    ###########
-                    print 'print in dataset.py L:136'
-
-                    xbatch = self.dataset.getX(self.set_split, init_sample, final_sample, debug=True)
-                    captions = self.dataset.Y_val['caption'][init_sample:final_sample]
-                    images_list = self.dataset.X_val['image'][init_sample:final_sample]
-                    for c,im,imdeb,impix in zip(captions, images_list, xbatch[0], X_batch[0]):
-                        print c
-                        print im
-                        print imdeb
-                        print impix[:,50:55,50:55]
-                    ###########
-                    """
+                    X_batch = self.dataset.getX(self.set_split,
+                                                init_sample,
+                                                final_sample,
+                                                normalization=self.params['normalization'],
+                                                meanSubstraction=self.params['mean_substraction'],
+                                                dataAugmentation=False)
                     data = self.net.prepareData(X_batch, None)[0]
                 else:
-                    X_batch, Y_batch = self.dataset.getXY(self.set_split, batch_size,
-                                                 normalization=self.params['normalization'],
-                                                 meanSubstraction=self.params['mean_substraction'],
-                                                 dataAugmentation=data_augmentation)
-                    #print 'source words:', [map(lambda x: self.dataset.vocabulary['source_text']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in X_batch[0]]]
-                    #print 'target words:', [map(lambda x: self.dataset.vocabulary['target_text']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0]]]
-                    #print 'Mask:', Y_batch[0][1]
-
-                    # Fake outputs for debugging
-                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 64, 112, 112))
-                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 1, 112, 112))
-                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 64))
-                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], Y_batch[0][0].shape[1], 1000))
-                    #Y_batch[0] = np.zeros((Y_batch[0][0].shape[0], 1000))
-
+                    X_batch, Y_batch = self.dataset.getXY(self.set_split,
+                                                          batch_size,
+                                                          normalization=self.params['normalization'],
+                                                          meanSubstraction=self.params['mean_substraction'],
+                                                          dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, Y_batch)
 
             yield(data)
@@ -2964,6 +2953,82 @@ class Dataset(object):
             Y.append(y)
 
         return [X,Y]
+
+
+
+    def getX_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
+              dataAugmentation=True, debug=False):
+        """
+            Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
+
+            :param set_name: 'train', 'val' or 'test' set
+            :param k: positions of the desired samples
+            :param sorted_batches: If True, it will pick data of the same size
+            :param debug: if True all data will be returned without preprocessing
+
+
+            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
+
+            :param normalization: indicates if we want to normalize the data.
+
+
+            # 'image-features' and 'video-features'-related parameters
+
+            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
+
+
+            # 'raw-image' and 'video'-related parameters
+
+            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
+            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
+
+            :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k' samples belonging to the chosen 'set_name'
+        """
+
+        self.__checkSetName(set_name)
+        self.__isLoaded(set_name, 0)
+        self.__isLoaded(set_name, 1)
+
+        # Recover input samples
+        X = []
+        for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
+            ghost_x = False
+            if id_in in self.optional_inputs:
+                try:
+                    x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+                except:
+                    x = [[]] * len(k)
+                    ghost_x = True
+            else:
+                x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+
+            #if(set_name=='val'):
+            #    logging.info(x)
+
+            # Pre-process inputs
+            if not debug and not ghost_x:
+                if type_in == 'raw-image':
+                    daRandomParams = None
+                    if dataAugmentation:
+                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
+                elif type_in == 'video':
+                    x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
+                                        normalization_type, normalization, meanSubstraction, dataAugmentation)
+                elif type_in == 'text':
+                    x = self.loadText(x, self.vocabulary[id_in],
+                                      self.max_text_len[id_in][set_name], self.text_offset[id_in],
+                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
+                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
+                elif type_in == 'image-features':
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
+                elif type_in == 'video-features':
+                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
+                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
+            X.append(x)
+
+        return X
+
 
     def getY(self, set_name, init, final, normalization_type='0-1', normalization=False, meanSubstraction=True,
               dataAugmentation=True, debug=False):

@@ -1541,31 +1541,47 @@ class Model_Wrapper(object):
         '''
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
-                          'normalize': False, 'mean_substraction': True, 'n_samples': None,
+        default_params = {'batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'n_samples': None,
                           'predict_on_sets': ['val']}
         params = self.checkParameters(parameters, default_params)
-
         predictions = dict()
         for s in params['predict_on_sets']:
             predictions[s] = []
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
             # Calculate how many interations are we going to perform
-            if default_params['n_samples'] is None:
+            if params['n_samples'] is None:
                 n_samples = eval("ds.len_"+s)
+                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                # Prepare data generator
+                data_gen = Data_Batch_Generator(s,
+                                                self,
+                                                ds,
+                                                num_iterations,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=True).generator()
+
             else:
-                n_samples = default_params['n_samples']
-
-            num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
-            # Prepare data generator
-            data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                     batch_size=params['batch_size'],
-                                     normalization=params['normalize'],
-                                     data_augmentation=False,
-                                     mean_substraction=params['mean_substraction'],
-                                     predict=True).generator()
-
+                n_samples = params['n_samples']
+                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                # Prepare data generator
+                data_gen = Data_Batch_Generator(s,
+                                            self,
+                                            ds,
+                                            num_iterations,
+                                            batch_size=params['batch_size'],
+                                            normalization=params['normalize'],
+                                            data_augmentation=False,
+                                            mean_substraction=params['mean_substraction'],
+                                            predict=True,
+                                            random_samples=n_samples).generator()
             # Predict on model
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,
@@ -1654,19 +1670,12 @@ class Model_Wrapper(object):
             scores = scores['output']
 
         if sampling_type == 'multinomial':
-            logscores = np.log(scores) / temperature
-            # numerically stable version
-            normalized_logscores= logscores - np.max(logscores, axis=-1)[:, np.newaxis]
-            margin_logscores = np.sum(np.exp(normalized_logscores),axis=-1)
-            probs = np.exp(normalized_logscores) / margin_logscores[:, np.newaxis]
-
-            #probs = probs.astype('float32')
-            draws = np.zeros_like(probs)
-            num_samples = probs.shape[0]
-            # we use 1 trial to mimic categorical distributions using multinomial
-            for k in xrange(num_samples):
-                draws[k, :] = np.random.multinomial(1,probs[k,:],1)
-            return np.argmax(draws, axis=-1)
+            preds = np.asarray(scores).astype('float64')
+            preds = np.log(preds) / temperature
+            exp_preds = np.exp(preds)
+            preds = exp_preds / np.sum(exp_preds)
+            probas = np.random.multinomial(1, preds, 1)
+            return np.argmax(probas)
         elif sampling_type == 'max_likelihood':
             return np.argmax(scores, axis=-1)
         else:
@@ -1686,9 +1695,10 @@ class Model_Wrapper(object):
         if verbose > 0:
             logging.info('Decoding prediction ...')
         flattened_preds = preds.reshape(-1, preds.shape[-1])
-        flattened_answer_pred = map(lambda x: index2word[x], self.sampling(scores=flattened_preds,
-                                                                          sampling_type=sampling_type,
-                                                                          temperature=temperature))
+        flattened_answer_pred = map(lambda x: index2word[x],
+                                    self.sampling(scores=flattened_preds,
+                                                  sampling_type=sampling_type,
+                                                  temperature=temperature))
         answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:2])
         answer_pred = []
         EOS = '<eos>'
