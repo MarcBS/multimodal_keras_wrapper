@@ -1522,30 +1522,49 @@ class Model_Wrapper(object):
         '''
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
-                          'normalize': False, 'mean_substraction': True, 'n_samples': None,
+        default_params = {'batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'n_samples': None,
                           'predict_on_sets': ['val']}
         params = self.checkParameters(parameters, default_params)
-
         predictions = dict()
         for s in params['predict_on_sets']:
             predictions[s] = []
 
             logging.info("<<< Predicting outputs of "+s+" set >>>")
             # Calculate how many interations are we going to perform
-            if default_params['n_samples'] is None:
+            if params['n_samples'] is None:
                 n_samples = eval("ds.len_"+s)
-            else:
-                n_samples = default_params['n_samples']
+                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                # Prepare data generator
+                data_gen = Data_Batch_Generator(s,
+                                                self,
+                                                ds,
+                                                num_iterations,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=True).generator()
 
-            num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
-            # Prepare data generator
-            data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                     batch_size=params['batch_size'],
-                                     normalization=params['normalize'],
-                                     data_augmentation=False,
-                                     mean_substraction=params['mean_substraction'],
-                                     predict=True).generator()
+            else:
+                n_samples = params['n_samples']
+                print "n_samples"
+                print "params",params
+                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                # Prepare data generator
+                data_gen = Data_Batch_Generator(s,
+                                            self,
+                                            ds,
+                                            num_iterations,
+                                            batch_size=params['batch_size'],
+                                            normalization=params['normalize'],
+                                            data_augmentation=False,
+                                            mean_substraction=params['mean_substraction'],
+                                            predict=True,
+                                            random_samples=n_samples).generator()
 
             # Predict on model
             if postprocess_fun is None:

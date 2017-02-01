@@ -651,7 +651,7 @@ class SampleEachNUpdates(KerasCallback):
 
     def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=dict(),
                  is_text=False, index2word_y=None, input_text_id=None, sampling='max_likelihood',
-                 beam_search=False, batch_size=50, reload_epoch=0, start_sampling_on_epoch=0,
+                 beam_search=False, batch_size=50, reload_epoch=0, start_sampling_on_epoch=0, is_3DLabel=False,
                  write_type='list', sampling_type='max_likelihood', out_pred_idx=None, in_pred_idx=None, verbose=1):
         """
             :param model: model to evaluate
@@ -664,6 +664,8 @@ class SampleEachNUpdates(KerasCallback):
             :param extra_vars: dictionary of extra variables
             :param is_text: defines if the predicted info is of type text
                             (in that case the data will be converted from values into a textual representation)
+            :param is_3DLabel: defines if the predicted info is of type 3DLabels
+
             :param index2word_y: mapping from the indices to words (only needed if is_text==True)
             :param sampling: sampling mechanism used (only used if is_text==True)
             :param out_pred_idx: index of the output prediction used for evaluation
@@ -686,6 +688,7 @@ class SampleEachNUpdates(KerasCallback):
         self.set_name = set_name
         self.n_samples = n_samples
         self.each_n_updates = each_n_updates
+        self.is_3DLabel = is_3DLabel
         self.extra_vars = extra_vars
         self.reload_epoch = reload_epoch
         self.start_sampling_on_epoch = start_sampling_on_epoch
@@ -705,19 +708,21 @@ class SampleEachNUpdates(KerasCallback):
 
         # Evaluate on each set separately
         for s in self.set_name:
-
             # Apply model predictions
             params_prediction = {'batch_size': self.batch_size,
                                  'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                  'predict_on_sets': [s],
                                  'n_samples': self.n_samples}
-
             if self.beam_search:
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions, truths, data = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
-                raise NotImplementedError()
-
+                # Convert predictions
+                postprocess_fun = None
+                if (self.is_3DLabel):
+                    postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
+                predictions = \
+                    self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
             gt_y = eval('self.ds.Y_'+s+'["'+self.gt_id+'"]')
             predictions = predictions[s]
             if(self.is_text):
