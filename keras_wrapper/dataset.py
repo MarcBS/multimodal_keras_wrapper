@@ -404,8 +404,12 @@ class Dataset(object):
                                         'video',  'video-features',
                                         'text',
                                         'id', 'ghost', 'file-name']
-        self.__accepted_types_outputs = ['categorical', 'binary', 'real', 'text', '3DLabel', '3DSemanticLabel', 'id', 'file-name']
-        #    inputs/outputs with type 'id' is only used for storing external identifiers for your data 
+        self.__accepted_types_outputs = ['categorical', 'binary',
+                                         'real',
+                                         'text',
+                                         '3DLabel', '3DSemanticLabel',
+                                         'id', 'file-name']
+        #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
         
         # List of implemented input normalization functions
@@ -691,7 +695,7 @@ class Dataset(object):
             # 'text'-related parameters
             
             :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
-            :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
+            :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text'). A previously calculated vocabulary will be used if build_vocabulary is an 'id' from a previously loaded input/output
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
             :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
             :param offset: number of timesteps that the text is shifted to the right (for sequential conditional models, which take as input the previous output)
@@ -713,13 +717,14 @@ class Dataset(object):
         
         # Insert type and id of input data
         keys_X_set = eval('self.X_'+set_name+'.keys()')
-        if id not in self.ids_inputs or overwrite_split:
+        if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
-            if not required:
-                self.optional_inputs.append(id)
         elif id in keys_X_set and not overwrite_split:
             raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+
+        if not required:
+            self.optional_inputs.append(id)
 
         if type not in self.__accepted_types_inputs:
             raise NotImplementedError('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
@@ -745,15 +750,16 @@ class Dataset(object):
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data,repeat_set))
         
-        self.__setInput(data, set_name, type, id)
+        self.__setInput(data, set_name, type, id, overwrite_split)
         
     
-    def __setInput(self, set, set_name, type, id):
+    def __setInput(self, set, set_name, type, id, overwrite_split):
         exec('self.X_'+set_name+'[id] = set')
         exec('self.loaded_'+set_name+'[0] = True')
         if id not in self.optional_inputs:
             exec('self.len_'+set_name+' = len(set)')
-            self.__checkLengthSet(set_name)
+            if not overwrite_split:
+                self.__checkLengthSet(set_name)
         
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
@@ -770,6 +776,7 @@ class Dataset(object):
             raise Exception('An input with id "'+id+'" does not exist in the Database.')
         if not self.silence:
             logging.info('Removed "' + set_name + '" set input of type "' + type + '" with id "'+ id + '.')
+
     def setLabels(self, labels_list, set_name, type='categorical', id='label'):
         """
             DEPRECATED
@@ -850,7 +857,7 @@ class Dataset(object):
 
         # Insert type and id of output data
         keys_Y_set = eval('self.Y_'+set_name+'.keys()')
-        if id not in self.ids_outputs or overwrite_split:
+        if id not in self.ids_outputs:
             self.ids_outputs.append(id)
             self.types_outputs.append(type)
         elif id in keys_Y_set and not overwrite_split:
@@ -884,14 +891,15 @@ class Dataset(object):
         if self.sample_weights.get(id) is None:
             self.sample_weights[id] = dict()
         self.sample_weights[id][set_name] = sample_weights
-        self.__setOutput(data, set_name, type, id)
+        self.__setOutput(data, set_name, type, id, overwrite_split)
 
     
-    def __setOutput(self, labels, set_name, type, id):
+    def __setOutput(self, labels, set_name, type, id, overwrite_split):
         exec('self.Y_'+set_name+'[id] = labels')
         exec('self.loaded_'+set_name+'[1] = True')
         exec('self.len_'+set_name+' = len(labels)')
-        self.__checkLengthSet(set_name)
+        if not overwrite_split:
+            self.__checkLengthSet(set_name)
         
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set outputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
@@ -1113,6 +1121,8 @@ class Dataset(object):
             with open(annotations_list, 'r') as list_:
                 for line in list_:
                     sentences.append(line.rstrip('\n'))
+        elif isinstance(annotations_list, list):
+            sentences = annotations_list
         else:
             raise Exception('Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences. '
                             'It currently is: %s'%(str(annotations_list)))
@@ -3122,8 +3132,8 @@ class Dataset(object):
             if lengths[1:] != lengths[:-1]:
                 raise Exception('Inputs and outputs size '
                                 '('+str(lengths)+') for "'+set_name+ '" set do not match.\n'
-                                                                     '\t Inputs:' + str(self.ids_inputs)+''
-                                                                                                         '\t Outputs:' + str(self.ids_outputs))
+                                '\t Inputs:' + str(self.ids_inputs)+''
+                                '\t Outputs:' + str(self.ids_outputs))
 
                 
     def __getNextSamples(self, k, set_name):
