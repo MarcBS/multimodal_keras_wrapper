@@ -694,14 +694,14 @@ class SampleEachNUpdates(KerasCallback):
         self.sampling_type = sampling_type
         self.out_pred_idx = out_pred_idx
         self.in_pred_idx = in_pred_idx
+        self.cum_update = 0
         self.verbose = verbose
 
     def on_batch_end(self, n_update, logs={}):
-        n_update += 1  # start by index 1
-        n_update += self.reload_epoch
-        if n_update < self.start_sampling_on_epoch:
+        self.cum_update += 1
+        if n_update < self.start_sampling_on_epoch + self.reload_epoch:
             return
-        elif n_update % self.each_n_updates != 0:
+        elif self.cum_update % self.each_n_updates != 0:
             return
 
         # Evaluate on each set separately
