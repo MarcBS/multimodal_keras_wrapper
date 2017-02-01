@@ -1570,8 +1570,6 @@ class Model_Wrapper(object):
 
             else:
                 n_samples = params['n_samples']
-                print "n_samples"
-                print "params",params
                 num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
                 # Prepare data generator
                 data_gen = Data_Batch_Generator(s,
@@ -1584,7 +1582,6 @@ class Model_Wrapper(object):
                                             mean_substraction=params['mean_substraction'],
                                             predict=True,
                                             random_samples=n_samples).generator()
-
             # Predict on model
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,
