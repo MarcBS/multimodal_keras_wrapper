@@ -650,9 +650,9 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
 class SampleEachNUpdates(KerasCallback):
 
     def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=dict(),
-                 is_text=False, index2word_y=None, sampling='max_likelihood', beam_search=False, batch_size=50,
-                 reload_epoch=0, start_sampling_on_epoch=0, write_type='list', sampling_type='max_likelihood',
-                 out_pred_idx=None, verbose=1):
+                 is_text=False, index2word_y=None, input_text_id=None, sampling='max_likelihood',
+                 beam_search=False, batch_size=50, reload_epoch=0, start_sampling_on_epoch=0,
+                 write_type='list', sampling_type='max_likelihood', out_pred_idx=None, in_pred_idx=None, verbose=1):
         """
             :param model: model to evaluate
             :param dataset: instance of the class Dataset in keras_wrapper.dataset
@@ -662,18 +662,23 @@ class SampleEachNUpdates(KerasCallback):
             :param n_samples: batch size used during sampling
             :param each_n_updates: sampling each this number of epochs
             :param extra_vars: dictionary of extra variables
-            :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
+            :param is_text: defines if the predicted info is of type text
+                            (in that case the data will be converted from values into a textual representation)
             :param index2word_y: mapping from the indices to words (only needed if is_text==True)
             :param sampling: sampling mechanism used (only used if is_text==True)
-            :param out_pred_idx: index of the output prediction used for evaluation (only applicable if model has more than one output, else set to None)
+            :param out_pred_idx: index of the output prediction used for evaluation
+                            (only applicable if model has more than one output, else set to None)
             :param reload_epoch: number o the epoch reloaded (0 by default)
             :param start_sampling_on_epoch: only starts evaluating model if a given epoch has been reached
+            :param in_pred_idx: index of the input prediction used for evaluation
+                            (only applicable if model has more than one input, else set to None)
             :param verbose: verbosity level; by default 1
         """
         self.model_to_eval = model
         self.ds = dataset
         self.gt_id = gt_id
         self.index2word_y = index2word_y
+        self.input_text_id = input_text_id
         self.is_text = is_text
         self.sampling = sampling
         self.beam_search = beam_search
@@ -687,6 +692,7 @@ class SampleEachNUpdates(KerasCallback):
         self.write_type = write_type
         self.sampling_type = sampling_type
         self.out_pred_idx = out_pred_idx
+        self.in_pred_idx = in_pred_idx
         self.verbose = verbose
 
     def on_batch_end(self, n_update, logs={}):
