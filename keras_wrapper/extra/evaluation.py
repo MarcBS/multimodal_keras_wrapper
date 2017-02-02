@@ -1,4 +1,4 @@
-#from vqaEval import VQAEval
+# from vqaEval import VQAEval
 
 # supported evaluators
 import json
@@ -16,6 +16,7 @@ import numpy as np
 from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
 from localization_utilities import *
+
 
 ########################################
 # EVALUATION FUNCTIONS SELECTOR
@@ -39,7 +40,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
 
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
-        (Meteor(language=extra_vars['language']),"METEOR"),
+        (Meteor(language=extra_vars['language']), "METEOR"),
         (Rouge(), "ROUGE_L"),
         (Cider(), "CIDEr")
     ]
@@ -54,10 +55,10 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
             final_scores[method] = score
 
     if verbose > 0:
-        logging.info('Computing coco scores on the %s split...' %(split))
+        logging.info('Computing coco scores on the %s split...' % (split))
     for metric in sorted(final_scores):
         value = final_scores[metric]
-        logging.info(metric +': ' + str(value))
+        logging.info(metric + ': ' + str(value))
 
     return final_scores
 
@@ -77,29 +78,30 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
     '''
     quesFile = extra_vars[split]['quesFile']
     annFile = extra_vars[split]['annFile']
-    
+
     # create temporal resFile
     resFile = 'tmp_res_file.json'
     list2vqa(resFile, pred_list, extra_vars[split]['question_ids'])
-    
+
     # create vqa object and vqaRes object
     vqa_ = visual_qa.VQA(annFile, quesFile)
     vqaRes = vqa_.loadRes(resFile, quesFile)
-    vqaEval_ = vqaEval.VQAEval(vqa_, vqaRes, n=2)   #n is precision of accuracy (number of places after decimal), default is 2
+    vqaEval_ = vqaEval.VQAEval(vqa_, vqaRes,
+                               n=2)  # n is precision of accuracy (number of places after decimal), default is 2
     vqaEval_.evaluate()
-    os.remove(resFile) # remove temporal file
-    
+    os.remove(resFile)  # remove temporal file
+
     # get results
     acc_overall = vqaEval_.accuracy['overall']
     acc_yes_no = vqaEval_.accuracy['perAnswerType']['yes/no']
     acc_number = vqaEval_.accuracy['perAnswerType']['number']
     acc_other = vqaEval_.accuracy['perAnswerType']['other']
-    #acc_per_class = vqaEval_.accuracy['perAnswerClass']
-    #acc_class_normalized = vqaEval_.accuracy['classNormalizedOverall']
+    # acc_per_class = vqaEval_.accuracy['perAnswerClass']
+    # acc_class_normalized = vqaEval_.accuracy['classNormalizedOverall']
 
     if verbose > 0:
-        logging.info('VQA Metric: Accuracy yes/no is {0}, other is {1}, number is {2}, overall is {3}'.\
-                format(acc_yes_no, acc_other, acc_number, acc_overall))#, acc_class_normalized))
+        logging.info('VQA Metric: Accuracy yes/no is {0}, other is {1}, number is {2}, overall is {3}'. \
+                     format(acc_yes_no, acc_other, acc_number, acc_overall))  # , acc_class_normalized))
     return {'overall accuracy': acc_overall,
             'yes/no accuracy': acc_yes_no,
             'number accuracy': acc_number,
@@ -123,7 +125,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     word2idx = extra_vars[split]['word2idx']
     n_classes = len(word2idx)
     n_samples = len(pred_list)
-    
+
     # Create prediction matrix
     y_pred = np.zeros((n_samples, n_classes))
     for i_s, sample in enumerate(pred_list):
@@ -141,10 +143,11 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     rankloss = sklearn_metrics.label_ranking_loss(y_gt, y_pred)
 
     if verbose > 0:
-        logging.info('Coverage Error (best: avg labels per sample = %f): %f' %(np.sum(y_gt)/float(n_samples), coverr))
+        logging.info(
+            'Coverage Error (best: avg labels per sample = %f): %f' % (np.sum(y_gt) / float(n_samples), coverr))
         logging.info('Label Ranking Average Precision (best: 1.0): %f' % avgprec)
         logging.info('Label Ranking Loss (best: 0.0): %f' % rankloss)
-    
+
     return {'coverage error': coverr,
             'average precision': avgprec,
             'ranking loss': rankloss}
@@ -257,7 +260,7 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
             'f1': f1}
     """
 
-    
+
 def averagePrecision(pred_list, verbose, extra_vars, split):
     '''
         Computes a Precision-Recall curve and its associated mAP score given a set of precalculated reports.
@@ -274,23 +277,22 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
                 extra_vars['n_classes'] - number of classes in the detection task
     '''
 
-    thresholds=np.arange(0,1,0.1)
+    thresholds = np.arange(0, 1, 0.1)
     fixedIoU = 0.5
-    
+
     gts = extra_vars[split]['references']
     n_classes = extra_vars['n_classes']
 
     n_samples = len(pred_list)
     n_thresholds = len(thresholds)
-    
+
     # prepare variables for storing all precision-recall values
     general_measures = [[] for j in range(n_thresholds)]
     class_measures = [[] for j in range(n_thresholds)]
-    
-    
+
     # compute precision-recall measures for each min_prediction_score threshold
     for thres in range(n_thresholds):
-        
+
         # Counters for computing general precision-recall curve
         FP = 0
         TP = 0
@@ -304,7 +306,7 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
         FN_classes = np.zeros((n_classes,))
         total_GT_classes = np.zeros((n_classes,))
         total_pred_classes = np.zeros((n_classes,))
-        
+
         for s in range(n_samples):
 
             # Re-use report of the current image provided in the parameters (or recently computed)
@@ -325,7 +327,8 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
             predicted_scores = aux_predicted_scores
 
             # Compute TPs, FPs and FNs
-            [TP_, FP_, FN_, TP_c, FP_c, FN_c] = _computeMeasures(fixedIoU, n_classes, predicted_bboxes, predicted_Y, predicted_scores, GT_bboxes, GT_Y)
+            [TP_, FP_, FN_, TP_c, FP_c, FN_c] = _computeMeasures(fixedIoU, n_classes, predicted_bboxes, predicted_Y,
+                                                                 predicted_scores, GT_bboxes, GT_Y)
 
             total_GT += len(GT_bboxes)
             total_pred += len(predicted_bboxes)
@@ -342,22 +345,20 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
                 total_GT_classes[y] += 1
             for y in predicted_Y:
                 total_pred_classes[y] += 1
-        
-    
+
         # Compute general precision / recall / accuracy measures
-        if((TP+FP) == 0):
+        if ((TP + FP) == 0):
             precision = 0.0
         else:
-            precision = float(TP)/(TP+FP)
-        if((TP+FN) == 0):
+            precision = float(TP) / (TP + FP)
+        if ((TP + FN) == 0):
             recall = 0.0
         else:
-            recall = float(TP)/(TP+FN)
-        if((FP+FN+TP) == 0):
+            recall = float(TP) / (TP + FN)
+        if ((FP + FN + TP) == 0):
             accuracy = 0.0
         else:
-            accuracy = float(TP)/(FP+FN+TP)
-
+            accuracy = float(TP) / (FP + FN + TP)
 
         # Compute class-specific precision - recall
         precision_classes = np.zeros((n_classes,))
@@ -367,22 +368,23 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
             TP = TP_classes[c]
             FP = FP_classes[c]
             FN = FN_classes[c]
-            if((TP+FP) == 0):
+            if ((TP + FP) == 0):
                 precision_classes[c] = 0.0
             else:
-                precision_classes[c] = float(TP)/(TP+FP)
-            if((TP+FN) == 0):
+                precision_classes[c] = float(TP) / (TP + FP)
+            if ((TP + FN) == 0):
                 recall_classes[c] = 0.0
             else:
-                recall_classes[c] = float(TP)/(TP+FN)
-            if((FP+FN+TP) == 0):
+                recall_classes[c] = float(TP) / (TP + FN)
+            if ((FP + FN + TP) == 0):
                 accuracy_classes[c] = 0.0
             else:
-                accuracy_classes[c] = float(TP)/(FP+FN+TP)
-        
+                accuracy_classes[c] = float(TP) / (FP + FN + TP)
+
         # store results
         general_measures[thres] = [precision, recall, accuracy, total_GT, total_pred]
-        class_measures[thres] = [precision_classes, recall_classes, accuracy_classes, total_GT_classes, total_pred_classes]
+        class_measures[thres] = [precision_classes, recall_classes, accuracy_classes, total_GT_classes,
+                                 total_pred_classes]
 
     # Compute average precision (AP) (adapted from PASCAL VOC evaluation code VOCap.m)
     prec = [general_measures[thres][0] for thres in range(n_thresholds)][::-1]
@@ -400,27 +402,27 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
 
     if verbose > 0:
         logging.info('Average Precision (AP): %f' % (AP))
-        logging.info('Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n\tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
-                     (thresholds[5],
-                      general_measures[5][0], general_measures[5][1], general_measures[5][2],
-                      general_measures[5][3], general_measures[5][4]))
+        logging.info(
+            'Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n\tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
+            (thresholds[5],
+             general_measures[5][0], general_measures[5][1], general_measures[5][2],
+             general_measures[5][3], general_measures[5][4]))
 
     return_dict = dict()
     return_dict['AP'] = AP
     for thres in range(n_thresholds):
-        return_dict['precision_'+str(thres)] = general_measures[thres][0]
-        return_dict['recall_'+str(thres)] = general_measures[thres][1]
-        return_dict['accuracy_'+str(thres)] = general_measures[thres][2]
-        return_dict['total_GT_'+str(thres)] = general_measures[thres][3]
-        return_dict['total_pred_'+str(thres)] = general_measures[thres][4]
+        return_dict['precision_' + str(thres)] = general_measures[thres][0]
+        return_dict['recall_' + str(thres)] = general_measures[thres][1]
+        return_dict['accuracy_' + str(thres)] = general_measures[thres][2]
+        return_dict['total_GT_' + str(thres)] = general_measures[thres][3]
+        return_dict['total_pred_' + str(thres)] = general_measures[thres][4]
         for c in range(n_classes):
-            return_dict['precision_'+str(thres)+'_'+str(c)] = class_measures[thres][0][c]
-            return_dict['recall_'+str(thres)+'_'+str(c)] = class_measures[thres][1][c]
-            return_dict['accuracy_'+str(thres)+'_'+str(c)] = class_measures[thres][2][c]
-            return_dict['total_GT_'+str(thres)+'_'+str(c)] = class_measures[thres][3][c]
-            return_dict['total_pred_'+str(thres)+'_'+str(c)] = class_measures[thres][4][c]
-                    
-                    
+            return_dict['precision_' + str(thres) + '_' + str(c)] = class_measures[thres][0][c]
+            return_dict['recall_' + str(thres) + '_' + str(c)] = class_measures[thres][1][c]
+            return_dict['accuracy_' + str(thres) + '_' + str(c)] = class_measures[thres][2][c]
+            return_dict['total_GT_' + str(thres) + '_' + str(c)] = class_measures[thres][3][c]
+            return_dict['total_pred_' + str(thres) + '_' + str(c)] = class_measures[thres][4][c]
+
     return return_dict
 
 
@@ -446,17 +448,17 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
     TP = 0
     FP = 0
     FN = 0
-    
+
     # Class-specific counters
     TP_classes = np.zeros((n_classes))
     FP_classes = np.zeros((n_classes))
     FN_classes = np.zeros((n_classes))
-    
-    if(len(predicted_Y) > 0):
+
+    if (len(predicted_Y) > 0):
         using_recognition = True
     else:
         using_recognition = False
-    
+
     # Compute IoU for each pair of bounding boxes in (GT, pred)
     iou_values = []
     pred_ids = []
@@ -467,54 +469,54 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
             iou_values.append(computeIoU(gt, pred))
             pred_ids.append(j)
             match_bboxes.append([i, j])
-    
+
     # Compute matchings (sorted by IoU)
-    final_matches = [] # stores the final indices for [gt,pred] matches
+    final_matches = []  # stores the final indices for [gt,pred] matches
     matched_gt = [False for i in range(len(GT_bboxes))]
     matched_pred = [False for i in range(len(predicted_bboxes))]
-    #max_iou = np.argsort(np.array(iou_values, dtype=np.float))[::-1]
+    # max_iou = np.argsort(np.array(iou_values, dtype=np.float))[::-1]
     max_scores = np.argsort(np.array(predicted_scores, dtype=np.float))[::-1]
-    
+
     # Sort predictions by "scores"
     i = 0
-    while(i < len(max_scores) and not all(matched_gt)):
-        #m = match_bboxes[max_iou[i]]
+    while (i < len(max_scores) and not all(matched_gt)):
+        # m = match_bboxes[max_iou[i]]
         this_pred_id = max_scores[i]
-        m_list = [[p_, match_bboxes[p_]] for p_,p in enumerate(pred_ids) if p==this_pred_id]
-        this_iou = [iou_values[p] for p,m in m_list]
+        m_list = [[p_, match_bboxes[p_]] for p_, p in enumerate(pred_ids) if p == this_pred_id]
+        this_iou = [iou_values[p] for p, m in m_list]
         max_iou = np.argsort(np.array(this_iou, dtype=np.float))[::-1]
-        
+
         # Sort GT by IoU
         j = 0
-        while(j < len(max_iou) and not matched_pred[this_pred_id]): # if pred has not been matched yet
+        while (j < len(max_iou) and not matched_pred[this_pred_id]):  # if pred has not been matched yet
             j_ind = max_iou[j]
-            if(this_iou[j_ind] > IoU and not matched_gt[m_list[j_ind][1][0]]):
+            if (this_iou[j_ind] > IoU and not matched_gt[m_list[j_ind][1][0]]):
                 # Assign match
                 matched_gt[m_list[j_ind][1][0]] = True
                 matched_pred[this_pred_id] = True
                 final_matches.append(m_list[j_ind][1])
             j += 1
         i += 1
-        
+
     # Compute FPs, FNs and TPs on the current image
     for m in matched_gt:
-        if(m):
+        if (m):
             TP += 1
         else:
             FN += 1
     for m in matched_pred:
-        if(not m):
+        if (not m):
             FP += 1
 
     # Compute class-specific counters
-    if(using_recognition):
+    if (using_recognition):
         # Check matching pairs
         for m in final_matches:
             y_gt = GT_Y[m[0]]
             y_pred = predicted_Y[m[1]]
-            
+
             # GT and pred coincide
-            if(y_gt == y_pred):
+            if (y_gt == y_pred):
                 TP_classes[y_gt] += 1
             # Missclassified but correctly localized
             else:
@@ -522,16 +524,15 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
                 FP_classes[y_pred] += 1
         # Check missed GT bboxes
         for i, m in enumerate(matched_gt):
-            if(not m):
+            if (not m):
                 FN_classes[GT_Y[i]] += 1
         # Check mislocalized Pred bboxes
         for i, m in enumerate(matched_pred):
-            if(not m):
+            if (not m):
                 FP_classes[predicted_Y[i]] += 1
 
-
     return [TP, FP, FN, TP_classes, FP_classes, FN_classes]
-        
+
 
 def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
     """
@@ -545,20 +546,22 @@ def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
 
     if mask is not None:
         y_pred /= np.sum(y_pred, axis=-1, keepdims=True)
-        mask = np.reshape(mask, y_true.shape[:-1])[:,:,None]
-        truth_mask = (y_true*mask).flatten().nonzero()[0]
+        mask = np.reshape(mask, y_true.shape[:-1])[:, :, None]
+        truth_mask = (y_true * mask).flatten().nonzero()[0]
         predictions = y_pred.flatten()[truth_mask]
         ppl = np.power(2, np.mean(-np.log2(predictions)))
         if verbose > 0:
-            logging.info('Computing perplexity scores on the %s split...' %(split))
+            logging.info('Computing perplexity scores on the %s split...' % (split))
             logging.info('PPL: ' + str(ppl))
         return ppl
     else:
         ppl = np.power(2, np.mean(-np.log2(y_pred)))
         if verbose > 0:
-            logging.info('Computing perplexity scores on the %s split...' %(split))
+            logging.info('Computing perplexity scores on the %s split...' % (split))
             logging.info('PPL: ' + str(ppl))
         return ppl
+
+
 ########################################
 # AUXILIARY FUNCTIONS
 ########################################
@@ -574,15 +577,17 @@ def vqa_store(question_id_list, answer_list, path):
     """
     question_answer_pairs = []
     assert len(question_id_list) == len(answer_list), \
-            'must be the same number of questions and answers'
-    for q,a in zip(question_id_list, answer_list):
-        question_answer_pairs.append({'question_id':q, 'answer':str(a)})
-    with open(path,'w') as f:
+        'must be the same number of questions and answers'
+    for q, a in zip(question_id_list, answer_list):
+        question_answer_pairs.append({'question_id': q, 'answer': str(a)})
+    with open(path, 'w') as f:
         json.dump(question_answer_pairs, f)
+
 
 def caption_store(samples, path):
     with open(path, 'w') as f:
-            print >>f, '\n'.join(samples)
+        print >> f, '\n'.join(samples)
+
 
 # List of evaluation functions and their identifiers (will be used in params['METRICS'])
 select = {
@@ -595,4 +600,3 @@ select = {
     'ppl': compute_perplexity,
 
 }
-
