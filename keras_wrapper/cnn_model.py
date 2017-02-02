@@ -1054,10 +1054,10 @@ class Model_Wrapper(object):
         # Choose model to use for sampling
         ##########################################
         model = self.model
-        for model_input in params['model_inputs'][:-1]:
+        for model_input in params['model_inputs']:
             if X[model_input].shape[0] == 1:
                 in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
-        in_data[params['model_inputs'][-1]] = states_below
+        in_data[params['model_inputs'][params['state_below_index']]] = states_below
 
         ##########################################
         # Recover output identifiers
@@ -1146,7 +1146,7 @@ class Model_Wrapper(object):
             for model_input in params['model_inputs'][:-1]:
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
-            in_data[params['model_inputs'][-1]] = states_below.reshape(n_samples, 1)
+            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, 1)
         elif ii == 1:  # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
@@ -1401,7 +1401,8 @@ class Model_Wrapper(object):
                           'heuristic': 0,
                           'mapping': None,
                           'conditional_intersample': False,
-                          'link_index_id': 'link_index'
+                          'link_index_id': 'link_index',
+                          'state_below_index': -1
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -1423,7 +1424,7 @@ class Model_Wrapper(object):
                     "- ids_outputs_next\n")
 
         # Check if the model is ready for applying a conditional intersample search
-        if params['optimized_search']:
+        if params['conditional_intersample']:
             if 'matchings_sample_to_next_sample' not in dir(self) or \
                             'ids_conditional_inputs' not in dir(self) or \
                             'ids_conditional_outputs' not in dir(self):
@@ -1433,14 +1434,13 @@ class Model_Wrapper(object):
                     "- ids_conditional_inputs\n",
                     "- ids_conditional_outputs\n")
 
-
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("<<< Predicting outputs of " + s + " set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
             if not params['optimized_search']:  # use optimized search model if available
                 assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
-            params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][-1]]
+            params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
                 n_samples = eval("ds.len_" + s)
@@ -1536,7 +1536,7 @@ class Model_Wrapper(object):
                             previous_outputs[output_id] = best_sample
 
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
-            total_cost, total_cost / n_samples))
+                total_cost, total_cost / n_samples))
             sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
                 time.time() - start_time) / n_samples))
 
