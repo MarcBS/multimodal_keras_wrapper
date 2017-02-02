@@ -10,11 +10,14 @@ Modified by: Marc Bola\~nos
 
 import json
 import numpy as np
+
+
 ###
 # Helpers
 ###
 def _dirac(pred, gt):
-    return int(pred==gt)
+    return int(pred == gt)
+
 
 ###
 # Main functions
@@ -24,36 +27,38 @@ def file2list(filepath):
         lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0]
     return lines
 
+
 def numpy2file(filepath, mylist, permission='w'):
     mylist = np.asarray(mylist)
     with open(filepath, permission) as f:
         np.save(f, mylist)
 
-def listoflists2file(filepath,mylist,permission='w'):
+
+def listoflists2file(filepath, mylist, permission='w'):
     mylist = [str(sublist) for sublist in mylist]
     mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
-        mylist=mylist.encode('utf-8')
-    with open(filepath,permission) as f:
+        mylist = mylist.encode('utf-8')
+    with open(filepath, permission) as f:
         f.writelines(mylist)
 
-        
-def list2file(filepath,mylist,permission='w'):
+
+def list2file(filepath, mylist, permission='w'):
     mylist = [str(l) for l in mylist]
-    mylist='\n'.join(mylist)
+    mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
-        mylist=mylist.encode('utf-8')
-    with open(filepath,permission) as f:
+        mylist = mylist.encode('utf-8')
+    with open(filepath, permission) as f:
         f.writelines(mylist)
 
-        
-def list2vqa(filepath,mylist,qids,permission='w'):
+
+def list2vqa(filepath, mylist, qids, permission='w'):
     res = []
     for ans, qst in zip(mylist, qids):
         res.append({'answer': ans, 'question_id': int(qst)})
-    with open(filepath,permission) as f:
+    with open(filepath, permission) as f:
         json.dump(res, f)
-        
+
 
 def dump_hdf5_simple(filepath, dataset_name, data):
     import h5py
@@ -71,8 +76,8 @@ def load_hdf5_simple(filepath, dataset_name):
 
 
 def pickle_model(
-        path, 
-        model, 
+        path,
+        model,
         word2index_x,
         word2index_y,
         index2word_x,
@@ -81,7 +86,7 @@ def pickle_model(
     import cPickle as pickle
     modifier = 10
     tmp = sys.getrecursionlimit()
-    sys.setrecursionlimit(tmp*modifier)
+    sys.setrecursionlimit(tmp * modifier)
     with open(path, 'wb') as f:
         p_dict = {'model': model,
                   'word2index_x': word2index_x,
@@ -154,8 +159,8 @@ def text_to_model(filepath):
     pass
 
 
-def print_qa(questions, answers_gt, answers_gt_original, answers_pred, 
-        era, similarity=_dirac, path=''):
+def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
+             era, similarity=_dirac, path=''):
     """
     In:
         questions - list of questions
@@ -170,22 +175,22 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
     Out:
         the similarity score
     """
-    assert(len(questions)==len(answers_gt))
-    assert(len(questions)==len(answers_pred))
-    output=['-'*50, 'Era {0}'.format(era)]
+    assert (len(questions) == len(answers_gt))
+    assert (len(questions) == len(answers_pred))
+    output = ['-' * 50, 'Era {0}'.format(era)]
     score = 0.0
     for k, q in enumerate(questions):
-        a_gt=answers_gt[k]
-        a_gt_original=answers_gt_original[k]
-        a_p=answers_pred[k]
+        a_gt = answers_gt[k]
+        a_gt_original = answers_gt_original[k]
+        a_p = answers_pred[k]
         score += _dirac(a_p, a_gt_original)
         if type(q[0]) is unicode:
             tmp = unicode(
-                    'question: {0}\nanswer: {1}\nanswer_original: {2}\nprediction: {3}\n')
+                'question: {0}\nanswer: {1}\nanswer_original: {2}\nprediction: {3}\n')
         else:
             tmp = 'question: {0}\nanswer: {1}\nanswer_original: {2}\nprediction: {3}\n'
         output.append(tmp.format(q, a_gt, a_gt_original, a_p))
-    score = (score / len(questions))*100.0
+    score = (score / len(questions)) * 100.0
     output.append('Score: {0}'.format(score))
     if path == '':
         print('%s' % '\n'.join(map(str, output)))
@@ -203,13 +208,14 @@ def dict2file(mydict, path, title=None):
             useful if we write many dictionaries
             into the same file
     """
-    tmp = [str(x[0])+':'+str(x[1]) for x in mydict.items()]
+    tmp = [str(x[0]) + ':' + str(x[1]) for x in mydict.items()]
     if title is not None:
         output_list = [title]
         output_list.extend(tmp)
     else:
         output_list = tmp
     list2file(path, output_list, 'a')
+
 
 def dict2pkl(mydict, path):
     """
@@ -236,4 +242,3 @@ def pkl2dict(path):
     """
     import cPickle
     return cPickle.load(open(path))
-
