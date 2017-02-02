@@ -152,9 +152,10 @@ class Data_Batch_Generator(object):
             
             # Recovers a batch of data
             if self.params['random_samples'] > 0:
-                indices = np.random.randint(0, n_samples_split, self.params['random_samples'])
+                num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
+                indices = np.random.randint(0, n_samples_split, num_retrieve)
+                self.params['random_samples'] -= num_retrieve
                 # At sampling from train/val, we always have Y
-
                 if self.predict:
                     X_batch = self.dataset.getX_FromIndices(self.set_split,
                                                             indices,

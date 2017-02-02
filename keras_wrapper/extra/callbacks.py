@@ -567,29 +567,6 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
-            """
-            # Early stop check
-            if self.early_stop and s in ['val', 'validation', 'dev', 'development']:
-                current_score = metrics[self.stop_metric]
-                if current_score > self.best_score:
-                    self.best_score = current_score
-                    self.best_epoch = epoch
-                    self.wait = 0
-                    if self.verbose > 0:
-                        logging.info(
-                            '---current best %s: %.4f' % (self.stop_metric, current_score))
-                else:
-                    if self.wait >= self.patience:
-                        if self.verbose > 0:
-                            logging.info(
-                                '%s %d: early stopping. Best %s value found at %s %d: %.4f' %
-                                (str(counter_name), epoch, self.stop_metric, str(counter_name),
-                                 self.best_epoch, self.best_score))
-                            self.model.stop_training = True
-                    self.wait += 1
-                    if self.verbose > 0:
-                        logging.info('----bad counter: %d/%d' % (self.wait, self.patience))
-            """
 
 ###################################################
 # Storing callbacks
@@ -637,7 +614,7 @@ class SampleEachNUpdates(KerasCallback):
             :param gt_id: identifier in the Dataset instance of the output data about to evaluate
             :param metric_name: name of the performance metric
             :param set_name: name of the set split that will be evaluated
-            :param n_samples: batch size used during sampling
+            :param n_samples: number of samples predicted during sampling
             :param each_n_updates: sampling each this number of epochs
             :param extra_vars: dictionary of extra variables
             :param is_text: defines if the predicted info is of type text
@@ -675,11 +652,15 @@ class SampleEachNUpdates(KerasCallback):
         self.out_pred_idx = out_pred_idx
         self.in_pred_idx = in_pred_idx
         self.cum_update = 0
+        self.epoch_count = 0
         self.verbose = verbose
+
+    def on_epoch_end(self, n_epoch, logs={}):
+        self.epoch_count += 1
 
     def on_batch_end(self, n_update, logs={}):
         self.cum_update += 1
-        if n_update < self.start_sampling_on_epoch + self.reload_epoch:
+        if self.epoch_count + self.reload_epoch < self.start_sampling_on_epoch:
             return
         elif self.cum_update % self.each_n_updates != 0:
             return
@@ -701,7 +682,6 @@ class SampleEachNUpdates(KerasCallback):
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
                 predictions = \
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
-            truths = eval('self.ds.Y_'+s+'["'+self.gt_id+'"]')
             predictions = predictions[s]
             if(self.is_text):
                 if self.out_pred_idx is not None:
