@@ -20,6 +20,7 @@ import numpy as np
 
 from .utils import bbox
 
+
 # ------------------------------------------------------- #
 #       SAVE/LOAD
 #           External functions for saving and loading Dataset instances
@@ -46,12 +47,12 @@ def saveDataset(dataset, store_path):
     :return: None
     """
     create_dir_if_not_exists(store_path)
-    store_path = store_path + '/Dataset_'+ dataset.name +'.pkl'
+    store_path = store_path + '/Dataset_' + dataset.name + '.pkl'
     if not dataset.silence:
-        logging.info("<<< Saving Dataset instance to "+ store_path +" ... >>>")
-    
+        logging.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
+
     pk.dump(dataset, open(store_path, 'wb'))
-    
+
     if not dataset.silence:
         logging.info("<<< Dataset instance saved >>>")
 
@@ -64,12 +65,13 @@ def loadDataset(dataset_path):
     :return: Loaded Dataset object
     """
 
-    logging.info("<<< Loading Dataset instance from "+ dataset_path +" ... >>>")
-    
+    logging.info("<<< Loading Dataset instance from " + dataset_path + " ... >>>")
+
     dataset = pk.load(open(dataset_path, 'rb'))
-    
+
     logging.info("<<< Dataset instance loaded >>>")
     return dataset
+
 
 # ------------------------------------------------------- #
 #       DATA BATCH GENERATOR CLASS
@@ -82,9 +84,9 @@ class Data_Batch_Generator(object):
     """
 
     def __init__(self, set_split, net, dataset, num_iterations,
-                 batch_size=50, 
+                 batch_size=50,
                  normalization=False,
-                 data_augmentation=True, 
+                 data_augmentation=True,
                  mean_substraction=True,
                  predict=False,
                  random_samples=-1,
@@ -108,20 +110,20 @@ class Data_Batch_Generator(object):
         self.net = net
         self.predict = predict
         # Several parameters
-        self.params = {'batch_size': batch_size, 
+        self.params = {'batch_size': batch_size,
                        'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
                        'num_iterations': num_iterations,
                        'random_samples': random_samples,
                        'shuffle': shuffle}
-    
+
     def generator(self):
         """
         Gets and processes the data
         :return: generator with the data
         """
-            
+
         if self.set_split == 'train' and not self.predict:
             data_augmentation = self.params['data_augmentation']
         else:
@@ -130,26 +132,26 @@ class Data_Batch_Generator(object):
         it = 0
         while 1:
 
-            if self.set_split == 'train' and it%self.params['num_iterations']==0 and \
+            if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
                     not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
                 silence = self.dataset.silence
                 self.dataset.silence = True
                 self.dataset.shuffleTraining()
                 self.dataset.silence = silence
-            if it%self.params['num_iterations']==0 and self.params['random_samples'] == -1:
+            if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
                 self.dataset.resetCounters(set_name=self.set_split)
             it += 1
-            
+
             # Checks if we are finishing processing the data split
-            init_sample = (it-1)*self.params['batch_size']
-            final_sample = it*self.params['batch_size']
+            init_sample = (it - 1) * self.params['batch_size']
+            final_sample = it * self.params['batch_size']
             batch_size = self.params['batch_size']
-            n_samples_split = eval("self.dataset.len_"+self.set_split)
+            n_samples_split = eval("self.dataset.len_" + self.set_split)
             if final_sample >= n_samples_split:
                 final_sample = n_samples_split
-                batch_size = final_sample-init_sample
+                batch_size = final_sample - init_sample
                 it = 0
-            
+
             # Recovers a batch of data
             if self.params['random_samples'] > 0:
                 num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
@@ -189,7 +191,7 @@ class Data_Batch_Generator(object):
                                                           dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, Y_batch)
 
-            yield(data)
+            yield (data)
 
 
 class Homogeneous_Data_Batch_Generator(object):
@@ -197,6 +199,7 @@ class Homogeneous_Data_Batch_Generator(object):
     Retrieves batches of the same length.
     Parts of the code borrowed from https://github.com/kelvinxu/arctic-captions/blob/master/homogeneous_data.py
     """
+
     def __init__(self, set_split, net, dataset, num_iterations,
                  batch_size=50, maxlen=100,
                  normalization=False,
@@ -219,35 +222,34 @@ class Homogeneous_Data_Batch_Generator(object):
         self.prepare()
         self.reset()
 
-
-
     def prepare(self):
         self.lengths = []
-        
+
         it = 0
         finished_iterations = False
         while not finished_iterations:
             it += 1
-            
+
             # Checks if we are finishing processing the data split
-            init_sample = (it-1)*self.params['batch_size']
-            final_sample = it*self.params['batch_size']
+            init_sample = (it - 1) * self.params['batch_size']
+            final_sample = it * self.params['batch_size']
             batch_size = self.params['batch_size']
-            n_samples_split = eval("self.dataset.len_"+self.set_split)
+            n_samples_split = eval("self.dataset.len_" + self.set_split)
             if final_sample >= n_samples_split:
                 final_sample = n_samples_split
-                batch_size = final_sample-init_sample
+                batch_size = final_sample - init_sample
                 finished_iterations = True
-            
-            #TODO: Deal with multiple outputs!
+
+            # TODO: Deal with multiple outputs!
             Y_batch = self.dataset.getY(self.set_split, init_sample, final_sample,
-                                    normalization=self.params['normalization'],
-                                    meanSubstraction=self.params['mean_substraction'])[0] # TODO: first output selection, this 0 is harcoded!
-            Y_batch = Y_batch[1] # just use mask
+                                        normalization=self.params['normalization'],
+                                        meanSubstraction=self.params['mean_substraction'])[
+                0]  # TODO: first output selection, this 0 is harcoded!
+            Y_batch = Y_batch[1]  # just use mask
 
             batch_lengths = [int(np.sum(cc)) for cc in Y_batch]
             self.lengths += batch_lengths
-            
+
         # find the unique lengths
         self.len_unique = np.unique(self.lengths)
 
@@ -289,7 +291,7 @@ class Homogeneous_Data_Batch_Generator(object):
 
             else:
                 while True:
-                    self.len_idx = np.mod(self.len_idx+1, len(self.len_unique))
+                    self.len_idx = np.mod(self.len_idx + 1, len(self.len_unique))
                     if self.len_curr_counts[self.len_unique[self.len_idx]] > 0:
                         break
                     it += 1
@@ -297,23 +299,24 @@ class Homogeneous_Data_Batch_Generator(object):
                         break
                 if it >= len(self.len_unique):
                     self.reset()
-                #raise StopIteration()
+                # raise StopIteration()
 
                 # get the batch size
                 curr_batch_size = np.minimum(self.batch_size, self.len_curr_counts[self.len_unique[self.len_idx]])
                 curr_pos = self.len_indices_pos[self.len_unique[self.len_idx]]
                 # get the indices for the current batch
-                curr_indices = self.len_indices[self.len_unique[self.len_idx]][curr_pos:curr_pos+curr_batch_size]
+                curr_indices = self.len_indices[self.len_unique[self.len_idx]][curr_pos:curr_pos + curr_batch_size]
                 self.len_indices_pos[self.len_unique[self.len_idx]] += curr_batch_size
                 self.len_curr_counts[self.len_unique[self.len_idx]] -= curr_batch_size
 
                 X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, curr_indices,
-                                             normalization=self.params['normalization'],
-                                             meanSubstraction=self.params['mean_substraction'],
-                                             dataAugmentation=data_augmentation)
+                                                                  normalization=self.params['normalization'],
+                                                                  meanSubstraction=self.params['mean_substraction'],
+                                                                  dataAugmentation=data_augmentation)
                 data = self.net.prepareData(X_batch, Y_batch)
 
-            yield(data)
+            yield (data)
+
 
 # ------------------------------------------------------- #
 #       MAIN CLASS
@@ -323,7 +326,7 @@ class Dataset(object):
     Class for defining instances of databases adapted for Keras. It includes several utility functions for easily managing
     data splits, image loading, mean calculation, etc.
     """
-    
+
     def __init__(self, name, path, silence=False):
         """
         Dataset initializer
@@ -335,17 +338,17 @@ class Dataset(object):
         self.name = name
         # Path to the folder where the images are stored
         self.path = path
-        
+
         # If silence = False, some informative sentences will be printed while using the "Dataset" object instance
         self.silence = silence
-        
+
         # Variable for storing external extra variables
         self.extra_variables = dict()
-        
+
         ############################ Data loading parameters
         # Lock for threads synchronization
         self.__lock_read = threading.Lock()
-        
+
         # Indicators for knowing if the data [X, Y] has been loaded for each data split
         self.loaded_train = [False, False]
         self.loaded_val = [False, False]
@@ -353,7 +356,7 @@ class Dataset(object):
         self.len_train = 0
         self.len_val = 0
         self.len_test = 0
-        
+
         # Initialize dictionaries of samples
         self.X_train = dict()
         self.X_val = dict()
@@ -376,22 +379,22 @@ class Dataset(object):
         self.Y_raw_test = dict()
 
         #################################################
-        
-        
+
+
         ############################ Parameters for managing all the inputs and outputs
         # List of identifiers for the inputs and outputs and their respective types 
         # (which will define the preprocessing applied)
         self.ids_inputs = []
-        self.types_inputs = [] # see accepted types in self.__accepted_types_inputs
+        self.types_inputs = []  # see accepted types in self.__accepted_types_inputs
         self.optional_inputs = []
 
         self.ids_outputs = []
-        self.types_outputs = [] # see accepted types in self.__accepted_types_outputs
-        self.sample_weights = dict() # Choose whether we should compute output masks or not
+        self.types_outputs = []  # see accepted types in self.__accepted_types_outputs
+        self.sample_weights = dict()  # Choose whether we should compute output masks or not
 
         # List of implemented input and output data types
         self.__accepted_types_inputs = ['raw-image', 'image-features',
-                                        'video',  'video-features',
+                                        'video', 'video-features',
                                         'text',
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
@@ -401,39 +404,39 @@ class Dataset(object):
                                          'id', 'file-name']
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
-        
+
         # List of implemented input normalization functions
-        self.__available_norm_im_vid = ['0-1']    # 'image' and 'video' only
-        self.__available_norm_feat = ['L2']       # 'image-features' and 'video-features' only
+        self.__available_norm_im_vid = ['0-1']  # 'image' and 'video' only
+        self.__available_norm_feat = ['L2']  # 'image-features' and 'video-features' only
         #################################################
-        
-        
+
+
         ############################ Parameters used for inputs/outputs of type 'text'
-        self.extra_words = {'<pad>': 0, '<unk>': 1, '<null>':2}    # extra words introduced in all vocabularies
-        self.vocabulary = dict()     # vocabularies (words2idx and idx2words)
-        self.max_text_len = dict()   # number of words accepted in a 'text' sample
-        self.vocabulary_len = dict() # number of words in the vocabulary
-        self.text_offset = dict()    # number of timesteps that the text is shifted (to the right)
-        self.fill_text = dict()      # text padding mode
-        self.pad_on_batch = dict()   # text padding mode: If pad_on_batch, the sample will have the maximum length
-                                     # of the current batch. Else, it will have a fixed length (max_text_len)
-        self.words_so_far = dict()   # if True, each sample will be represented as the complete set of words until
-                                     # the point defined by the timestep dimension
-                                     # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
-        self.mapping = dict()        # Source -- Target predefined word mapping
+        self.extra_words = {'<pad>': 0, '<unk>': 1, '<null>': 2}  # extra words introduced in all vocabularies
+        self.vocabulary = dict()  # vocabularies (words2idx and idx2words)
+        self.max_text_len = dict()  # number of words accepted in a 'text' sample
+        self.vocabulary_len = dict()  # number of words in the vocabulary
+        self.text_offset = dict()  # number of timesteps that the text is shifted (to the right)
+        self.fill_text = dict()  # text padding mode
+        self.pad_on_batch = dict()  # text padding mode: If pad_on_batch, the sample will have the maximum length
+        # of the current batch. Else, it will have a fixed length (max_text_len)
+        self.words_so_far = dict()  # if True, each sample will be represented as the complete set of words until
+        # the point defined by the timestep dimension
+        # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
+        self.mapping = dict()  # Source -- Target predefined word mapping
         #################################################
-        
-        
+
+
         ############################ Parameters used for inputs of type 'video' or 'video-features'
         self.counts_frames = dict()
         self.paths_frames = dict()
-        self.max_video_len = dict() 
+        self.max_video_len = dict()
         #################################################
-        
+
         ############################ Parameters used for inputs of type 'image-features' or 'video-features'
         self.features_lengths = dict()
         #################################################
-        
+
         ############################ Parameters used for inputs of type 'raw-image'
         # Image resize dimensions used for all the returned images
         self.img_size = dict()
@@ -444,12 +447,12 @@ class Dataset(object):
         # Whether they are RGB images (or grayscale)
         self.use_RGB = dict()
         #################################################
-        
+
         ############################ Parameters used for outputs of type 'categorical', '3DLabels' or '3DSemanticLabel'
         self.classes = dict()
         self.dic_classes = dict()
         #################################################
-        
+
         ############################ Parameters used for outputs of type '3DLabels' or '3DSemanticLabel'
         self.id_in_3DLabel = dict()
         #################################################
@@ -457,81 +460,78 @@ class Dataset(object):
         ############################ Parameters used for outputs of type '3DSemanticLabel'
         self.semantic_classes = dict()
         #################################################
-        
+
         # Reset counters to start loading data in batches
         self.resetCounters()
-        
-    
+
     def shuffleTraining(self):
         """
         Applies a random shuffling to the training samples.
         """
         if not self.silence:
             logging.info("Shuffling training samples.")
-        
+
         # Shuffle
         num = self.len_train
         shuffled_order = random.sample([i for i in range(num)], num)
-        
+
         # Process each input sample
         for id in self.X_train.keys():
             self.X_train[id] = [self.X_train[id][s] for s in shuffled_order]
         # Process each output sample
         for id in self.Y_train.keys():
             self.Y_train[id] = [self.Y_train[id][s] for s in shuffled_order]
-            
+
         if not self.silence:
             logging.info("Shuffling training done.")
-    
-    
+
     def keepTopOutputs(self, set_name, id_out, n_top):
         self.__checkSetName(set_name)
-        
+
         if id_out not in self.ids_outputs:
             raise Exception("The parameter 'id_out' must specify a valid id for an output of the dataset.")
-        
-        #type_out = self.types_outputs(self.ids_outputs.index(id_out))
-        #if type_out != 'text':
+
+        # type_out = self.types_outputs(self.ids_outputs.index(id_out))
+        # if type_out != 'text':
         #    raise Exception("This method is only applicable to outputs of type 'text'.")
-        
-        logging.info('Keeping top '+str(n_top)+' outputs from the '+set_name+' set and removing the rest.')
-        
+
+        logging.info('Keeping top ' + str(n_top) + ' outputs from the ' + set_name + ' set and removing the rest.')
+
         # Sort outputs by number of occurrences
         samples = None
-        exec('samples = self.Y_'+set_name)
+        exec ('samples = self.Y_' + set_name)
         count = Counter(samples[id_out])
-        most_frequent = sorted(count.items(), key=lambda x:x[1], reverse=True)[:n_top]
+        most_frequent = sorted(count.items(), key=lambda x: x[1], reverse=True)[:n_top]
         most_frequent = [m[0] for m in most_frequent]
-        
+
         # Select top samples
         kept = []
         for i, s in enumerate(samples[id_out]):
             if s in most_frequent:
                 kept.append(i)
-                
+
         # Remove non-top samples    
         # Inputs
         ids = None
-        exec('ids = self.X_'+set_name+'.keys()')
+        exec ('ids = self.X_' + set_name + '.keys()')
         for id in ids:
-            exec('self.X_'+set_name+'[id] = [self.X_'+set_name+'[id][k] for k in kept]')
+            exec ('self.X_' + set_name + '[id] = [self.X_' + set_name + '[id][k] for k in kept]')
         # Outputs
-        exec('ids = self.Y_'+set_name+'.keys()')
+        exec ('ids = self.Y_' + set_name + '.keys()')
         for id in ids:
-            exec('self.Y_'+set_name+'[id] = [self.Y_'+set_name+'[id][k] for k in kept]')
+            exec ('self.Y_' + set_name + '[id] = [self.Y_' + set_name + '[id][k] for k in kept]')
         new_len = len(samples[id_out])
-        exec('self.len_'+set_name+' = new_len')
-        
+        exec ('self.len_' + set_name + ' = new_len')
+
         self.__checkLengthSet(set_name)
-        
-        logging.info(str(new_len)+' samples remaining after removal.')
-    
-    
+
+        logging.info(str(new_len) + ' samples remaining after removal.')
+
     # ------------------------------------------------------- #
     #       GENERAL SETTERS
     #           classes list, train, val and test set, etc.
     # ------------------------------------------------------- #
-    
+
     def resetCounters(self, set_name="all"):
         """
         Resets some basic counter indices for the next samples to read.
@@ -542,22 +542,21 @@ class Dataset(object):
             self.last_test = 0
         else:
             self.__checkSetName(set_name)
-            exec('self.last_'+set_name+'=0')
-            
+            exec ('self.last_' + set_name + '=0')
+
     def setSilence(self, silence):
         """
         Changes the silence mode of the 'Dataset' instance.
         """
         self.silence = silence
-        
-        
+
     def setListGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='raw-image', id='image'):
         """
             Deprecated
         """
         logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInputGeneral() instead.")
         self.setInputGeneral(path_list, split, shuffle, type, id)
-    
+
     def setInputGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='raw-image', id='image'):
         """ 
             DEPRECATED
@@ -570,47 +569,48 @@ class Dataset(object):
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
             :param id: identifier of the input data loaded
         """
-        
+
         raise NotImplementedError("This function is deprecated use setInput instead.")
 
         if sum(split) != 1:
             raise Exception('"split" values must sum 1.')
         if len(split) != 3:
             raise Exception('The length of "split" must be equal to 3.')
-        
+
         # Read list
         set = []
         with open(path_list, 'r') as list_:
             for line in list_:
                 set.append(line.rstrip('\n'))
         nSamples = len(set)
-        
+
         # Randomize list of samples
         set_num = [i for i in range(nSamples)]
         if shuffle:
             set_num = random.sample(set_num, nSamples)
-        
+
         # Insert type and id of input data
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             if type not in self.__accepted_types_inputs:
-                raise NotImplementedError('The input type '+type+' is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
+                raise NotImplementedError(
+                    'The input type ' + type + ' is not implemented. The list of valid types are the following: ' + str(
+                        self.__accepted_types_inputs))
             self.types_inputs.append(type)
         else:
-            raise Exception('An input with id '+id+' is already loaded into the Database instance.')
-        
+            raise Exception('An input with id ' + id + ' is already loaded into the Database instance.')
+
         offset = 0
         order = ['train', 'val', 'test']
         set_split = []
         for i in range(len(split)):
-            last = int(math.ceil(nSamples*split[i]))
-            set_split.append(set_num[offset:offset+last])
+            last = int(math.ceil(nSamples * split[i]))
+            set_split.append(set_num[offset:offset + last])
             offset += last
-            
+
             # Insert into the corresponding list
             if len(set_split[i]) > 0:
                 self.__setInput([set[elem] for elem in set_split[i]], order[i], id=id)
-
 
     def setList(self, path_list, set_name, type='raw-image', id='image'):
         """
@@ -618,7 +618,6 @@ class Dataset(object):
         """
         logging.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
         self.setInput(path_list, set_name, type, id)
-
 
     def setRawInput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
         """
@@ -637,29 +636,32 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of input data
-        keys_X_set = eval('self.X_raw_'+set_name+'.keys()')
+        keys_X_set = eval('self.X_raw_' + set_name + '.keys()')
         if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
-            self.optional_inputs.append(id) # This is always optional
+            self.optional_inputs.append(id)  # This is always optional
         elif id in keys_X_set and not overwrite_split:
-            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+            raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
-            raise NotImplementedError('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
+            raise NotImplementedError(
+                'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
+                    self.__accepted_types_inputs))
 
-        exec('self.X_raw_'+set_name+'[id] = path_list')
-        exec('self.loaded_raw_'+set_name+'[0] = True')
+        exec ('self.X_raw_' + set_name + '[id] = path_list')
+        exec ('self.loaded_raw_' + set_name + '[0] = True')
         if not self.silence:
-            logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id + '".')
+            logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
-
-    def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True, overwrite_split=False,
-                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,               # 'raw-image' / 'video'   (height, width, depth)
-                 max_text_len=35, tokenization='tokenize_basic',offset=0, fill='end', min_occ=0,  # 'text'
-                 pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,      # 'text'
-                 feat_len = 1024,                                                                 # 'image-features' / 'video-features'
-                 max_video_len=26                                                                 # 'video'
+    def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
+                 overwrite_split=False,
+                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,
+                 # 'raw-image' / 'video'   (height, width, depth)
+                 max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0,  # 'text'
+                 pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
+                 feat_len=1024,  # 'image-features' / 'video-features'
+                 max_video_len=26  # 'video'
                  ):
         """
             Loads a list which can contain all samples from either the 'train', 'val', or
@@ -704,21 +706,23 @@ class Dataset(object):
             :param max_video_len: maximum video length, the rest of the data will be padded with 0s (only applicable if the input data is of type 'video' or video-features').
         """
         self.__checkSetName(set_name)
-        
+
         # Insert type and id of input data
-        keys_X_set = eval('self.X_'+set_name+'.keys()')
+        keys_X_set = eval('self.X_' + set_name + '.keys()')
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
         elif id in keys_X_set and not overwrite_split:
-            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+            raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
         if not required:
             self.optional_inputs.append(id)
 
         if type not in self.__accepted_types_inputs:
-            raise NotImplementedError('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
-        
+            raise NotImplementedError(
+                'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
+                    self.__accepted_types_inputs))
+
         # Proprocess the input data depending on its type
         if type == 'raw-image':
             data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop, use_RGB)
@@ -732,40 +736,42 @@ class Dataset(object):
         elif type == 'image-features':
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif type == 'video-features':
-            data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len)
+            data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop,
+                                                feat_len)
         elif type == 'id':
             data = self.preprocessIDs(path_list, id, set_name)
         elif type == 'ghost':
             data = []
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
-            data = list(np.repeat(data,repeat_set))
-        
+            data = list(np.repeat(data, repeat_set))
+
         self.__setInput(data, set_name, type, id, overwrite_split)
-        
-    
+
     def __setInput(self, set, set_name, type, id, overwrite_split):
-        exec('self.X_'+set_name+'[id] = set')
-        exec('self.loaded_'+set_name+'[0] = True')
+        exec ('self.X_' + set_name + '[id] = set')
+        exec ('self.loaded_' + set_name + '[0] = True')
         if id not in self.optional_inputs:
-            exec('self.len_'+set_name+' = len(set)')
+            exec ('self.len_' + set_name + ' = len(set)')
             if not overwrite_split:
                 self.__checkLengthSet(set_name)
-        
+
         if not self.silence:
-            logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
-        
+            logging.info(
+                'Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '" and length ' + str(
+                    eval('self.len_' + set_name)) + '.')
+
     def removeInput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
-        keys_X_set = eval('self.X_'+set_name+'.keys()')
+        keys_X_set = eval('self.X_' + set_name + '.keys()')
         if id in self.ids_inputs:
             ind_remove = self.ids_inputs.index(id)
             del self.ids_inputs[ind_remove]
             del self.types_inputs[ind_remove]
-            exec('del self.X_'+set_name+'[id]')
+            exec ('del self.X_' + set_name + '[id]')
         elif id not in keys_X_set:
-            raise Exception('An input with id "'+id+'" does not exist in the Database.')
+            raise Exception('An input with id "' + id + '" does not exist in the Database.')
         if not self.silence:
-            logging.info('Removed "' + set_name + '" set input of type "' + type + '" with id "'+ id + '.')
+            logging.info('Removed "' + set_name + '" set input of type "' + type + '" with id "' + id + '.')
 
     def setLabels(self, labels_list, set_name, type='categorical', id='label'):
         """
@@ -791,28 +797,30 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of input data
-        keys_Y_set = eval('self.Y_raw_'+set_name+'.keys()')
+        keys_Y_set = eval('self.Y_raw_' + set_name + '.keys()')
         if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
-            self.optional_inputs.append(id) # This is always optional
+            self.optional_inputs.append(id)  # This is always optional
 
         elif id in keys_Y_set and not overwrite_split:
-            raise Exception('An input with id "'+id+'" is already loaded into the Database.')
+            raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
-            raise NotImplementedError('The input type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_inputs))
+            raise NotImplementedError(
+                'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
+                    self.__accepted_types_inputs))
 
-        exec('self.Y_raw_'+set_name+'[id] = path_list')
-        exec('self.loaded_raw_'+set_name+'[1] = True')
+        exec ('self.Y_raw_' + set_name + '[id] = path_list')
+        exec ('self.loaded_raw_' + set_name + '[1] = True')
 
         if not self.silence:
-            logging.info('Loaded "' + set_name + '" set inputs of type "'+type+'" with id "'+id + '".')
+            logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,   # 'text'
-                  pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,       # 'text'
-                  associated_id_in=None,                                                            # '3DLabel' or '3DSemanticLabel'
+                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
+                  pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
+                  associated_id_in=None,  # '3DLabel' or '3DSemanticLabel'
                   sample_weights=False):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -846,15 +854,17 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of output data
-        keys_Y_set = eval('self.Y_'+set_name+'.keys()')
+        keys_Y_set = eval('self.Y_' + set_name + '.keys()')
         if id not in self.ids_outputs:
             self.ids_outputs.append(id)
             self.types_outputs.append(type)
         elif id in keys_Y_set and not overwrite_split:
-            raise Exception('An output with id "'+id+'" is already loaded into the Database.')
-        
+            raise Exception('An output with id "' + id + '" is already loaded into the Database.')
+
         if type not in self.__accepted_types_outputs:
-            raise NotImplementedError('The output type "'+type+'" is not implemented. The list of valid types are the following: '+str(self.__accepted_types_outputs))
+            raise NotImplementedError(
+                'The output type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
+                    self.__accepted_types_outputs))
 
         # Preprocess the output data depending on its type
         if type == 'categorical':
@@ -871,46 +881,47 @@ class Dataset(object):
             data = self.preprocessReal(path_list)
         elif type == 'id':
             data = self.preprocessIDs(path_list, id)
-        elif(type == '3DLabel'):
+        elif (type == '3DLabel'):
             data = self.preprocess3DLabel(path_list, id, associated_id_in)
-        elif(type == '3DSemanticLabel'):
+        elif (type == '3DSemanticLabel'):
             data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in)
 
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
-            data = list(np.repeat(data,repeat_set))
+            data = list(np.repeat(data, repeat_set))
         if self.sample_weights.get(id) is None:
             self.sample_weights[id] = dict()
         self.sample_weights[id][set_name] = sample_weights
         self.__setOutput(data, set_name, type, id, overwrite_split)
 
-    
     def __setOutput(self, labels, set_name, type, id, overwrite_split):
-        exec('self.Y_'+set_name+'[id] = labels')
-        exec('self.loaded_'+set_name+'[1] = True')
-        exec('self.len_'+set_name+' = len(labels)')
+        exec ('self.Y_' + set_name + '[id] = labels')
+        exec ('self.loaded_' + set_name + '[1] = True')
+        exec ('self.len_' + set_name + ' = len(labels)')
         if not overwrite_split:
             self.__checkLengthSet(set_name)
-        
+
         if not self.silence:
-            logging.info('Loaded "' + set_name + '" set outputs of type "'+type+'" with id "'+id+'" and length '+ str(eval('self.len_'+set_name)) + '.')
+            logging.info(
+                'Loaded "' + set_name + '" set outputs of type "' + type + '" with id "' + id + '" and length ' + str(
+                    eval('self.len_' + set_name)) + '.')
 
     def removeOutput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
-        keys_Y_set = eval('self.Y_'+set_name+'.keys()')
+        keys_Y_set = eval('self.Y_' + set_name + '.keys()')
         if id in self.ids_outputs:
             ind_remove = self.ids_outputs.index(id)
             del self.ids_outputs[ind_remove]
             del self.types_outputs[ind_remove]
-            exec('del self.Y_'+set_name+'[id]')
+            exec ('del self.Y_' + set_name + '[id]')
         elif id not in keys_Y_set:
-            raise Exception('An output with id "'+id+'" does not exist in the Database.')
+            raise Exception('An output with id "' + id + '" does not exist in the Database.')
         if not self.silence:
-            logging.info('Removed "' + set_name + '" set outputs of type "' + type + '" with id "'+ id + '.')
+            logging.info('Removed "' + set_name + '" set outputs of type "' + type + '" with id "' + id + '.')
 
     # ------------------------------------------------------- #
     #       TYPE 'categorical' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-    
+
     def setClasses(self, path_classes, id):
         """
         Loads the list of classes of the dataset.
@@ -931,15 +942,16 @@ class Dataset(object):
         elif isinstance(path_classes, list):
             self.classes[id] = path_classes
         else:
-            raise Exception('Wrong type for "path_classes". It must be a path to a text file with the classes or an instance of the class list.')
-        
+            raise Exception(
+                'Wrong type for "path_classes". It must be a path to a text file with the classes or an instance of the class list.')
+
         self.dic_classes[id] = dict()
         for c in range(len(self.classes[id])):
             self.dic_classes[id][self.classes[id][c]] = c
-        
+
         if not self.silence:
             logging.info('Loaded classes list with ' + str(len(self.dic_classes[id])) + " different labels.")
-    
+
     def preprocessCategorical(self, labels_list):
         """
         Preprocesses categorical data.
@@ -948,7 +960,7 @@ class Dataset(object):
 
         :return: Preprocessed labels.
         """
-        
+
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
             labels = []
             with open(labels_list, 'r') as list_:
@@ -957,14 +969,15 @@ class Dataset(object):
         elif isinstance(labels_list, list):
             labels = labels_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a text file with the labels or an instance of the class list.')
-        
+            raise Exception(
+                'Wrong type for "path_list". It must be a path to a text file with the labels or an instance of the class list.')
+
         return labels
-    
+
     # ------------------------------------------------------- #
     #       TYPE 'binary' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-       
+
     def preprocessBinary(self, labels_list):
         """
         Preprocesses binary classes.
@@ -977,7 +990,7 @@ class Dataset(object):
             labels = labels_list
         else:
             raise Exception('Wrong type for "path_list". It must be an instance of the class list.')
-        
+
         return labels
 
     # ------------------------------------------------------- #
@@ -1008,7 +1021,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
     #       TYPE 'features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-    
+
     def preprocessFeatures(self, path_list, id, set_name, feat_len):
         """
         Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file storing a feature vector.
@@ -1026,22 +1039,23 @@ class Dataset(object):
             data = []
             with open(path_list, 'r') as list_:
                 for line in list_:
-                    #data.append(np.fromstring(line.rstrip('\n'), sep=','))
+                    # data.append(np.fromstring(line.rstrip('\n'), sep=','))
                     data.append(line.rstrip('\n'))
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path'
-                            ' to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
+            raise Exception(
+                'Wrong type for "path_list". It must be a path to a text file. Each line must contain a path'
+                ' to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
 
         if not isinstance(feat_len, list):
             feat_len = [feat_len]
         self.features_lengths[id] = feat_len
 
         return data
-    
-    
-    def loadFeatures(self, X, feat_len, normalization_type='L2', normalization=False, loaded=False, external=False, data_augmentation=True):
+
+    def loadFeatures(self, X, feat_len, normalization_type='L2', normalization=False, loaded=False, external=False,
+                     data_augmentation=True):
         """
         Loads and normalizes features.
 
@@ -1056,14 +1070,15 @@ class Dataset(object):
         :return: Loaded features as numpy array
         """
         if normalization and normalization_type not in self.__available_norm_feat:
-            raise NotImplementedError('The chosen normalization type '+ normalization_type +' is not implemented for the type "image-features" and "video-features".')
-        
+            raise NotImplementedError(
+                'The chosen normalization type ' + normalization_type + ' is not implemented for the type "image-features" and "video-features".')
+
         n_batch = len(X)
-        features = np.zeros(tuple([n_batch]+feat_len))
-        
+        features = np.zeros(tuple([n_batch] + feat_len))
+
         for i, feat in enumerate(X):
             if not external:
-                feat = self.path +'/'+ feat
+                feat = self.path + '/' + feat
 
             feat = np.load(feat)
 
@@ -1075,16 +1090,16 @@ class Dataset(object):
 
             if normalization:
                 if normalization_type == 'L2':
-                    feat = feat / np.linalg.norm(feat,ord=2)
-                    
+                    feat = feat / np.linalg.norm(feat, ord=2)
+
             features[i] = feat
-            
+
         return np.array(features)
-    
+
     # ------------------------------------------------------- #
     #       TYPE 'text' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-    
+
     def preprocessText(self, annotations_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                        max_words, offset, fill, min_occ, pad_on_batch, words_so_far):
         """
@@ -1114,20 +1129,21 @@ class Dataset(object):
         elif isinstance(annotations_list, list):
             sentences = annotations_list
         else:
-            raise Exception('Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences. '
-                            'It currently is: %s'%(str(annotations_list)))
-            
+            raise Exception(
+                'Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences. '
+                'It currently is: %s' % (str(annotations_list)))
+
         # Check if tokenization method exists
         if hasattr(self, tokenization):
-            tokfun = eval('self.'+tokenization)
+            tokfun = eval('self.' + tokenization)
         else:
-            raise Exception('Tokenization procedure "'+ tokenization +'" is not implemented.')
-            
+            raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
+
         # Tokenize sentences
-        if max_text_len != 0: # will only tokenize if we are not using the whole sentence as a class
+        if max_text_len != 0:  # will only tokenize if we are not using the whole sentence as a class
             for i in range(len(sentences)):
                 sentences[i] = tokfun(sentences[i])
-    
+
         # Build vocabulary
         error_vocab = False
         if build_vocabulary == True:
@@ -1136,13 +1152,15 @@ class Dataset(object):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
                 if not self.silence:
-                    logging.info('\tReusing vocabulary named "'+build_vocabulary+'" for data with id "'+id+'".')
+                    logging.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with id "' + id + '".')
             else:
-                raise Exception('The parameter "build_vocabulary" must be a boolean or a str containing an id of the vocabulary we want to copy.')
-        
+                raise Exception(
+                    'The parameter "build_vocabulary" must be a boolean or a str containing an id of the vocabulary we want to copy.')
+
         if not id in self.vocabulary:
-            raise Exception('The dataset must include a vocabulary with id "'+id+'" in order to process the type "text" data. Set "build_vocabulary" to True if you want to use the current data for building the vocabulary.')
-    
+            raise Exception(
+                'The dataset must include a vocabulary with id "' + id + '" in order to process the type "text" data. Set "build_vocabulary" to True if you want to use the current data for building the vocabulary.')
+
         # Store max text len
         self.max_text_len[id][set_name] = max_text_len
         self.text_offset[id] = offset
@@ -1151,8 +1169,7 @@ class Dataset(object):
         self.words_so_far[id] = words_so_far
 
         return sentences
-    
-    
+
     def build_vocabulary(self, captions, id, tokfun, do_split, min_occ=0, n_words=0):
         """
         Vocabulary builder for data of type 'text'
@@ -1166,34 +1183,34 @@ class Dataset(object):
         :return: None.
         """
         if not self.silence:
-            logging.info("Creating vocabulary for data with id '"+id+"'.")
-        
+            logging.info("Creating vocabulary for data with id '" + id + "'.")
+
         counters = []
         sentence_counts = []
         counter = Counter()
         sentence_count = 0
         for line in captions:
             if do_split:
-                #tokenized = tokfun(line)º
-                #words = tokenized.strip().split(' ')
+                # tokenized = tokfun(line)º
+                # words = tokenized.strip().split(' ')
                 words = line.strip().split(' ')
                 counter.update(words)
             else:
                 counter.update([line])
             sentence_count += 1
-            
+
         if not do_split and not self.silence:
             logging.info('Using whole sentence as a single word.')
-            
+
         counters.append(counter)
         sentence_counts.append(sentence_count)
-        #logging.info("\t %d unique words in %d sentences with a total of %d words." %
+        # logging.info("\t %d unique words in %d sentences with a total of %d words." %
         #      (len(counter), sentence_count, sum(counter.values())))
 
         combined_counter = reduce(add, counters)
         if not self.silence:
             logging.info("\t Total: %d unique words in %d sentences with a total of %d words." %
-              (len(combined_counter), sum(sentence_counts),sum(combined_counter.values())))
+                         (len(combined_counter), sum(sentence_counts), sum(combined_counter.values())))
 
         # keep only words with less than 'min_occ' occurrences
         if min_occ > 1:
@@ -1201,20 +1218,20 @@ class Dataset(object):
             for k in combined_counter.keys():
                 if combined_counter[k] < min_occ:
                     del combined_counter[k]
-                    removed +=1
+                    removed += 1
             if not self.silence:
                 logging.info("\t Removed %d words with less than %d occurrences. New total: %d." %
-                  (removed, min_occ,len(combined_counter)))
-                    
+                             (removed, min_occ, len(combined_counter)))
+
         # keep only top 'n_words'
         if n_words > 0:
             vocab_count = combined_counter.most_common(n_words - len(self.extra_words))
             if not self.silence:
                 logging.info("Creating dictionary of %s most common words, covering "
-                        "%2.1f%% of the text."
-                        % (n_words,
-                           100.0 * sum([count for word, count in vocab_count]) /
-                           sum(combined_counter.values())))
+                             "%2.1f%% of the text."
+                             % (n_words,
+                                100.0 * sum([count for word, count in vocab_count]) /
+                                sum(combined_counter.values())))
         else:
             if not self.silence:
                 logging.info("Creating dictionary of all words")
@@ -1223,10 +1240,10 @@ class Dataset(object):
         dictionary = {}
         for i, (word, count) in enumerate(vocab_count):
             dictionary[word] = i + len(self.extra_words)
-                
-        for w,k in self.extra_words.iteritems():
+
+        for w, k in self.extra_words.iteritems():
             dictionary[w] = k
-        
+
         # Store dictionary and append to previously existent if needed.
         if id not in self.vocabulary:
             self.vocabulary[id] = dict()
@@ -1235,7 +1252,7 @@ class Dataset(object):
             self.vocabulary[id]['idx2words'] = inv_dictionary
 
             self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
-        
+
         else:
             old_keys = self.vocabulary[id]['words2idx'].keys()
             new_keys = dictionary.keys()
@@ -1244,15 +1261,14 @@ class Dataset(object):
                 if key not in old_keys:
                     self.vocabulary[id]['words2idx'][key] = self.vocabulary_len[id]
                     self.vocabulary_len[id] += 1
-                    added +=1
-            
+                    added += 1
+
             inv_dictionary = {v: k for k, v in self.vocabulary[id]['words2idx'].items()}
             self.vocabulary[id]['idx2words'] = inv_dictionary
-            
+
             if not self.silence:
-                logging.info('Appending ' +str(added)+ ' words to dictionary with id "' +id+ '".')
-                logging.info('\tThe new total is '+str(self.vocabulary_len[id]) +'.')
-        
+                logging.info('Appending ' + str(added) + ' words to dictionary with id "' + id + '".')
+                logging.info('\tThe new total is ' + str(self.vocabulary_len[id]) + '.')
 
     def merge_vocabularies(self, ids):
         '''
@@ -1263,11 +1279,11 @@ class Dataset(object):
         '''
         assert isinstance(ids, list), 'ids must be a list of inputs/outputs identifiers of type text'
         if not self.silence:
-            logging.info('Merging vocabularies of the following ids: '+str(ids))
+            logging.info('Merging vocabularies of the following ids: ' + str(ids))
 
         # Pick the first vocabulary as reference
         vocab_ref = self.vocabulary[ids[0]]['words2idx']
-        next_idx = max(vocab_ref.values())+1
+        next_idx = max(vocab_ref.values()) + 1
 
         # Merge all vocabularies to the reference
         for i in range(1, len(ids)):
@@ -1293,7 +1309,6 @@ class Dataset(object):
         if not self.silence:
             logging.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
 
-
     def load3DLabels(self, bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         '''
         Loads a set of outputs of the type 3DLabel (used for detection)
@@ -1311,69 +1326,69 @@ class Dataset(object):
         n_samples = len(bbox_list)
         h, w, d = img_size
         h_crop, w_crop, d_crop = size_crop
-        labels = np.zeros((n_samples, nClasses,h_crop,w_crop), dtype=np.float32)
-            
+        labels = np.zeros((n_samples, nClasses, h_crop, w_crop), dtype=np.float32)
+
         for i in range(n_samples):
             line = bbox_list[i]
             arrayLine = line.split(';')
             arrayBndBox = arrayLine[:-1]
-            w_original,h_original,d_original = eval(arrayLine[-1])
+            w_original, h_original, d_original = eval(arrayLine[-1])
 
-            label3D = np.zeros((nClasses,h_original,w_original), dtype=np.float32)
-            
+            label3D = np.zeros((nClasses, h_original, w_original), dtype=np.float32)
+
             for array in arrayBndBox:
                 bndbox = eval(array)[0]
                 idxclass = eval(array)[1]
 
-                #bndbox_ones = np.ones((bndbox[3] - bndbox[1] + 1, bndbox[2] - bndbox[0] + 1))
-                #label3D[idxclass, bndbox[1] - 1:bndbox[3], bndbox[0] - 1:bndbox[2]] = bndbox_ones
+                # bndbox_ones = np.ones((bndbox[3] - bndbox[1] + 1, bndbox[2] - bndbox[0] + 1))
+                # label3D[idxclass, bndbox[1] - 1:bndbox[3], bndbox[0] - 1:bndbox[2]] = bndbox_ones
 
-                bndbox_ones = np.ones((bndbox[2]-bndbox[0]+1,bndbox[3]-bndbox[1]+1))
-                label3D[idxclass,bndbox[0]-1:bndbox[2],bndbox[1]-1:bndbox[3]] = bndbox_ones
+                bndbox_ones = np.ones((bndbox[2] - bndbox[0] + 1, bndbox[3] - bndbox[1] + 1))
+                label3D[idxclass, bndbox[0] - 1:bndbox[2], bndbox[1] - 1:bndbox[3]] = bndbox_ones
 
-            if not dataAugmentation or daRandomParams==None:
+            if not dataAugmentation or daRandomParams == None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
-                    label2D = misc.imresize(label3D[j],(h_crop,w_crop))
+                    label2D = misc.imresize(label3D[j], (h_crop, w_crop))
                     maxval = np.max(label2D)
                     if maxval > 0: label2D /= maxval
                     labels[i, j] = label2D
             else:
-                label3D_rs = np.zeros((nClasses,h_crop,w_crop), dtype=np.float32)
+                label3D_rs = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
                 # Crop the labels (random crop)
                 for j in range(nClasses):
-                    label2D = misc.imresize(label3D[j],(h,w))
+                    label2D = misc.imresize(label3D[j], (h, w))
                     maxval = np.max(label2D)
                     if maxval > 0: label2D /= maxval
                     randomParams = daRandomParams[image_list[i]]
                     # Take random crop
                     left = randomParams["left"]
                     right = np.add(left, size_crop[0:2])
-                    
+
                     label2D = label2D[left[0]:right[0], left[1]:right[1]]
-                    
+
                     # Randomly flip (with a certain probability)
                     flip = randomParams["hflip"]
-                    prob_flip_horizontal = randomParams["prob_flip_horizontal"] 
-                    if flip < prob_flip_horizontal: # horizontal flip
+                    prob_flip_horizontal = randomParams["prob_flip_horizontal"]
+                    if flip < prob_flip_horizontal:  # horizontal flip
                         label2D = np.fliplr(label2D)
                     flip = randomParams["vflip"]
-                    prob_flip_vertical = randomParams["prob_flip_vertical"] 
-                    if flip < prob_flip_vertical: # vertical flip
+                    prob_flip_vertical = randomParams["prob_flip_vertical"]
+                    if flip < prob_flip_vertical:  # vertical flip
                         label2D = np.flipud(label2D)
-                    
+
                     label3D_rs[j] = label2D
-                    
+
                 labels[i] = label3D_rs
 
         # Reshape labels to (batch_size, width*height, classes) before returning
-        labels = np.reshape(labels, (n_samples, nClasses,w_crop*h_crop))
-        labels = np.transpose(labels, (0,2,1))
+        labels = np.reshape(labels, (n_samples, nClasses, w_crop * h_crop))
+        labels = np.transpose(labels, (0, 2, 1))
 
         return labels
 
-
-    def load3DSemanticLabels(self, labeled_images_list, nClasses, classes_to_colour, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
+    def load3DSemanticLabels(self, labeled_images_list, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
+                             img_size, size_crop, image_list):
         '''
         Loads a set of outputs of the type 3DSemanticLabel (used for semantic segmentation)
 
@@ -1397,7 +1412,7 @@ class Dataset(object):
             line = labeled_images_list[i].rstrip('\n')
 
             ### Load labeled GT image
-            labeled_im = self.path +'/'+ line
+            labeled_im = self.path + '/' + line
             # Check if the filename includes the extension
             [path, filename] = ntpath.split(labeled_im)
             [filename, ext] = os.path.splitext(filename)
@@ -1420,12 +1435,11 @@ class Dataset(object):
                 logging.warning("Can't load image " + labeled_im)
                 labeled_im = np.zeros((h, w))
 
-
             label3D = np.zeros((nClasses, h, w), dtype=np.float32)
 
             # Insert 1s in the corresponding positions for each class
             for class_id, colour in classes_to_colour.iteritems():
-                #indices = np.where(np.all(labeled_im == colour, axis=-1))
+                # indices = np.where(np.all(labeled_im == colour, axis=-1))
                 indices = np.where(labeled_im == class_id)
                 num_vals = len(indices[0])
                 if num_vals > 0:
@@ -1474,7 +1488,6 @@ class Dataset(object):
 
         return labels
 
-
     def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far, loading_X=False):
         """
         Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
@@ -1491,7 +1504,7 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
-        if max_len == 0: # use whole sentence as class
+        if max_len == 0:  # use whole sentence as class
             X_out = np.zeros(n_batch).astype('int32')
             for i in range(n_batch):
                 w = X[i]
@@ -1500,8 +1513,8 @@ class Dataset(object):
                 else:
                     X_out[i] = vocab['<unk>']
             if loading_X:
-                X_out = (X_out, None) # This None simulates a mask
-        else: # process text as a sequence of words
+                X_out = (X_out, None)  # This None simulates a mask
+        else:  # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
             else:
@@ -1510,8 +1523,8 @@ class Dataset(object):
             if words_so_far:
                 X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
-                null_row = np.ones((1,max_len_batch)).astype('int32') * self.extra_words['<pad>']
-                zero_row = np.zeros((1,max_len_batch)).astype('int8')
+                null_row = np.ones((1, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                zero_row = np.zeros((1, max_len_batch)).astype('int8')
                 if offset > 0:
                     null_row[0] = np.append([vocab['<null>']] * offset, null_row[0, :-offset])
             else:
@@ -1519,12 +1532,12 @@ class Dataset(object):
                 X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
 
             if max_len_batch == max_len:
-                max_len_batch -= 1 # always leave space for <eos> symbol
+                max_len_batch -= 1  # always leave space for <eos> symbol
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
                 x = X[i].strip().split(' ')
                 len_j = len(x)
-                if fill== 'start':
+                if fill == 'start':
                     offset_j = max_len_batch - len_j
                 else:
                     offset_j = 0
@@ -1545,16 +1558,16 @@ class Dataset(object):
                         X_mask[i, j + offset_j, j + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
 
                 else:
-                    for j, w in zip(range(len_j),x[:len_j]):
+                    for j, w in zip(range(len_j), x[:len_j]):
                         if w in vocab:
-                            X_out[i,j+offset_j] = vocab[w]
+                            X_out[i, j + offset_j] = vocab[w]
                         else:
-                            #print w, "not in vocab!"
-                            X_out[i,j+offset_j] = vocab['<unk>']
-                        X_mask[i,j+offset_j] = 1  # fill mask
+                            # print w, "not in vocab!"
+                            X_out[i, j + offset_j] = vocab['<unk>']
+                        X_mask[i, j + offset_j] = 1  # fill mask
                     X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
 
-                if offset > 0: # Move the text to the right -> null symbol
+                if offset > 0:  # Move the text to the right -> null symbol
                     if words_so_far:
                         for k in range(len_j):
                             X_out[i, k] = np.append([vocab['<null>']] * offset, X_out[i, k, :-offset])
@@ -1562,8 +1575,8 @@ class Dataset(object):
                         X_out[i] = np.append(null_row, X_out[i, :-offset], axis=0)
                         X_mask[i] = np.append(zero_row, X_mask[i, :-offset], axis=0)
                     else:
-                        X_out[i] = np.append([vocab['<null>']]*offset, X_out[i, :-offset])
-                        X_mask[i] = np.append([0]*offset, X_mask[i, :-offset])
+                        X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
+                        X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
             X_out = (X_out, X_mask)
 
         return X_out
@@ -1595,19 +1608,21 @@ class Dataset(object):
         :return: Tokenized version of caption
         """
 
-        punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!']
+        punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',',
+                 '?', '!']
+
         def processPunctuation(inText):
             outText = inText
             for p in punct:
                 outText = outText.replace(p, ' ' + p + ' ')
             return outText
+
         resAns = caption.lower() if lowercase else caption
         resAns = resAns.replace('\n', ' ')
         resAns = resAns.replace('\t', ' ')
         resAns = processPunctuation(resAns)
         resAns = resAns.replace('  ', ' ')
         return resAns
-
 
     def tokenize_aggressive(self, caption, lowercase=True):
         """
@@ -1622,11 +1637,13 @@ class Dataset(object):
         punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')',
                  '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!',
                  '¿', '¡', '\n', '\t', '\r']
+
         def processPunctuation(inText):
             outText = inText
             for p in punct:
                 outText = outText.replace(p, '')
             return outText
+
         resAns = caption.lower() if lowercase else caption
         resAns = processPunctuation(resAns)
         resAns = re.sub('[  ]+', ' ', resAns)
@@ -1647,7 +1664,6 @@ class Dataset(object):
         tokenized = map(lambda x: x.lower(), tokenized.split())
         tokenized = " ".join(tokenized)
         return tokenized
-
 
     def tokenize_montreal(self, caption):
         """
@@ -1703,7 +1719,6 @@ class Dataset(object):
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         return tokenized
 
-
     def tokenize_none_char(self, caption):
         """
         Character-level tokenization. Respects all symbols. Separates chars. Inserts <space> sybmol for spaces.
@@ -1720,25 +1735,26 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
+
         def convert_chars(x):
             if x == ' ':
                 return '<space>'
             else:
                 return x.encode('utf-8')
+
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         tokenized = re.sub('&amp;', ' & ', tokenized)
-        tokenized = re.sub('&#124;',' | ', tokenized)
-        tokenized = re.sub('&gt;',  ' > ', tokenized)
-        tokenized = re.sub('&lt;',  ' < ', tokenized)
-        tokenized = re.sub('&apos;'," ' ", tokenized)
-        tokenized = re.sub('&quot;',' " ', tokenized)
+        tokenized = re.sub('&#124;', ' | ', tokenized)
+        tokenized = re.sub('&gt;', ' > ', tokenized)
+        tokenized = re.sub('&lt;', ' < ', tokenized)
+        tokenized = re.sub('&apos;', " ' ", tokenized)
+        tokenized = re.sub('&quot;', ' " ', tokenized)
         tokenized = re.sub('&#91;', ' [ ', tokenized)
         tokenized = re.sub('&#93;', ' ] ', tokenized)
         tokenized = re.sub('[  ]+', ' ', tokenized)
         tokenized = [convert_chars(char) for char in tokenized.decode('utf-8')]
         tokenized = " ".join(tokenized)
         return tokenized
-
 
     def tokenize_CNN_sentence(self, caption):
         """
@@ -1771,35 +1787,47 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
-        contractions = {"aint": "ain't", "arent": "aren't", "cant": "can't", "couldve": "could've", "couldnt": "couldn't",
-                "couldn'tve": "couldn’t’ve", "couldnt’ve": "couldn’t’ve", "didnt": "didn’t", "doesnt": "doesn’t",
-                "dont": "don’t", "hadnt": "hadn’t", "hadnt’ve": "hadn’t’ve", "hadn'tve": "hadn’t’ve",
-                "hasnt": "hasn’t", "havent": "haven’t", "hed": "he’d", "hed’ve": "he’d’ve", "he’dve": "he’d’ve",
-                "hes": "he’s", "howd": "how’d", "howll": "how’ll", "hows": "how’s", "Id’ve": "I’d’ve",
-                "I’dve": "I’d’ve", "Im": "I’m", "Ive": "I’ve", "isnt": "isn’t", "itd": "it’d", "itd’ve": "it’d’ve",
-                "it’dve": "it’d’ve", "itll": "it’ll", "let’s": "let’s", "maam": "ma’am", "mightnt": "mightn’t",
-                "mightnt’ve": "mightn’t’ve", "mightn’tve": "mightn’t’ve", "mightve": "might’ve", "mustnt": "mustn’t",
-                "mustve": "must’ve", "neednt": "needn’t", "notve": "not’ve", "oclock": "o’clock", "oughtnt": "oughtn’t",
-                "ow’s’at": "’ow’s’at", "’ows’at": "’ow’s’at", "’ow’sat": "’ow’s’at", "shant": "shan’t",
-                "shed’ve": "she’d’ve", "she’dve": "she’d’ve", "she’s": "she’s", "shouldve": "should’ve",
-                "shouldnt": "shouldn’t", "shouldnt’ve": "shouldn’t’ve", "shouldn’tve": "shouldn’t’ve",
-                "somebody’d": "somebodyd", "somebodyd’ve": "somebody’d’ve", "somebody’dve": "somebody’d’ve",
-                "somebodyll": "somebody’ll", "somebodys": "somebody’s", "someoned": "someone’d",
-                "someoned’ve": "someone’d’ve", "someone’dve": "someone’d’ve", "someonell": "someone’ll",
-                "someones": "someone’s", "somethingd": "something’d", "somethingd’ve": "something’d’ve",
-                "something’dve": "something’d’ve", "somethingll": "something’ll", "thats": "that’s",
-                "thered": "there’d", "thered’ve": "there’d’ve", "there’dve": "there’d’ve", "therere": "there’re",
-                "theres": "there’s", "theyd": "they’d", "theyd’ve": "they’d’ve", "they’dve": "they’d’ve",
-                "theyll": "they’ll", "theyre": "they’re", "theyve": "they’ve", "twas": "’twas", "wasnt": "wasn’t",
-                "wed’ve": "we’d’ve", "we’dve": "we’d’ve", "weve": "we've", "werent": "weren’t", "whatll": "what’ll",
-                "whatre": "what’re", "whats": "what’s", "whatve": "what’ve", "whens": "when’s", "whered":
-                    "where’d", "wheres": "where's", "whereve": "where’ve", "whod": "who’d", "whod’ve": "who’d’ve",
-                "who’dve": "who’d’ve", "wholl": "who’ll", "whos": "who’s", "whove": "who've", "whyll": "why’ll",
-                "whyre": "why’re", "whys": "why’s", "wont": "won’t", "wouldve": "would’ve", "wouldnt": "wouldn’t",
-                "wouldnt’ve": "wouldn’t’ve", "wouldn’tve": "wouldn’t’ve", "yall": "y’all", "yall’ll": "y’all’ll",
-                "y’allll": "y’all’ll", "yall’d’ve": "y’all’d’ve", "y’alld’ve": "y’all’d’ve", "y’all’dve": "y’all’d’ve",
-                "youd": "you’d", "youd’ve": "you’d’ve", "you’dve": "you’d’ve", "youll": "you’ll",
-                "youre": "you’re", "youve": "you’ve"}
+        contractions = {"aint": "ain't", "arent": "aren't", "cant": "can't", "couldve": "could've",
+                        "couldnt": "couldn't",
+                        "couldn'tve": "couldn’t’ve", "couldnt’ve": "couldn’t’ve", "didnt": "didn’t",
+                        "doesnt": "doesn’t",
+                        "dont": "don’t", "hadnt": "hadn’t", "hadnt’ve": "hadn’t’ve", "hadn'tve": "hadn’t’ve",
+                        "hasnt": "hasn’t", "havent": "haven’t", "hed": "he’d", "hed’ve": "he’d’ve", "he’dve": "he’d’ve",
+                        "hes": "he’s", "howd": "how’d", "howll": "how’ll", "hows": "how’s", "Id’ve": "I’d’ve",
+                        "I’dve": "I’d’ve", "Im": "I’m", "Ive": "I’ve", "isnt": "isn’t", "itd": "it’d",
+                        "itd’ve": "it’d’ve",
+                        "it’dve": "it’d’ve", "itll": "it’ll", "let’s": "let’s", "maam": "ma’am", "mightnt": "mightn’t",
+                        "mightnt’ve": "mightn’t’ve", "mightn’tve": "mightn’t’ve", "mightve": "might’ve",
+                        "mustnt": "mustn’t",
+                        "mustve": "must’ve", "neednt": "needn’t", "notve": "not’ve", "oclock": "o’clock",
+                        "oughtnt": "oughtn’t",
+                        "ow’s’at": "’ow’s’at", "’ows’at": "’ow’s’at", "’ow’sat": "’ow’s’at", "shant": "shan’t",
+                        "shed’ve": "she’d’ve", "she’dve": "she’d’ve", "she’s": "she’s", "shouldve": "should’ve",
+                        "shouldnt": "shouldn’t", "shouldnt’ve": "shouldn’t’ve", "shouldn’tve": "shouldn’t’ve",
+                        "somebody’d": "somebodyd", "somebodyd’ve": "somebody’d’ve", "somebody’dve": "somebody’d’ve",
+                        "somebodyll": "somebody’ll", "somebodys": "somebody’s", "someoned": "someone’d",
+                        "someoned’ve": "someone’d’ve", "someone’dve": "someone’d’ve", "someonell": "someone’ll",
+                        "someones": "someone’s", "somethingd": "something’d", "somethingd’ve": "something’d’ve",
+                        "something’dve": "something’d’ve", "somethingll": "something’ll", "thats": "that’s",
+                        "thered": "there’d", "thered’ve": "there’d’ve", "there’dve": "there’d’ve",
+                        "therere": "there’re",
+                        "theres": "there’s", "theyd": "they’d", "theyd’ve": "they’d’ve", "they’dve": "they’d’ve",
+                        "theyll": "they’ll", "theyre": "they’re", "theyve": "they’ve", "twas": "’twas",
+                        "wasnt": "wasn’t",
+                        "wed’ve": "we’d’ve", "we’dve": "we’d’ve", "weve": "we've", "werent": "weren’t",
+                        "whatll": "what’ll",
+                        "whatre": "what’re", "whats": "what’s", "whatve": "what’ve", "whens": "when’s", "whered":
+                            "where’d", "wheres": "where's", "whereve": "where’ve", "whod": "who’d",
+                        "whod’ve": "who’d’ve",
+                        "who’dve": "who’d’ve", "wholl": "who’ll", "whos": "who’s", "whove": "who've", "whyll": "why’ll",
+                        "whyre": "why’re", "whys": "why’s", "wont": "won’t", "wouldve": "would’ve",
+                        "wouldnt": "wouldn’t",
+                        "wouldnt’ve": "wouldn’t’ve", "wouldn’tve": "wouldn’t’ve", "yall": "y’all",
+                        "yall’ll": "y’all’ll",
+                        "y’allll": "y’all’ll", "yall’d’ve": "y’all’d’ve", "y’alld’ve": "y’all’d’ve",
+                        "y’all’dve": "y’all’d’ve",
+                        "youd": "you’d", "youd’ve": "you’d’ve", "you’dve": "you’d’ve", "youll": "you’ll",
+                        "youre": "you’re", "youve": "you’ve"}
         punct = [';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\',
                  '_', '-', '>', '<', '@', '`', ',', '?', '!']
         commaStrip = re.compile("(\d)(\,)(\d)")
@@ -1841,14 +1869,13 @@ class Dataset(object):
         resAns = processDigitArticle(resAns)
 
         return resAns
-    
-    
+
     # ------------------------------------------------------- #
     #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-    
+
     def preprocessVideos(self, path_list, id, set_name, max_video_len, img_size, img_size_crop):
-        
+
         if isinstance(path_list, list) and len(path_list) == 2:
             # path to all images in all videos
             data = []
@@ -1860,7 +1887,7 @@ class Dataset(object):
             with open(path_list[1], 'r') as list_:
                 for line in list_:
                     counts_frames.append(int(line.rstrip('\n')))
-            
+
             if id not in self.paths_frames:
                 self.paths_frames[id] = dict()
             self.paths_frames[id][set_name] = data
@@ -1868,13 +1895,13 @@ class Dataset(object):
             self.img_size[id] = img_size
             self.img_size_crop[id] = img_size_crop
         else:
-            raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
+            raise Exception(
+                'Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
 
         return counts_frames
-    
-    
+
     def preprocessVideoFeatures(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len):
-        
+
         if isinstance(path_list, list) and len(path_list) == 2:
             # path to all images in all videos
             paths_frames = []
@@ -1886,22 +1913,23 @@ class Dataset(object):
             with open(path_list[1], 'r') as list_:
                 for line in list_:
                     counts_frames.append(int(line.rstrip('\n')))
-            
+
             # video indices
             video_indices = range(len(counts_frames))
-            
+
             if id not in self.paths_frames:
                 self.paths_frames[id] = dict()
             if id not in self.counts_frames:
                 self.counts_frames[id] = dict()
-            
+
             self.paths_frames[id][set_name] = paths_frames
             self.counts_frames[id][set_name] = counts_frames
             self.max_video_len[id] = max_video_len
             self.img_size[id] = img_size
             self.img_size_crop[id] = img_size_crop
         else:
-            raise Exception('Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
+            raise Exception(
+                'Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
 
         if feat_len is not None:
             if not isinstance(feat_len, list):
@@ -1909,9 +1937,9 @@ class Dataset(object):
             self.features_lengths[id] = feat_len
 
         return video_indices
-    
-    
-    def loadVideos(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, meanSubstraction, dataAugmentation):
+
+    def loadVideos(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, meanSubstraction,
+                   dataAugmentation):
         """
          Loads a set of videos from disk. (Untested!)
 
@@ -1927,25 +1955,26 @@ class Dataset(object):
         """
 
         n_videos = len(n_frames)
-        V = np.zeros((n_videos, max_len*3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
-        
+        V = np.zeros((n_videos, max_len * 3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
+
         idx = [0 for i in range(n_videos)]
         # recover all indices from image's paths of all videos
         for v in range(n_videos):
-            this_last = last+v                
+            this_last = last + v
             if this_last >= n_videos:
-                v = this_last%n_videos
+                v = this_last % n_videos
                 this_last = v
-            idx[v] = int(sum(eval('self.X_'+set_name+'[id][:this_last]')))
-        
+            idx[v] = int(sum(eval('self.X_' + set_name + '[id][:this_last]')))
+
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
-            paths = self.paths_frames[id][set_name][i:i+n]
+            paths = self.paths_frames[id][set_name][i:i + n]
             daRandomParams = None
             if dataAugmentation:
                 daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation,daRandomParams)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation,
+                                     daRandomParams)
             # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
             len_j = images.shape[0]
             offset_j = max_len - len_j
@@ -1953,43 +1982,40 @@ class Dataset(object):
                 len_j = len_j + offset_j
                 offset_j = 0
             for j in range(len_j):
-                V[enum, (j+offset_j)*3:(j+offset_j+1)*3] = images[j]
-        
+                V[enum, (j + offset_j) * 3:(j + offset_j + 1) * 3] = images[j]
+
         return V
-    
-    
-    def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len, external=False, data_augmentation=True):
-        
+
+    def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len,
+                          external=False, data_augmentation=True):
 
         n_videos = len(idx_videos)
         if isinstance(feat_len, list):
             feat_len = feat_len[0]
         features = np.zeros((n_videos, max_len, feat_len))
-        
+
         n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
-        
+
         idx = [0 for i_nvid in range(n_videos)]
         # recover all initial indices from image's paths of all videos
         for v in range(n_videos):
             last_idx = idx_videos[v]
             idx[v] = int(sum(self.counts_frames[id][set_name][:last_idx]))
 
-
         # select subset of max_len from n_frames[i]
         selected_frames = [0 for i_nvid in range(n_videos)]
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i + n]
 
-            if data_augmentation: # apply random frames selection
+            if data_augmentation:  # apply random frames selection
                 selected_idx = sorted(random.sample(range(n), min(max_len, n)))
-            else: # apply equidistant frames selection
-                selected_idx = np.round(np.linspace(0, n-1, min(max_len, n)))
-                #splits = np.array_split(range(n), min(max_len, n))
-                #selected_idx = [s[0] for s in splits]
+            else:  # apply equidistant frames selection
+                selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
+                # splits = np.array_split(range(n), min(max_len, n))
+                # selected_idx = [s[0] for s in splits]
 
             selected_paths = [paths[int(idx)] for idx in selected_idx]
             selected_frames[enum] = selected_paths
-
 
         # load features from selected paths
         for i, vid_paths in enumerate(selected_frames):
@@ -2039,24 +2065,25 @@ class Dataset(object):
 
         return np.array(features)
 
-    
-    def loadVideosByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization, meanSubstraction, dataAugmentation):
+    def loadVideosByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization,
+                          meanSubstraction, dataAugmentation):
         n_videos = len(indices)
-        V = np.zeros((n_videos, max_len*3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
+        V = np.zeros((n_videos, max_len * 3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
 
         idx = [0 for i in range(n_videos)]
         # recover all indices from image's paths of all videos
         for v in range(n_videos):
-            idx[v] = int(sum(eval('self.X_'+set_name+'[id][indices[v]]')))
+            idx[v] = int(sum(eval('self.X_' + set_name + '[id][indices[v]]')))
 
         # load images from each video
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
-            paths = self.paths_frames[id][set_name][i:i+n]
+            paths = self.paths_frames[id][set_name][i:i + n]
             daRandomParams = None
             if dataAugmentation:
                 daRandomParams = self.getDataAugmentationRandomParams(paths, id)
             # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation,
+                                     daRandomParams)
             # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
             len_j = images.shape[0]
             offset_j = max_len - len_j
@@ -2064,19 +2091,18 @@ class Dataset(object):
                 len_j = len_j + offset_j
                 offset_j = 0
             for j in range(len_j):
-                V[enum, (j+offset_j)*3:(j+offset_j+1)*3] = images[j]
+                V[enum, (j + offset_j) * 3:(j + offset_j + 1) * 3] = images[j]
 
         return V
 
-        
     # ------------------------------------------------------- #
     #       TYPE 'id' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-    
+
     def preprocessIDs(self, path_list, id, set_name):
-        
+
         logging.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
-        if isinstance(path_list, str) and os.path.isfile(path_list): # path to list of IDs
+        if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of IDs
             data = []
             with open(path_list, 'r') as list_:
                 for line in list_:
@@ -2084,8 +2110,9 @@ class Dataset(object):
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a text file with an id in each line or an instance of the class list with an id in each position.')
-    
+            raise Exception(
+                'Wrong type for "path_list". It must be a path to a text file with an id in each line or an instance of the class list with an id in each position.')
+
         return data
 
     # ------------------------------------------------------- #
@@ -2094,7 +2121,6 @@ class Dataset(object):
 
     def preprocess3DSemanticLabel(self, path_list, id, associated_id_in):
         return self.preprocess3DLabel(path_list, id, associated_id_in)
-
 
     def setSemanticClasses(self, path_classes, id):
         """
@@ -2112,7 +2138,8 @@ class Dataset(object):
                 for line in list_:
                     line = line.rstrip('\n').split(',')
                     if len(line) != 4:
-                        raise Exception('Wrong format for semantic classes. Must contain a class name followed by the RGB colour values separated by commas.')
+                        raise Exception(
+                            'Wrong format for semantic classes. Must contain a class name followed by the RGB colour values separated by commas.')
                     class_id = self.dic_classes[id][line[0]]
                     semantic_classes[int(class_id)] = [int(line[1]), int(line[2]), int(line[3])]
             self.semantic_classes[id] = semantic_classes
@@ -2121,8 +2148,7 @@ class Dataset(object):
                 'Wrong type for "path_classes". It must be a path to a text file with the classes and their associated colour in the GT image.')
 
         if not self.silence:
-            logging.info('Loaded semantic classes list for data with id: '+id)
-
+            logging.info('Loaded semantic classes list for data with id: ' + id)
 
     def load_GT_3DSemanticLabels(self, gt, id):
         '''
@@ -2181,22 +2207,23 @@ class Dataset(object):
     # ------------------------------------------------------- #
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-    
+
     def preprocess3DLabel(self, path_list, id, associated_id_in):
-        if(isinstance(path_list, str) and os.path.isfile(path_list)):
+        if (isinstance(path_list, str) and os.path.isfile(path_list)):
             path_list_3DLabel = []
             with open(path_list, 'r') as list_:
                 for line in list_:
                     path_list_3DLabel.append(line.strip())
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
+            raise Exception(
+                'Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
 
         self.id_in_3DLabel[id] = associated_id_in
-            
+
         return path_list_3DLabel
 
-
-    def convert_3DLabels_to_bboxes(self, predictions, original_sizes, threshold=0.5, idx_3DLabel=0, size_restriction=0.001):
+    def convert_3DLabels_to_bboxes(self, predictions, original_sizes, threshold=0.5, idx_3DLabel=0,
+                                   size_restriction=0.001):
         """
         Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.
 
@@ -2250,7 +2277,7 @@ class Dataset(object):
                     # Draw bounding box on original image
                     box = list(bbox(current_obj))
                     current_obj = np.nonzero(current_obj)
-                    if len(current_obj) > min_size: # filter too small bboxes
+                    if len(current_obj) > min_size:  # filter too small bboxes
 
                         # expand box before final detection
                         # x_exp = box[2]# * box_expansion
@@ -2316,10 +2343,10 @@ class Dataset(object):
     # ------------------------------------------------------- #
     #       TYPE 'raw-image' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
-    
+
     def preprocessImages(self, path_list, id, set_name, img_size, img_size_crop, use_RGB):
-        
-        if isinstance(path_list, str) and os.path.isfile(path_list): # path to list of images' paths
+
+        if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of images' paths
             data = []
             with open(path_list, 'r') as list_:
                 for line in list_:
@@ -2327,23 +2354,23 @@ class Dataset(object):
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a text file with an image path in each line or an instance of the class list with an image path in each position.')
-            
+            raise Exception(
+                'Wrong type for "path_list". It must be a path to a text file with an image path in each line or an instance of the class list with an image path in each position.')
+
         self.img_size[id] = img_size
         self.img_size_crop[id] = img_size_crop
         self.use_RGB[id] = use_RGB
-            
+
         # Tries to load a train_mean file from the dataset folder if exists
-        mean_file_path = self.path+'/train_mean'
+        mean_file_path = self.path + '/train_mean'
         for s in range(len(self.img_size[id])):
-            mean_file_path += '_'+str(self.img_size[id][s])
-        mean_file_path += '_'+id+'_.jpg'
+            mean_file_path += '_' + str(self.img_size[id][s])
+        mean_file_path += '_' + id + '_.jpg'
         if os.path.isfile(mean_file_path):
             self.setTrainMean(mean_file_path, id)
-            
+
         return data
-       
-    
+
     def setTrainMean(self, mean_image, id, normalization=False):
         """
             Loads a pre-calculated training mean image, 'mean_image' can either be:
@@ -2361,10 +2388,10 @@ class Dataset(object):
         elif isinstance(mean_image, list):
             mean_image = np.array(mean_image)
         self.train_mean[id] = mean_image.astype(np.float32)
-        
+
         if normalization:
-            self.train_mean[id] = self.train_mean[id]/255.0
-            
+            self.train_mean[id] = self.train_mean[id] / 255.0
+
         if self.train_mean[id].shape != tuple(self.img_size_crop[id]):
             if len(self.train_mean[id].shape) == 1 and self.train_mean[id].shape[0] == self.img_size_crop[id][2]:
                 if not self.silence:
@@ -2374,8 +2401,9 @@ class Dataset(object):
                     mean_image[:, :, c] = self.train_mean[id][c]
                 self.train_mean[id] = mean_image
             else:
-                logging.warning("The loaded training mean size does not match the desired images size.\nChange the images size with setImageSize(size) or recalculate the training mean with calculateTrainMean().")
-    
+                logging.warning(
+                    "The loaded training mean size does not match the desired images size.\nChange the images size with setImageSize(size) or recalculate the training mean with calculateTrainMean().")
+
     def calculateTrainMean(self, id):
         """
             Calculates the mean of the data belonging to the training set split in each channel.
@@ -2386,14 +2414,15 @@ class Dataset(object):
         elif self.train_mean[id].shape != tuple(self.img_size[id]):
             calculate = True
             if not self.silence:
-                logging.warning("The loaded training mean size does not match the desired images size. Recalculating mean...")
-            
+                logging.warning(
+                    "The loaded training mean size does not match the desired images size. Recalculating mean...")
+
         if calculate:
             if not self.silence:
                 logging.info("Start training set mean calculation...")
-            
+
             I_sum = np.zeros(self.img_size_crop[id], dtype=np.float64)
-            
+
             # Load images in batches and sum all of them
             init = 0
             batch = 200
@@ -2413,29 +2442,28 @@ class Dataset(object):
                 sys.stdout.write('\r')
                 sys.stdout.write("Processed %d/%d images..." % (final, self.len_train))
                 sys.stdout.flush()
-            
+
             # Mean calculation
-            self.train_mean[id] = I_sum/self.len_train
-            
+            self.train_mean[id] = I_sum / self.len_train
+
             # Store the calculated mean
             mean_name = '/train_mean'
             for s in range(len(self.img_size[id])):
-                mean_name += '_'+str(self.img_size[id][s])
-            mean_name += '_'+id+'_.jpg'
-            store_path = self.path+'/'+mean_name
+                mean_name += '_' + str(self.img_size[id][s])
+            mean_name += '_' + id + '_.jpg'
+            store_path = self.path + '/' + mean_name
             misc.imsave(store_path, self.train_mean[id])
 
-            #self.train_mean[id] = self.train_mean[id].astype(np.float32)/255.0
-            
+            # self.train_mean[id] = self.train_mean[id].astype(np.float32)/255.0
+
             if not self.silence:
-                logging.info("Image mean stored in "+ store_path)
-            
+                logging.info("Image mean stored in " + store_path)
+
         # Return the mean
         return self.train_mean[id]
-    
-        
+
     def loadImages(self, images, id, normalization_type='0-1',
-                   normalization=False, meanSubstraction=True, 
+                   normalization=False, meanSubstraction=True,
                    dataAugmentation=True, daRandomParams=None,
                    external=False, loaded=False):
         """
@@ -2453,51 +2481,52 @@ class Dataset(object):
         """
         # Check if the chosen normalization type exists
         if normalization and normalization_type not in self.__available_norm_im_vid:
-            raise NotImplementedError('The chosen normalization type '+ normalization_type +' is not implemented for the type "raw-image" and "video".')
-        
+            raise NotImplementedError(
+                'The chosen normalization type ' + normalization_type + ' is not implemented for the type "raw-image" and "video".')
+
         # Prepare the training mean image
-        if meanSubstraction: # remove mean
-            
+        if meanSubstraction:  # remove mean
+
             if id not in self.train_mean:
-                raise Exception('Training mean is not loaded or calculated yet for the input with id "'+id+'".')
+                raise Exception('Training mean is not loaded or calculated yet for the input with id "' + id + '".')
             train_mean = copy.copy(self.train_mean[id])
             train_mean = misc.imresize(train_mean, self.img_size_crop[id][0:2])
 
             # Transpose dimensions
-            if len(self.img_size[id]) == 3: # if it is a 3D image
+            if len(self.img_size[id]) == 3:  # if it is a 3D image
                 # Convert RGB to BGR
-                if self.img_size[id][2] == 3: # if has 3 channels
+                if self.img_size[id][2] == 3:  # if has 3 channels
                     train_mean = train_mean[:, :, ::-1]
                 train_mean = train_mean.transpose(2, 0, 1)
 
         nImages = len(images)
-        
+
         type_imgs = np.float32
         if len(self.img_size[id]) == 3:
-            I = np.zeros([nImages]+[self.img_size_crop[id][2]]+self.img_size_crop[id][0:2], dtype=type_imgs)
+            I = np.zeros([nImages] + [self.img_size_crop[id][2]] + self.img_size_crop[id][0:2], dtype=type_imgs)
         else:
-            I = np.zeros([nImages]+self.img_size_crop[id], dtype=type_imgs)
-            
+            I = np.zeros([nImages] + self.img_size_crop[id], dtype=type_imgs)
+
         ''' Process each image separately '''
         for i in range(nImages):
             im = images[i]
-            
+
             if not loaded:
                 if not external:
-                    im = self.path +'/'+ im
-                
+                    im = self.path + '/' + im
+
                 # Check if the filename includes the extension
                 [path, filename] = ntpath.split(im)
                 [filename, ext] = os.path.splitext(filename)
-                
+
                 # If it doesn't then we find it
                 if not ext:
-                    filename = fnmatch.filter(os.listdir(path), filename+'*')
+                    filename = fnmatch.filter(os.listdir(path), filename + '*')
                     if not filename:
-                        raise Exception('Non existent image '+ im)
+                        raise Exception('Non existent image ' + im)
                     else:
-                        im = path+'/'+filename[0]
-                
+                        im = path + '/' + filename[0]
+
                 # Read image
                 try:
                     logging.disable(logging.CRITICAL)
@@ -2506,7 +2535,7 @@ class Dataset(object):
 
                 except:
                     logging.warning("WARNING!")
-                    logging.warning("Can't load image "+im)
+                    logging.warning("Can't load image " + im)
                     im = np.zeros(tuple(self.img_size[id]))
 
             # Convert to RGB
@@ -2534,15 +2563,15 @@ class Dataset(object):
                     im = im[left[0]:right[0], left[1]:right[1], :]
                 else:
                     im = im[left[0]:right[0], left[1]:right[1]]
-                
+
                 # Randomly flip (with a certain probability)
                 flip = randomParams["hflip"]
                 prob_flip_horizontal = randomParams["prob_flip_horizontal"]
-                if flip < prob_flip_horizontal: # horizontal flip
+                if flip < prob_flip_horizontal:  # horizontal flip
                     im = np.fliplr(im)
                 prob_flip_vertical = randomParams["prob_flip_vertical"]
                 flip = randomParams["vflip"]
-                if flip < prob_flip_vertical: # vertical flip
+                if flip < prob_flip_vertical:  # vertical flip
                     im = np.flipud(im)
 
             # Normalize
@@ -2553,28 +2582,28 @@ class Dataset(object):
             # Permute dimensions
             if len(self.img_size[id]) == 3:
                 # Convert RGB to BGR
-                if self.img_size[id][2] == 3: # if has 3 channels
+                if self.img_size[id][2] == 3:  # if has 3 channels
                     im = im[:, :, ::-1]
                 im = im.transpose(2, 0, 1)
             else:
                 pass
-            
+
             # Substract training images mean
-            if meanSubstraction: # remove mean
+            if meanSubstraction:  # remove mean
                 im = im - train_mean
-            
+
             I[i] = im
 
         return I
 
-    
-    def getDataAugmentationRandomParams(self, images, id, prob_flip_horizontal=0.5, prob_flip_vertical = 0.0):
-        
+    def getDataAugmentationRandomParams(self, images, id, prob_flip_horizontal=0.5, prob_flip_vertical=0.0):
+
         daRandomParams = dict()
-       
+
         for i in range(len(images)):
             # Random crop
-            margin = [self.img_size[id][0]-self.img_size_crop[id][0], self.img_size[id][1]-self.img_size_crop[id][1]]
+            margin = [self.img_size[id][0] - self.img_size_crop[id][0],
+                      self.img_size[id][1] - self.img_size_crop[id][1]]
             if margin[0] > 0:
                 left = random.sample([k_ for k_ in range(margin[0])], 1)
             else:
@@ -2587,31 +2616,29 @@ class Dataset(object):
             # Randomly flip (with a certain probability)
             hflip = random.random()
             vflip = random.random()
-            
+
             randomParams = dict()
             randomParams["left"] = left
             randomParams["hflip"] = hflip
             randomParams["vflip"] = vflip
             randomParams["prob_flip_horizontal"] = prob_flip_horizontal
             randomParams["prob_flip_vertical"] = prob_flip_vertical
-            
+
             daRandomParams[images[i]] = randomParams
 
         return daRandomParams
-        
-    
+
     def getClassID(self, class_name, id):
         """
             :return: the class id (int) for a given class string.
         """
         return self.dic_classes[id][class_name]
-    
-    
+
     # ------------------------------------------------------- #
     #       GETTERS
     #           [X,Y] pairs or X only
     # ------------------------------------------------------- #
-        
+
     def getX(self, set_name, init, final, normalization_type='0-1', normalization=False,
              meanSubstraction=True, dataAugmentation=True, debug=False):
         """
@@ -2642,33 +2669,34 @@ class Dataset(object):
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
-        
-        if final > eval('self.len_'+set_name):
+
+        if final > eval('self.len_' + set_name):
             raise Exception('"final" index must be smaller than the number of samples in the set.')
         if init < 0:
             raise Exception('"init" index must be equal or greater than 0.')
         if init >= final:
             raise Exception('"init" index must be smaller than "final" index.')
-        
+
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
-                    x = eval('self.X_'+set_name+'[id_in][init:final]')
+                    x = eval('self.X_' + set_name + '[id_in][init:final]')
                     assert len(x) == (final - init)
                 except:
                     x = [[]] * (final - init)
                     ghost_x = True
             else:
-                x = eval('self.X_'+set_name+'[id_in][init:final]')
+                x = eval('self.X_' + set_name + '[id_in][init:final]')
 
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
+                                        daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
@@ -2678,15 +2706,16 @@ class Dataset(object):
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
                                       words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                                          data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
-                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
+                                               normalization_type, normalization, self.features_lengths[id_in],
+                                               data_augmentation=dataAugmentation)
             X.append(x)
-        
+
         return X
-        
-        
+
     def getXY(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
               dataAugmentation=True, debug=False):
         """
@@ -2719,7 +2748,7 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
-        
+
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
 
         # Recover input samples
@@ -2729,28 +2758,32 @@ class Dataset(object):
             if id_in in self.optional_inputs:
                 try:
                     if surpassed:
-                        x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
+                        x = eval('self.X_' + set_name + '[id_in][last:]') + eval(
+                            'self.X_' + set_name + '[id_in][0:new_last]')
                     else:
-                        x = eval('self.X_'+set_name+'[id_in][last:new_last]')
-                except: x = []
+                        x = eval('self.X_' + set_name + '[id_in][last:new_last]')
+                except:
+                    x = []
             else:
                 if surpassed:
-                    x = eval('self.X_'+set_name+'[id_in][last:]') + eval('self.X_'+set_name+'[id_in][0:new_last]')
+                    x = eval('self.X_' + set_name + '[id_in][last:]') + eval(
+                        'self.X_' + set_name + '[id_in][0:new_last]')
                 else:
-                    x = eval('self.X_'+set_name+'[id_in][last:new_last]')
+                    x = eval('self.X_' + set_name + '[id_in][last:new_last]')
 
-            #if(set_name=='val'):
+            # if(set_name=='val'):
             #    logging.info(x)
-                
+
             # Pre-process inputs
             if not debug:
                 if type_in == 'raw-image':
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
+                                        daRandomParams)
                 elif type_in == 'video':
-                    x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in], 
+                    x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif type_in == 'text':
                     x = self.loadText(x, self.vocabulary[id_in],
@@ -2758,20 +2791,22 @@ class Dataset(object):
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
                                       words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                                          data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], normalization_type,
-                                               normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
+                                               normalization, self.features_lengths[id_in],
+                                               data_augmentation=dataAugmentation)
             X.append(x)
-            
+
         # Recover output samples
         Y = []
         for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
             if surpassed:
-                y = eval('self.Y_'+set_name+'[id_out][last:]') + eval('self.Y_'+set_name+'[id_out][0:new_last]')
+                y = eval('self.Y_' + set_name + '[id_out][last:]') + eval('self.Y_' + set_name + '[id_out][0:new_last]')
             else:
-                y = eval('self.Y_'+set_name+'[id_out][last:new_last]')
-            
+                y = eval('self.Y_' + set_name + '[id_out][last:new_last]')
+
             # Pre-process outputs
             if not debug:
                 if type_out == 'categorical':
@@ -2781,16 +2816,17 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
-                elif(type_out == '3DLabel'):
+                elif (type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     if surpassed:
-                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:]') + eval('self.X_'+set_name+'[assoc_id_in][0:new_last]')
+                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:]') + eval(
+                            'self.X_' + set_name + '[assoc_id_in][0:new_last]')
                     else:
-                        imlist = eval('self.X_'+set_name+'[assoc_id_in][last:new_last]')
+                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:new_last]')
 
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
-                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
                 elif (type_out == '3DSemanticLabel'):
                     nClasses = len(self.classes[id_out])
@@ -2803,8 +2839,8 @@ class Dataset(object):
                         imlist = eval('self.X_' + set_name + '[assoc_id_in][last:new_last]')
 
                     y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
-                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
-                                          imlist)
+                                                  self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
+                                                  imlist)
                 elif type_out == 'text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
@@ -2818,20 +2854,20 @@ class Dataset(object):
                     else:
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(np.uint8)
+                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
+                                np.uint8)
                         if self.sample_weights[id_out][set_name]:
-                            y_aux = (y_aux, y[1]) # join data and mask
+                            y_aux = (y_aux, y[1])  # join data and mask
                     y = y_aux
             Y.append(y)
-        
+
         if debug:
             return [X, Y, [new_last, last, surpassed]]
- 
-        return [X,Y]
-        
-    
+
+        return [X, Y]
+
     def getXY_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
-              dataAugmentation=True, debug=False):
+                          dataAugmentation=True, debug=False):
         """
             Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
 
@@ -2858,7 +2894,7 @@ class Dataset(object):
 
             :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k' samples belonging to the chosen 'set_name'
         """
-        
+
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
@@ -2869,14 +2905,14 @@ class Dataset(object):
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
-                    x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+                    x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
                 except:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
-                x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
-                
-            #if(set_name=='val'):
+                x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+
+            # if(set_name=='val'):
             #    logging.info(x)
 
             # Pre-process inputs
@@ -2885,28 +2921,31 @@ class Dataset(object):
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
+                                        daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
-                                        normalization_type, normalization, meanSubstraction, dataAugmentation)
+                                               normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif type_in == 'text':
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
                                       words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                                          data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
-                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], 
-                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
+                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
+                                               normalization_type, normalization, self.features_lengths[id_in],
+                                               data_augmentation=dataAugmentation)
             X.append(x)
 
         # Recover output samples
         Y = []
         for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
-            y = [eval('self.Y_'+set_name+'[id_out][index]') for index in k]
+            y = [eval('self.Y_' + set_name + '[id_out][index]') for index in k]
 
-            #if(set_name=='val'):
+            # if(set_name=='val'):
             #    logging.info(y)
 
             # Pre-process outputs
@@ -2918,12 +2957,12 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
-                elif(type_out == '3DLabel'):
+                elif (type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
-                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
                 elif (type_out == '3DSemanticLabel'):
                     nClasses = len(self.classes[id_out])
@@ -2949,16 +2988,14 @@ class Dataset(object):
                             y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
-                            y_aux = (y_aux, y[1]) # join data and mask
+                            y_aux = (y_aux, y[1])  # join data and mask
                     y = y_aux
             Y.append(y)
 
-        return [X,Y]
-
-
+        return [X, Y]
 
     def getX_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
-              dataAugmentation=True, debug=False):
+                         dataAugmentation=True, debug=False):
         """
             Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
 
@@ -2996,14 +3033,14 @@ class Dataset(object):
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
-                    x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+                    x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
                 except:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
-                x = [eval('self.X_'+set_name+'[id_in][index]') for index in k]
+                x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
 
-            #if(set_name=='val'):
+            # if(set_name=='val'):
             #    logging.info(x)
 
             # Pre-process inputs
@@ -3012,27 +3049,29 @@ class Dataset(object):
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
+                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
+                                        daRandomParams)
                 elif type_in == 'video':
                     x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
-                                        normalization_type, normalization, meanSubstraction, dataAugmentation)
+                                               normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif type_in == 'text':
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
                                       words_so_far=self.words_so_far[id_in], loading_X=True)[0]
                 elif type_in == 'image-features':
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization, data_augmentation=dataAugmentation)
+                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                                          data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
-                                          normalization_type, normalization, self.features_lengths[id_in], data_augmentation=dataAugmentation)
+                                               normalization_type, normalization, self.features_lengths[id_in],
+                                               data_augmentation=dataAugmentation)
             X.append(x)
 
         return X
 
-
     def getY(self, set_name, init, final, normalization_type='0-1', normalization=False, meanSubstraction=True,
-              dataAugmentation=True, debug=False):
+             dataAugmentation=True, debug=False):
         """
             Gets the [Y] samples for the FULL dataset
 
@@ -3060,17 +3099,17 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 1)
 
-        if final > eval('self.len_'+set_name):
+        if final > eval('self.len_' + set_name):
             raise Exception('"final" index must be smaller than the number of samples in the set.')
         if init < 0:
             raise Exception('"init" index must be equal or greater than 0.')
         if init >= final:
             raise Exception('"init" index must be smaller than "final" index.')
-        
+
         # Recover output samples
         Y = []
         for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
-            y = eval('self.Y_'+set_name+'[id_out][init:final]')
+            y = eval('self.Y_' + set_name + '[id_out][init:final]')
 
             # Pre-process outputs
             if not debug:
@@ -3081,12 +3120,12 @@ class Dataset(object):
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
-                elif(type_out == '3DLabel'):
+                elif (type_out == '3DLabel'):
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
                     y = self.load3DLabels(y, nClasses, dataAugmentation, None,
-                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], 
+                                          self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
                 elif (type_out == '3DSemanticLabel'):
                     nClasses = len(self.classes[id_out])
@@ -3112,13 +3151,12 @@ class Dataset(object):
                             y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
-                            y_aux = (y_aux, y[1]) # join data and mask
+                            y_aux = (y_aux, y[1])  # join data and mask
 
                     y = y_aux
             Y.append(y)
 
         return Y
-
 
     # ------------------------------------------------------- #
     #       AUXILIARY FUNCTIONS
@@ -3134,11 +3172,11 @@ class Dataset(object):
         """
 
         str_ = '---------------------------------------------\n'
-        str_ += '\tDataset '+self.name+'\n'
+        str_ += '\tDataset ' + self.name + '\n'
         str_ += '---------------------------------------------\n'
-        str_ += 'store path: '+self.path+'\n'
-        str_ += 'data length: '+'\n'
-        str_ += '\ttrain - '+str(self.len_train)+'\n'
+        str_ += 'store path: ' + self.path + '\n'
+        str_ += 'data length: ' + '\n'
+        str_ += '\ttrain - ' + str(self.len_train) + '\n'
         str_ += '\tval   - ' + str(self.len_val) + '\n'
         str_ += '\ttest  - ' + str(self.len_test) + '\n'
 
@@ -3162,14 +3200,13 @@ class Dataset(object):
         :param pos:
         :return:
         """
-        if eval('not self.loaded_'+set_name+ '[pos]'):
-            if pos==0:
-                raise Exception('Set '+set_name+' samples are not loaded yet.')
-            elif pos==1:
-                raise Exception('Set '+set_name+' labels are not loaded yet.')
-        return 
-    
-    
+        if eval('not self.loaded_' + set_name + '[pos]'):
+            if pos == 0:
+                raise Exception('Set ' + set_name + ' samples are not loaded yet.')
+            elif pos == 1:
+                raise Exception('Set ' + set_name + ' labels are not loaded yet.')
+        return
+
     def __checkSetName(self, set_name):
         """
         Checks name of a split.
@@ -3178,65 +3215,61 @@ class Dataset(object):
         :return: Boolean specifying the validity of the name
         """
         if set_name != 'train' and set_name != 'val' and set_name != 'test':
-            raise Exception('Incorrect set_name specified "'+set_name+ '"\nOnly "train", "val" or "test" are valid set names.')
-        return 
-        
-    
+            raise Exception(
+                'Incorrect set_name specified "' + set_name + '"\nOnly "train", "val" or "test" are valid set names.')
+        return
+
     def __checkLengthSet(self, set_name):
         """
         Check that the length of the inputs and outputs match. Only checked if the input is not optional.
         :param set_name: 
         :return:
         """
-        if eval('self.loaded_'+set_name+ '[0] and self.loaded_'+set_name+ '[1]'):
+        if eval('self.loaded_' + set_name + '[0] and self.loaded_' + set_name + '[1]'):
             lengths = []
             for id_in in self.ids_inputs:
                 if id_in not in self.optional_inputs:
-                    exec('lengths.append(len(self.X_'+ set_name +'[id_in]))')
+                    exec ('lengths.append(len(self.X_' + set_name + '[id_in]))')
             for id_out in self.ids_outputs:
-                exec('lengths.append(len(self.Y_'+ set_name +'[id_out]))')
+                exec ('lengths.append(len(self.Y_' + set_name + '[id_out]))')
             if lengths[1:] != lengths[:-1]:
                 raise Exception('Inputs and outputs size '
-                                '('+str(lengths)+') for "'+set_name+ '" set do not match.\n'
-                                '\t Inputs:' + str(self.ids_inputs)+''
-                                '\t Outputs:' + str(self.ids_outputs))
+                                '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
+                                                                            '\t Inputs:' + str(self.ids_inputs) + ''
+                                                                                                                  '\t Outputs:' + str(
+                    self.ids_outputs))
 
-                
     def __getNextSamples(self, k, set_name):
         """
             Gets the indices to the next K samples we are going to read.
         """
-        self.__lock_read.acquire() # LOCK (for avoiding reading the same samples by different threads)
-        
-        new_last = eval('self.last_'+set_name+'+k')
-        last = eval('self.last_'+set_name)
-        length = eval('self.len_'+set_name)
+        self.__lock_read.acquire()  # LOCK (for avoiding reading the same samples by different threads)
+
+        new_last = eval('self.last_' + set_name + '+k')
+        last = eval('self.last_' + set_name)
+        length = eval('self.len_' + set_name)
         if new_last > length:
             new_last = new_last - length
             surpassed = True
         else:
             surpassed = False
-        exec('self.last_'+set_name+ '= new_last')
-        
-        self.__lock_read.release() # UNLOCK
-        
+        exec ('self.last_' + set_name + '= new_last')
+
+        self.__lock_read.release()  # UNLOCK
+
         return [new_last, last, surpassed]
 
     def __getstate__(self):
         """
             Behavour applied when pickling a Dataset instance.
-        """ 
+        """
         obj_dict = self.__dict__.copy()
         del obj_dict['_Dataset__lock_read']
         return obj_dict
-        
-    
+
     def __setstate__(self, dict):
         """
             Behavour applied when unpickling a Dataset instance.
         """
         dict['_Dataset__lock_read'] = threading.Lock()
         self.__dict__ = dict
-
-                
-                

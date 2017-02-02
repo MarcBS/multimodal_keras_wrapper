@@ -16,12 +16,11 @@ from read_write import *
 
 
 def checkDefaultParamsBeamSearch(params):
-
     required_params = ['model_inputs', 'model_outputs', 'dataset_inputs', 'dataset_outputs']
     default_params = {'beam_size': 5, 'maxlen': 30, 'normalize': False, 'alpha_factor': 1.0,
                       'words_so_far': False, 'n_parallel_loaders': 5, 'optimized_search': False}
 
-    for k,v in params.iteritems():
+    for k, v in params.iteritems():
         if k in default_params.keys() or k in required_params:
             default_params[k] = v
 
@@ -30,6 +29,7 @@ def checkDefaultParamsBeamSearch(params):
             raise Exception('The beam search parameter ' + k + ' must be specified.')
 
     return default_params
+
 
 ###################################################
 # Performance evaluation callbacks
@@ -120,7 +120,7 @@ class PrintPerformanceMetricOnEpochEnd(KerasCallback):
                 if (self.is_3DLabel):
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
                 predictions = \
-                self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
+                    self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 
             if (self.is_text):
                 if self.out_pred_idx is not None:
@@ -206,6 +206,7 @@ class PrintPerformanceMetricOnEpochEnd(KerasCallback):
                         logging.info('----bad counter: %d/%d' % (self.wait, self.patience))
             """
 
+
 class PrintPerformanceMetricEachNUpdates(KerasCallback):
     def __init__(self, model, dataset, gt_id, metric_name, set_name, batch_size, extra_vars=dict(),
                  is_text=False, is_3DLabel=False, index2word_y=None, sampling='max_likelihood', beam_search=False,
@@ -290,7 +291,7 @@ class PrintPerformanceMetricEachNUpdates(KerasCallback):
                 if (self.is_3DLabel):
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
                 predictions = \
-                self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
+                    self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 
             if (self.is_text):
                 if self.out_pred_idx is not None:
@@ -358,7 +359,6 @@ class PrintPerformanceMetricEachNUpdates(KerasCallback):
 
 
 class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
-
     def __init__(self, model, dataset, gt_id, metric_name, set_name, batch_size, each_n_epochs=1,
                  extra_vars=None,
                  is_text=False, index2word_y=None, input_text_id=None, index2word_x=None,
@@ -507,7 +507,8 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                                                                                     alphas=alphas,
                                                                                     x_text=sources,
                                                                                     heuristic=heuristic,
-                                                                                    mapping=params_prediction['mapping'],
+                                                                                    mapping=params_prediction[
+                                                                                        'mapping'],
                                                                                     verbose=self.verbose)
                 else:
                     predictions = self.model_to_eval.decode_predictions(predictions, 1,
@@ -568,6 +569,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     logging.info('Done evaluating on metric ' + metric)
 
 
+
 ###################################################
 # Storing callbacks
 ###################################################
@@ -587,15 +589,17 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
 
     def on_epoch_end(self, epoch, logs={}):
         epoch += 1
-        if(epoch%self.epochs_for_save==0):
+        if (epoch % self.epochs_for_save == 0):
             print('')
             self.store_function(self.model_to_save, epoch)
 
-    #def on_batch_end(self, n_update, logs={}):
-    #    n_update += 1
-    #    if (n_update % self.epochs_for_save == 0):
-    #        print('')
-    #        self.store_function(self.model_to_save, n_update)
+            # def on_batch_end(self, n_update, logs={}):
+            #    n_update += 1
+            #    if (n_update % self.epochs_for_save == 0):
+            #        print('')
+            #        self.store_function(self.model_to_save, n_update)
+
+
 ###
 
 ###################################################
@@ -603,9 +607,8 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
 ###################################################
 
 class SampleEachNUpdates(KerasCallback):
-
     def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=dict(),
-                 is_text=False, index2word_y=None, input_text_id=None, sampling='max_likelihood',
+                 is_text=False, index2word_y=None, input_text_id=None, sampling='max_likelihood', temperature=1.,
                  beam_search=False, batch_size=50, reload_epoch=0, start_sampling_on_epoch=0, is_3DLabel=False,
                  write_type='list', sampling_type='max_likelihood', out_pred_idx=None, in_pred_idx=None, verbose=1):
         """
@@ -645,6 +648,7 @@ class SampleEachNUpdates(KerasCallback):
         self.each_n_updates = each_n_updates
         self.is_3DLabel = is_3DLabel
         self.extra_vars = extra_vars
+        self.temperature = temperature
         self.reload_epoch = reload_epoch
         self.start_sampling_on_epoch = start_sampling_on_epoch
         self.write_type = write_type
@@ -683,27 +687,28 @@ class SampleEachNUpdates(KerasCallback):
                 predictions = \
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
             predictions = predictions[s]
-            if(self.is_text):
+            if (self.is_text):
                 if self.out_pred_idx is not None:
                     predictions = predictions[self.out_pred_idx]
                 # Convert predictions into sentences
                 if self.beam_search:
                     predictions = self.model_to_eval.decode_predictions_beam_search(predictions,
-                                                      self.index2word_y,
-                                                      verbose=self.verbose)
+                                                                                    self.index2word_y,
+                                                                                    verbose=self.verbose)
                     truths = self.model_to_eval.decode_predictions_one_hot(truths,
-                                          self.index2word_y,
-                                          verbose=self.verbose)
+                                                                           self.index2word_y,
+                                                                           verbose=self.verbose)
                 else:
-                    predictions = self.model_to_eval.decode_predictions(predictions, 1, # always set temperature to 1
-                                                      self.index2word_y,
-                                                      self.sampling_type,
-                                                      verbose=self.verbose)
+                    predictions = self.model_to_eval.decode_predictions(predictions,
+                                                                        self.temperature,
+                                                                        self.index2word_y,
+                                                                        self.sampling_type,
+                                                                        verbose=self.verbose)
 
             # Write samples
             for i, (sample, truth) in enumerate(zip(predictions, truths)):
-                print ("Hypothesis (%d): %s"%(i, sample))
-                print ("Reference  (%d): %s"%(i, truth))
+                print("Hypothesis (%d): %s" % (i, sample))
+                print("Reference  (%d): %s" % (i, truth))
 
 
 ###################################################
@@ -713,6 +718,7 @@ class EarlyStopping(KerasCallback):
     """
     Applies early stopping if performance has not improved for some epochs.
     """
+
     def __init__(self, model, patience=0, check_split='val', metric_check='acc', verbose=1):
         """
         :param model: model to check performance
@@ -732,21 +738,20 @@ class EarlyStopping(KerasCallback):
         all_scores = self.model_to_eval.getLog(self.check_split, self.metric_check)
         if all_scores[-1] is not None:
             self.best_score = max(all_scores)
-            self.best_epoch = all_scores.index(self.best_score)+1
+            self.best_epoch = all_scores.index(self.best_score) + 1
             self.wait = len(all_scores) - self.best_epoch
         else:
             self.best_score = -1.
             self.best_epoch = -1
             self.wait = 0
 
-
     def on_epoch_end(self, epoch, logs={}):
         epoch += 1  # start by index 1
         # Get last metric value from logs
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         if current_score is None:
-            warnings.warn('The chosen metric'+str(self.metric_check)+' does not exist;'
-                          ' this reducer works only with a valid metric.')
+            warnings.warn('The chosen metric' + str(self.metric_check) + ' does not exist;'
+                                                                         ' this reducer works only with a valid metric.')
             return
 
         # Check if the best score has been outperformed in the current epoch
@@ -763,7 +768,8 @@ class EarlyStopping(KerasCallback):
             logging.info('---bad counter: %d/%d' % (self.wait, self.patience))
             if self.wait >= self.patience:
                 if self.verbose > 0:
-                    logging.info("---epoch %d: early stopping. Best %s found at epoch %d: %f" % (epoch, self.metric_check, self.best_epoch, self.best_score))
+                    logging.info("---epoch %d: early stopping. Best %s found at epoch %d: %f" % (
+                    epoch, self.metric_check, self.best_epoch, self.best_score))
                 self.model.stop_training = True
 
 

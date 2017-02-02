@@ -1,6 +1,7 @@
 import matplotlib as mpl
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, ArbitraryDeconvolution2D
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, \
+    ArbitraryDeconvolution2D
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -15,7 +16,7 @@ from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 
-mpl.use('Agg') # run matplotlib without X server (GUI)
+mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 
 import numpy as np
@@ -30,11 +31,13 @@ import copy
 import shutil
 
 import logging
+
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
 
 from keras.optimizers import Adam, RMSprop, Nadam, Adadelta
 from keras.applications.vgg19 import VGG19
+
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
@@ -67,7 +70,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         model_name = path + '/epoch_' + iter
 
     if not model_wrapper.silence:
-        logging.info("<<< Saving model to "+ model_name +" ... >>>")
+        logging.info("<<< Saving model to " + model_name + " ... >>>")
 
     # Create models dir
     if not os.path.isdir(path):
@@ -75,20 +78,20 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
 
     # Save model structure
     json_string = model_wrapper.model.to_json()
-    open(model_name +'_structure.json', 'w').write(json_string)
+    open(model_name + '_structure.json', 'w').write(json_string)
     # Save model weights
-    model_wrapper.model.save_weights(model_name +'_weights.h5', overwrite=True)
+    model_wrapper.model.save_weights(model_name + '_weights.h5', overwrite=True)
 
     # Save auxiliar models for optimized search
     if model_wrapper.model_init is not None:
-        logging.info("<<< Saving model_init to "+ model_name +"_structure_init.json... >>>")
+        logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
         # Save model structure
         json_string = model_wrapper.model_init.to_json()
         open(model_name + '_structure_init.json', 'w').write(json_string)
         # Save model weights
         model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
     if model_wrapper.model_next is not None:
-        logging.info("<<< Saving model_next to "+ model_name +"_structure_next.json... >>>")
+        logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
         # Save model structure
         json_string = model_wrapper.model_next.to_json()
         open(model_name + '_structure_next.json', 'w').write(json_string)
@@ -118,13 +121,13 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
         model_name = model_path
     else:
         model_name = model_path + "/epoch_" + iter
-    logging.info("<<< Loading model from "+ model_name + "_Model_Wrapper.pkl ... >>>")
+    logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
     model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
 
     # Load model weights
-    model.load_weights(model_name +'_weights.h5')
+    model.load_weights(model_name + '_weights.h5')
 
     # Load auxiliar models for optimized search
     if os.path.exists(model_name + '_structure_init.json') and \
@@ -168,7 +171,7 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     else:
         model_wrapper.model_init = None
         model_wrapper.model_next = None
-    logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time()-t))
+    logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time() - t))
     return model_wrapper
 
 
@@ -204,13 +207,13 @@ class Model_Wrapper(object):
             :param inheritance: indicates if we are building an instance from a child class (in this case the model will not be built from this __init__, it should be built from the child class).
         """
         self.__toprint = ['net_type', 'name', 'plot_path', 'models_path', 'lr', 'momentum',
-                            'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
+                          'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
 
         self.silence = silence
         self.net_type = type
         self.lr = 0.01  # insert default learning rate
-        self.momentum = 1.0-self.lr  # insert default momentum
-        self.loss='categorical_crossentropy'  # default loss function
+        self.momentum = 1.0 - self.lr  # insert default momentum
+        self.loss = 'categorical_crossentropy'  # default loss function
         self.training_parameters = []
         self.testing_parameters = []
         self.training_state = dict()
@@ -248,22 +251,22 @@ class Model_Wrapper(object):
             if structure_path:
                 # Load a .json model
                 if not self.silence:
-                    logging.info("<<< Loading model structure from file "+ structure_path +" >>>")
+                    logging.info("<<< Loading model structure from file " + structure_path + " >>>")
                 self.model = model_from_json(open(structure_path).read())
 
             else:
                 # Build model from scratch
                 if hasattr(self, type):
                     if not self.silence:
-                        logging.info("<<< Building "+ type +" Model_Wrapper >>>")
-                    eval('self.'+type+'(nOutput, input_shape)')
+                        logging.info("<<< Building " + type + " Model_Wrapper >>>")
+                    eval('self.' + type + '(nOutput, input_shape)')
                 else:
-                    raise Exception('Model_Wrapper type "'+ type +'" is not implemented.')
+                    raise Exception('Model_Wrapper type "' + type + '" is not implemented.')
 
             # Load weights from file
             if weights_path:
                 if not self.silence:
-                    logging.info("<<< Loading weights from file "+ weights_path +" >>>")
+                    logging.info("<<< Loading weights from file " + weights_path + " >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
 
     def updateLogger(self):
@@ -302,7 +305,6 @@ class Model_Wrapper(object):
             raise Exception("When using Sequential models only one output can be provided in outputsMapping")
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
-
 
     def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None, decay=0.0, clipnorm=10., optimizer=None):
         """
@@ -355,8 +357,7 @@ class Model_Wrapper(object):
             raise NotImplementedError()
 
         if not self.silence:
-            logging.info("Optimizer updated, learning rate set to "+ str(lr))
-
+            logging.info("Optimizer updated, learning rate set to " + str(lr))
 
     def setName(self, model_name, plots_path=None, models_path=None, create_plots=False, clear_dirs=True):
         """
@@ -402,7 +403,6 @@ class Model_Wrapper(object):
                 if not os.path.isdir(self.plot_path):
                     os.makedirs(self.plot_path)
 
-
     def checkParameters(self, input_params, default_params):
         """
             Validates a set of input parameters and uses the default ones if not specified.
@@ -411,14 +411,14 @@ class Model_Wrapper(object):
         params = dict()
 
         # Check input parameters' validity
-        for key,val in input_params.iteritems():
+        for key, val in input_params.iteritems():
             if key in valid_params:
                 params[key] = val
             else:
-                raise Exception("Parameter '"+ key +"' is not a valid parameter.")
+                raise Exception("Parameter '" + key + "' is not a valid parameter.")
 
         # Use default parameters if not provided
-        for key,default_val in default_params.iteritems():
+        for key, default_val in default_params.iteritems():
             if key not in params:
                 params[key] = default_val
 
@@ -469,7 +469,7 @@ class Model_Wrapper(object):
             callback_model = self.callback_model
         else:
             callback_model = self
-            
+
         if hasattr(callback_model, 'stop_training') and callback_model.stop_training == True:
             return True
         else:
@@ -514,15 +514,15 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
 
         default_params = {'n_epochs': 1, 'batch_size': 50,
-                          'maxlen':100,  # sequence learning parameters (BeamSearch)
+                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
                           'homogeneous_batches': False,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
                           'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
-                          'data_augmentation': True,'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True,  'epoch_offset': 0,
-                          'patience': 0, 'metric_check': None,    # early stopping parameters
-                          'lr_decay': None, 'lr_gamma':0.1} # LR decay parameters
+                          'data_augmentation': True, 'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True, 'epoch_offset': 0,
+                          'patience': 0, 'metric_check': None,  # early stopping parameters
+                          'lr_decay': None, 'lr_gamma': 0.1}  # LR decay parameters
 
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -564,11 +564,11 @@ class Model_Wrapper(object):
 
     def __train(self, ds, params, state=dict()):
 
-        logging.info("Training parameters: "+ str(params))
+        logging.info("Training parameters: " + str(params))
 
         # initialize state
         state['samples_per_epoch'] = ds.len_train
-        state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch'])/params['batch_size']))
+        state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch']) / params['batch_size']))
 
         # Prepare callbacks
         callbacks = []
@@ -594,10 +594,10 @@ class Model_Wrapper(object):
         # Prepare data generators
         if params['homogeneous_batches']:
             train_gen = Homogeneous_Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
-                                             batch_size=params['batch_size'], maxlen=params['maxlen'],
-                                             normalization=params['normalize'],
-                                             data_augmentation=params['data_augmentation'],
-                                             mean_substraction=params['mean_substraction']).generator()
+                                                         batch_size=params['batch_size'], maxlen=params['maxlen'],
+                                                         normalization=params['normalize'],
+                                                         data_augmentation=params['data_augmentation'],
+                                                         mean_substraction=params['mean_substraction']).generator()
         else:
             train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
                                              batch_size=params['batch_size'],
@@ -611,14 +611,14 @@ class Model_Wrapper(object):
             # Calculate how many validation interations are we going to perform per test
             n_valid_samples = ds.len_val
             if params['num_iterations_val'] == None:
-                params['num_iterations_val'] = int(math.ceil(float(n_valid_samples)/params['batch_size']))
+                params['num_iterations_val'] = int(math.ceil(float(n_valid_samples) / params['batch_size']))
 
             # prepare data generator
             val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
-                                         batch_size=params['batch_size'],
-                                         normalization=params['normalize'],
-                                         data_augmentation=False,
-                                         mean_substraction=params['mean_substraction']).generator()
+                                           batch_size=params['batch_size'],
+                                           normalization=params['normalize'],
+                                           data_augmentation=False,
+                                           mean_substraction=params['mean_substraction']).generator()
         else:
             val_gen = None
             n_valid_samples = None
@@ -642,11 +642,11 @@ class Model_Wrapper(object):
         losses_train = []
         top_scores_train = []
 
-        logging.info("Training parameters: "+ str(params))
+        logging.info("Training parameters: " + str(params))
 
         # Calculate how many iterations are we going to perform
         if not state.has_key('n_iterations_per_epoch'):
-            state['n_iterations_per_epoch'] = int(math.ceil(float(ds.len_train)/params['batch_size']))
+            state['n_iterations_per_epoch'] = int(math.ceil(float(ds.len_train) / params['batch_size']))
             state['count_iteration'] = 0
             state['epoch'] = 0
             state['it'] = -1
@@ -656,11 +656,11 @@ class Model_Wrapper(object):
 
         # Calculate how many validation interations are we going to perform per test
         if params['num_iterations_val'] == None:
-            params['num_iterations_val'] = int(math.ceil(float(ds.len_val)/params['batch_size']))
+            params['num_iterations_val'] = int(math.ceil(float(ds.len_val) / params['batch_size']))
 
         # Apply params['n_epochs'] for training
         for state['epoch'] in range(state['epoch'], params['n_epochs']):
-            logging.info("<<< Starting epoch "+str(state['epoch']+1)+"/"+str(params['n_epochs']) +" >>>")
+            logging.info("<<< Starting epoch " + str(state['epoch'] + 1) + "/" + str(params['n_epochs']) + " >>>")
 
             # Shuffle the training samples before each epoch
             ds.shuffleTraining()
@@ -669,19 +669,19 @@ class Model_Wrapper(object):
             t_queue = []
             for t_ind in range(state['n_iterations_per_epoch']):
                 t = ThreadDataLoader(retrieveXY, ds, 'train', params['batch_size'],
-                                params['normalize'], params['mean_substraction'], params['data_augmentation'])
-                if t_ind > state['it'] and t_ind < params['n_parallel_loaders'] +state['it']+1:
+                                     params['normalize'], params['mean_substraction'], params['data_augmentation'])
+                if t_ind > state['it'] and t_ind < params['n_parallel_loaders'] + state['it'] + 1:
                     t.start()
                 t_queue.append(t)
 
-            for state['it'] in range(state['it']+1, state['n_iterations_per_epoch']):
-                state['count_iteration'] +=1
+            for state['it'] in range(state['it'] + 1, state['n_iterations_per_epoch']):
+                state['count_iteration'] += 1
 
                 # Recovers a pre-loaded batch of data
-                time_load = time.time()*1000.0
+                time_load = time.time() * 1000.0
                 t = t_queue[state['it']]
                 t.join()
-                time_load = time.time()*1000.0-time_load
+                time_load = time.time() * 1000.0 - time_load
                 if params['verbose'] > 0:
                     logging.info("DEBUG: Batch loaded in %0.8s ms" % str(time_load))
 
@@ -697,32 +697,32 @@ class Model_Wrapper(object):
                     print exc_trace
                     raise Exception('Exception occurred in ThreadLoader.')
                 t_queue[state['it']] = None
-                if state['it']+params['n_parallel_loaders'] < state['n_iterations_per_epoch']:
+                if state['it'] + params['n_parallel_loaders'] < state['n_iterations_per_epoch']:
                     if params['verbose'] > 1:
                         logging.info("DEBUG: Starting new thread loader.")
-                    t = t_queue[state['it']+params['n_parallel_loaders']]
+                    t = t_queue[state['it'] + params['n_parallel_loaders']]
                     t.start()
 
                 # Forward and backward passes on the current batch
-                time_train = time.time()*1000.0
+                time_train = time.time() * 1000.0
                 if isinstance(self.model, Sequential):
                     [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
                     loss = self.model.train_on_batch(X_batch, Y_batch)
                     loss = loss[0]
                     [score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch)[0])
                 elif isinstance(self.model, Model):
-                    t1 = time.time()*1000.0
+                    t1 = time.time() * 1000.0
                     [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
                     if params['verbose'] > 1:
-                        t2 = time.time()*1000.0
-                        logging.info("DEBUG: Data ready for training (%0.8s ms)." % (t2-t1))
+                        t2 = time.time() * 1000.0
+                        logging.info("DEBUG: Data ready for training (%0.8s ms)." % (t2 - t1))
                     loss = self.model.train_on_batch(X_batch, Y_batch)
                     if params['verbose'] > 1:
-                        t3 = time.time()*1000.0
-                        logging.info("DEBUG: Training forward & backward passes performed (%0.8s ms)." % (t3-t2))
+                        t3 = time.time() * 1000.0
+                        logging.info("DEBUG: Training forward & backward passes performed (%0.8s ms)." % (t3 - t2))
                     loss = loss[0]
                     score = loss[1]
-                    #[score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch))
+                    # [score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch))
                 else:
                     [data, last_output] = self._prepareGraphData(X_batch, Y_batch)
                     loss = self.model.train_on_batch(data)
@@ -736,7 +736,7 @@ class Model_Wrapper(object):
                     else:
                         score = score[last_output]
                         top_score = top_score[last_output]
-                time_train = time.time()*1000.0-time_train
+                time_train = time.time() * 1000.0 - time_train
                 if params['verbose'] > 0:
                     logging.info("DEBUG: Train on batch performed in %0.8s ms" % str(time_train))
 
@@ -750,10 +750,11 @@ class Model_Wrapper(object):
                     score = np.mean(scores_train)
                     top_score = np.mean(top_scores_train)
 
-                    logging.info("Train - Iteration: "+ str(state['count_iteration']) + "   (" + str(state['count_iteration']*params['batch_size']) + " samples seen)")
-                    logging.info("\tTrain loss: "+ str(loss))
-                    logging.info("\tTrain accuracy: "+ str(score))
-                    logging.info("\tTrain accuracy top-5: "+ str(top_score))
+                    logging.info("Train - Iteration: " + str(state['count_iteration']) + "   (" + str(
+                        state['count_iteration'] * params['batch_size']) + " samples seen)")
+                    logging.info("\tTrain loss: " + str(loss))
+                    logging.info("\tTrain accuracy: " + str(score))
+                    logging.info("\tTrain accuracy top-5: " + str(top_score))
 
                     self.log('train', 'iteration', state['count_iteration'])
                     self.log('train', 'loss', loss)
@@ -777,7 +778,7 @@ class Model_Wrapper(object):
                     t_val_queue = []
                     for t_ind in range(params['num_iterations_val']):
                         t = ThreadDataLoader(retrieveXY, ds, 'val', params['batch_size'],
-                                        params['normalize'], params['mean_substraction'], False)
+                                             params['normalize'], params['mean_substraction'], False)
                         if t_ind < params['n_parallel_loaders']:
                             t.start()
                         t_val_queue.append(t)
@@ -797,8 +798,8 @@ class Model_Wrapper(object):
                             print exc_trace
                             raise Exception('Exception occurred in ThreadLoader.')
                         t_val_queue[it_val] = None
-                        if it_val+params['n_parallel_loaders'] < params['num_iterations_val']:
-                            t_val = t_val_queue[it_val+params['n_parallel_loaders']]
+                        if it_val + params['n_parallel_loaders'] < params['num_iterations_val']:
+                            t_val = t_val_queue[it_val + params['n_parallel_loaders']]
                             t_val.start()
 
                         # Forward prediction pass
@@ -806,7 +807,8 @@ class Model_Wrapper(object):
                             [X_val, Y_val] = self._prepareSequentialData(X_val, Y_val)
                             loss = self.model.test_on_batch(X_val, Y_val, accuracy=False)
                             loss = loss[0]
-                            [score, top_score] = self._getSequentialAccuracy(Y_val, self.model.predict_on_batch(X_val)[0])
+                            [score, top_score] = self._getSequentialAccuracy(Y_val,
+                                                                             self.model.predict_on_batch(X_val)[0])
                         else:
                             [data, last_output] = self._prepareGraphData(X_val, Y_val)
                             loss = self.model.test_on_batch(data)
@@ -825,13 +827,13 @@ class Model_Wrapper(object):
                         top_scores.append(float(top_score))
 
                     ds.resetCounters(set_name='val')
-                    logging.info("Val - Iteration: "+ str(state['count_iteration']))
+                    logging.info("Val - Iteration: " + str(state['count_iteration']))
                     loss = np.mean(losses)
-                    logging.info("\tValidation loss: "+ str(loss))
+                    logging.info("\tValidation loss: " + str(loss))
                     score = np.mean(scores)
-                    logging.info("\tValidation accuracy: "+ str(score))
+                    logging.info("\tValidation accuracy: " + str(score))
                     top_score = np.mean(top_scores)
-                    logging.info("\tValidation accuracy top-5: "+ str(top_score))
+                    logging.info("\tValidation accuracy top-5: " + str(top_score))
 
                     self.log('val', 'iteration', state['count_iteration'])
                     self.log('val', 'loss', loss)
@@ -857,18 +859,19 @@ class Model_Wrapper(object):
                             lr_gamma = params['lr_gamma'][0][1]
                         else:
                             # Find next valid lr_gamma
-                            while params['lr_gamma'][0][0] != None and params['lr_gamma'][0][0] <= state['count_iteration']:
+                            while params['lr_gamma'][0][0] != None and params['lr_gamma'][0][0] <= state[
+                                'count_iteration']:
                                 params['lr_gamma'].pop(0)
                             lr_gamma = params['lr_gamma'][0][1]
                     # Else, we have a single lr_gamma for the whole training
                     else:
                         lr_gamma = params['lr_gamma']
                     lr = self.lr * lr_gamma
-                    momentum = 1-lr
+                    momentum = 1 - lr
                     self.setOptimizer(lr, momentum)
 
             self.training_state = state
-            state['it'] = -1 # start again from the first iteration of the next epoch
+            state['it'] = -1  # start again from the first iteration of the next epoch
 
     def testNet(self, ds, parameters, out_name=None):
 
@@ -882,31 +885,31 @@ class Model_Wrapper(object):
 
         # Calculate how many test interations are we going to perform
         n_samples = ds.len_test
-        num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+        num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
         # Test model
         # We won't use an Homogeneous_Batch_Generator for testing
         data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
-                                         batch_size=params['batch_size'],
-                                         normalization=params['normalize'],
-                                         data_augmentation=False,
-                                         mean_substraction=params['mean_substraction']).generator()
+                                        batch_size=params['batch_size'],
+                                        normalization=params['normalize'],
+                                        data_augmentation=False,
+                                        mean_substraction=params['mean_substraction']).generator()
 
         out = self.model.evaluate_generator(data_gen,
-                                      val_samples=n_samples,
-                                      max_q_size=params['n_parallel_loaders'])
+                                            val_samples=n_samples,
+                                            max_q_size=params['n_parallel_loaders'])
 
         # Display metrics results
         for name, o in zip(self.model.metrics_names, out):
-            logging.info('test '+name+': %0.8s' % o)
+            logging.info('test ' + name + ': %0.8s' % o)
 
-        #loss_all = out[0]
-        #loss_ecoc = out[1]
-        #loss_final = out[2]
-        #acc_ecoc = out[3]
-        #acc_final = out[4]
-        #logging.info('Test loss: %0.8s' % loss_final)
-        #logging.info('Test accuracy: %0.8s' % acc_final)
+            # loss_all = out[0]
+            # loss_ecoc = out[1]
+            # loss_final = out[2]
+            # acc_ecoc = out[3]
+            # acc_final = out[4]
+            # logging.info('Test loss: %0.8s' % loss_final)
+            # logging.info('Test accuracy: %0.8s' % acc_final)
 
     def testNet_deprecated(self, ds, parameters, out_name=None):
         """
@@ -931,7 +934,7 @@ class Model_Wrapper(object):
 
         logging.info("<<< Testing model >>>")
 
-        numIterationsTest = int(math.ceil(float(ds.len_test)/params['batch_size']))
+        numIterationsTest = int(math.ceil(float(ds.len_test) / params['batch_size']))
         scores = []
         losses = []
         top_scores = []
@@ -939,7 +942,7 @@ class Model_Wrapper(object):
         t_test_queue = []
         for t_ind in range(numIterationsTest):
             t = ThreadDataLoader(retrieveXY, ds, 'test', params['batch_size'],
-                            params['normalize'], params['mean_substraction'], False)
+                                 params['normalize'], params['mean_substraction'], False)
             if t_ind < params['n_parallel_loaders']:
                 t.start()
             t_test_queue.append(t)
@@ -958,8 +961,8 @@ class Model_Wrapper(object):
                 print exc_trace
                 raise Exception('Exception occurred in ThreadLoader.')
             t_test_queue[it_test] = None
-            if it_test+params['n_parallel_loaders'] < numIterationsTest:
-                t_test = t_test_queue[it_test+params['n_parallel_loaders']]
+            if it_test + params['n_parallel_loaders'] < numIterationsTest:
+                t_test = t_test_queue[it_test + params['n_parallel_loaders']]
                 t_test.start()
 
             if isinstance(self.model, Sequential) or isinstance(self.model, Model):
@@ -986,9 +989,9 @@ class Model_Wrapper(object):
             top_scores.append(float(top_score))
 
         ds.resetCounters(set_name='test')
-        logging.info("\tTest loss: "+ str(np.mean(losses)))
-        logging.info("\tTest accuracy: "+ str(np.mean(scores)))
-        logging.info("\tTest accuracy top-5: "+ str(np.mean(top_scores)))
+        logging.info("\tTest loss: " + str(np.mean(losses)))
+        logging.info("\tTest accuracy: " + str(np.mean(scores)))
+        logging.info("\tTest accuracy top-5: " + str(np.mean(top_scores)))
 
     def testNetSamples(self, X, batch_size=50):
         """
@@ -1068,12 +1071,12 @@ class Model_Wrapper(object):
         ##########################################
         # Apply prediction on current timestep
         ##########################################
-        if params['batch_size'] >= n_samples: # The model inputs beam will fit into one batch in memory
+        if params['batch_size'] >= n_samples:  # The model inputs beam will fit into one batch in memory
             out_data = model.predict_on_batch(in_data)
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
                 aux_in_data = {}
-                for k,v in in_data.iteritems():
+                for k, v in in_data.iteritems():
                     aux_in_data[k] = np.expand_dims(v[i], axis=0)
                 predicted_out = model.predict_on_batch(aux_in_data)
                 if i == 0:
@@ -1169,7 +1172,7 @@ class Model_Wrapper(object):
         ##########################################
         # Apply prediction on current timestep
         ##########################################
-        if params['batch_size'] >= n_samples: # The model inputs beam will fit into one batch in memory
+        if params['batch_size'] >= n_samples:  # The model inputs beam will fit into one batch in memory
             out_data = model.predict_on_batch(in_data)
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
@@ -1248,18 +1251,21 @@ class Model_Wrapper(object):
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
             if k > params['maxlen']:
-                raise NotImplementedError("BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
-            state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))] * live_k)
+                raise NotImplementedError(
+                    "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
+            state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray(
+                [np.zeros((params['maxlen'], params['maxlen']))] * live_k)
         else:
-            state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['maxlen'])] * live_k)
+            state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray(
+                [np.zeros(params['maxlen'])] * live_k)
 
         prev_out = None
         for ii in xrange(params['maxlen']):
             # for every possible live sample calc prob for every possible label
-            if params['optimized_search']: # use optimized search model if available
+            if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
                 if params['pos_unk']:
-                    alphas = prev_out[-1][0] # Shape: (k, n_steps)
+                    alphas = prev_out[-1][0]  # Shape: (k, n_steps)
                     prev_out = prev_out[:-1]
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
@@ -1267,24 +1273,24 @@ class Model_Wrapper(object):
             cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
             # Find the best options by calling argsort of flatten array
-            ranks_flat = cand_flat.argsort()[:(k-dead_k)]
+            ranks_flat = cand_flat.argsort()[:(k - dead_k)]
             # Decypher flatten indices
             voc_size = probs.shape[1]
-            trans_indices = ranks_flat / voc_size # index of row
-            word_indices = ranks_flat % voc_size # index of col
+            trans_indices = ranks_flat / voc_size  # index of row
+            word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_trans_indices = []
-            new_hyp_scores = np.zeros(k-dead_k).astype('float32')
+            new_hyp_scores = np.zeros(k - dead_k).astype('float32')
             if params['pos_unk']:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
-                new_hyp_samples.append(hyp_samples[ti]+[wi])
+                new_hyp_samples.append(hyp_samples[ti] + [wi])
                 new_trans_indices.append(ti)
                 new_hyp_scores[idx] = copy.copy(costs[idx])
                 if params['pos_unk']:
-                    new_hyp_alphas.append(hyp_alphas[ti]+[alphas[ti]])
+                    new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
 
             # check the finished samples
             new_live_k = 0
@@ -1322,13 +1328,15 @@ class Model_Wrapper(object):
                     state_below = np.expand_dims(state_below, axis=0)
             else:
                 state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
-                                         np.zeros((state_below.shape[0], max(params['maxlen'] - state_below.shape[1] - 1, 0)),
-                                         dtype='int64')))
+                                         np.zeros((state_below.shape[0],
+                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                  dtype='int64')))
 
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
                     state_below = np.hstack((state_below,
-                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1], state_below.shape[2]))))
+                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                                       state_below.shape[2]))))
 
             if params['optimized_search'] and ii > 0:
                 # filter next search inputs w.r.t. remaining samples
@@ -1354,7 +1362,6 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
         return self.predictBeamSearchNet(ds, parameters)
 
-
     def predictBeamSearchNet(self, ds, parameters={}):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
@@ -1365,7 +1372,7 @@ class Model_Wrapper(object):
         :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
         :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
-
+        :param conditional_intersample: boolean indicating if the outputs from a sample are the inputs of the following one
         The following attributes must be inserted to the model when building an optimized search model:
         
             * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
@@ -1381,8 +1388,9 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
                           'normalize': False, 'mean_substraction': True,
-                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples':-1,
+                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
+                          'model_conditional_inputs': ['previous_description'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
@@ -1392,7 +1400,9 @@ class Model_Wrapper(object):
                           'optimized_search': False,
                           'pos_unk': False,
                           'heuristic': 0,
-                          'mapping': None
+                          'mapping': None,
+                          'conditional_intersample': False,
+                          'link_index_id': 'link_index'
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -1413,37 +1423,49 @@ class Model_Wrapper(object):
                     "- ids_inputs_next\n",
                     "- ids_outputs_next\n")
 
+        # Check if the model is ready for applying a conditional intersample search
+        if params['optimized_search']:
+            if 'matchings_sample_to_next_sample' not in dir(self) or \
+                            'ids_conditional_inputs' not in dir(self) or \
+                            'ids_conditional_outputs' not in dir(self):
+                raise Exception(
+                    "The following attributes must be inserted to the model when building an optimized search model:\n",
+                    "- matchings_sample_to_next_sample\n",
+                    "- ids_conditional_inputs\n",
+                    "- ids_conditional_outputs\n")
+
+
         predictions = dict()
         for s in params['predict_on_sets']:
-            logging.info("<<< Predicting outputs of "+s+" set >>>")
+            logging.info("<<< Predicting outputs of " + s + " set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
-            if not params['optimized_search']: # use optimized search model if available
+            if not params['optimized_search']:  # use optimized search model if available
                 assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
             params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
-                n_samples = eval("ds.len_"+s)
-                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                n_samples = eval("ds.len_" + s)
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                         batch_size=params['batch_size'],
-                                         normalization=params['normalize'],
-                                         data_augmentation=False,
-                                         mean_substraction=params['mean_substraction'],
-                                         predict=True).generator()
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=True).generator()
             else:
                 n_samples = params['n_samples']
-                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                         batch_size=params['batch_size'],
-                                         normalization=params['normalize'],
-                                         data_augmentation=False,
-                                         mean_substraction=params['mean_substraction'],
-                                         predict=False,
-                                         random_samples=n_samples).generator()
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=False,
+                                                random_samples=n_samples).generator()
             if params['n_samples'] > 0:
                 references = []
                 sources_sampling = []
@@ -1475,8 +1497,14 @@ class Model_Wrapper(object):
                         X[input_id] = data[input_id]
                         if params['pos_unk']:
                             s_dict[input_id] = X[input_id]
-                    if params['pos_unk'] and not eval('ds.loaded_raw_'+ s +'[0]'):
+                    if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
                         sources.append(s_dict)
+
+                if params['conditional_intersample']:
+                    if X[params['link_index_id']] == -1:
+                        previous_outputs = [ds.extra_words['<null>']] * params['model_conditional_inputs']
+                    for input_id in params['model_conditional_inputs']:
+                        X[input_id] = previous_outputs[input_id]
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
@@ -1491,7 +1519,7 @@ class Model_Wrapper(object):
                     else:
                         samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                     if params['normalize']:
-                        counts = [len(sample)**params['alpha_factor'] for sample in samples]
+                        counts = [len(sample) ** params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
@@ -1503,15 +1531,20 @@ class Model_Wrapper(object):
                     if params['n_samples'] > 0:
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
+                    if params['conditional_intersample']:
+                        # TODO: Make it more general
+                        for (output_id, input_id) in params['matchings_sample_to_next_sample'].iteritems():
+                            previous_outputs[output_id] = best_sample
 
-            sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n'%(total_cost, total_cost/n_samples))
+            sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
+            total_cost, total_cost / n_samples))
             sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
-            time.time() - start_time) / n_samples))
+                time.time() - start_time) / n_samples))
 
             sys.stdout.flush()
 
             if params['pos_unk']:
-                if eval('ds.loaded_raw_'+ s +'[0]'):
+                if eval('ds.loaded_raw_' + s + '[0]'):
                     sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'))
                 predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
             else:
@@ -1552,11 +1585,11 @@ class Model_Wrapper(object):
         for s in params['predict_on_sets']:
             predictions[s] = []
 
-            logging.info("<<< Predicting outputs of "+s+" set >>>")
+            logging.info("<<< Predicting outputs of " + s + " set >>>")
             # Calculate how many interations are we going to perform
             if params['n_samples'] is None:
-                n_samples = eval("ds.len_"+s)
-                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                n_samples = eval("ds.len_" + s)
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
                 # Prepare data generator
                 data_gen = Data_Batch_Generator(s,
                                                 self,
@@ -1570,18 +1603,18 @@ class Model_Wrapper(object):
 
             else:
                 n_samples = params['n_samples']
-                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
                 # Prepare data generator
                 data_gen = Data_Batch_Generator(s,
-                                            self,
-                                            ds,
-                                            num_iterations,
-                                            batch_size=params['batch_size'],
-                                            normalization=params['normalize'],
-                                            data_augmentation=False,
-                                            mean_substraction=params['mean_substraction'],
-                                            predict=True,
-                                            random_samples=n_samples).generator()
+                                                self,
+                                                ds,
+                                                num_iterations,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=True,
+                                                random_samples=n_samples).generator()
             # Predict on model
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,
@@ -1596,7 +1629,7 @@ class Model_Wrapper(object):
 
                     # Apply post-processing function
                     if isinstance(postprocess_fun, list):
-                        last_processed = min(processed_samples+params['batch_size'], n_samples)
+                        last_processed = min(processed_samples + params['batch_size'], n_samples)
                         out = postprocess_fun[0](out, postprocess_fun[1][processed_samples:last_processed])
                     else:
                         out = postprocess_fun(out)
@@ -1632,10 +1665,10 @@ class Model_Wrapper(object):
         predictions = self.model.predict_on_batch(X)
 
         # Select output if indicated
-        if isinstance(self.model, Model): # Graph
+        if isinstance(self.model, Model):  # Graph
             if out_name:
                 predictions = predictions[out_name]
-        elif isinstance(self.model, Sequential): # Sequential
+        elif isinstance(self.model, Sequential):  # Sequential
             predictions = predictions[0]
 
         return predictions
@@ -1706,7 +1739,7 @@ class Model_Wrapper(object):
 
         for a_no in answer_pred_matrix:
             init_token_pos = 0
-            end_token_pos = [j for j, x in enumerate(a_no) if x==EOS or x == PAD]
+            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
             tmp = ' '.join(a_no[init_token_pos:end_token_pos])
             answer_pred.append(tmp)
@@ -1773,16 +1806,17 @@ class Model_Wrapper(object):
             assert x_text is not None, 'When using POS_UNK, you must provide the input ' \
                                        'text to decode_predictions_beam_search!'
             if verbose > 0:
-                logging.info('Using heuristic %d'%heuristic)
+                logging.info('Using heuristic %d' % heuristic)
         if pad_sequences:
-                preds = [pred[:sum([int(elem > 0) for elem in pred])+1] for pred in preds]
+            preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
         flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
         answer_pred = []
 
         if alphas is not None:
             x_text = map(lambda x: x.split(), x_text)
-            hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
-                                  alphas, x_text)
+            hard_alignments = map(
+                lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
+                alphas, x_text)
             for i, a_no in enumerate(flattened_answer_pred):
                 if unk_symbol in a_no:
                     if verbose > 1:
@@ -1846,13 +1880,13 @@ class Model_Wrapper(object):
             raise NotImplementedError
         return data
 
-    def _prepareSequentialData(self, X, Y=None,sample_weights=False):
+    def _prepareSequentialData(self, X, Y=None, sample_weights=False):
 
         # Format input data
-        if len(self.inputsMapping.keys()) == 1: # single input
+        if len(self.inputsMapping.keys()) == 1:  # single input
             X = X[self.inputsMapping[0]]
         else:
-            X_new = [0 for i in range(len(self.inputsMapping.keys()))] # multiple inputs
+            X_new = [0 for i in range(len(self.inputsMapping.keys()))]  # multiple inputs
             for in_model, in_ds in self.inputsMapping.iteritems():
                 X_new[in_model] = X[in_ds]
             X = X_new
@@ -1860,14 +1894,14 @@ class Model_Wrapper(object):
         # Format output data (only one output possible for Sequential models)
         Y_sample_weights = None
         if Y is not None:
-            if len(self.outputsMapping.keys()) == 1: # single output
+            if len(self.outputsMapping.keys()) == 1:  # single output
                 if isinstance(Y[self.outputsMapping[0]], tuple):
                     Y = Y[self.outputsMapping[0]][0]
                     Y_sample_weights = Y[self.outputsMapping[0]][1]
                 else:
                     Y = Y[self.outputsMapping[0]]
             else:
-                Y_new = [0 for i in range(len(self.outputsMapping.keys()))] # multiple outputs
+                Y_new = [0 for i in range(len(self.outputsMapping.keys()))]  # multiple outputs
                 Y_sample_weights = [None for i in range(len(self.outputsMapping.keys()))]
                 for out_model, out_ds in self.outputsMapping.iteritems():
                     if isinstance(Y[out_ds], tuple):
@@ -1933,15 +1967,15 @@ class Model_Wrapper(object):
         top_accuracies = dict()
         for key, val in prediction.iteritems():
             pred = np_utils.categorical_probas_to_classes(val)
-            top_pred = np.argsort(val,axis=1)[:,::-1][:,:np.min([topN, val.shape[1]])]
+            top_pred = np.argsort(val, axis=1)[:, ::-1][:, :np.min([topN, val.shape[1]])]
             GT = np_utils.categorical_probas_to_classes(data[key])
 
             # Top1 accuracy
-            correct = [1 if pred[i]==GT[i] else 0 for i in range(len(pred))]
+            correct = [1 if pred[i] == GT[i] else 0 for i in range(len(pred))]
             accuracies[key] = float(np.sum(correct)) / float(len(correct))
 
             # TopN accuracy
-            top_correct = [1 if GT[i] in top_pred[i,:] else 0 for i in range(top_pred.shape[0])]
+            top_correct = [1 if GT[i] in top_pred[i, :] else 0 for i in range(top_pred.shape[0])]
             top_accuracies[key] = float(np.sum(top_correct)) / float(len(top_correct))
 
         return [accuracies, top_accuracies]
@@ -1950,16 +1984,16 @@ class Model_Wrapper(object):
         """
             Calculates the topN accuracy obtained from a set of samples on a Sequential model.
         """
-        top_pred = np.argsort(pred,axis=1)[:,::-1][:,:np.min([topN, pred.shape[1]])]
+        top_pred = np.argsort(pred, axis=1)[:, ::-1][:, :np.min([topN, pred.shape[1]])]
         pred = np_utils.categorical_probas_to_classes(pred)
         GT = np_utils.categorical_probas_to_classes(GT)
 
         # Top1 accuracy
-        correct = [1 if pred[i]==GT[i] else 0 for i in range(len(pred))]
+        correct = [1 if pred[i] == GT[i] else 0 for i in range(len(pred))]
         accuracies = float(np.sum(correct)) / float(len(correct))
 
         # TopN accuracy
-        top_correct = [1 if GT[i] in top_pred[i,:] else 0 for i in range(top_pred.shape[0])]
+        top_correct = [1 if GT[i] in top_pred[i, :] else 0 for i in range(top_pred.shape[0])]
         top_accuracies = float(np.sum(top_correct)) / float(len(top_correct))
 
         return [accuracies, top_accuracies]
@@ -1974,14 +2008,13 @@ class Model_Wrapper(object):
         Plot basic model information.
         """
 
-        #if(isinstance(self.model, Model)):
+        # if(isinstance(self.model, Model)):
         print_summary(self.model.layers)
         return ''
 
-
         obj_str = '-----------------------------------------------------------------------------------\n'
         class_name = self.__class__.__name__
-        obj_str += '\t\t'+class_name +' instance\n'
+        obj_str += '\t\t' + class_name + ' instance\n'
         obj_str += '-----------------------------------------------------------------------------------\n'
 
         # Print pickled attributes
@@ -1991,19 +2024,23 @@ class Model_Wrapper(object):
 
         # Print layers structure
         obj_str += "\n::: Layers structure:\n\n"
-        obj_str += 'MODEL TYPE: ' + self.model.__class__.__name__ +'\n'
+        obj_str += 'MODEL TYPE: ' + self.model.__class__.__name__ + '\n'
         if isinstance(self.model, Sequential):
-            obj_str += "INPUT: "+ str(tuple(self.model.layers[0].input_shape)) +"\n"
+            obj_str += "INPUT: " + str(tuple(self.model.layers[0].input_shape)) + "\n"
             for i, layer in enumerate(self.model.layers):
-                obj_str += str(layer.name) + ' '+ str(layer.output_shape) +'\n'
-            obj_str += "OUTPUT: "+ str(self.model.layers[-1].output_shape) +"\n"
+                obj_str += str(layer.name) + ' ' + str(layer.output_shape) + '\n'
+            obj_str += "OUTPUT: " + str(self.model.layers[-1].output_shape) + "\n"
         else:
             for i, inputs in enumerate(self.model.input_config):
-                obj_str += "INPUT (" +str(i)+ "): "+ str(inputs['name']) + ' '+ str(tuple(inputs['input_shape'])) +"\n"
+                obj_str += "INPUT (" + str(i) + "): " + str(inputs['name']) + ' ' + str(
+                    tuple(inputs['input_shape'])) + "\n"
             for node in self.model.node_config:
-                obj_str += str(node['name']) + ', in ['+ str(node['input']) +']' +', out_shape: ' +str(self.model.nodes[node['name']].output_shape) + '\n'
+                obj_str += str(node['name']) + ', in [' + str(node['input']) + ']' + ', out_shape: ' + str(
+                    self.model.nodes[node['name']].output_shape) + '\n'
             for i, outputs in enumerate(self.model.output_config):
-                obj_str += "OUTPUT (" +str(i)+ "): "+ str(outputs['name']) + ', in ['+ str(outputs['input']) +']' +', out_shape: ' +str(self.model.outputs[outputs['name']].output_shape) +"\n"
+                obj_str += "OUTPUT (" + str(i) + "): " + str(outputs['name']) + ', in [' + str(
+                    outputs['input']) + ']' + ', out_shape: ' + str(
+                    self.model.outputs[outputs['name']].output_shape) + "\n"
 
         obj_str += '-----------------------------------------------------------------------------------\n'
 
@@ -2020,8 +2057,8 @@ class Model_Wrapper(object):
         :param value: numerical value taken by the data_type
         """
         if mode not in self.__modes:
-            raise Exception('The provided mode "'+ mode +'" is not valid.')
-        #if data_type not in self.__data_types:
+            raise Exception('The provided mode "' + mode + '" is not valid.')
+        # if data_type not in self.__data_types:
         #    raise Exception('The provided data_type "'+ data_type +'" is not valid.')
 
         if mode not in self.__logger:
@@ -2029,7 +2066,6 @@ class Model_Wrapper(object):
         if data_type not in self.__logger[mode]:
             self.__logger[mode][data_type] = list()
         self.__logger[mode][data_type].append(value)
-
 
     def getLog(self, mode, data_type):
         """
@@ -2050,7 +2086,7 @@ class Model_Wrapper(object):
         """
             Plots the training progress information.
         """
-        colours = {'train_accuracy_top-5': 'y','train_accuracy': 'y', 'train_loss': 'k',
+        colours = {'train_accuracy_top-5': 'y', 'train_accuracy': 'y', 'train_loss': 'k',
                    'val_accuracy_top-5': 'g', 'val_accuracy': 'g', 'val_loss': 'b',
                    'max_accuracy': 'r'}
 
@@ -2065,13 +2101,13 @@ class Model_Wrapper(object):
                 raise Exception("Either train 'accuracy' and/or 'loss' must be logged into the model for plotting.")
 
             iterations = self.__logger['train']['iteration']
-            all_iterations = all_iterations+iterations
+            all_iterations = all_iterations + iterations
 
             # Loss
             if 'loss' in self.__logger['train']:
                 loss = self.__logger['train']['loss']
                 plt.subplot(211)
-                #plt.plot(iterations, loss, colours['train_loss']+'o')
+                # plt.plot(iterations, loss, colours['train_loss']+'o')
                 plt.plot(iterations, loss, colours['train_loss'])
                 plt.subplot(212)
                 plt.plot(iterations, loss, colours['train_loss'])
@@ -2080,22 +2116,21 @@ class Model_Wrapper(object):
             if 'accuracy' in self.__logger['train']:
                 accuracy = self.__logger['train']['accuracy']
                 plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['train_accuracy']+'o')
+                plt.plot(iterations, accuracy, colours['train_accuracy'] + 'o')
                 plt.plot(iterations, accuracy, colours['train_accuracy'])
                 plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['train_accuracy']+'o')
+                plt.plot(iterations, accuracy, colours['train_accuracy'] + 'o')
                 plt.plot(iterations, accuracy, colours['train_accuracy'])
 
             # Accuracy Top-5
             if 'accuracy top-5' in self.__logger['train']:
                 accuracy = self.__logger['train']['accuracy top-5']
                 plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['train_accuracy_top-5']+'.')
+                plt.plot(iterations, accuracy, colours['train_accuracy_top-5'] + '.')
                 plt.plot(iterations, accuracy, colours['train_accuracy_top-5'])
                 plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['train_accuracy_top-5']+'.')
+                plt.plot(iterations, accuracy, colours['train_accuracy_top-5'] + '.')
                 plt.plot(iterations, accuracy, colours['train_accuracy_top-5'])
-
 
         # Plot val information
         if 'val' in self.__logger:
@@ -2105,13 +2140,13 @@ class Model_Wrapper(object):
                 raise Exception("Either val 'accuracy' and/or 'loss' must be logged into the model for plotting.")
 
             iterations = self.__logger['val']['iteration']
-            all_iterations = all_iterations+iterations
+            all_iterations = all_iterations + iterations
 
             # Loss
             if 'loss' in self.__logger['val']:
                 loss = self.__logger['val']['loss']
                 plt.subplot(211)
-                #plt.plot(iterations, loss, colours['val_loss']+'o')
+                # plt.plot(iterations, loss, colours['val_loss']+'o')
                 plt.plot(iterations, loss, colours['val_loss'])
                 plt.subplot(212)
                 plt.plot(iterations, loss, colours['val_loss'])
@@ -2120,32 +2155,32 @@ class Model_Wrapper(object):
             if 'accuracy' in self.__logger['val']:
                 accuracy = self.__logger['val']['accuracy']
                 plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['val_accuracy']+'o')
+                plt.plot(iterations, accuracy, colours['val_accuracy'] + 'o')
                 plt.plot(iterations, accuracy, colours['val_accuracy'])
                 plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['val_accuracy']+'o')
+                plt.plot(iterations, accuracy, colours['val_accuracy'] + 'o')
                 plt.plot(iterations, accuracy, colours['val_accuracy'])
 
             # Accuracy Top-5
             if 'accuracy top-5' in self.__logger['val']:
                 accuracy = self.__logger['val']['accuracy top-5']
                 plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['val_accuracy_top-5']+'.')
+                plt.plot(iterations, accuracy, colours['val_accuracy_top-5'] + '.')
                 plt.plot(iterations, accuracy, colours['val_accuracy_top-5'])
                 plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['val_accuracy_top-5']+'.')
+                plt.plot(iterations, accuracy, colours['val_accuracy_top-5'] + '.')
                 plt.plot(iterations, accuracy, colours['val_accuracy_top-5'])
 
         # Plot max accuracy
-        max_iter = np.max(all_iterations+[0])
+        max_iter = np.max(all_iterations + [0])
         plt.subplot(211)
-        plt.plot([0, max_iter], [1, 1], colours['max_accuracy']+'-')
+        plt.plot([0, max_iter], [1, 1], colours['max_accuracy'] + '-')
         plt.subplot(212)
-        plt.plot([0, max_iter], [1, 1], colours['max_accuracy']+'-')
-        plt.axis([0, max_iter, 0, 1]) # limit height to 1
+        plt.plot([0, max_iter], [1, 1], colours['max_accuracy'] + '-')
+        plt.axis([0, max_iter, 0, 1])  # limit height to 1
 
         # Fill labels
-        #plt.ylabel('Loss/Accuracy')
+        # plt.ylabel('Loss/Accuracy')
         plt.xlabel('Iteration')
         plt.subplot(211)
         plt.title('Training progress')
@@ -2155,7 +2190,7 @@ class Model_Wrapper(object):
             os.makedirs(self.plot_path)
 
         # Save figure
-        plot_file = self.plot_path+'/iter_'+str(max_iter)+'.jpg'
+        plot_file = self.plot_path + '/iter_' + str(max_iter) + '.jpg'
         plt.savefig(plot_file)
         if not self.silence:
             logging.info("Progress plot saved in " + plot_file)
@@ -2234,7 +2269,6 @@ class Model_Wrapper(object):
 
         self.model = Model(input=inp, output=out)
 
-
     def basic_model_seq(self, nOutput, input):
         """
             Builds a basic CNN model.
@@ -2292,7 +2326,6 @@ class Model_Wrapper(object):
         self.model.add(Dense(nOutput))
         self.model.add(Activation('softmax'))
 
-
     def One_vs_One(self, nOutput, input):
         """
             Builds a simple One_vs_One network with 3 convolutional layers (useful for ECOC models).
@@ -2304,17 +2337,17 @@ class Model_Wrapper(object):
             input_shape = tuple(input)
 
         self.model = Sequential()
-        self.model.add(ZeroPadding2D((1,1),input_shape=input_shape)) # default input_shape=(3,224,224)
+        self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
         self.model.add(Convolution2D(32, 1, 1, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(16, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(8, 3, 3, activation='relu'))
-        self.model.add(MaxPooling2D((2,2), strides=(1,1)))
+        self.model.add(MaxPooling2D((2, 2), strides=(1, 1)))
 
         self.model.add(Flatten())
         self.model.add(Dropout(0.5))
-        self.model.add(Dense(nOutput, activation='softmax')) # default nOutput=1000
+        self.model.add(Dense(nOutput, activation='softmax'))  # default nOutput=1000
 
     def VGG_16(self, nOutput, input):
         """
@@ -2327,48 +2360,48 @@ class Model_Wrapper(object):
             input_shape = tuple(input)
 
         self.model = Sequential()
-        self.model.add(ZeroPadding2D((1,1),input_shape=input_shape)) # default input_shape=(3,224,224)
+        self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
         self.model.add(Convolution2D(64, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(64, 3, 3, activation='relu'))
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(128, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(128, 3, 3, activation='relu'))
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(256, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(256, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(256, 3, 3, activation='relu'))
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3, activation='relu'))
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3, activation='relu'))
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3, activation='relu'))
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(Flatten())
         self.model.add(Dense(4096, activation='relu'))
         self.model.add(Dropout(0.5))
         self.model.add(Dense(4096, activation='relu'))
         self.model.add(Dropout(0.5))
-        self.model.add(Dense(nOutput, activation='softmax')) # default nOutput=1000
+        self.model.add(Dense(nOutput, activation='softmax'))  # default nOutput=1000
 
     def VGG_16_PReLU(self, nOutput, input):
         """
@@ -2381,54 +2414,54 @@ class Model_Wrapper(object):
             input_shape = tuple(input)
 
         self.model = Sequential()
-        self.model.add(ZeroPadding2D((1,1),input_shape=input_shape)) # default input_shape=(3,224,224)
+        self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
         self.model.add(Convolution2D(64, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(64, 3, 3))
         self.model.add(PReLU())
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(128, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(128, 3, 3))
         self.model.add(PReLU())
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(256, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(256, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(256, 3, 3))
         self.model.add(PReLU())
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3))
         self.model.add(PReLU())
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3))
         self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1,1)))
+        self.model.add(ZeroPadding2D((1, 1)))
         self.model.add(Convolution2D(512, 3, 3))
         self.model.add(PReLU())
-        self.model.add(MaxPooling2D((2,2), strides=(2,2)))
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(Flatten())
         self.model.add(Dense(4096))
@@ -2437,7 +2470,7 @@ class Model_Wrapper(object):
         self.model.add(Dense(4096))
         self.model.add(PReLU())
         self.model.add(Dropout(0.5))
-        self.model.add(Dense(nOutput, activation='softmax')) # default nOutput=1000
+        self.model.add(Dense(nOutput, activation='softmax'))  # default nOutput=1000
 
     def VGG_16_FunctionalAPI(self, nOutput, input):
         """
@@ -2450,52 +2483,51 @@ class Model_Wrapper(object):
 
         vis_input = Input(shape=input_shape, name="vis_input")
 
-        x = ZeroPadding2D((1,1))                           (vis_input)
-        x = Convolution2D(64, 3, 3, activation='relu')     (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(64, 3, 3, activation='relu')     (x)
-        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+        x = ZeroPadding2D((1, 1))(vis_input)
+        x = Convolution2D(64, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(64, 3, 3, activation='relu')(x)
+        x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(128, 3, 3, activation='relu')    (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(128, 3, 3, activation='relu')    (x)
-        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(128, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(128, 3, 3, activation='relu')(x)
+        x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(256, 3, 3, activation='relu')    (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(256, 3, 3, activation='relu')    (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(256, 3, 3, activation='relu')    (x)
-        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(512, 3, 3, activation='relu')    (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(512, 3, 3, activation='relu')    (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(512, 3, 3, activation='relu')    (x)
-        x = MaxPooling2D((2,2), strides=(2,2))             (x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(512, 3, 3, activation='relu')    (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(512, 3, 3, activation='relu')    (x)
-        x = ZeroPadding2D((1,1))                           (x)
-        x = Convolution2D(512, 3, 3, activation='relu')    (x)
-        x = MaxPooling2D((2,2), strides=(2,2),
-                         name='last_max_pool')             (x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = ZeroPadding2D((1, 1))(x)
+        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = MaxPooling2D((2, 2), strides=(2, 2),
+                         name='last_max_pool')(x)
 
-        x = Flatten()                                      (x)
-        x = Dense(4096, activation='relu')                 (x)
-        x = Dropout(0.5)                                   (x)
-        x = Dense(4096, activation='relu')                 (x)
-        x = Dropout(0.5, name='last_dropout')              (x)
-        x = Dense(nOutput, activation='softmax', name='output')   (x) # nOutput=1000 by default
+        x = Flatten()(x)
+        x = Dense(4096, activation='relu')(x)
+        x = Dropout(0.5)(x)
+        x = Dense(4096, activation='relu')(x)
+        x = Dropout(0.5, name='last_dropout')(x)
+        x = Dense(nOutput, activation='softmax', name='output')(x)  # nOutput=1000 by default
 
         self.model = Model(input=vis_input, output=x)
-
 
     def VGG_19(self, nOutput, input):
 
@@ -2514,7 +2546,6 @@ class Model_Wrapper(object):
         out = Dense(nOutput, name=self.ids_outputs[0], activation='softmax')(out)
 
         self.model = Model(input=image, output=out)
-
 
     def VGG_19_ImageNet(self, nOutput, input):
 
@@ -2646,59 +2677,58 @@ class Model_Wrapper(object):
         # Define image input layer
         img_input = Input(shape=input_shape, name='input_data')
         CONCAT_AXIS = 1
-        NB_CLASS = nOutput         # number of classes (default 1000)
+        NB_CLASS = nOutput  # number of classes (default 1000)
         DROPOUT = 0.4
-        WEIGHT_DECAY = 0.0005   # L2 regularization factor
-        USE_BN = True           # whether to use batch normalization
+        WEIGHT_DECAY = 0.0005  # L2 regularization factor
+        USE_BN = True  # whether to use batch normalization
         # Theano - 'th' (channels, width, height)
         # Tensorflow - 'tf' (width, height, channels)
         DIM_ORDERING = 'th'
-        pool_name = 'last_max_pool' # name of the last max-pooling layer
+        pool_name = 'last_max_pool'  # name of the last max-pooling layer
 
-        x = self.conv_layer(img_input, nb_col=7, nb_filter=64, subsample=(2,2),
-                       nb_row=7, dim_ordering=DIM_ORDERING, padding=1)
+        x = self.conv_layer(img_input, nb_col=7, nb_filter=64, subsample=(2, 2),
+                            nb_row=7, dim_ordering=DIM_ORDERING, padding=1)
         x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING)(x)
 
         x = self.conv_layer(x, nb_col=1, nb_filter=64,
-                       nb_row=1, dim_ordering=DIM_ORDERING)
+                            nb_row=1, dim_ordering=DIM_ORDERING)
         x = self.conv_layer(x, nb_col=3, nb_filter=192,
-                       nb_row=3, dim_ordering=DIM_ORDERING, padding=1)
+                            nb_row=3, dim_ordering=DIM_ORDERING, padding=1)
         x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING)(x)
 
-        x = self.inception_module(x, params=[(64, ), (96, 128), (16, 32), (32, )],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
-        x = self.inception_module(x, params=[(128,), (128, 192), (32, 96), (64, )],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(64,), (96, 128), (16, 32), (32,)],
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(128,), (128, 192), (32, 96), (64,)],
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
 
         x = ZeroPadding2D(padding=(2, 2), dim_ordering=DIM_ORDERING)(x)
         x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING)(x)
 
-        x = self.inception_module(x, params=[(192,), (96, 208), (16, 48), (64, )],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(192,), (96, 208), (16, 48), (64,)],
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
         # AUX 1 - Branch HERE
-        x = self.inception_module(x, params=[(160,), (112, 224), (24, 64), (64, )],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
-        x = self.inception_module(x, params=[(128,), (128, 256), (24, 64), (64, )],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
-        x = self.inception_module(x, params=[(112,), (144, 288), (32, 64), (64, )],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(160,), (112, 224), (24, 64), (64,)],
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(128,), (128, 256), (24, 64), (64,)],
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+        x = self.inception_module(x, params=[(112,), (144, 288), (32, 64), (64,)],
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
         # AUX 2 - Branch HERE
         x = self.inception_module(x, params=[(256,), (160, 320), (32, 128), (128,)],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
         x = MaxPooling2D(strides=(2, 2), pool_size=(3, 3), dim_ordering=DIM_ORDERING, name=pool_name)(x)
 
         x = self.inception_module(x, params=[(256,), (160, 320), (32, 128), (128,)],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
         x = self.inception_module(x, params=[(384,), (192, 384), (48, 128), (128,)],
-                             dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
+                                  dim_ordering=DIM_ORDERING, concat_axis=CONCAT_AXIS)
         x = AveragePooling2D(strides=(1, 1), dim_ordering=DIM_ORDERING)(x)
         x = Flatten()(x)
         x = Dropout(DROPOUT)(x)
-        #x = Dense(output_dim=NB_CLASS,
+        # x = Dense(output_dim=NB_CLASS,
         #          activation='linear')(x)
         x = Dense(output_dim=NB_CLASS,
                   activation='softmax', name='output')(x)
-
 
         self.model = Model(input=img_input, output=[x])
 
@@ -2734,7 +2764,7 @@ class Model_Wrapper(object):
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax'))
 
-    def One_vs_One_Inception(self, nOutput=2, input=[224,224,3]):
+    def One_vs_One_Inception(self, nOutput=2, input=[224, 224, 3]):
         """
             Builds a simple One_vs_One_Inception network with 2 inception layers (useful for ECOC models).
         """
@@ -2751,7 +2781,8 @@ class Model_Wrapper(object):
         # Inception Eb
         out_Eb = self.__addInception('inceptionEb', out_Ea, 2, 2, 4, 2, 1, 1)
         # Average Pooling    pool_size=(7,7)
-        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1,1)), name='ave_pool/ECOC', input=out_Eb)
+        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1, 1)), name='ave_pool/ECOC',
+                            input=out_Eb)
         # Softmax
         self.model.add_node(Flatten(), name='loss_OnevsOne/classifier_flatten', input='ave_pool/ECOC')
         self.model.add_node(Dropout(0.5), name='loss_OnevsOne/drop', input='loss_OnevsOne/classifier_flatten')
@@ -2765,22 +2796,24 @@ class Model_Wrapper(object):
         """
 
         # Inception Ea
-        out_Ea = self.__addInception('inceptionEa_'+str(id_branch), input, 4, 2, 8, 2, 2, 2)
+        out_Ea = self.__addInception('inceptionEa_' + str(id_branch), input, 4, 2, 8, 2, 2, 2)
         # Inception Eb
-        out_Eb = self.__addInception('inceptionEb_'+str(id_branch), out_Ea, 2, 2, 4, 2, 1, 1)
+        out_Eb = self.__addInception('inceptionEb_' + str(id_branch), out_Ea, 2, 2, 4, 2, 1, 1)
         # Average Pooling    pool_size=(7,7)
-        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1,1)), name='ave_pool/ECOC_'+str(id_branch), input=out_Eb)
+        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1, 1)),
+                            name='ave_pool/ECOC_' + str(id_branch), input=out_Eb)
         # Softmax
         self.model.add_node(Flatten(),
-                            name='fc_OnevsOne_'+str(id_branch)+'/flatten', input='ave_pool/ECOC_'+str(id_branch))
+                            name='fc_OnevsOne_' + str(id_branch) + '/flatten', input='ave_pool/ECOC_' + str(id_branch))
         self.model.add_node(Dropout(0.5),
-                            name='fc_OnevsOne_'+str(id_branch)+'/drop', input='fc_OnevsOne_'+str(id_branch)+'/flatten')
-        output_name = 'fc_OnevsOne_'+str(id_branch)
-        self.model.add_node(Dense(nOutput, activation=activation), 
-                            name=output_name, input='fc_OnevsOne_'+str(id_branch)+'/drop')
+                            name='fc_OnevsOne_' + str(id_branch) + '/drop',
+                            input='fc_OnevsOne_' + str(id_branch) + '/flatten')
+        output_name = 'fc_OnevsOne_' + str(id_branch)
+        self.model.add_node(Dense(nOutput, activation=activation),
+                            name=output_name, input='fc_OnevsOne_' + str(id_branch) + '/drop')
 
         return output_name
-        
+
     def add_One_vs_One_Inception_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
@@ -2789,56 +2822,58 @@ class Model_Wrapper(object):
         in_node = self.model.get_layer(input).output
 
         # Inception Ea
-        [out_Ea, out_Ea_name] = self.__addInception_Functional('inceptionEa_'+str(id_branch), in_node, 4, 2, 8, 2, 2, 2)
+        [out_Ea, out_Ea_name] = self.__addInception_Functional('inceptionEa_' + str(id_branch), in_node, 4, 2, 8, 2, 2,
+                                                               2)
         # Inception Eb
-        [out_Eb, out_Eb_name] = self.__addInception_Functional('inceptionEb_'+str(id_branch), out_Ea, 2, 2, 4, 2, 1, 1)
+        [out_Eb, out_Eb_name] = self.__addInception_Functional('inceptionEb_' + str(id_branch), out_Ea, 2, 2, 4, 2, 1,
+                                                               1)
         # Average Pooling    pool_size=(7,7)
-        x = AveragePooling2D(pool_size=input_shape, strides=(1,1), name='ave_pool/ECOC_'+str(id_branch)) (out_Eb)
+        x = AveragePooling2D(pool_size=input_shape, strides=(1, 1), name='ave_pool/ECOC_' + str(id_branch))(out_Eb)
 
         # Softmax
-        output_name = 'fc_OnevsOne_'+str(id_branch)
-        x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
-        x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
-        out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
-        
+        output_name = 'fc_OnevsOne_' + str(id_branch)
+        x = Flatten(name='fc_OnevsOne_' + str(id_branch) + '/flatten')(x)
+        x = Dropout(0.5, name='fc_OnevsOne_' + str(id_branch) + '/drop')(x)
+        out_node = Dense(nOutput, activation=activation, name=output_name)(x)
+
         return out_node
 
     def add_One_vs_One_3x3_Functional(self, input, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
-        out_3x3 = Convolution2D(nkernels, 3, 3, name='3x3/ecoc_'+str(id_branch), activation='relu')            (input)
+        out_3x3 = Convolution2D(nkernels, 3, 3, name='3x3/ecoc_' + str(id_branch), activation='relu')(input)
 
         # Average Pooling    pool_size=(7,7)
-        x = AveragePooling2D(pool_size=input_shape, strides=(1,1), name='ave_pool/ecoc_'+str(id_branch)) (out_3x3)
+        x = AveragePooling2D(pool_size=input_shape, strides=(1, 1), name='ave_pool/ecoc_' + str(id_branch))(out_3x3)
 
         # Softmax
-        output_name = 'fc_OnevsOne_'+str(id_branch)+'/out'
-        x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
-        x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
-        out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
-        
+        output_name = 'fc_OnevsOne_' + str(id_branch) + '/out'
+        x = Flatten(name='fc_OnevsOne_' + str(id_branch) + '/flatten')(x)
+        x = Dropout(0.5, name='fc_OnevsOne_' + str(id_branch) + '/drop')(x)
+        out_node = Dense(nOutput, activation=activation, name=output_name)(x)
+
         return out_node
 
     def add_One_vs_One_3x3_double_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
-        out_3x3 = Convolution2D(64, 3, 3, name='3x3_1/ecoc_'+str(id_branch), activation='relu')          (input)
+        out_3x3 = Convolution2D(64, 3, 3, name='3x3_1/ecoc_' + str(id_branch), activation='relu')(input)
 
         # Max Pooling
-        x = MaxPooling2D(strides=(2, 2), pool_size=(2, 2), name='max_pool/ecoc_'+str(id_branch))         (out_3x3)
+        x = MaxPooling2D(strides=(2, 2), pool_size=(2, 2), name='max_pool/ecoc_' + str(id_branch))(out_3x3)
 
         # 3x3 convolution
-        x = Convolution2D(32, 3, 3, name='3x3_2/ecoc_'+str(id_branch), activation='relu')                (x)
+        x = Convolution2D(32, 3, 3, name='3x3_2/ecoc_' + str(id_branch), activation='relu')(x)
 
         # Softmax
-        output_name = 'fc_OnevsOne_'+str(id_branch)+'/out'
-        x = Flatten(name='fc_OnevsOne_'+str(id_branch)+'/flatten')                (x)
-        x = Dropout(0.5, name='fc_OnevsOne_'+str(id_branch)+'/drop')              (x)
-        out_node = Dense(nOutput, activation=activation, name=output_name)         (x)
-        
+        output_name = 'fc_OnevsOne_' + str(id_branch) + '/out'
+        x = Flatten(name='fc_OnevsOne_' + str(id_branch) + '/flatten')(x)
+        x = Dropout(0.5, name='fc_OnevsOne_' + str(id_branch) + '/drop')(x)
+        out_node = Dense(nOutput, activation=activation, name=output_name)(x)
+
         return out_node
 
-    def One_vs_One_Inception_v2(self, nOutput=2, input=[224,224,3]):
+    def One_vs_One_Inception_v2(self, nOutput=2, input=[224, 224, 3]):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers (useful for ECOC models).
         """
@@ -2855,37 +2890,41 @@ class Model_Wrapper(object):
         # Inception Eb
         out_Eb = self.__addInception('inceptionEb', out_Ea, 8, 8, 16, 8, 4, 4)
         # Average Pooling    pool_size=(7,7)
-        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1,1)), name='ave_pool/ECOC', input=out_Eb)
+        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1, 1)), name='ave_pool/ECOC',
+                            input=out_Eb)
         # Softmax
         self.model.add_node(Flatten(), name='loss_OnevsOne/classifier_flatten', input='ave_pool/ECOC')
         self.model.add_node(Dropout(0.5), name='loss_OnevsOne/drop', input='loss_OnevsOne/classifier_flatten')
         self.model.add_node(Dense(nOutput, activation='softmax'), name='loss_OnevsOne', input='loss_OnevsOne/drop')
         # Output
         self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
-    
+
     def add_One_vs_One_Inception_v2(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
         """
 
         # Inception Ea
-        out_Ea = self.__addInception('inceptionEa_'+str(id_branch), input, 16, 8, 32, 8, 8, 8)
+        out_Ea = self.__addInception('inceptionEa_' + str(id_branch), input, 16, 8, 32, 8, 8, 8)
         # Inception Eb
-        out_Eb = self.__addInception('inceptionEb_'+str(id_branch), out_Ea, 8, 8, 16, 8, 4, 4)
+        out_Eb = self.__addInception('inceptionEb_' + str(id_branch), out_Ea, 8, 8, 16, 8, 4, 4)
         # Average Pooling    pool_size=(7,7)
-        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1,1)), name='ave_pool/ECOC_'+str(id_branch), input=out_Eb)
+        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1, 1)),
+                            name='ave_pool/ECOC_' + str(id_branch), input=out_Eb)
         # Softmax
         self.model.add_node(Flatten(),
-                            name='fc_OnevsOne_'+str(id_branch)+'/flatten', input='ave_pool/ECOC_'+str(id_branch))
+                            name='fc_OnevsOne_' + str(id_branch) + '/flatten', input='ave_pool/ECOC_' + str(id_branch))
         self.model.add_node(Dropout(0.5),
-                            name='fc_OnevsOne_'+str(id_branch)+'/drop', input='fc_OnevsOne_'+str(id_branch)+'/flatten')
-        output_name = 'fc_OnevsOne_'+str(id_branch)
-        self.model.add_node(Dense(nOutput, activation=activation), 
-                            name=output_name, input='fc_OnevsOne_'+str(id_branch)+'/drop')
+                            name='fc_OnevsOne_' + str(id_branch) + '/drop',
+                            input='fc_OnevsOne_' + str(id_branch) + '/flatten')
+        output_name = 'fc_OnevsOne_' + str(id_branch)
+        self.model.add_node(Dense(nOutput, activation=activation),
+                            name=output_name, input='fc_OnevsOne_' + str(id_branch) + '/drop')
 
         return output_name
 
-    def __addInception(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
+    def __addInception(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce,
+                       kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
 
@@ -2899,37 +2938,38 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        self.model.add_node(Convolution2D(kernels_1x1, 1, 1), name=id+'/1x1', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id+'/relu_1x1', input=id+'/1x1')
+        self.model.add_node(Convolution2D(kernels_1x1, 1, 1), name=id + '/1x1', input=input_layer)
+        self.model.add_node(Activation('relu'), name=id + '/relu_1x1', input=id + '/1x1')
 
         # Branch 2
-        self.model.add_node(Convolution2D(kernels_3x3_reduce, 1, 1), name=id+'/3x3_reduce', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id+'/relu_3x3_reduce', input=id+'/3x3_reduce')
-        self.model.add_node(ZeroPadding2D((1,1)), name=id+'/3x3_zeropadding', input=id+'/relu_3x3_reduce')
-        self.model.add_node(Convolution2D(kernels_3x3, 3, 3), name=id+'/3x3', input=id+'/3x3_zeropadding')
-        self.model.add_node(Activation('relu'), name=id+'/relu_3x3', input=id+'/3x3')
+        self.model.add_node(Convolution2D(kernels_3x3_reduce, 1, 1), name=id + '/3x3_reduce', input=input_layer)
+        self.model.add_node(Activation('relu'), name=id + '/relu_3x3_reduce', input=id + '/3x3_reduce')
+        self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/3x3_zeropadding', input=id + '/relu_3x3_reduce')
+        self.model.add_node(Convolution2D(kernels_3x3, 3, 3), name=id + '/3x3', input=id + '/3x3_zeropadding')
+        self.model.add_node(Activation('relu'), name=id + '/relu_3x3', input=id + '/3x3')
 
         # Branch 3
-        self.model.add_node(Convolution2D(kernels_5x5_reduce, 1, 1), name=id+'/5x5_reduce', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id+'/relu_5x5_reduce', input=id+'/5x5_reduce')
-        self.model.add_node(ZeroPadding2D((2,2)), name=id+'/5x5_zeropadding', input=id+'/relu_5x5_reduce')
-        self.model.add_node(Convolution2D(kernels_5x5, 5, 5), name=id+'/5x5', input=id+'/5x5_zeropadding')
-        self.model.add_node(Activation('relu'), name=id+'/relu_5x5', input=id+'/5x5')
+        self.model.add_node(Convolution2D(kernels_5x5_reduce, 1, 1), name=id + '/5x5_reduce', input=input_layer)
+        self.model.add_node(Activation('relu'), name=id + '/relu_5x5_reduce', input=id + '/5x5_reduce')
+        self.model.add_node(ZeroPadding2D((2, 2)), name=id + '/5x5_zeropadding', input=id + '/relu_5x5_reduce')
+        self.model.add_node(Convolution2D(kernels_5x5, 5, 5), name=id + '/5x5', input=id + '/5x5_zeropadding')
+        self.model.add_node(Activation('relu'), name=id + '/relu_5x5', input=id + '/5x5')
 
         # Branch 4
-        self.model.add_node(ZeroPadding2D((1,1)), name=id+'/pool_zeropadding', input=input_layer)
-        self.model.add_node(MaxPooling2D((3,3), strides=(1,1)), name=id+'/pool', input=id+'/pool_zeropadding')
-        self.model.add_node(Convolution2D(kernels_pool_projection, 1, 1), name=id+'/pool_proj', input=id+'/pool')
-        self.model.add_node(Activation('relu'), name=id+'/relu_pool_proj', input=id+'/pool_proj')
+        self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/pool_zeropadding', input=input_layer)
+        self.model.add_node(MaxPooling2D((3, 3), strides=(1, 1)), name=id + '/pool', input=id + '/pool_zeropadding')
+        self.model.add_node(Convolution2D(kernels_pool_projection, 1, 1), name=id + '/pool_proj', input=id + '/pool')
+        self.model.add_node(Activation('relu'), name=id + '/relu_pool_proj', input=id + '/pool_proj')
 
         # Concat
-        inputs_list = [id+'/relu_1x1', id+'/relu_3x3', id+'/relu_5x5', id+'/relu_pool_proj']
-        out_name = id+'/concat'
+        inputs_list = [id + '/relu_1x1', id + '/relu_3x3', id + '/relu_5x5', id + '/relu_pool_proj']
+        out_name = id + '/concat'
         self.model.add_node(Activation('linear'), name=out_name, inputs=inputs_list, concat_axis=1)
 
         return out_name
 
-    def __addInception_Functional(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
+    def __addInception_Functional(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3,
+                                  kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
 
@@ -2943,56 +2983,57 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        x_b1 = Convolution2D(kernels_1x1, 1, 1, name=id+'/1x1', activation='relu')                   (input_layer)
+        x_b1 = Convolution2D(kernels_1x1, 1, 1, name=id + '/1x1', activation='relu')(input_layer)
 
         # Branch 2
-        x_b2 = Convolution2D(kernels_3x3_reduce, 1, 1, name=id+'/3x3_reduce', activation='relu')     (input_layer)
-        x_b2 = ZeroPadding2D((1,1), name=id+'/3x3_zeropadding')                                      (x_b2)
-        x_b2 = Convolution2D(kernels_3x3, 3, 3, name=id+'/3x3', activation='relu')                   (x_b2)
+        x_b2 = Convolution2D(kernels_3x3_reduce, 1, 1, name=id + '/3x3_reduce', activation='relu')(input_layer)
+        x_b2 = ZeroPadding2D((1, 1), name=id + '/3x3_zeropadding')(x_b2)
+        x_b2 = Convolution2D(kernels_3x3, 3, 3, name=id + '/3x3', activation='relu')(x_b2)
 
         # Branch 3
-        x_b3 = Convolution2D(kernels_5x5_reduce, 1, 1, name=id+'/5x5_reduce', activation='relu')     (input_layer)
-        x_b3 = ZeroPadding2D((2,2), name=id+'/5x5_zeropadding')                                      (x_b3)
-        x_b3 = Convolution2D(kernels_5x5, 5, 5, name=id+'/5x5', activation='relu')                   (x_b3)
+        x_b3 = Convolution2D(kernels_5x5_reduce, 1, 1, name=id + '/5x5_reduce', activation='relu')(input_layer)
+        x_b3 = ZeroPadding2D((2, 2), name=id + '/5x5_zeropadding')(x_b3)
+        x_b3 = Convolution2D(kernels_5x5, 5, 5, name=id + '/5x5', activation='relu')(x_b3)
 
         # Branch 4
-        x_b4 = ZeroPadding2D((1,1), name=id+'/pool_zeropadding')                                     (input_layer)
-        x_b4 = MaxPooling2D((3,3), strides=(1,1), name=id+'/pool')                                   (x_b4)
-        x_b4 = Convolution2D(kernels_pool_projection, 1, 1, name=id+'/pool_proj', activation='relu') (x_b4)
-
+        x_b4 = ZeroPadding2D((1, 1), name=id + '/pool_zeropadding')(input_layer)
+        x_b4 = MaxPooling2D((3, 3), strides=(1, 1), name=id + '/pool')(x_b4)
+        x_b4 = Convolution2D(kernels_pool_projection, 1, 1, name=id + '/pool_proj', activation='relu')(x_b4)
 
         # Concat
-        out_name = id+'/concat'
+        out_name = id + '/concat'
         out_node = merge([x_b1, x_b2, x_b3, x_b4], mode='concat', concat_axis=1, name=out_name)
 
         return [out_node, out_name]
-    
+
     def add_One_vs_One_Merge(self, inputs_list, nOutput, activation='softmax'):
-        
-        self.model.add_node(Flatten(), name='ecoc_loss', inputs=inputs_list, merge_mode='concat') # join outputs from OneVsOne classifers
+
+        self.model.add_node(Flatten(), name='ecoc_loss', inputs=inputs_list,
+                            merge_mode='concat')  # join outputs from OneVsOne classifers
         self.model.add_node(Dropout(0.5), name='final_loss/drop', input='ecoc_loss')
-        self.model.add_node(Dense(nOutput, activation=activation), name='final_loss', input='final_loss/drop') # apply final joint prediction
-        
+        self.model.add_node(Dense(nOutput, activation=activation), name='final_loss',
+                            input='final_loss/drop')  # apply final joint prediction
+
         # Outputs
         self.model.add_output(name='ecoc_loss/output', input='ecoc_loss')
         self.model.add_output(name='final_loss/output', input='final_loss')
 
         return ['ecoc_loss/output', 'final_loss/output']
-    
+
     def add_One_vs_One_Merge_Functional(self, inputs_list, nOutput, activation='softmax'):
-        
+
         # join outputs from OneVsOne classifers
         ecoc_loss_name = 'ecoc_loss'
         final_loss_name = 'final_loss/out'
         ecoc_loss = merge(inputs_list, name=ecoc_loss_name, mode='concat', concat_axis=1)
-        drop = Dropout(0.5, name='final_loss/drop')                                (ecoc_loss)
+        drop = Dropout(0.5, name='final_loss/drop')(ecoc_loss)
         # apply final joint prediction
-        final_loss = Dense(nOutput, activation=activation, name=final_loss_name)    (drop)
-        
+        final_loss = Dense(nOutput, activation=activation, name=final_loss_name)(drop)
+
         in_node = self.model.layers[0].name
         in_node = self.model.get_layer(in_node).output
         self.model = Model(input=in_node, output=[ecoc_loss, final_loss])
-        #self.model = Model(input=in_node, output=['ecoc_loss', 'final_loss'])
+        # self.model = Model(input=in_node, output=['ecoc_loss', 'final_loss'])
 
         return [ecoc_loss_name, final_loss_name]
 
@@ -3018,12 +3059,13 @@ class Model_Wrapper(object):
         self.model.add_input(name='input', input_shape=input_shape)
 
         # Layers
-        self.model.add_node(ZeroPadding2D((1,1)), name='CAM_conv/zeropadding', input='input')
+        self.model.add_node(ZeroPadding2D((1, 1)), name='CAM_conv/zeropadding', input='input')
         self.model.add_node(Convolution2D(1024, 3, 3), name='CAM_conv', input='CAM_conv/zeropadding')
         self.model.add_node(Activation('relu'), name='CAM_conv/relu', input='CAM_conv')
-        self.model.add_node(AveragePooling2D(pool_size=(14,14)), name='GAP', input='CAM_conv/relu')
+        self.model.add_node(AveragePooling2D(pool_size=(14, 14)), name='GAP', input='CAM_conv/relu')
         self.model.add_node(Flatten(), name='GAP/flatten', input='GAP')
-        self.model.add_node(Dense(nOutput, activation='softmax'), name='GAP/classifier_food_vs_nofood', input='GAP/flatten')
+        self.model.add_node(Dense(nOutput, activation='softmax'), name='GAP/classifier_food_vs_nofood',
+                            input='GAP/flatten')
 
         # Output
         self.model.add_output(name='GAP/softmax', input='GAP/classifier_food_vs_nofood')
@@ -3063,7 +3105,6 @@ class Model_Wrapper(object):
             prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=axis)
         return merge(list_outputs, mode='concat', concat_axis=axis)
 
-
     def add_dense_layer(self, in_layer, k, drop, init_weights):
         """
         Adds a Dense Layer inside a Dense Block, which is composed of BN, ReLU, Conv and Dropout
@@ -3080,17 +3121,16 @@ class Model_Wrapper(object):
         :return: output layer
         """
 
-        out_layer = BatchNormalization(mode=2) (in_layer)
-        out_layer = Activation('relu') (out_layer)
-        out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same') (out_layer)
+        out_layer = BatchNormalization(mode=2)(in_layer)
+        out_layer = Activation('relu')(out_layer)
+        out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same')(out_layer)
         if drop > 0.0:
-            out_layer = Dropout(drop) (out_layer)
+            out_layer = Dropout(drop)(out_layer)
         return out_layer
 
-
     def add_transitiondown_block(self, x,
-                               nb_filters_conv, pool_size, init_weights,
-                               nb_layers, growth, drop):
+                                 nb_filters_conv, pool_size, init_weights,
+                                 nb_layers, growth, drop):
         """
         Adds a Transition Down Block. Consisting of BN, ReLU, Conv and Dropout, Pooling, Dense Block.
 
@@ -3120,7 +3160,8 @@ class Model_Wrapper(object):
             axis = 1
 
         # Dense Block
-        x_dense = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
+        x_dense = self.add_dense_block(x, nb_layers, growth, drop,
+                                       init_weights)  # (growth*nb_layers) feature maps added
 
         ## Concatenation and skip connection recovery for upsampling path
         skip = merge([x, x_dense], mode='concat', concat_axis=axis)
@@ -3131,10 +3172,9 @@ class Model_Wrapper(object):
         x_out = Convolution2D(nb_filters_conv, 1, 1, init=init_weights, border_mode='same')(x_out)
         if drop > 0.0:
             x_out = Dropout(drop)(x_out)
-        x_out = MaxPooling2D(pool_size=(pool_size,pool_size)) (x_out)
+        x_out = MaxPooling2D(pool_size=(pool_size, pool_size))(x_out)
 
         return [x_out, skip]
-
 
     def add_transitionup_block(self, x, skip_conn,
                                nb_filters_deconv, init_weights,
@@ -3202,6 +3242,7 @@ class Model_Wrapper(object):
             del obj_dict['model_init']
             del obj_dict['model_next']
         return obj_dict
+
 
 # Backwards compatibility
 CNN_Model = Model_Wrapper

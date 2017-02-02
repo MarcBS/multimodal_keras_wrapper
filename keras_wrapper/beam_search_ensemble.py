@@ -10,7 +10,6 @@ from keras_wrapper.dataset import Data_Batch_Generator
 
 
 class BeamSearchEnsemble:
-
     def __init__(self, models, dataset, params_prediction, verbose=0):
         """
 
@@ -130,26 +129,26 @@ class BeamSearchEnsemble:
             cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
             # Find the best options by calling argsort of flatten array
-            ranks_flat = cand_flat.argsort()[:(k-dead_k)]
+            ranks_flat = cand_flat.argsort()[:(k - dead_k)]
 
             # Decypher flatten indices
             voc_size = probs.shape[1]
             trans_indices = ranks_flat / voc_size  # index of row
-            word_indices = ranks_flat % voc_size   # index of col
+            word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
 
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_trans_indices = []
-            new_hyp_scores = np.zeros(k-dead_k).astype('float32')
+            new_hyp_scores = np.zeros(k - dead_k).astype('float32')
             if params['pos_unk']:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
-                new_hyp_samples.append(hyp_samples[ti]+[wi])
+                new_hyp_samples.append(hyp_samples[ti] + [wi])
                 new_trans_indices.append(ti)
                 new_hyp_scores[idx] = copy.copy(costs[idx])
                 if params['pos_unk']:
-                    new_hyp_alphas.append(hyp_alphas[ti]+[alphas[ti]])
+                    new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
 
             # check the finished samples
             new_live_k = 0
@@ -189,7 +188,7 @@ class BeamSearchEnsemble:
                 state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
                                          np.zeros((state_below.shape[0],
                                                    max(params['maxlen'] - state_below.shape[1] - 1, 0)),
-                                         dtype='int64')))
+                                                  dtype='int64')))
 
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
@@ -198,7 +197,7 @@ class BeamSearchEnsemble:
                                                        state_below.shape[2]))))
 
             if params['optimized_search'] and ii > 0:
-                for n_model in  range(len(self.models)):
+                for n_model in range(len(self.models)):
                     # filter next search inputs w.r.t. remaining samples
                     for idx_vars in range(len(prev_outs[n_model])):
                         prev_outs[n_model][idx_vars] = prev_outs[n_model][idx_vars][indices_alive]
@@ -260,15 +259,15 @@ class BeamSearchEnsemble:
 
         predictions = dict()
         for s in params['predict_on_sets']:
-            logging.info("<<< Predicting outputs of "+s+" set >>>")
+            logging.info("<<< Predicting outputs of " + s + " set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
             if not params['optimized_search']:  # use optimized search model if available
                 assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
-                n_samples = eval("self.dataset.len_"+s)
-                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                n_samples = eval("self.dataset.len_" + s)
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 # TODO: We prepare data as model 0... Different data preparators for each model?
@@ -283,7 +282,7 @@ class BeamSearchEnsemble:
                                                 predict=True).generator()
             else:
                 n_samples = params['n_samples']
-                num_iterations = int(math.ceil(float(n_samples)/params['batch_size']))
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
                 # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                 data_gen = Data_Batch_Generator(s,
@@ -340,7 +339,7 @@ class BeamSearchEnsemble:
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores, alphas = self.beam_search(x, params, null_sym=self.dataset.extra_words['<null>'])
                     if params['normalize']:
-                        counts = [len(sample)**params['alpha_factor'] for sample in samples]
+                        counts = [len(sample) ** params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
@@ -354,7 +353,7 @@ class BeamSearchEnsemble:
                             references.append(Y[output_id][i])
 
             sys.stdout.write('Total cost of the translations: %f \t '
-                             'Average cost of the translations: %f\n' % (total_cost, total_cost/n_samples))
+                             'Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
             sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' %
                              ((time.time() - start_time), (time.time() - start_time) / n_samples))
 
@@ -369,7 +368,6 @@ class BeamSearchEnsemble:
             return predictions
         else:
             return predictions, references, sources_sampling
-
 
     def BeamSearchNet(self):
         """
