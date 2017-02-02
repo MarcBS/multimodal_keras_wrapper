@@ -17,8 +17,17 @@ from read_write import *
 
 def checkDefaultParamsBeamSearch(params):
     required_params = ['model_inputs', 'model_outputs', 'dataset_inputs', 'dataset_outputs']
-    default_params = {'beam_size': 5, 'maxlen': 30, 'normalize': False, 'alpha_factor': 1.0,
-                      'words_so_far': False, 'n_parallel_loaders': 5, 'optimized_search': False}
+    default_params = {'beam_size': 5,
+                      'maxlen': 30,
+                      'normalize': False,
+                      'alpha_factor': 1.0,
+                      'words_so_far': False,
+                      'n_parallel_loaders': 5,
+                      'optimized_search': False,
+                      'conditional_intersample': False,
+                      'link_index_id': 'link_index',
+                      'state_below_index': -1
+                      }
 
     for k, v in params.iteritems():
         if k in default_params.keys() or k in required_params:
@@ -462,7 +471,9 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                 params_prediction = {'batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
-                                     'pos_unk': False, 'heuristic': 0, 'mapping': None}
+                                     'pos_unk': False,
+                                     'heuristic': 0,
+                                     'mapping': None}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:

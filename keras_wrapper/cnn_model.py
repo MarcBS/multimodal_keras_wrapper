@@ -1501,10 +1501,11 @@ class Model_Wrapper(object):
 
                 if params['conditional_intersample']:
                     if X[params['link_index_id']] == -1:
-                        previous_outputs = [ds.extra_words['<null>']] * params['model_conditional_inputs']
+                        previous_outputs = {}
+                        for input_id in params['model_conditional_inputs']:
+                            previous_outputs[input_id] = [ds.extra_words['<null>']]
                     for input_id in params['model_conditional_inputs']:
                         X[input_id] = previous_outputs[input_id]
-
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
                     sys.stdout.write('\r')
