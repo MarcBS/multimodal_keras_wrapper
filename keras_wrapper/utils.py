@@ -63,7 +63,7 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ec
         outputs_list.append('loss_OnevsOne/output')
 
         logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
-        str(count + 1), str(n_combs), c, str(time.time() - t)))
+            str(count + 1), str(n_combs), c, str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -100,7 +100,7 @@ def build_OneVsAllECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr):
         outputs_list.append('loss_OnevsOne/output')
 
         logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
-        str(count + 1), str(n_classes), '(' + str(c) + ' vs All)', str(time.time() - t)))
+            str(count + 1), str(n_classes), '(' + str(c) + ' vs All)', str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -144,7 +144,7 @@ def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2
         outputs_list.append('loss_OnevsOne/output')
 
         logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
-        str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time() - t)))
+            str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -186,7 +186,7 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
         outputs_list.append('loss_OnevsOne/output')
 
         logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
-        str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time() - t)))
+            str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
