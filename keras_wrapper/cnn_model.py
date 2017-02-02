@@ -1390,6 +1390,7 @@ class Model_Wrapper(object):
                           'normalize': False, 'mean_substraction': True,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
+                          'model_conditional_inputs': ['previous_description'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
@@ -1400,7 +1401,8 @@ class Model_Wrapper(object):
                           'pos_unk': False,
                           'heuristic': 0,
                           'mapping': None,
-                          'conditional_intersample': False
+                          'conditional_intersample': False,
+                          'link_index_id': 'link_index'
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -1420,6 +1422,18 @@ class Model_Wrapper(object):
                     "- ids_outputs_init\n",
                     "- ids_inputs_next\n",
                     "- ids_outputs_next\n")
+
+        # Check if the model is ready for applying a conditional intersample search
+        if params['optimized_search']:
+            if 'matchings_sample_to_next_sample' not in dir(self) or \
+                            'ids_conditional_inputs' not in dir(self) or \
+                            'ids_conditional_outputs' not in dir(self):
+                raise Exception(
+                    "The following attributes must be inserted to the model when building an optimized search model:\n",
+                    "- matchings_sample_to_next_sample\n",
+                    "- ids_conditional_inputs\n",
+                    "- ids_conditional_outputs\n")
+
 
         predictions = dict()
         for s in params['predict_on_sets']:
@@ -1485,7 +1499,13 @@ class Model_Wrapper(object):
                             s_dict[input_id] = X[input_id]
                     if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
                         sources.append(s_dict)
-                
+
+                if params['conditional_intersample']:
+                    if X[params['link_index_id']] == -1:
+                        previous_outputs = [ds.extra_words['<null>']] * params['model_conditional_inputs']
+                    for input_id in params['model_conditional_inputs']:
+                        X[input_id] = previous_outputs[input_id]
+
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
                     sys.stdout.write('\r')
@@ -1511,9 +1531,13 @@ class Model_Wrapper(object):
                     if params['n_samples'] > 0:
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
+                    if params['conditional_intersample']:
+                        # TODO: Make it more general
+                        for (output_id, input_id) in params['matchings_sample_to_next_sample'].iteritems():
+                            previous_outputs[output_id] = best_sample
 
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
-                total_cost, total_cost / n_samples))
+            total_cost, total_cost / n_samples))
             sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
                 time.time() - start_time) / n_samples))
 
