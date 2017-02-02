@@ -475,7 +475,7 @@ class Model_Wrapper(object):
         else:
             return False
 
-    def trainNet(self, ds, parameters, out_name=None):
+    def trainNet(self, ds, parameters={}, out_name=None):
         """
             Trains the network on the given dataset 'ds'.
 
@@ -531,7 +531,6 @@ class Model_Wrapper(object):
 
         logging.info("<<< Training model >>>")
 
-        self.__logger = dict()
         self.__train(ds, params)
 
         logging.info("<<< Finished training model >>>")

@@ -736,10 +736,11 @@ class EarlyStopping(KerasCallback):
 
         # check already stored scores in case we have loaded a pre-trained model
         all_scores = self.model_to_eval.getLog(self.check_split, self.metric_check)
+        all_epochs = self.model_to_eval.getLog(self.check_split, 'epoch')
         if all_scores[-1] is not None:
             self.best_score = max(all_scores)
-            self.best_epoch = all_scores.index(self.best_score) + 1
-            self.wait = len(all_scores) - self.best_epoch
+            self.best_epoch = all_epochs[all_scores.index(self.best_score)]
+            self.wait = max(all_epochs) - self.best_epoch
         else:
             self.best_score = -1.
             self.best_epoch = -1
