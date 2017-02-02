@@ -240,6 +240,12 @@ class Model_Wrapper(object):
         self.matchings_init_to_next = None
         self.matchings_next_to_next = None
 
+        # Inputs and outputs names for models with temporally linked samples
+        self.ids_temporally_linked_inputs = list()
+
+        # Matchings between temporally linked samples
+        self.matchings_sample_to_next_sample = None
+
         # Prepare logger
         self.updateLogger()
 
@@ -1371,7 +1377,6 @@ class Model_Wrapper(object):
         :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
         :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
-        :param conditional_intersample: boolean indicating if the outputs from a sample are the inputs of the following one
         The following attributes must be inserted to the model when building an optimized search model:
         
             * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
@@ -1381,6 +1386,11 @@ class Model_Wrapper(object):
             * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
             * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
 
+        :param temporally_linked: boolean indicating if the outputs from a sample are the inputs of the following one
+        The following attributes must be inserted to the model when building a temporally_linked model:
+            * matchings_sample_to_next_sample:
+            * ids_temporally_linked_inputs:
+
         :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         """
 
@@ -1389,7 +1399,6 @@ class Model_Wrapper(object):
                           'normalize': False, 'mean_substraction': True,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
-                          'model_conditional_inputs': ['previous_description'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
@@ -1400,7 +1409,7 @@ class Model_Wrapper(object):
                           'pos_unk': False,
                           'heuristic': 0,
                           'mapping': None,
-                          'conditional_intersample': False,
+                          'temporally_linked': False,
                           'link_index_id': 'link_index',
                           'state_below_index': -1
                           }
@@ -1423,16 +1432,14 @@ class Model_Wrapper(object):
                     "- ids_inputs_next\n",
                     "- ids_outputs_next\n")
 
-        # Check if the model is ready for applying a conditional intersample search
-        if params['conditional_intersample']:
+        # Check if the model is ready for applying a temporally_linked search
+        if params['temporally_linked']:
             if 'matchings_sample_to_next_sample' not in dir(self) or \
-                            'ids_conditional_inputs' not in dir(self) or \
-                            'ids_conditional_outputs' not in dir(self):
+                            'ids_temporally_linked_inputs' not in dir(self):
                 raise Exception(
-                    "The following attributes must be inserted to the model when building an optimized search model:\n",
+                    "The following attributes must be inserted to the model when building a temporally_linked model:\n",
                     "- matchings_sample_to_next_sample\n",
-                    "- ids_conditional_inputs\n",
-                    "- ids_conditional_outputs\n")
+                    "- ids_temporally_linked_inputs\n")
 
         predictions = dict()
         for s in params['predict_on_sets']:
@@ -1499,12 +1506,12 @@ class Model_Wrapper(object):
                     if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
                         sources.append(s_dict)
 
-                if params['conditional_intersample']:
+                if params['temporally_linked']:
                     if X[params['link_index_id']] == -1:
                         previous_outputs = {}
-                        for input_id in params['model_conditional_inputs']:
+                        for input_id in params['ids_temporally_linked_inputs']:
                             previous_outputs[input_id] = [ds.extra_words['<null>']]
-                    for input_id in params['model_conditional_inputs']:
+                    for input_id in params['ids_temporally_linked_inputs']:
                         X[input_id] = previous_outputs[input_id]
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
@@ -1531,10 +1538,10 @@ class Model_Wrapper(object):
                     if params['n_samples'] > 0:
                         for output_id in params['model_outputs']:
                             references.append(Y[output_id][i])
-                    if params['conditional_intersample']:
+                    if params['temporally_linked']:
                         # TODO: Make it more general
                         for (output_id, input_id) in params['matchings_sample_to_next_sample'].iteritems():
-                            previous_outputs[output_id] = best_sample
+                            previous_outputs[input_id] = best_sample
 
             sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
                 total_cost, total_cost / n_samples))

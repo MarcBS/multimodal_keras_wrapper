@@ -24,7 +24,7 @@ def checkDefaultParamsBeamSearch(params):
                       'words_so_far': False,
                       'n_parallel_loaders': 5,
                       'optimized_search': False,
-                      'conditional_intersample': False,
+                      'temporally_linked': False,
                       'link_index_id': 'link_index',
                       'state_below_index': -1
                       }
