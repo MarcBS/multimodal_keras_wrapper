@@ -1530,10 +1530,11 @@ class Model_Wrapper(object):
                         if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
                             sources.append(s_dict)
 
-                    for i in range(len(X[params['model_inputs'][0]])):
 
-                        # recover previous output if using a temporally-linked model
-                        if params['temporally_linked']:
+                    """
+                    # recover previous output if using a temporally-linked model
+                    if params['temporally_linked']:
+                        for i in range(len(X[params['model_inputs'][0]])):
                             link = X[params['link_index_id']][i]
                             for input_id in self.ids_temporally_linked_inputs:
                                 if link not in previous_outputs[
@@ -1548,14 +1549,31 @@ class Model_Wrapper(object):
                                                           pad_on_batch=ds.pad_on_batch[input_id],
                                                           words_so_far=ds.words_so_far[input_id],
                                                           loading_X=True)[0]
+                    """
 
+                    for i in range(len(X[params['model_inputs'][0]])):
                         sampled += 1
                         sys.stdout.write('\r')
                         sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
                         sys.stdout.flush()
                         x = dict()
+
                         for input_id in params['model_inputs']:
-                            x[input_id] = np.asarray([X[input_id][i]])
+                            if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
+                                link = int(X[params['link_index_id']][i])
+                                if link not in previous_outputs[input_id].keys():  # input to current sample was not processed yet
+                                    link = -1
+                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in previous_outputs[input_id][link]]
+                                x[input_id] = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
+                                                             ds.max_text_len[input_id][s],
+                                                             ds.text_offset[input_id],
+                                                             fill=ds.fill_text[input_id],
+                                                             pad_on_batch=ds.pad_on_batch[input_id],
+                                                             words_so_far=ds.words_so_far[input_id],
+                                                             loading_X=True)[0]
+                            else:
+                                x[input_id] = np.asarray([X[input_id][i]])
+
                         if params['pos_unk']:
                             samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                         else:
