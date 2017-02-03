@@ -697,29 +697,30 @@ class SampleEachNUpdates(KerasCallback):
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
                 predictions = \
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
-            predictions = predictions[s]
-            if (self.is_text):
-                if self.out_pred_idx is not None:
-                    predictions = predictions[self.out_pred_idx]
-                # Convert predictions into sentences
-                if self.beam_search:
-                    predictions = self.model_to_eval.decode_predictions_beam_search(predictions,
-                                                                                    self.index2word_y,
-                                                                                    verbose=self.verbose)
-                    truths = self.model_to_eval.decode_predictions_one_hot(truths,
-                                                                           self.index2word_y,
-                                                                           verbose=self.verbose)
-                else:
-                    predictions = self.model_to_eval.decode_predictions(predictions,
-                                                                        self.temperature,
-                                                                        self.index2word_y,
-                                                                        self.sampling_type,
-                                                                        verbose=self.verbose)
+            if s in predictions:
+                predictions = predictions[s]
+                if (self.is_text):
+                    if self.out_pred_idx is not None:
+                        predictions = predictions[self.out_pred_idx]
+                    # Convert predictions into sentences
+                    if self.beam_search:
+                        predictions = self.model_to_eval.decode_predictions_beam_search(predictions,
+                                                                                        self.index2word_y,
+                                                                                        verbose=self.verbose)
+                        truths = self.model_to_eval.decode_predictions_one_hot(truths,
+                                                                               self.index2word_y,
+                                                                               verbose=self.verbose)
+                    else:
+                        predictions = self.model_to_eval.decode_predictions(predictions,
+                                                                            self.temperature,
+                                                                            self.index2word_y,
+                                                                            self.sampling_type,
+                                                                            verbose=self.verbose)
 
-            # Write samples
-            for i, (sample, truth) in enumerate(zip(predictions, truths)):
-                print("Hypothesis (%d): %s" % (i, sample))
-                print("Reference  (%d): %s" % (i, truth))
+                # Write samples
+                for i, (sample, truth) in enumerate(zip(predictions, truths)):
+                    print("Hypothesis (%d): %s" % (i, sample))
+                    print("Reference  (%d): %s" % (i, truth))
 
 
 ###################################################

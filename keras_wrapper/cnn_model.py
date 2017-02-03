@@ -1388,6 +1388,7 @@ class Model_Wrapper(object):
 
         :param temporally_linked: boolean indicating if the outputs from a sample are the inputs of the following one
         The following attributes must be inserted to the model when building a temporally_linked model:
+
             * matchings_sample_to_next_sample:
             * ids_temporally_linked_inputs:
 
@@ -1442,121 +1443,157 @@ class Model_Wrapper(object):
                     "- ids_temporally_linked_inputs\n")
 
         predictions = dict()
+        references = []
+        sources_sampling = []
         for s in params['predict_on_sets']:
             logging.info("<<< Predicting outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
-            if not params['optimized_search']:  # use optimized search model if available
-                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
-            params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
-            # Calculate how many interations are we going to perform
-            if params['n_samples'] < 1:
-                n_samples = eval("ds.len_" + s)
-                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
-                # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                batch_size=params['batch_size'],
-                                                normalization=params['normalize'],
-                                                data_augmentation=False,
-                                                mean_substraction=params['mean_substraction'],
-                                                predict=True).generator()
+            # TODO: enable 'train' sampling on temporally-linked models
+            if params['temporally_linked'] and s == 'train':
+                logging.info('Sampling is currenly not implemented on the "train" set for temporally-linked models.')
+                data_gen = -1
+                data_gen_instance = -1
             else:
-                n_samples = params['n_samples']
-                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
-                # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                data_gen = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                batch_size=params['batch_size'],
-                                                normalization=params['normalize'],
-                                                data_augmentation=False,
-                                                mean_substraction=params['mean_substraction'],
-                                                predict=False,
-                                                random_samples=n_samples).generator()
-            if params['n_samples'] > 0:
-                references = []
-                sources_sampling = []
-            best_samples = []
-            if params['pos_unk']:
-                best_alphas = []
-                sources = []
+                assert len(params['model_inputs']) > 0, 'We need at least one input!'
+                if not params['optimized_search']:  # use optimized search model if available
+                    assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
 
-            total_cost = 0
-            sampled = 0
-            start_time = time.time()
-            eta = -1
-            for j in range(num_iterations):
-                data = data_gen.next()
-                X = dict()
-                if params['n_samples'] > 0:
-                    s_dict = {}
-                    for input_id in params['model_inputs']:
-                        X[input_id] = data[0][input_id]
-                        s_dict[input_id] = X[input_id]
-                    sources_sampling.append(s_dict)
-
-                    Y = dict()
-                    for output_id in params['model_outputs']:
-                        Y[output_id] = data[1][output_id]
-                else:
-                    s_dict = {}
-                    for input_id in params['model_inputs']:
-                        X[input_id] = data[input_id]
-                        if params['pos_unk']:
-                            s_dict[input_id] = X[input_id]
-                    if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
-                        sources.append(s_dict)
+                params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
 
                 if params['temporally_linked']:
-                    if X[params['link_index_id']] == -1:
-                        previous_outputs = {}
-                        for input_id in params['ids_temporally_linked_inputs']:
-                            previous_outputs[input_id] = [ds.extra_words['<null>']]
-                    for input_id in params['ids_temporally_linked_inputs']:
-                        X[input_id] = previous_outputs[input_id]
-                for i in range(len(X[params['model_inputs'][0]])):
-                    sampled += 1
-                    sys.stdout.write('\r')
-                    sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
-                    sys.stdout.flush()
-                    x = dict()
-                    for input_id in params['model_inputs']:
-                        x[input_id] = np.asarray([X[input_id][i]])
-                    if params['pos_unk']:
-                        samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                    else:
-                        samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                    if params['normalize']:
-                        counts = [len(sample) ** params['alpha_factor'] for sample in samples]
-                        scores = [co / cn for co, cn in zip(scores, counts)]
-                    best_score = np.argmin(scores)
-                    best_sample = samples[best_score]
-                    best_samples.append(best_sample)
-                    if params['pos_unk']:
-                        best_alphas.append(np.asarray(alphas[best_score]))
-                    total_cost += scores[best_score]
-                    eta = (n_samples - sampled) * (time.time() - start_time) / sampled
+                    count_samples = 0
+                    previous_outputs = {}  # variable for storing previous outputs if using a temporally-linked model
+                    for input_id in self.ids_temporally_linked_inputs:
+                        previous_outputs[input_id] = dict()
+                        previous_outputs[input_id][-1] = [ds.extra_words['<null>']]
+
+                # Calculate how many interations are we going to perform
+                if params['n_samples'] < 1:
+                    n_samples = eval("ds.len_" + s)
+                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+
+                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                    batch_size=params['batch_size'],
+                                                    normalization=params['normalize'],
+                                                    data_augmentation=False,
+                                                    mean_substraction=params['mean_substraction'],
+                                                    predict=True)
+                    data_gen = data_gen_instance.generator()
+                else:
+                    n_samples = params['n_samples']
+                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+
+                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                    batch_size=params['batch_size'],
+                                                    normalization=params['normalize'],
+                                                    data_augmentation=False,
+                                                    mean_substraction=params['mean_substraction'],
+                                                    predict=False,
+                                                    random_samples=n_samples,
+                                                    temporally_linked=params['temporally_linked'])
+                    data_gen = data_gen_instance.generator()
+
+                if params['n_samples'] > 0:
+                    references = []
+                    sources_sampling = []
+                best_samples = []
+                if params['pos_unk']:
+                    best_alphas = []
+                    sources = []
+
+                total_cost = 0
+                sampled = 0
+                start_time = time.time()
+                eta = -1
+                for j in range(num_iterations):
+                    data = data_gen.next()
+                    X = dict()
                     if params['n_samples'] > 0:
+                        s_dict = {}
+                        for input_id in params['model_inputs']:
+                            X[input_id] = data[0][input_id]
+                            s_dict[input_id] = X[input_id]
+                        sources_sampling.append(s_dict)
+
+                        Y = dict()
                         for output_id in params['model_outputs']:
-                            references.append(Y[output_id][i])
+                            Y[output_id] = data[1][output_id]
+                    else:
+                        s_dict = {}
+                        for input_id in params['model_inputs']:
+                            X[input_id] = data[input_id]
+                            if params['pos_unk']:
+                                s_dict[input_id] = X[input_id]
+                        if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
+                            sources.append(s_dict)
+
+                    # recover previous output if using a temporally-linked model
                     if params['temporally_linked']:
-                        # TODO: Make it more general
-                        for (output_id, input_id) in params['matchings_sample_to_next_sample'].iteritems():
-                            previous_outputs[input_id] = best_sample
+                        link = X[params['link_index_id']]
+                        for input_id in self.ids_temporally_linked_inputs:
+                            if link not in previous_outputs[input_id].keys(): # input to current sample was not processed yet
+                                link = -1
+                            prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in previous_outputs[input_id][link]]
+                            X[input_id] = ds.loadText(' '.join(prev_x), ds.vocabulary[input_id],
+                                                        ds.max_text_len[input_id][s],
+                                                        ds.text_offset[input_id],
+                                                        fill=ds.fill_text[input_id],
+                                                        pad_on_batch=ds.pad_on_batch[input_id],
+                                                        words_so_far=ds.words_so_far[input_id],
+                                                        loading_X=True)[0]
 
-            sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
-                total_cost, total_cost / n_samples))
-            sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
-                time.time() - start_time) / n_samples))
+                    for i in range(len(X[params['model_inputs'][0]])):
+                        sampled += 1
+                        sys.stdout.write('\r')
+                        sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                        sys.stdout.flush()
+                        x = dict()
+                        for input_id in params['model_inputs']:
+                            x[input_id] = np.asarray([X[input_id][i]])
+                        if params['pos_unk']:
+                            samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+                        else:
+                            samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+                        if params['normalize']:
+                            counts = [len(sample) ** params['alpha_factor'] for sample in samples]
+                            scores = [co / cn for co, cn in zip(scores, counts)]
+                        best_score = np.argmin(scores)
+                        best_sample = samples[best_score]
+                        best_samples.append(best_sample)
+                        if params['pos_unk']:
+                            best_alphas.append(np.asarray(alphas[best_score]))
+                        total_cost += scores[best_score]
+                        eta = (n_samples - sampled) * (time.time() - start_time) / sampled
+                        if params['n_samples'] > 0:
+                            for output_id in params['model_outputs']:
+                                references.append(Y[output_id][i])
 
-            sys.stdout.flush()
+                        # store outputs for temporally-linked models
+                        if params['temporally_linked']:
+                            first_idx = max(0, data_gen_instance.first_idx)
+                            # TODO: Make it more general
+                            for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
+                                previous_outputs[input_id][first_idx+count_samples] = best_sample
+                            count_samples += 1
 
-            if params['pos_unk']:
-                if eval('ds.loaded_raw_' + s + '[0]'):
-                    sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'))
-                predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
-            else:
-                predictions[s] = np.asarray(best_samples)
+                sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
+                    total_cost, total_cost / n_samples))
+                sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
+                    time.time() - start_time) / n_samples))
+
+                sys.stdout.flush()
+
+                if params['pos_unk']:
+                    if eval('ds.loaded_raw_' + s + '[0]'):
+                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'))
+                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
+                else:
+                    predictions[s] = np.asarray(best_samples)
         del data_gen
+        del data_gen_instance
         if params['n_samples'] < 1:
             return predictions
         else:

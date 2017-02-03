@@ -90,7 +90,8 @@ class Data_Batch_Generator(object):
                  mean_substraction=True,
                  predict=False,
                  random_samples=-1,
-                 shuffle=True):
+                 shuffle=True,
+                 temporally_linked=False):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -104,11 +105,14 @@ class Data_Batch_Generator(object):
         :param predict: Whether we are predicting or training
         :param random_samples: Retrieves this number of training samples
         :param shuffle: Shuffle the training dataset
+        :param temporally_linked: Indicates if we are using a temporally-linked model
         """
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
         self.predict = predict
+        self.temporally_linked = temporally_linked
+        self.first_idx = -1
         # Several parameters
         self.params = {'batch_size': batch_size,
                        'data_augmentation': data_augmentation,
@@ -155,8 +159,16 @@ class Data_Batch_Generator(object):
             # Recovers a batch of data
             if self.params['random_samples'] > 0:
                 num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
-                indices = np.random.randint(0, n_samples_split, num_retrieve)
+                if self.temporally_linked:
+                    if self.first_idx == -1:
+                        self.first_idx = np.random.randint(0, n_samples_split-self.params['random_samples'], 1)[0]
+                        self.next_idx = self.first_idx
+                    indices = range(self.next_idx,self.next_idx+num_retrieve)
+                    self.next_idx += num_retrieve
+                else:
+                    indices = np.random.randint(0, n_samples_split, num_retrieve)
                 self.params['random_samples'] -= num_retrieve
+
                 # At sampling from train/val, we always have Y
                 if self.predict:
                     X_batch = self.dataset.getX_FromIndices(self.set_split,
