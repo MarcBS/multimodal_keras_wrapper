@@ -175,6 +175,54 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     return model_wrapper
 
 
+def transferWeights(old_model, new_model, layers_mapping):
+    """
+    Transfers all existent layer' weights from an old model to a new model.
+
+    :param old_model: old version of the model, where the weights will be picked
+    :param new_model: new version of the model, where the weights will be transfered to
+    :param layers_mapping: mapping from old to new model layers
+    :return: new model with weights transfered
+    """
+
+    logging.info("<<< Transfering weights from models. >>>")
+
+    old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(old_model.model.layers)])
+    new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(new_model.model.layers)])
+
+    for lold, lnew in layers_mapping.iteritems():
+        # Check if layers exist in both models
+        if lold in old_layer_dict and lnew in new_layer_dict:
+
+            # Create dictionary name --> layer
+            old = old_layer_dict[lold][0].get_weights()
+            new = new_layer_dict[lnew][0].get_weights()
+
+            # Find weight sizes matchings for each layer (without repetitions)
+            new_shapes = [w.shape for w in new]
+            mapping_weights = dict()
+            for pos_old, wo in enumerate(old):
+                old_shape = wo.shape
+                indices = [i for i, shp in enumerate(new_shapes) if shp == old_shape]
+                if indices:
+                    for ind in indices:
+                        if ind not in mapping_weights.keys():
+                            mapping_weights[ind] = pos_old
+                            break
+
+            # Transfer weights for each layer
+            for new_idx, old_idx in mapping_weights.iteritems():
+                new[new_idx] = old[old_idx]
+            new_model.model.layers[new_layer_dict[lnew][1]].set_weights(new)
+
+        else:
+            logging.info('Can not apply weights transfer from "'+lold+'" to "'+lnew+'"')
+
+    logging.info("<<< Weights transfered successfully. >>>")
+
+    return new_model
+
+
 # ------------------------------------------------------- #
 #       MAIN CLASS
 # ------------------------------------------------------- #
@@ -1462,13 +1510,12 @@ class Model_Wrapper(object):
                 params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
 
                 if params['temporally_linked']:
-                    count_samples = 0
                     previous_outputs = {}  # variable for storing previous outputs if using a temporally-linked model
                     for input_id in self.ids_temporally_linked_inputs:
                         previous_outputs[input_id] = dict()
                         previous_outputs[input_id][-1] = [ds.extra_words['<null>']]
 
-                # Calculate how many interations are we going to perform
+                # Calculate how many iterations are we going to perform
                 if params['n_samples'] < 1:
                     n_samples = eval("ds.len_" + s)
                     num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
@@ -1530,27 +1577,6 @@ class Model_Wrapper(object):
                         if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
                             sources.append(s_dict)
 
-
-                    """
-                    # recover previous output if using a temporally-linked model
-                    if params['temporally_linked']:
-                        for i in range(len(X[params['model_inputs'][0]])):
-                            link = X[params['link_index_id']][i]
-                            for input_id in self.ids_temporally_linked_inputs:
-                                if link not in previous_outputs[
-                                    input_id].keys():  # input to current sample was not processed yet
-                                    link = -1
-                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
-                                          previous_outputs[input_id][link]]
-                                X[input_id][i] = ds.loadText(' '.join(prev_x), ds.vocabulary[input_id],
-                                                          ds.max_text_len[input_id][s],
-                                                          ds.text_offset[input_id],
-                                                          fill=ds.fill_text[input_id],
-                                                          pad_on_batch=ds.pad_on_batch[input_id],
-                                                          words_so_far=ds.words_so_far[input_id],
-                                                          loading_X=True)[0]
-                    """
-
                     for i in range(len(X[params['model_inputs'][0]])):
                         sampled += 1
                         sys.stdout.write('\r')
@@ -1560,17 +1586,17 @@ class Model_Wrapper(object):
 
                         for input_id in params['model_inputs']:
                             if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
-                                link = int(X[params['link_index_id']][i])
-                                if link not in previous_outputs[input_id].keys():  # input to current sample was not processed yet
-                                    link = -1
-                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in previous_outputs[input_id][link]]
-                                x[input_id] = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
-                                                             ds.max_text_len[input_id][s],
-                                                             ds.text_offset[input_id],
-                                                             fill=ds.fill_text[input_id],
-                                                             pad_on_batch=ds.pad_on_batch[input_id],
-                                                             words_so_far=ds.words_so_far[input_id],
-                                                             loading_X=True)[0]
+                                    link = int(X[params['link_index_id']][i])
+                                    if link not in previous_outputs[input_id].keys():  # input to current sample was not processed yet
+                                        link = -1
+                                    prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in previous_outputs[input_id][link]]
+                                    x[input_id] = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
+                                                                 ds.max_text_len[input_id][s],
+                                                                 ds.text_offset[input_id],
+                                                                 fill=ds.fill_text[input_id],
+                                                                 pad_on_batch=ds.pad_on_batch[input_id],
+                                                                 words_so_far=ds.words_so_far[input_id],
+                                                                 loading_X=True)[0]
                             else:
                                 x[input_id] = np.asarray([X[input_id][i]])
 
@@ -1597,8 +1623,7 @@ class Model_Wrapper(object):
                             first_idx = max(0, data_gen_instance.first_idx)
                             # TODO: Make it more general
                             for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
-                                previous_outputs[input_id][first_idx+count_samples] = best_sample
-                            count_samples += 1
+                                previous_outputs[input_id][first_idx+sampled-1] = best_sample
 
                 sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
                     total_cost, total_cost / n_samples))
