@@ -1530,22 +1530,25 @@ class Model_Wrapper(object):
                         if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
                             sources.append(s_dict)
 
-                    # recover previous output if using a temporally-linked model
-                    if params['temporally_linked']:
-                        link = X[params['link_index_id']]
-                        for input_id in self.ids_temporally_linked_inputs:
-                            if link not in previous_outputs[input_id].keys(): # input to current sample was not processed yet
-                                link = -1
-                            prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in previous_outputs[input_id][link]]
-                            X[input_id] = ds.loadText(' '.join(prev_x), ds.vocabulary[input_id],
-                                                        ds.max_text_len[input_id][s],
-                                                        ds.text_offset[input_id],
-                                                        fill=ds.fill_text[input_id],
-                                                        pad_on_batch=ds.pad_on_batch[input_id],
-                                                        words_so_far=ds.words_so_far[input_id],
-                                                        loading_X=True)[0]
-
                     for i in range(len(X[params['model_inputs'][0]])):
+
+                        # recover previous output if using a temporally-linked model
+                        if params['temporally_linked']:
+                            link = X[params['link_index_id']][i]
+                            for input_id in self.ids_temporally_linked_inputs:
+                                if link not in previous_outputs[
+                                    input_id].keys():  # input to current sample was not processed yet
+                                    link = -1
+                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
+                                          previous_outputs[input_id][link]]
+                                X[input_id][i] = ds.loadText(' '.join(prev_x), ds.vocabulary[input_id],
+                                                          ds.max_text_len[input_id][s],
+                                                          ds.text_offset[input_id],
+                                                          fill=ds.fill_text[input_id],
+                                                          pad_on_batch=ds.pad_on_batch[input_id],
+                                                          words_so_far=ds.words_so_far[input_id],
+                                                          loading_X=True)[0]
+
                         sampled += 1
                         sys.stdout.write('\r')
                         sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
