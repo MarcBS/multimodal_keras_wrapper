@@ -1558,8 +1558,8 @@ class Model_Wrapper(object):
                         sys.stdout.flush()
                         x = dict()
 
-                        for input_id in params['model_inputs']:
-                            if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
+                        if params['temporally_linked']:
+                            for input_id in self.ids_temporally_linked_inputs:
                                 link = int(X[params['link_index_id']][i])
                                 if link not in previous_outputs[input_id].keys():  # input to current sample was not processed yet
                                     link = -1
@@ -1571,8 +1571,8 @@ class Model_Wrapper(object):
                                                              pad_on_batch=ds.pad_on_batch[input_id],
                                                              words_so_far=ds.words_so_far[input_id],
                                                              loading_X=True)[0]
-                            else:
-                                x[input_id] = np.asarray([X[input_id][i]])
+                        else:
+                            x[input_id] = np.asarray([X[input_id][i]])
 
                         if params['pos_unk']:
                             samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
