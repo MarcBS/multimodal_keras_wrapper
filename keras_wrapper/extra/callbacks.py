@@ -477,13 +477,16 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
+                orig_size = self.extra_vars.get('eval_orig_size', False)
                 params_prediction = {'batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s]}
                 # Convert predictions
                 postprocess_fun = None
-                if (self.is_3DLabel):
+                if self.is_3DLabel:
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
+                elif orig_size:
+                    postprocess_fun = [self.ds.resize_semantic_output, self.extra_vars['eval_orig_size_id']]
                 predictions = \
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 

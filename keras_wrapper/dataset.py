@@ -2216,6 +2216,29 @@ class Dataset(object):
 
         return out_list
 
+
+    def resize_semantic_output(self, predictions, id_out):
+        out_pred = []
+
+        assoc_id_in = self.id_in_3DLabel[id_out]
+        in_size = self.img_size_crop[assoc_id_in]
+        out_size = self.img_size[assoc_id_in]
+        n_classes = len(self.classes)
+
+        for pred in predictions:
+            pred = np.transpose(pred, [1, 0])
+            pred = np.reshape(pred, (-1, in_size[0], in_size[1]))
+
+            pred = misc.imresize(pred, [[n_classes] + out_size[0:2]])
+
+            pred = np.reshape(pred, (-1, out_size[0], out_size[1]))
+            pred = np.transpose(pred, [1, 0])
+
+            out_pred.append(pred)
+
+        return out_pred
+
+
     # ------------------------------------------------------- #
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
