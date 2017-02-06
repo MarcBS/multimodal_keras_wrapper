@@ -1628,7 +1628,8 @@ class Model_Wrapper(object):
                             first_idx = max(0, data_gen_instance.first_idx)
                             # TODO: Make it more general
                             for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
-                                previous_outputs[input_id][first_idx+sampled-1] = best_sample
+                                # Get all words previous to the padding
+                                previous_outputs[input_id][first_idx+sampled-1] = best_sample[:sum([int(elem > 0) for elem in best_sample])]
 
                 sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
                     total_cost, total_cost / n_samples))
