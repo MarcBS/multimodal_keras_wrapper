@@ -575,7 +575,7 @@ class Model_Wrapper(object):
                           'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
                           'data_augmentation': True, 'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True, 'epoch_offset': 0,
-                          'patience': 0, 'metric_check': None,  # early stopping parameters
+                          'patience': 0, 'metric_check': None, 'eval_on_epochs': True, 'each_n_epochs': 1, 'start_eval_on_epoch':0, # early stopping parameters
                           'lr_decay': None, 'lr_gamma': 0.1}  # LR decay parameters
 
         params = self.checkParameters(parameters, default_params)
@@ -637,7 +637,12 @@ class Model_Wrapper(object):
 
         # Early stopper
         if params.get('metric_check') is not None:
-            callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
+            callback_early_stop = EarlyStopping(self,
+                                                patience=params['patience'],
+                                                metric_check=params['metric_check'],
+                                                eval_on_epochs=params['eval_on_epochs'],
+                                                each_n_epochs=params['each_n_epochs'],
+                                                start_eval_on_epoch=params['start_eval_on_epoch'])
             callbacks.append(callback_early_stop)
 
         # Store model

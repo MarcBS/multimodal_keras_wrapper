@@ -731,7 +731,15 @@ class EarlyStopping(KerasCallback):
     Applies early stopping if performance has not improved for some epochs.
     """
 
-    def __init__(self, model, patience=0, check_split='val', metric_check='acc', verbose=1):
+    def __init__(self,
+                 model,
+                 patience=0,
+                 check_split='val',
+                 metric_check='acc',
+                 eval_on_epochs=True,
+                 each_n_epochs=1,
+                 start_eval_on_epoch=0,
+                 verbose=1):
         """
         :param model: model to check performance
         :param patience: number of beginning epochs without reduction; by default 0 (disabled)
@@ -744,8 +752,12 @@ class EarlyStopping(KerasCallback):
         self.patience = patience
         self.check_split = check_split
         self.metric_check = metric_check
-        self.verbose = verbose
+        self.eval_on_epochs = eval_on_epochs
+        self.start_eval_on_epoch = start_eval_on_epoch
+        self.each_n_epochs = each_n_epochs
 
+        self.verbose = verbose
+        self.cum_update = 0
         # check already stored scores in case we have loaded a pre-trained model
         all_scores = self.model_to_eval.getLog(self.check_split, self.metric_check)
         all_epochs = self.model_to_eval.getLog(self.check_split, 'epoch')
@@ -760,8 +772,24 @@ class EarlyStopping(KerasCallback):
 
     def on_epoch_end(self, epoch, logs={}):
         epoch += 1  # start by index 1
-        # Get last metric value from logs
+        self.epoch = epoch
+        if not self.eval_on_epochs:
+            return
+        elif (epoch - self.start_eval_on_epoch) % self.each_n_epochs != 0:
+            return
+        self.evaluate(self.epoch, counter_name='epoch')
+
+    def on_batch_end(self, n_update, logs={}):
+        self.cum_update += 1  # start by index 1
+        if self.eval_on_epochs:
+            return
+        if self.cum_update % self.each_n_epochs != 0:
+            return
+        self.evaluate(self.cum_update, counter_name='update')
+
+    def evaluate(self, epoch, counter_name='epoch'):
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
+        # Get last metric value from logs
         if current_score is None:
             warnings.warn('The chosen metric' + str(self.metric_check) + ' does not exist;'
                                                                          ' this reducer works only with a valid metric.')
@@ -781,8 +809,8 @@ class EarlyStopping(KerasCallback):
             logging.info('---bad counter: %d/%d' % (self.wait, self.patience))
             if self.wait >= self.patience:
                 if self.verbose > 0:
-                    logging.info("---epoch %d: early stopping. Best %s found at epoch %d: %f" % (
-                    epoch, self.metric_check, self.best_epoch, self.best_score))
+                    logging.info("---%s %d: early stopping. Best %s found at %s %d: %f" % (
+                    str(counter_name), epoch, self.metric_check,  str(counter_name), self.best_epoch, self.best_score))
                 self.model.stop_training = True
 
 
