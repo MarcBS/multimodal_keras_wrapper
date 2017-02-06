@@ -575,7 +575,7 @@ class Model_Wrapper(object):
                           'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
                           'data_augmentation': True, 'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True, 'epoch_offset': 0,
-                          'patience': 0, 'metric_check': None,  # early stopping parameters
+                          'patience': 0, 'metric_check': None, 'eval_on_epochs': True, 'each_n_epochs': 1, 'start_eval_on_epoch':0, # early stopping parameters
                           'lr_decay': None, 'lr_gamma': 0.1}  # LR decay parameters
 
         params = self.checkParameters(parameters, default_params)
@@ -637,7 +637,12 @@ class Model_Wrapper(object):
 
         # Early stopper
         if params.get('metric_check') is not None:
-            callback_early_stop = EarlyStopping(self, patience=params['patience'], metric_check=params['metric_check'])
+            callback_early_stop = EarlyStopping(self,
+                                                patience=params['patience'],
+                                                metric_check=params['metric_check'],
+                                                eval_on_epochs=params['eval_on_epochs'],
+                                                each_n_epochs=params['each_n_epochs'],
+                                                start_eval_on_epoch=params['start_eval_on_epoch'])
             callbacks.append(callback_early_stop)
 
         # Store model
@@ -1623,7 +1628,8 @@ class Model_Wrapper(object):
                             first_idx = max(0, data_gen_instance.first_idx)
                             # TODO: Make it more general
                             for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
-                                previous_outputs[input_id][first_idx+sampled-1] = best_sample
+                                # Get all words previous to the padding
+                                previous_outputs[input_id][first_idx+sampled-1] = best_sample[:sum([int(elem > 0) for elem in best_sample])]
 
                 sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
                     total_cost, total_cost / n_samples))
