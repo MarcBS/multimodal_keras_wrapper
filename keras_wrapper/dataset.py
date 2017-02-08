@@ -51,7 +51,7 @@ def saveDataset(dataset, store_path):
     if not dataset.silence:
         logging.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
 
-    pk.dump(dataset, open(store_path, 'wb'))
+    pk.dump(dataset, open(store_path, 'wb'), protocol=pk.HIGHEST_PROTOCOL)
 
     if not dataset.silence:
         logging.info("<<< Dataset instance saved >>>")
@@ -1170,7 +1170,6 @@ class Dataset(object):
             else:
                 raise Exception(
                     'The parameter "build_vocabulary" must be a boolean or a str containing an id of the vocabulary we want to copy.')
-
         elif isinstance(build_vocabulary, dict):
                 self.vocabulary[id] = build_vocabulary
                 if not self.silence:
