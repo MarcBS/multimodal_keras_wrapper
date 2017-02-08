@@ -1167,9 +1167,14 @@ class Dataset(object):
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
                 if not self.silence:
                     logging.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with id "' + id + '".')
-            else:
-                raise Exception(
-                    'The parameter "build_vocabulary" must be a boolean or a str containing an id of the vocabulary we want to copy.')
+        else:
+            try:
+                self.vocabulary[id] = build_vocabulary
+                if not self.silence:
+                    logging.info('\tReusing vocabulary from dictionary for data with id "' + id + '".')
+            except: raise Exception(
+                'The parameter "build_vocabulary" must be a boolean, a str containing an id of the vocabulary we want to copy'
+                'or a vocabulary object.')
 
         if not id in self.vocabulary:
             raise Exception(
