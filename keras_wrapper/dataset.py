@@ -201,8 +201,10 @@ class Data_Batch_Generator(object):
                                                           normalization=self.params['normalization'],
                                                           meanSubstraction=self.params['mean_substraction'],
                                                           dataAugmentation=data_augmentation)
+                    #print 'Y_batch:', Y_batch
+                    #print 'target words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0]]]
+                    #print 'Mask:', Y_batch[0][1]
                     data = self.net.prepareData(X_batch, Y_batch)
-
             yield (data)
 
 
