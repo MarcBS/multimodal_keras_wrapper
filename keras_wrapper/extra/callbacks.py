@@ -8,7 +8,6 @@ import random
 import warnings
 import numpy as np
 import logging
-
 from keras.callbacks import Callback as KerasCallback
 
 import evaluation
@@ -52,29 +51,36 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                  beam_search=False, write_samples=False, save_path='logs/performance.',
                  reload_epoch=0,
                  eval_on_epochs=True, start_eval_on_epoch=0, is_3DLabel=False,
-                 write_type='list', sampling_type='max_likelihood',
-                 out_pred_idx=None, early_stop=False, patience=5, stop_metric='Bleu-4', verbose=1):
+                 write_type='list', sampling_type='max_likelihood', save_each_evaluation=True,
+                 out_pred_idx=None, verbose=1):
         """
-            :param model: model to evaluate
-            :param dataset: instance of the class Dataset in keras_wrapper.dataset
-            :param gt_id: identifier in the Dataset instance of the output data about to evaluate
-            :param metric_name: name of the performance metric
-            :param set_name: name of the set split that will be evaluated
-            :param batch_size: batch size used during sampling
-            :param each_n_epochs: sampling each this number of epochs
-            :param extra_vars: dictionary of extra variables
-            :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
-            :param is_3DLabel: defines if the predicted info is of type 3DLabels
-            :param index2word_y: mapping from the indices to words (only needed if is_text==True)
-            :param sampling: sampling mechanism used (only used if is_text==True)
-            :param write_samples: flag for indicating if we want to write the predicted data in a text file
-            :param save_path: path to dumb the logs
-            :param eval_on_epochs: Eval each epochs or updates
-            :param start_eval_on_epoch: only starts evaluating model if a given epoch has been reached
-            :param write_type: method used for writing predictions
-            :param sampling_type: type of sampling used (multinomial or max_likelihood)
-            :param out_pred_idx: index of the output prediction used for evaluation (only applicable if model has more than one output, else set to None)
-            :param verbose: verbosity level; by default 1
+        Evaluates a model each N epochs or updates
+
+        :param model: model to evaluate
+        :param dataset: instance of the class Dataset in keras_wrapper.dataset
+        :param gt_id: identifier in the Dataset instance of the output data to evaluate
+        :param metric_name: name of the performance metric
+        :param set_name:  name of the set split that will be evaluated
+        :param batch_size: batch size used during sampling
+        :param each_n_epochs: sampling each this number of epochs or updates
+        :param extra_vars: dictionary of extra variables
+        :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
+        :param index2word_y: mapping from the indices to words (only needed if is_text==True)
+        :param input_text_id:
+        :param index2word_x: mapping from the indices to words (only needed if is_text==True)
+        :param sampling: sampling mechanism used (only used if is_text==True)
+        :param beam_search: whether to use a beam search method or not
+        :param write_samples: flag for indicating if we want to write the predicted data in a text file
+        :param save_path: path to dumb the logs
+        :param reload_epoch: reloading epoch
+        :param eval_on_epochs: eval each epochs (True) or each updates (False)
+        :param start_eval_on_epoch: only starts evaluating model if a given epoch has been reached
+        :param is_3DLabel: defines if the predicted info is of type 3DLabels
+        :param write_type:  method used for writing predictions
+        :param sampling_type: type of sampling used (multinomial or max_likelihood)
+        :param save_each_evaluation: save the model each time we evaluate (epochs or updates)
+        :param out_pred_idx: index of the output prediction used for evaluation (only applicable if model has more than one output, else set to None)
+        :param verbose: verbosity level; by default 1
         """
         self.model_to_eval = model
         self.ds = dataset
@@ -98,15 +104,13 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
         self.sampling_type = sampling_type
         self.write_samples = write_samples
         self.out_pred_idx = out_pred_idx
-        self.early_stop = early_stop
-        self.patience = patience
-        self.stop_metric = stop_metric
         self.best_score = -1
         self.best_epoch = -1
         self.wait = 0
         self.verbose = verbose
         self.cum_update = 0
         self.epoch = reload_epoch
+        self.save_each_evaluation = save_each_evaluation
         super(PrintPerformanceMetricOnEpochEndOrEachNUpdates, self).__init__()
 
     def on_epoch_end(self, epoch, logs={}):
@@ -141,6 +145,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
         self.evaluate(self.cum_update, counter_name='iteration')
 
     def evaluate(self, epoch, counter_name='epoch'):
+
         # Evaluate on each set separately
         for s in self.set_name:
             # Apply model predictions
@@ -211,8 +216,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
             # Store predictions
             if self.write_samples:
                 # Store result
-                filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(
-                    epoch) + '.pred'  # results file
+                filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '.pred'  # results file
                 if self.write_type == 'list':
                     list2file(filepath, predictions)
                 elif self.write_type == 'vqa':
@@ -228,6 +232,10 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     raise NotImplementedError(
                         'The store type "' + self.write_type + '" is not implemented.')
 
+            # Save the model
+            if self.save_each_evaluation:
+                from keras_wrapper.cnn_model import saveModel
+                saveModel(self.model_to_eval, epoch, store_iter=not(self.eval_on_epochs))
             # Evaluate on each metric
             for metric in self.metric_name:
                 if self.verbose > 0:
@@ -259,6 +267,10 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
+
+
+
+
 ###################################################
 # Storing callbacks
 ###################################################
@@ -287,9 +299,6 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
             #    if (n_update % self.epochs_for_save == 0):
             #        print('')
             #        self.store_function(self.model_to_save, n_update)
-
-
-###
 
 ###################################################
 # Sampling callbacks
