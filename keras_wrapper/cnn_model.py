@@ -45,7 +45,7 @@ from keras.applications.vgg19 import VGG19
 # ------------------------------------------------------- #
 
 
-def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=True):
+def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=False):
     """
     Saves a backup of the current Model_Wrapper object after being trained for 'update_num' iterations/updates/epochs.
 

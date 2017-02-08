@@ -25,7 +25,10 @@ def checkDefaultParamsBeamSearch(params):
                       'optimized_search': False,
                       'temporally_linked': False,
                       'link_index_id': 'link_index',
-                      'state_below_index': -1
+                      'state_below_index': -1,
+                      'pos_unk': False,
+                      'heuristic': 0,
+                      'mapping': None
                       }
 
     for k, v in params.iteritems():
@@ -172,7 +175,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                 predictions = \
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 
-            if (self.is_text):
+            if self.is_text:
                 if params_prediction.get('pos_unk', False):
                     samples = predictions[0]
                     alphas = predictions[1]
@@ -232,10 +235,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     raise NotImplementedError(
                         'The store type "' + self.write_type + '" is not implemented.')
 
-            # Save the model
-            if self.save_each_evaluation:
-                from keras_wrapper.cnn_model import saveModel
-                saveModel(self.model_to_eval, epoch, store_iter=not(self.eval_on_epochs))
+
             # Evaluate on each metric
             for metric in self.metric_name:
                 if self.verbose > 0:
@@ -266,7 +266,10 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                     f.write(line + '\n')
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
-
+        # Save the model
+        if self.save_each_evaluation:
+            from keras_wrapper.cnn_model import saveModel
+            saveModel(self.model_to_eval, epoch, store_iter=not self.eval_on_epochs)
 
 
 
@@ -290,7 +293,7 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
 
     def on_epoch_end(self, epoch, logs={}):
         epoch += 1
-        if (epoch % self.epochs_for_save == 0):
+        if epoch % self.epochs_for_save == 0:
             print('')
             self.store_function(self.model_to_save, epoch)
 
@@ -305,8 +308,9 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
 ###################################################
 
 class SampleEachNUpdates(KerasCallback):
-    def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=dict(),
-                 is_text=False, index2word_y=None, input_text_id=None, sampling='max_likelihood', temperature=1.,
+    def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=None,
+                 is_text=False, index2word_x=None, index2word_y=None, input_text_id=None, print_sources=False,
+                 sampling='max_likelihood', temperature=1.,
                  beam_search=False, batch_size=50, reload_epoch=0, start_sampling_on_epoch=0, is_3DLabel=False,
                  write_type='list', sampling_type='max_likelihood', out_pred_idx=None, in_pred_idx=None, verbose=1):
         """
@@ -335,6 +339,7 @@ class SampleEachNUpdates(KerasCallback):
         self.model_to_eval = model
         self.ds = dataset
         self.gt_id = gt_id
+        self.index2word_x = index2word_x
         self.index2word_y = index2word_y
         self.input_text_id = input_text_id
         self.is_text = is_text
@@ -355,7 +360,9 @@ class SampleEachNUpdates(KerasCallback):
         self.in_pred_idx = in_pred_idx
         self.cum_update = 0
         self.epoch_count = 0
+        self.print_sources = print_sources
         self.verbose = verbose
+        super(SampleEachNUpdates, self).__init__()
 
     def on_epoch_end(self, n_epoch, logs={}):
         self.epoch_count += 1
@@ -373,42 +380,74 @@ class SampleEachNUpdates(KerasCallback):
             params_prediction = {'batch_size': self.batch_size,
                                  'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                  'predict_on_sets': [s],
-                                 'n_samples': self.n_samples}
+                                 'n_samples': self.n_samples,
+                                 'pos_unk': False, 'heuristic': 0, 'mapping': None}
             if self.beam_search:
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
-                predictions, truths, data = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
+                predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
                 # Convert predictions
                 postprocess_fun = None
-                if (self.is_3DLabel):
+                if self.is_3DLabel:
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
-                predictions = \
-                    self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
+                predictions = self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
+
+
+            if self.print_sources:
+                if self.in_pred_idx is not None:
+                    sources = [srcs for srcs in sources[0][self.in_pred_idx]]
+                sources = self.model_to_eval.decode_predictions_beam_search(sources,
+                                                        self.index2word_x,
+                                                        pad_sequences=True,
+                                                        verbose=self.verbose)
+
             if s in predictions:
+                if params_prediction['pos_unk']:
+                    samples = predictions[s][0]
+                    alphas = predictions[s][1]
+                    heuristic = params_prediction['heuristic']
+                else:
+                    samples = predictions[s]
+                    alphas = None
+                    heuristic = None
+
                 predictions = predictions[s]
-                if (self.is_text):
+                if self.is_text:
                     if self.out_pred_idx is not None:
-                        predictions = predictions[self.out_pred_idx]
+                        samples = samples[self.out_pred_idx]
                     # Convert predictions into sentences
                     if self.beam_search:
-                        predictions = self.model_to_eval.decode_predictions_beam_search(predictions,
+                        predictions = self.model_to_eval.decode_predictions_beam_search(samples,
                                                                                         self.index2word_y,
+                                                                                        alphas=alphas,
+                                                                                        x_text=sources,
+                                                                                        heuristic=heuristic,
+                                                                                        mapping=params_prediction
+                                                                                        ['mapping'],
                                                                                         verbose=self.verbose)
-                        truths = self.model_to_eval.decode_predictions_one_hot(truths,
-                                                                               self.index2word_y,
-                                                                               verbose=self.verbose)
                     else:
-                        predictions = self.model_to_eval.decode_predictions(predictions,
-                                                                            self.temperature,
+                        predictions = self.model_to_eval.decode_predictions(samples,
+                                                                            1,
                                                                             self.index2word_y,
                                                                             self.sampling_type,
                                                                             verbose=self.verbose)
+                    truths = self.model_to_eval.decode_predictions_one_hot(truths,
+                                                                           self.index2word_y,
+                                                                           verbose=self.verbose)
 
                 # Write samples
-                for i, (sample, truth) in enumerate(zip(predictions, truths)):
-                    print("Hypothesis (%d): %s" % (i, sample))
-                    print("Reference  (%d): %s" % (i, truth))
-
+                if self.print_sources:
+                    # Write samples
+                    for i, (source, sample, truth) in enumerate(zip(sources, predictions, truths)):
+                        print ("Source     (%d): %s" % (i, source))
+                        print ("Hypothesis (%d): %s" % (i, sample))
+                        print ("Reference  (%d): %s" % (i, truth))
+                        print ("")
+                else:
+                    for i, (sample, truth) in enumerate(zip(predictions, truths)):
+                        print ("Hypothesis (%d): %s" % (i, sample))
+                        print ("Reference  (%d): %s" % (i, truth))
+                        print ("")
 
 ###################################################
 # Learning modifiers callbacks
