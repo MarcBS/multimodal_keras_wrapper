@@ -17,7 +17,7 @@ from scipy import misc
 from scipy import ndimage
 from PIL import Image as pilimage
 import numpy as np
-
+from extra.read_write import create_dir_if_not_exists
 from .utils import bbox
 
 
@@ -25,18 +25,6 @@ from .utils import bbox
 #       SAVE/LOAD
 #           External functions for saving and loading Dataset instances
 # ------------------------------------------------------- #
-
-def create_dir_if_not_exists(directory):
-    """
-    Creates a directory if it doen't exist
-
-    :param directory: Directory to create
-    :return: None
-    """
-    if not os.path.exists(directory):
-        logging.info("<<< creating directory " + directory + " ... >>>")
-        os.makedirs(directory)
-
 
 def saveDataset(dataset, store_path):
     """

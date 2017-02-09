@@ -10,7 +10,8 @@ Modified by: Marc Bola\~nos
 
 import json
 import numpy as np
-
+import os
+import logging
 
 ###
 # Helpers
@@ -18,6 +19,17 @@ import numpy as np
 def _dirac(pred, gt):
     return int(pred == gt)
 
+
+def create_dir_if_not_exists(directory):
+    """
+    Creates a directory if it doen't exist
+
+    :param directory: Directory to create
+    :return: None
+    """
+    if not os.path.exists(directory):
+        logging.info("<<< creating directory " + directory + " ... >>>")
+        os.makedirs(directory)
 
 ###
 # Main functions
