@@ -45,7 +45,7 @@ from keras.applications.vgg19 import VGG19
 # ------------------------------------------------------- #
 
 
-def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=True):
+def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=False):
     """
     Saves a backup of the current Model_Wrapper object after being trained for 'update_num' iterations/updates/epochs.
 
@@ -67,7 +67,10 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         else:
             model_name = path
     else:
-        model_name = path + '/epoch_' + iter
+        if store_iter:
+            model_name = path + '/update_' + iter
+        else:
+            model_name = path + '/epoch_' + iter
 
     if not model_wrapper.silence:
         logging.info("<<< Saving model to " + model_name + " ... >>>")
@@ -3186,10 +3189,12 @@ class Model_Wrapper(object):
         :param init_weights: weights initialization function
         :return: output layer of the dense block
         """
-        if K.image_dim_ordering() == 'tf':
+        if K.image_dim_ordering() == 'th':
+            axis = 1
+        elif K.image_dim_ordering() == 'tf':
             axis = -1
         else:
-            axis = 1
+            raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
         list_outputs = []
         prev_layer = in_layer
@@ -3250,10 +3255,12 @@ class Model_Wrapper(object):
 
         :return: [output layer, skip connection name]
         """
-        if K.image_dim_ordering() == 'tf':
+        if K.image_dim_ordering() == 'th':
+            axis = 1
+        elif K.image_dim_ordering() == 'tf':
             axis = -1
         else:
-            axis = 1
+            raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
         # Dense Block
         x_dense = self.add_dense_block(x, nb_layers, growth, drop,
@@ -3298,17 +3305,18 @@ class Model_Wrapper(object):
 
         :return: output layer
         """
-        if K.image_dim_ordering() == 'tf':
+        if K.image_dim_ordering() == 'th':
+            axis = 1
+        elif K.image_dim_ordering() == 'tf':
             axis = -1
         else:
-            axis = 1
+            raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
         # Transition Up
-        x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
+        x = Deconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
                                      subsample=(2, 2), border_mode='same')(x)
-        # x = Deconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
-        #                     output_shape=tuple([None, nb_filters_deconv]+out_dim),
-        #                     subsample=(2, 2), border_mode='same')(x)
+        #x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
+        #                             subsample=(2, 2), border_mode='same')(x)
 
         # Skip connection concatenation
         x = merge([skip_conn, x], mode='concat', concat_axis=axis)

@@ -17,7 +17,7 @@ from scipy import misc
 from scipy import ndimage
 from PIL import Image as pilimage
 import numpy as np
-
+from extra.read_write import create_dir_if_not_exists
 from .utils import bbox
 
 
@@ -25,18 +25,6 @@ from .utils import bbox
 #       SAVE/LOAD
 #           External functions for saving and loading Dataset instances
 # ------------------------------------------------------- #
-
-def create_dir_if_not_exists(directory):
-    """
-    Creates a directory if it doen't exist
-
-    :param directory: Directory to create
-    :return: None
-    """
-    if not os.path.exists(directory):
-        logging.info("<<< creating directory " + directory + " ... >>>")
-        os.makedirs(directory)
-
 
 def saveDataset(dataset, store_path):
     """
@@ -51,7 +39,7 @@ def saveDataset(dataset, store_path):
     if not dataset.silence:
         logging.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
 
-    pk.dump(dataset, open(store_path, 'wb'))
+    pk.dump(dataset, open(store_path, 'wb'), protocol=pk.HIGHEST_PROTOCOL)
 
     if not dataset.silence:
         logging.info("<<< Dataset instance saved >>>")
@@ -161,9 +149,9 @@ class Data_Batch_Generator(object):
                 num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
                 if self.temporally_linked:
                     if self.first_idx == -1:
-                        self.first_idx = np.random.randint(0, n_samples_split-self.params['random_samples'], 1)[0]
+                        self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
                         self.next_idx = self.first_idx
-                    indices = range(self.next_idx,self.next_idx+num_retrieve)
+                    indices = range(self.next_idx, self.next_idx + num_retrieve)
                     self.next_idx += num_retrieve
                 else:
                     indices = np.random.randint(0, n_samples_split, num_retrieve)
@@ -201,8 +189,10 @@ class Data_Batch_Generator(object):
                                                           normalization=self.params['normalization'],
                                                           meanSubstraction=self.params['mean_substraction'],
                                                           dataAugmentation=data_augmentation)
+                    # print 'Y_batch:', Y_batch
+                    # print 'target words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0]]]
+                    # print 'Mask:', Y_batch[0][1]
                     data = self.net.prepareData(X_batch, Y_batch)
-
             yield (data)
 
 
@@ -1168,6 +1158,10 @@ class Dataset(object):
             else:
                 raise Exception(
                     'The parameter "build_vocabulary" must be a boolean or a str containing an id of the vocabulary we want to copy.')
+        elif isinstance(build_vocabulary, dict):
+            self.vocabulary[id] = build_vocabulary
+            if not self.silence:
+                logging.info('\tReusing vocabulary from dictionary for data with id "' + id + '".')
 
         if not id in self.vocabulary:
             raise Exception(
@@ -2216,7 +2210,6 @@ class Dataset(object):
 
         return out_list
 
-
     def resize_semantic_output(self, predictions, id_out):
         out_pred = []
 
@@ -2237,7 +2230,6 @@ class Dataset(object):
             out_pred.append(pred)
 
         return out_pred
-
 
     # ------------------------------------------------------- #
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
