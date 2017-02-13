@@ -189,7 +189,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
                 if self.is_3DLabel:
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
                 elif orig_size:
-                    postprocess_fun = [self.ds.resize_semantic_output, self.extra_vars['eval_orig_size_id']]
+                    postprocess_fun = [self.ds.resize_semantic_output, self.extra_vars[s]['eval_orig_size_id']]
                 predictions = \
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 

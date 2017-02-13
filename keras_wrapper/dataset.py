@@ -2210,15 +2210,17 @@ class Dataset(object):
 
         return out_list
 
-    def resize_semantic_output(self, predictions, id_out):
+    def resize_semantic_output(self, predictions, ids_out):
         out_pred = []
 
-        assoc_id_in = self.id_in_3DLabel[id_out]
-        in_size = self.img_size_crop[assoc_id_in]
-        out_size = self.img_size[assoc_id_in]
         n_classes = len(self.classes)
 
-        for pred in predictions:
+        for pred, id_out in zip(predictions, ids_out):
+
+            assoc_id_in = self.id_in_3DLabel[id_out]
+            in_size = self.img_size_crop[assoc_id_in]
+            out_size = self.img_size[assoc_id_in]
+
             pred = np.transpose(pred, [1, 0])
             pred = np.reshape(pred, (-1, in_size[0], in_size[1]))
 
