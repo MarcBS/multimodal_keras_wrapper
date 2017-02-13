@@ -47,15 +47,32 @@ def checkDefaultParamsBeamSearch(params):
 ###################################################
 
 class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
-    def __init__(self, model, dataset, gt_id, metric_name, set_name, batch_size, each_n_epochs=1,
+    def __init__(self,
+                 model,
+                 dataset,
+                 gt_id,
+                 metric_name,
+                 set_name,
+                 batch_size,
+                 each_n_epochs=1,
                  extra_vars=None,
-                 is_text=False, index2word_y=None, input_text_id=None, index2word_x=None,
+                 is_text=False,
+                 index2word_y=None,
+                 input_text_id=None,
+                 index2word_x=None,
                  sampling='max_likelihood',
-                 beam_search=False, write_samples=False, save_path='logs/performance.',
+                 beam_search=False,
+                 write_samples=False,
+                 save_path='logs/performance.',
                  reload_epoch=0,
-                 eval_on_epochs=True, start_eval_on_epoch=0, is_3DLabel=False,
-                 write_type='list', sampling_type='max_likelihood', save_each_evaluation=True,
-                 out_pred_idx=None, verbose=1):
+                 eval_on_epochs=True,
+                 start_eval_on_epoch=0,
+                 is_3DLabel=False,
+                 write_type='list',
+                 sampling_type='max_likelihood',
+                 save_each_evaluation=True,
+                 out_pred_idx=None,
+                 verbose=1):
         """
         Evaluates a model each N epochs or updates
 
@@ -114,6 +131,7 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
         self.cum_update = 0
         self.epoch = reload_epoch
         self.save_each_evaluation = save_each_evaluation
+        create_dir_if_not_exists(self.save_path)
         super(PrintPerformanceMetricOnEpochEndOrEachNUpdates, self).__init__()
 
     def on_epoch_end(self, epoch, logs={}):
