@@ -158,10 +158,10 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except:  # backwards compatibility
-        try:
-            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
-        except:
-            raise Exception(ValueError)
+        #try:
+        model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
+        #except:
+        #    raise Exception(ValueError)
 
     # Add logger for backwards compatibility (old pre-trained models) if it does not exist
     model_wrapper.updateLogger()
@@ -1940,6 +1940,22 @@ class Model_Wrapper(object):
                 tmp = ' '.join(a_no[:-1])
                 answer_pred.append(tmp)
         return answer_pred
+
+
+    def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
+        """
+        Converts a one-hot codification into a index-based one
+        :param preds: Predictions codified as one-hot vectors.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of convertedpredictions
+        """
+        if verbose > 0:
+            logging.info('Converting one hot prediction into indices...')
+        preds = map(lambda x: np.nonzero(x)[1], preds)
+        if pad_sequences:
+            preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
+        return preds
+
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
         """

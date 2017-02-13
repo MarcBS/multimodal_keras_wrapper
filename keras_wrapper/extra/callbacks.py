@@ -381,7 +381,9 @@ class SampleEachNUpdates(KerasCallback):
                                  'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                  'predict_on_sets': [s],
                                  'n_samples': self.n_samples,
-                                 'pos_unk': False, 'heuristic': 0, 'mapping': None}
+                                 'pos_unk': False,
+                                 'heuristic': 0,
+                                 'mapping': None}
             if self.beam_search:
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
