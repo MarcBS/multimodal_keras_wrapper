@@ -579,18 +579,28 @@ class Model_Wrapper(object):
                           'homogeneous_batches': False,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
-                          'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
-                          'data_augmentation': True, 'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True, 'epoch_offset': 0,
-                          'patience': 0, 'metric_check': None, 'eval_on_epochs': True, 'each_n_epochs': 1, 'start_eval_on_epoch':0, # early stopping parameters
-                          'lr_decay': None, 'lr_gamma': 0.1}  # LR decay parameters
-
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'data_augmentation': True,
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch':0, # early stopping parameters
+                          'lr_decay': None, # LR decay parameters
+                          'lr_gamma': 0.1}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
         self.training_parameters.append(save_params)
-
-        logging.info("<<< Training model >>>")
+        if params['verbose'] > 0:
+            logging.info("<<< Training model >>>")
 
         self.__train(ds, params)
 
@@ -622,9 +632,77 @@ class Model_Wrapper(object):
 
         logging.info("<<< Finished training Model_Wrapper >>>")
 
+    def trainNetFromSamples(self, x, y, parameters={}, class_weight=None, sample_weight=None, out_name=None):
+        """
+            Trains the network on the given samples x, y.
+
+            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.
+
+            The input 'parameters' is a dict() which may contain the following (optional) training parameters:
+
+            ####    Visualization parameters
+
+            :param report_iter: number of iterations between each loss report
+            :param iter_for_val: number of interations between each validation test
+            :param num_iterations_val: number of iterations applied on the validation dataset for computing the average performance (if None then all the validation data will be tested)
+
+            ####    Learning parameters
+
+            :param n_epochs: number of epochs that will be applied during training
+            :param batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
+            :param lr_decay: number of iterations passed for decreasing the learning rate
+            :param lr_gamma: proportion of learning rate kept at each decrease. It can also be a set of rules defined by a list, e.g. lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration 3000, ..., 0.8 until the end.
+            :param patience: number of epochs waiting for a possible performance increase before stopping training
+            :param metric_check: name of the metric checked for early stoppping and LR decrease
+
+            ####    Data processing parameters
+
+            :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
+            :param normalize: boolean indicating if we want to 0-1 normalize the image pixel values
+            :param mean_substraction: boolean indicating if we want to substract the training mean
+            :param data_augmentation: boolean indicating if we want to perform data augmentation (always False on validation)
+            :param shuffle: apply shuffling on training data at the beginning of each epoch.
+
+            ####    Other parameters
+
+            :param save_model: number of iterations between each model backup
+        """
+
+        # Check input parameters and recover default values if needed
+
+        default_params = {'n_epochs': 1, 'batch_size': 50,
+                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
+                          'homogeneous_batches': False,
+                          'epochs_for_save': 1,
+                          'num_iterations_val': None,
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'data_augmentation': True,
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch':0, # early stopping parameters
+                          'lr_decay': None, # LR decay parameters
+                          'lr_gamma': 0.1}
+        params = self.checkParameters(parameters, default_params)
+        save_params = copy.copy(params)
+        del save_params['extra_callbacks']
+        self.training_parameters.append(save_params)
+        self.__train_from_samples(x, y, params, class_weight=class_weight, sample_weight=sample_weight)
+        if params['verbose'] > 0:
+            logging.info("<<< Finished training model >>>")
+
     def __train(self, ds, params, state=dict()):
 
-        logging.info("Training parameters: " + str(params))
+        if params['verbose'] > 0:
+            logging.info("Training parameters: " + str(params))
 
         # initialize state
         state['samples_per_epoch'] = ds.len_train
@@ -653,8 +731,9 @@ class Model_Wrapper(object):
             callbacks.append(callback_early_stop)
 
         # Store model
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-        callbacks.append(callback_store_model)
+        if params['epochs_for_save'] >= 0:
+            callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+            callbacks.append(callback_store_model)
 
         # Prepare data generators
         if params['homogeneous_batches']:
@@ -698,6 +777,56 @@ class Model_Wrapper(object):
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
                                  initial_epoch=params['epoch_offset'])
+
+    def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None, state=dict()):
+
+        if params['verbose'] > 0:
+            logging.info("Training parameters: " + str(params))
+        # initialize state
+        state['samples_per_epoch'] = len(x)
+        state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch']) / min(params['batch_size'],
+                                                                                                len(x))))
+
+        # Prepare callbacks
+        callbacks = []
+        ## Callbacks order:
+
+        # Extra callbacks (e.g. evaluation)
+        callbacks += params['extra_callbacks']
+
+        # LR reducer
+        if params.get('lr_decay') is not None:
+            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            callbacks.append(callback_lr_reducer)
+
+        # Early stopper
+        if params.get('metric_check') is not None:
+            callback_early_stop = EarlyStopping(self,
+                                                patience=params['patience'],
+                                                metric_check=params['metric_check'],
+                                                eval_on_epochs=params['eval_on_epochs'],
+                                                each_n_epochs=params['each_n_epochs'],
+                                                start_eval_on_epoch=params['start_eval_on_epoch'])
+            callbacks.append(callback_early_stop)
+
+        # Store model
+        if params['epochs_for_save'] >= 0:
+            callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+            callbacks.append(callback_store_model)
+
+        # Train model
+        self.model.fit(x,
+                       y,
+                       batch_size=min(params['batch_size'], len(x)),
+                       nb_epoch=params['n_epochs'],
+                       verbose=params['verbose'],
+                       callbacks=callbacks,
+                       validation_data=None,
+                       validation_split=params.get('val_split', 0.),
+                       shuffle=params['shuffle'],
+                       class_weight=class_weight,
+                       sample_weight=sample_weight,
+                       initial_epoch=params['epoch_offset'])
 
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
         """
