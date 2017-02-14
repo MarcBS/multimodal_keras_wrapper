@@ -108,7 +108,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=dict(), full_path=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -123,7 +123,11 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     if full_path:
         model_name = model_path
     else:
-        model_name = model_path + "/epoch_" + iter
+        if reload_epoch:
+            model_name = model_path + "/epoch_" + iter
+        else:
+            model_name = model_path + "/update_" + iter
+
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
@@ -158,10 +162,10 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except:  # backwards compatibility
-        try:
-            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
-        except:
-            raise Exception(ValueError)
+        #try:
+        model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
+        #except:
+        #    raise Exception(ValueError)
 
     # Add logger for backwards compatibility (old pre-trained models) if it does not exist
     model_wrapper.updateLogger()
@@ -590,18 +594,28 @@ class Model_Wrapper(object):
                           'homogeneous_batches': False,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
-                          'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
-                          'data_augmentation': True, 'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True, 'epoch_offset': 0,
-                          'patience': 0, 'metric_check': None, 'eval_on_epochs': True, 'each_n_epochs': 1, 'start_eval_on_epoch':0, # early stopping parameters
-                          'lr_decay': None, 'lr_gamma': 0.1}  # LR decay parameters
-
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'data_augmentation': True,
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch':0, # early stopping parameters
+                          'lr_decay': None, # LR decay parameters
+                          'lr_gamma': 0.1}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
         self.training_parameters.append(save_params)
-
-        logging.info("<<< Training model >>>")
+        if params['verbose'] > 0:
+            logging.info("<<< Training model >>>")
 
         self.__train(ds, params)
 
@@ -633,9 +647,77 @@ class Model_Wrapper(object):
 
         logging.info("<<< Finished training Model_Wrapper >>>")
 
+    def trainNetFromSamples(self, x, y, parameters={}, class_weight=None, sample_weight=None, out_name=None):
+        """
+            Trains the network on the given samples x, y.
+
+            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.
+
+            The input 'parameters' is a dict() which may contain the following (optional) training parameters:
+
+            ####    Visualization parameters
+
+            :param report_iter: number of iterations between each loss report
+            :param iter_for_val: number of interations between each validation test
+            :param num_iterations_val: number of iterations applied on the validation dataset for computing the average performance (if None then all the validation data will be tested)
+
+            ####    Learning parameters
+
+            :param n_epochs: number of epochs that will be applied during training
+            :param batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
+            :param lr_decay: number of iterations passed for decreasing the learning rate
+            :param lr_gamma: proportion of learning rate kept at each decrease. It can also be a set of rules defined by a list, e.g. lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration 3000, ..., 0.8 until the end.
+            :param patience: number of epochs waiting for a possible performance increase before stopping training
+            :param metric_check: name of the metric checked for early stoppping and LR decrease
+
+            ####    Data processing parameters
+
+            :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
+            :param normalize: boolean indicating if we want to 0-1 normalize the image pixel values
+            :param mean_substraction: boolean indicating if we want to substract the training mean
+            :param data_augmentation: boolean indicating if we want to perform data augmentation (always False on validation)
+            :param shuffle: apply shuffling on training data at the beginning of each epoch.
+
+            ####    Other parameters
+
+            :param save_model: number of iterations between each model backup
+        """
+
+        # Check input parameters and recover default values if needed
+
+        default_params = {'n_epochs': 1, 'batch_size': 50,
+                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
+                          'homogeneous_batches': False,
+                          'epochs_for_save': 1,
+                          'num_iterations_val': None,
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'data_augmentation': True,
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch':0, # early stopping parameters
+                          'lr_decay': None, # LR decay parameters
+                          'lr_gamma': 0.1}
+        params = self.checkParameters(parameters, default_params)
+        save_params = copy.copy(params)
+        del save_params['extra_callbacks']
+        self.training_parameters.append(save_params)
+        self.__train_from_samples(x, y, params, class_weight=class_weight, sample_weight=sample_weight)
+        if params['verbose'] > 0:
+            logging.info("<<< Finished training model >>>")
+
     def __train(self, ds, params, state=dict()):
 
-        logging.info("Training parameters: " + str(params))
+        if params['verbose'] > 0:
+            logging.info("Training parameters: " + str(params))
 
         # initialize state
         state['samples_per_epoch'] = ds.len_train
@@ -664,8 +746,9 @@ class Model_Wrapper(object):
             callbacks.append(callback_early_stop)
 
         # Store model
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-        callbacks.append(callback_store_model)
+        if params['epochs_for_save'] >= 0:
+            callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+            callbacks.append(callback_store_model)
 
         # Prepare data generators
         if params['homogeneous_batches']:
@@ -709,6 +792,56 @@ class Model_Wrapper(object):
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
                                  initial_epoch=params['epoch_offset'])
+
+    def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None, state=dict()):
+
+        if params['verbose'] > 0:
+            logging.info("Training parameters: " + str(params))
+        # initialize state
+        state['samples_per_epoch'] = len(x)
+        state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch']) / min(params['batch_size'],
+                                                                                                len(x))))
+
+        # Prepare callbacks
+        callbacks = []
+        ## Callbacks order:
+
+        # Extra callbacks (e.g. evaluation)
+        callbacks += params['extra_callbacks']
+
+        # LR reducer
+        if params.get('lr_decay') is not None:
+            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            callbacks.append(callback_lr_reducer)
+
+        # Early stopper
+        if params.get('metric_check') is not None:
+            callback_early_stop = EarlyStopping(self,
+                                                patience=params['patience'],
+                                                metric_check=params['metric_check'],
+                                                eval_on_epochs=params['eval_on_epochs'],
+                                                each_n_epochs=params['each_n_epochs'],
+                                                start_eval_on_epoch=params['start_eval_on_epoch'])
+            callbacks.append(callback_early_stop)
+
+        # Store model
+        if params['epochs_for_save'] >= 0:
+            callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+            callbacks.append(callback_store_model)
+
+        # Train model
+        self.model.fit(x,
+                       y,
+                       batch_size=min(params['batch_size'], len(x)),
+                       nb_epoch=params['n_epochs'],
+                       verbose=params['verbose'],
+                       callbacks=callbacks,
+                       validation_data=None,
+                       validation_split=params.get('val_split', 0.),
+                       shuffle=params['shuffle'],
+                       class_weight=class_weight,
+                       sample_weight=sample_weight,
+                       initial_epoch=params['epoch_offset'])
 
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
         """
@@ -1788,6 +1921,182 @@ class Model_Wrapper(object):
         return predictions
 
     # ------------------------------------------------------- #
+    #       SCORING FUNCTIONS
+    #           Functions for making scoring (x, y) samples
+    # ------------------------------------------------------- #
+
+    def score_cond_model(self, X, Y, params, null_sym=2):
+        """
+        Scoring for Cond models.
+        :param X: Model inputs
+        :param Y: Model outputs
+        :param params: Search parameters
+        :param null_sym: <null> symbol
+        :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
+        """
+        # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
+        pad_on_batch = params['pad_on_batch']
+        score = 0.0
+        if params['words_so_far']:
+            state_below = np.asarray([[null_sym]]) \
+                if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))])
+        else:
+            state_below = np.asarray([null_sym]) \
+                if pad_on_batch else np.asarray([np.zeros(params['maxlen'])])
+
+        prev_out = None
+        for ii in xrange(len(Y)):
+            # for every possible live sample calc prob for every possible label
+            if params['optimized_search']:  # use optimized search model if available
+                [probs, prev_out, alphas] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
+            else:
+                probs = self.predict_cond(X, state_below, params, ii)
+            # total score for every sample is sum of -log of word prb
+            score -= np.log(probs[0, int(Y[ii])])
+            state_below = np.asarray([Y[:ii]], dtype='int64')
+            # we must include an additional dimension if the input for each timestep are all the generated words so far
+            if pad_on_batch:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+            else:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
+                                         np.zeros((state_below.shape[0],
+                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                  dtype='int64')))
+
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+                    state_below = np.hstack((state_below,
+                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                                       state_below.shape[2]))))
+
+
+            if params['optimized_search'] and ii > 0:
+                # filter next search inputs w.r.t. remaining samples
+                for idx_vars in range(len(prev_out)):
+                    prev_out[idx_vars] = prev_out[idx_vars]
+
+        return score
+
+    def scoreNet(self):
+        """
+        Approximates by beam search the best predictions of the net on the dataset splits chosen.
+        Params from config that affect the sarch process:
+            * batch_size: size of the batch
+            * n_parallel_loaders: number of parallel data batch loaders
+            * normalization: apply data normalization on images/features or not (only if using images/features as input)
+            * mean_substraction: apply mean data normalization on images or not (only if using images as input)
+            * predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+            * optimized_search: boolean indicating if the used model has the optimized Beam Search implemented
+             (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
+
+        The following attributes must be inserted to the model when building an optimized search model:
+
+            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
+            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
+            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                                the number of out variables must match the number of in variables)
+            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
+            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
+
+        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        """
+
+        # Check input parameters and recover default values if needed
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
+                          'normalize': False, 'mean_substraction': True,
+                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description'],
+                          'alpha_factor': 1.0,
+                          'sampling_type': 'max_likelihood',
+                          'words_so_far': False,
+                          'optimized_search': False,
+                          'state_below_index': -1,
+                          'output_text_index': 0,
+                          'pos_unk': False,
+                          'heuristic': 0,
+                          'mapping': None
+                          }
+        params = self.checkParameters(self.params, default_params)
+
+        scores_dict = dict()
+
+        for s in params['predict_on_sets']:
+            logging.info("<<< Scoring outputs of " + s + " set >>>")
+            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if not params['optimized_search']:  # use optimized search model if available
+                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+            params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
+            # Calculate how many interations are we going to perform
+            n_samples = eval("self.dataset.len_" + s)
+            num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+
+            # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+            # TODO: We prepare data as model 0... Different data preparators for each model?
+            data_gen = Data_Batch_Generator(s,
+                                            self.models[0],
+                                            self.dataset,
+                                            num_iterations,
+                                            shuffle=False,
+                                            batch_size=params['batch_size'],
+                                            normalization=params['normalize'],
+                                            data_augmentation=False,
+                                            mean_substraction=params['mean_substraction'],
+                                            predict=False).generator()
+            sources_sampling = []
+            scores = []
+            total_cost = 0
+            sampled = 0
+            start_time = time.time()
+            eta = -1
+            for j in range(num_iterations):
+                data = data_gen.next()
+                X = dict()
+                s_dict = {}
+                for input_id in params['model_inputs']:
+                    X[input_id] = data[0][input_id]
+                    s_dict[input_id] = X[input_id]
+                sources_sampling.append(s_dict)
+
+                Y = dict()
+                for output_id in params['model_outputs']:
+                    Y[output_id] = data[1][output_id]
+
+                for i in range(len(X[params['model_inputs'][0]])):
+                    sampled += 1
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Scored %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                    sys.stdout.flush()
+                    x = dict()
+                    y = dict()
+
+                    for input_id in params['model_inputs']:
+                        x[input_id] = np.asarray([X[input_id][i]])
+                    y = self.models[0].one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
+                                                         pad_sequences=True, verbose=0)[0]
+                    score = self.score_cond_model(x, y, params, null_sym=self.dataset.extra_words['<null>'])
+                    if params['normalize']:
+                        counts = float(len(y) ** params['alpha_factor'])
+                        score /= counts
+                    scores.append(score)
+                    total_cost += score
+                    eta = (n_samples - sampled) * (time.time() - start_time) / sampled
+
+            sys.stdout.write('Total cost of the translations: %f \t '
+                             'Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
+            sys.stdout.write('The scoring took: %f secs (Speed: %f sec/sample)\n' %
+                             ((time.time() - start_time), (time.time() - start_time) / n_samples))
+
+            sys.stdout.flush()
+            scores_dict[s] = scores
+        return scores_dict
+
+    # ------------------------------------------------------- #
     #       DECODING FUNCTIONS
     #           Functions for decoding predictions
     # ------------------------------------------------------- #
@@ -1955,6 +2264,22 @@ class Model_Wrapper(object):
                 tmp = ' '.join(a_no[:-1])
                 answer_pred.append(tmp)
         return answer_pred
+
+
+    def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
+        """
+        Converts a one-hot codification into a index-based one
+        :param preds: Predictions codified as one-hot vectors.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of convertedpredictions
+        """
+        if verbose > 0:
+            logging.info('Converting one hot prediction into indices...')
+        preds = map(lambda x: np.nonzero(x)[1], preds)
+        if pad_sequences:
+            preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
+        return preds
+
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
         """

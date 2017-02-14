@@ -20,8 +20,7 @@ class BeamSearchEnsemble:
         self.models = models
         self.dataset = dataset
         self.params = params_prediction
-        self.optimized_search = params_prediction['optimized_search'] if \
-            params_prediction.get('optimized_search') is not None else False
+        self.optimized_search = params_prediction.get('optimized_search', False)
         self.verbose = verbose
         if self.verbose > 0:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
@@ -253,7 +252,8 @@ class BeamSearchEnsemble:
                           'optimized_search': False,
                           'pos_unk': False,
                           'heuristic': 0,
-                          'mapping': None
+                          'mapping': None,
+                          'state_below_index': -1
                           }
         params = self.checkParameters(self.params, default_params)
 
@@ -368,6 +368,200 @@ class BeamSearchEnsemble:
             return predictions
         else:
             return predictions, references, sources_sampling
+
+    def score_cond_model(self, X, Y, params, null_sym=2):
+        """
+        Beam search method for Cond models.
+        (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
+        The algorithm in a nutshell does the following:
+
+        1. k = beam_size
+        2. open_nodes = [[]] * k
+        3. while k > 0:
+
+            3.1. Given the inputs, get (log) probabilities for the outputs.
+
+            3.2. Expand each open node with all possible output.
+
+            3.3. Prune and keep the k best nodes.
+
+            3.4. If a sample has reached the <eos> symbol:
+
+                3.4.1. Mark it as final sample.
+
+                3.4.2. k -= 1
+
+            3.5. Build new inputs (state_below) and go to 1.
+
+        4. return final_samples, final_scores
+
+        :param X: Model inputs
+        :param params: Search parameters
+        :param null_sym: <null> symbol
+        :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
+        """
+        # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
+        pad_on_batch = params['pad_on_batch']
+        score = 0.0
+        if params['words_so_far']:
+            state_below = np.asarray([[null_sym]]) \
+                if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))])
+        else:
+            state_below = np.asarray([null_sym]) \
+                if pad_on_batch else np.asarray([np.zeros(params['maxlen'])])
+
+        prev_outs = [None] * len(self.models)
+        for ii in xrange(len(Y)):
+            # for every possible live sample calc prob for every possible label
+            if self.optimized_search:  # use optimized search model if available
+                [probs, prev_outs, alphas] = self.predict_cond(self.models, X, state_below, params, ii,
+                                                               prev_outs=prev_outs)
+            else:
+                probs = self.predict_cond(self.models, X, state_below, params, ii)
+            # total score for every sample is sum of -log of word prb
+            score -= np.log(probs[0, int(Y[ii])])
+            state_below = np.asarray([Y[:ii]], dtype='int64')
+            # we must include an additional dimension if the input for each timestep are all the generated words so far
+            if pad_on_batch:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+            else:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
+                                         np.zeros((state_below.shape[0],
+                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                  dtype='int64')))
+
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+                    state_below = np.hstack((state_below,
+                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                                       state_below.shape[2]))))
+
+            if params['optimized_search'] and ii > 0:
+                for n_model in range(len(self.models)):
+                    # filter next search inputs w.r.t. remaining samples
+                    for idx_vars in range(len(prev_outs[n_model])):
+                        prev_outs[n_model][idx_vars] = prev_outs[n_model][idx_vars]
+
+        return score
+
+    def scoreNet(self):
+        """
+        Approximates by beam search the best predictions of the net on the dataset splits chosen.
+        Params from config that affect the sarch process:
+            * batch_size: size of the batch
+            * n_parallel_loaders: number of parallel data batch loaders
+            * normalization: apply data normalization on images/features or not (only if using images/features as input)
+            * mean_substraction: apply mean data normalization on images or not (only if using images as input)
+            * predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+            * optimized_search: boolean indicating if the used model has the optimized Beam Search implemented
+             (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
+
+        The following attributes must be inserted to the model when building an optimized search model:
+
+            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
+            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
+            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                                the number of out variables must match the number of in variables)
+            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
+            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
+
+        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        """
+
+        # Check input parameters and recover default values if needed
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
+                          'normalize': False, 'mean_substraction': True,
+                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description'],
+                          'alpha_factor': 1.0,
+                          'sampling_type': 'max_likelihood',
+                          'words_so_far': False,
+                          'optimized_search': False,
+                          'state_below_index': -1,
+                          'output_text_index': 0,
+                          'pos_unk': False,
+                          'heuristic': 0,
+                          'mapping': None
+                          }
+        params = self.checkParameters(self.params, default_params)
+
+        scores_dict = dict()
+
+        for s in params['predict_on_sets']:
+            logging.info("<<< Scoring outputs of " + s + " set >>>")
+            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if not params['optimized_search']:  # use optimized search model if available
+                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+            params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
+            # Calculate how many interations are we going to perform
+            n_samples = eval("self.dataset.len_" + s)
+            num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+
+            # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+            # TODO: We prepare data as model 0... Different data preparators for each model?
+            data_gen = Data_Batch_Generator(s,
+                                            self.models[0],
+                                            self.dataset,
+                                            num_iterations,
+                                            shuffle=False,
+                                            batch_size=params['batch_size'],
+                                            normalization=params['normalize'],
+                                            data_augmentation=False,
+                                            mean_substraction=params['mean_substraction'],
+                                            predict=False).generator()
+            sources_sampling = []
+            scores = []
+            total_cost = 0
+            sampled = 0
+            start_time = time.time()
+            eta = -1
+            for j in range(num_iterations):
+                data = data_gen.next()
+                X = dict()
+                s_dict = {}
+                for input_id in params['model_inputs']:
+                    X[input_id] = data[0][input_id]
+                    s_dict[input_id] = X[input_id]
+                sources_sampling.append(s_dict)
+
+                Y = dict()
+                for output_id in params['model_outputs']:
+                    Y[output_id] = data[1][output_id]
+
+                for i in range(len(X[params['model_inputs'][0]])):
+                    sampled += 1
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Scored %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                    sys.stdout.flush()
+                    x = dict()
+                    y = dict()
+
+                    for input_id in params['model_inputs']:
+                        x[input_id] = np.asarray([X[input_id][i]])
+                    y = self.models[0].one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
+                                                         pad_sequences=True, verbose=0)[0]
+                    score = self.score_cond_model(x, y, params, null_sym=self.dataset.extra_words['<null>'])
+                    if params['normalize']:
+                        counts = float(len(y) ** params['alpha_factor'])
+                        score /= counts
+                    scores.append(score)
+                    total_cost += score
+                    eta = (n_samples - sampled) * (time.time() - start_time) / sampled
+
+            sys.stdout.write('Total cost of the translations: %f \t '
+                             'Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
+            sys.stdout.write('The scoring took: %f secs (Speed: %f sec/sample)\n' %
+                             ((time.time() - start_time), (time.time() - start_time) / n_samples))
+
+            sys.stdout.flush()
+            scores_dict[s] = scores
+        return scores_dict
 
     def BeamSearchNet(self):
         """
