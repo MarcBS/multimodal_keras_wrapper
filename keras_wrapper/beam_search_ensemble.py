@@ -253,7 +253,8 @@ class BeamSearchEnsemble:
                           'optimized_search': False,
                           'pos_unk': False,
                           'heuristic': 0,
-                          'mapping': None
+                          'mapping': None,
+                          'state_below_index': -1
                           }
         params = self.checkParameters(self.params, default_params)
 
