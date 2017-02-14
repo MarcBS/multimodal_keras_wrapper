@@ -20,8 +20,7 @@ class BeamSearchEnsemble:
         self.models = models
         self.dataset = dataset
         self.params = params_prediction
-        self.optimized_search = params_prediction['optimized_search'] if \
-            params_prediction.get('optimized_search') is not None else False
+        self.optimized_search = params_prediction.get('optimized_search', False)
         self.verbose = verbose
         if self.verbose > 0:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
