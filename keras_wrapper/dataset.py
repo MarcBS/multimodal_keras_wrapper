@@ -1587,6 +1587,40 @@ class Dataset(object):
 
         return X_out
 
+    def loadTextOneHot(self, X, vocabularies, vocabulary_len, max_len, offset, fill, pad_on_batch, words_so_far,
+                       sample_weights=False, loading_X=False):
+
+        """
+        Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
+
+        :param X: Text to encode.
+        :param vocabularies: Mapping word -> index
+        :param max_len: Maximum length of the text.
+        :param offset: Shifts the text to the right, adding null symbol at the start
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
+        :param words_so_far: Experimental feature. Use with caution.
+        :param loading_X: Whether we are loading an input or an output of the model
+        :return: Text as sequence of number. Mask for each sentence.
+        """
+
+        y = self.loadText(X, vocabularies, max_len, offset,fill, pad_on_batch,
+                          words_so_far, loading_X=loading_X)
+        # Use whole sentence as class (classifier model)
+        if max_len == 0:
+            y_aux = np_utils.to_categorical(y, vocabulary_len).astype(np.uint8)
+        # Use words separately (generator model)
+        else:
+            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(np.uint8)
+            for idx in range(y[0].shape[0]):
+                y_aux[idx] = np_utils.to_categorical(y[0][idx], vocabulary_len).astype(
+                    np.uint8)
+            if sample_weights:
+                y_aux = (y_aux, y[1])  # join data and mask
+        return y_aux
+
+
+
     def loadMapping(self, path_list):
         """
         Loads a mapping of Source -- Target words.
@@ -2878,7 +2912,6 @@ class Dataset(object):
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
                         y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
-
                     # Use words separately (generator model)
                     else:
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
