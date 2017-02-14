@@ -188,7 +188,7 @@ def transferWeights(old_model, new_model, layers_mapping):
     :return: new model with weights transfered
     """
 
-    logging.info("<<< Transfering weights from models. >>>")
+    logging.info("<<< Transferring weights from models. >>>")
 
     old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(old_model.model.layers)])
     new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(new_model.model.layers)])
@@ -213,6 +213,18 @@ def transferWeights(old_model, new_model, layers_mapping):
                             mapping_weights[ind] = pos_old
                             break
 
+            # Alert for any weight matrix not inserted to new model
+            for pos_old, wo in enumerate(old):
+                if pos_old not in mapping_weights.values():
+                    logging.info('  Pre-trained weight matrix of layer ' + lold +
+                                 ' with dimensions '+str(wo.shape)+' can not be inserted to new model.')
+
+            # Alert for any weight matrix not modified
+            for pos_new, wn in enumerate(new):
+                if pos_new not in mapping_weights.keys():
+                    logging.info('  New model weight matrix of layer ' + lnew +
+                                 ' with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
+
             # Transfer weights for each layer
             for new_idx, old_idx in mapping_weights.iteritems():
                 new[new_idx] = old[old_idx]
@@ -221,7 +233,7 @@ def transferWeights(old_model, new_model, layers_mapping):
         else:
             logging.info('Can not apply weights transfer from "'+lold+'" to "'+lnew+'"')
 
-    logging.info("<<< Weights transfered successfully. >>>")
+    logging.info("<<< Weights transferred successfully. >>>")
 
     return new_model
 
@@ -363,7 +375,8 @@ class Model_Wrapper(object):
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None, decay=0.0, clipnorm=10., optimizer=None):
+    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None,
+                     decay=0.0, clipnorm=10., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
 
@@ -374,6 +387,7 @@ class Model_Wrapper(object):
             :param decay: lr decay
             :param clipnorm: gradients' clip norm
             :param optimizer: string identifying the type of optimizer used (default: SGD)
+            :param sample_weight_mode: 'temporal' or None
         """
         # Pick default parameters
         if lr is None:
@@ -394,7 +408,7 @@ class Model_Wrapper(object):
         if optimizer is None or optimizer.lower() == 'sgd':
             optimizer = SGD(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum, nesterov=True)
         elif optimizer.lower() == 'adam':
-            optimizer = Adam(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = Adam(lr=lr, clipnorm=clipnorm, decay=decay)
         elif optimizer.lower() == 'rmsprop':
             optimizer = RMSprop(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
         elif optimizer.lower() == 'nadam':
@@ -409,7 +423,8 @@ class Model_Wrapper(object):
 
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
-            self.model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+            self.model.compile(optimizer=optimizer, metrics=metrics, loss=loss,
+                               sample_weight_mode=sample_weight_mode)
         else:
             raise NotImplementedError()
 
