@@ -108,7 +108,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=dict(), full_path=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -123,7 +123,11 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     if full_path:
         model_name = model_path
     else:
-        model_name = model_path + "/epoch_" + iter
+        if reload_epoch:
+            model_name = model_path + "/epoch_" + iter
+        else:
+            model_name = model_path + "/update_" + iter
+
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
