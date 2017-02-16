@@ -182,6 +182,50 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=dict(), 
     return model_wrapper
 
 
+def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False):
+    """
+    Loads a the weights from files to a Model_Wrapper object.
+
+    :param model: Model_Wrapper object to update
+    :param model_path: path to the weights to load
+    :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :return: updated Model_Wrapper
+    """
+    t = time.time()
+    model_name = model.name
+    iter = str(update_num)
+
+    if not full_path:
+        if reload_epoch:
+            model_path = model_path + "/epoch_" + iter
+        else:
+            model_path = model_path + "/update_" + iter
+
+    logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
+
+    # Load model weights
+    model.model.load_weights(model_path + '_weights.h5')
+
+    # Load auxiliar models for optimized search
+    if os.path.exists(model_path + '_weights_init.h5') and os.path.exists(model_path + '_weights_next.h5'):
+        loaded_optimized = True
+    else:
+        loaded_optimized = False
+
+    if loaded_optimized:
+        # Load model structure
+        logging.info("<<< Updating optimized model... >>>")
+        logging.info("\t <<< Updating model_init from " + model_path + "_structure_init.json ... >>>")
+        model.model_init.load_weights(model_path + '_weights_init.h5')
+        # Load model structure
+        logging.info("\t <<< Updating model_next from " + model_path + "_structure_next.json ... >>>")
+        # Load model weights
+        model.model_next.load_weights(model_path + '_weights_next.h5')
+
+    logging.info("<<< Model updated in %0.6s seconds. >>>" % str(time.time() - t))
+    return model
+
+
 def transferWeights(old_model, new_model, layers_mapping):
     """
     Transfers all existent layer' weights from an old model to a new model.
@@ -797,12 +841,6 @@ class Model_Wrapper(object):
 
         if params['verbose'] > 0:
             logging.info("Training parameters: " + str(params))
-        # initialize state
-        state['samples_per_epoch'] = len(x)
-        state['n_iterations_per_epoch'] = int(math.ceil(float(state['samples_per_epoch']) / min(params['batch_size'],
-                                                                                                len(x))))
-
-        # Prepare callbacks
         callbacks = []
         ## Callbacks order:
 
