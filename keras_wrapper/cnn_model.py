@@ -220,14 +220,14 @@ def transferWeights(old_model, new_model, layers_mapping):
             # Alert for any weight matrix not inserted to new model
             for pos_old, wo in enumerate(old):
                 if pos_old not in mapping_weights.values():
-                    logging.info('  Pre-trained weight matrix of layer ' + lold +
-                                 ' with dimensions '+str(wo.shape)+' can not be inserted to new model.')
+                    logging.info('  Pre-trained weight matrix of layer "' + lold +
+                                 '" with dimensions '+str(wo.shape)+' can not be inserted to new model.')
 
             # Alert for any weight matrix not modified
             for pos_new, wn in enumerate(new):
                 if pos_new not in mapping_weights.keys():
-                    logging.info('  New model weight matrix of layer ' + lnew +
-                                 ' with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
+                    logging.info('  New model weight matrix of layer "' + lnew +
+                                 '" with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
 
             # Transfer weights for each layer
             for new_idx, old_idx in mapping_weights.iteritems():
@@ -1353,7 +1353,7 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
         elif ii == 0:  # first timestep
-            for model_input in params['model_inputs'][:-1]:
+            for model_input in params['model_inputs']:#[:-1]:
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, 1)
@@ -1755,7 +1755,6 @@ class Model_Wrapper(object):
                                                                  loading_X=True)[0]
                             else:
                                 x[input_id] = np.asarray([X[input_id][i]])
-
                         if params['pos_unk']:
                             samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                         else:

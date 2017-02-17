@@ -1943,16 +1943,31 @@ class Dataset(object):
     def preprocessVideoFeatures(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len):
 
         if isinstance(path_list, list) and len(path_list) == 2:
-            # path to all images in all videos
-            paths_frames = []
-            with open(path_list[0], 'r') as list_:
-                for line in list_:
-                    paths_frames.append(line.rstrip('\n'))
-            # frame counts
-            counts_frames = []
-            with open(path_list[1], 'r') as list_:
-                for line in list_:
-                    counts_frames.append(int(line.rstrip('\n')))
+            if isinstance(path_list[0], str):
+                # path to all images in all videos
+                paths_frames = []
+                with open(path_list[0], 'r') as list_:
+                    for line in list_:
+                        paths_frames.append(line.rstrip('\n'))
+            elif  isinstance(path_list[0], list):
+                paths_frames = path_list[0]
+            else:
+                raise Exception(
+                    'Wrong type for "path_frames". It must be a path to a file containing a list of frames or directly a list of frames.'
+                )
+
+            if isinstance(path_list[1], str):
+                # frame counts
+                counts_frames = []
+                with open(path_list[1], 'r') as list_:
+                    for line in list_:
+                        counts_frames.append(int(line.rstrip('\n')))
+            elif isinstance(path_list[1], list):
+                counts_frames = path_list[1]
+            else:
+                raise Exception(
+                    'Wrong type for "counts_frames". It must be a path to a file containing a list of counts or directly a list of counts.'
+                )
 
             # video indices
             video_indices = range(len(counts_frames))
