@@ -46,7 +46,7 @@ def checkDefaultParamsBeamSearch(params):
 # Performance evaluation callbacks
 ###################################################
 
-class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
+class EvalPerformance(KerasCallback):
     def __init__(self,
                  model,
                  dataset,
@@ -289,13 +289,13 @@ class PrintPerformanceMetricOnEpochEndOrEachNUpdates(KerasCallback):
             from keras_wrapper.cnn_model import saveModel
             saveModel(self.model_to_eval, epoch, store_iter=not self.eval_on_epochs)
 
-
+PrintPerformanceMetricOnEpochEndOrEachNUpdates = EvalPerformance
 
 
 ###################################################
 # Storing callbacks
 ###################################################
-class StoreModelWeightsOnEpochEnd(KerasCallback):
+class StoreModel(KerasCallback):
     def __init__(self, model, fun, epochs_for_save, verbose=0):
         """
         In:
@@ -321,11 +321,13 @@ class StoreModelWeightsOnEpochEnd(KerasCallback):
             #        print('')
             #        self.store_function(self.model_to_save, n_update)
 
+StoreModelWeightsOnEpochEnd = StoreModel
+
 ###################################################
 # Sampling callbacks
 ###################################################
 
-class SampleEachNUpdates(KerasCallback):
+class Sample(KerasCallback):
     def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=None,
                  is_text=False, index2word_x=None, index2word_y=None, input_text_id=None, print_sources=False,
                  sampling='max_likelihood', temperature=1.,
@@ -468,6 +470,8 @@ class SampleEachNUpdates(KerasCallback):
                         print ("Hypothesis (%d): %s" % (i, sample))
                         print ("Reference  (%d): %s" % (i, truth))
                         print ("")
+
+SampleEachNUpdates = Sample
 
 ###################################################
 # Learning modifiers callbacks
