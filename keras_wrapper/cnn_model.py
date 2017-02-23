@@ -636,6 +636,7 @@ class Model_Wrapper(object):
         default_params = {'n_epochs': 1, 'batch_size': 50,
                           'maxlen': 100,  # sequence learning parameters (BeamSearch)
                           'homogeneous_batches': False,
+                          'joint_batches': 4,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
                           'n_parallel_loaders': 8,
@@ -732,6 +733,7 @@ class Model_Wrapper(object):
         default_params = {'n_epochs': 1, 'batch_size': 50,
                           'maxlen': 100,  # sequence learning parameters (BeamSearch)
                           'homogeneous_batches': False,
+                          'joint_batches': 4,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
                           'n_parallel_loaders': 8,
@@ -796,8 +798,12 @@ class Model_Wrapper(object):
 
         # Prepare data generators
         if params['homogeneous_batches']:
-            train_gen = Homogeneous_Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
-                                                         batch_size=params['batch_size'], maxlen=params['maxlen'],
+            train_gen = Homogeneous_Data_Batch_Generator('train',
+                                                         self,
+                                                         ds,
+                                                         state['n_iterations_per_epoch'],
+                                                         batch_size=params['batch_size'],
+                                                         joint_batches=params['joint_batches'],
                                                          normalization=params['normalize'],
                                                          data_augmentation=params['data_augmentation'],
                                                          mean_substraction=params['mean_substraction']).generator()
