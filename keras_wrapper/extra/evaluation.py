@@ -590,7 +590,7 @@ def caption_store(samples, path):
 
 
 # List of evaluation functions and their identifiers (will be used in params['METRICS'])
-select = {
+selectMetric = {
     'vqa': eval_vqa,  # Metric for the VQA challenge
     'coco': get_coco_score,  # MS COCO evaluation library (BLEU, METEOR and CIDEr scores)
     'multilabel_metrics': multilabel_metrics,  # Set of multilabel classification metrics from sklearn
@@ -600,3 +600,5 @@ select = {
     'ppl': compute_perplexity,
 
 }
+
+select=selectMetric
