@@ -1501,7 +1501,7 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end, 'center': the vector will be surrounded by 0s, both at beginning and end
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
@@ -1543,7 +1543,9 @@ class Dataset(object):
                 x = X[i].strip().split(' ')
                 len_j = len(x)
                 if fill == 'start':
-                    offset_j = max_len_batch - len_j
+                    offset_j = max_len_batch - len_j - 1
+                elif fill == 'center':
+                    offset_j = (max_len_batch - len_j) / 2
                 else:
                     offset_j = 0
                     len_j = min(len_j, max_len_batch)
@@ -1596,7 +1598,7 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end, 'center': the vector will be surrounded by 0s, both at beginning and end
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
