@@ -64,6 +64,23 @@ def list2file(filepath, mylist, permission='w'):
         f.writelines(mylist)
 
 
+def nbest2file(filepath, mylist, separator='|||', permission='w'):
+    newlist = []
+    for l in mylist:
+        for l2 in l:
+            a = []
+            for l3 in l2:
+                if type(l3) is list:
+                    l3 = l3[0]
+                a.append(str(l3) + ' |||')
+            a = ' '.join(a + [' '])
+            newlist.append(a.strip()[:-len(separator)].strip())
+    mylist = '\n'.join(newlist)
+    if type(mylist[0]) is unicode:
+        mylist = mylist.encode('utf-8')
+    with open(filepath, permission) as f:
+        f.writelines(mylist)
+
 def list2vqa(filepath, mylist, qids, permission='w'):
     res = []
     for ans, qst in zip(mylist, qids):
