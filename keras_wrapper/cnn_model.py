@@ -35,7 +35,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
 
-from keras.optimizers import Adam, RMSprop, Nadam, Adadelta
+from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
 from keras.applications.vgg19 import VGG19
 
 
@@ -424,7 +424,7 @@ class Model_Wrapper(object):
         self.acc_output = acc_output
 
     def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None,
-                     decay=0.0, clipnorm=10., optimizer=None, sample_weight_mode=None):
+                     decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
 
@@ -454,15 +454,19 @@ class Model_Wrapper(object):
             metrics = []
 
         if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum, nesterov=True)
+            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=True)
         elif optimizer.lower() == 'adam':
-            optimizer = Adam(lr=lr, clipnorm=clipnorm, decay=decay)
+            optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+        elif optimizer.lower() == 'adagrad':
+            optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         elif optimizer.lower() == 'rmsprop':
-            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         elif optimizer.lower() == 'nadam':
-            optimizer = Nadam(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+        elif optimizer.lower() == 'adamax':
+            optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         elif optimizer.lower() == 'adadelta':
-            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         else:
             raise Exception('\tThe chosen optimizer is not implemented.')
 
