@@ -9,6 +9,7 @@ import warnings
 import numpy as np
 import logging
 from keras.callbacks import Callback as KerasCallback
+from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions
 
 import evaluation
 from read_write import *
@@ -205,10 +206,10 @@ class EvalPerformance(KerasCallback):
                         for preds in predictions[2]:
                             for src in preds[self.input_text_id]:
                                 sources.append(src)
-                        sources = self.model_to_eval.decode_predictions_beam_search(sources,
-                                                                                    self.index2word_x,
-                                                                                    pad_sequences=True,
-                                                                                    verbose=self.verbose)
+                        sources = decode_predictions_beam_search(sources,
+                                                                 self.index2word_x,
+                                                                 pad_sequences=True,
+                                                                 verbose=self.verbose)
                     heuristic = params_prediction['heuristic']
                 else:
                     samples = predictions
@@ -219,20 +220,19 @@ class EvalPerformance(KerasCallback):
                     samples = samples[self.out_pred_idx]
                 # Convert predictions into sentences
                 if self.beam_search:
-                    predictions = self.model_to_eval.decode_predictions_beam_search(samples,
-                                                                                    self.index2word_y,
-                                                                                    alphas=alphas,
-                                                                                    x_text=sources,
-                                                                                    heuristic=heuristic,
-                                                                                    mapping=params_prediction[
-                                                                                        'mapping'],
-                                                                                    verbose=self.verbose)
+                    predictions = decode_predictions_beam_search(samples,
+                                                                 self.index2word_y,
+                                                                 alphas=alphas,
+                                                                 x_text=sources,
+                                                                 heuristic=heuristic,
+                                                                 mapping=params_prediction['mapping'],
+                                                                 verbose=self.verbose)
                 else:
-                    predictions = self.model_to_eval.decode_predictions(predictions, 1,
-                                                                        # always set temperature to 1
-                                                                        self.index2word_y,
-                                                                        self.sampling_type,
-                                                                        verbose=self.verbose)
+                    predictions = decode_predictions(predictions,
+                                                     1, # always set temperature to 1
+                                                     self.index2word_y,
+                                                     self.sampling_type,
+                                                     verbose=self.verbose)
 
             # Store predictions
             if self.write_samples:
@@ -418,10 +418,10 @@ class Sample(KerasCallback):
             if self.print_sources:
                 if self.in_pred_idx is not None:
                     sources = [srcs for srcs in sources[0][self.in_pred_idx]]
-                sources = self.model_to_eval.decode_predictions_beam_search(sources,
-                                                        self.index2word_x,
-                                                        pad_sequences=True,
-                                                        verbose=self.verbose)
+                sources = decode_predictions_beam_search(sources,
+                                                         self.index2word_x,
+                                                         pad_sequences=True,
+                                                         verbose=self.verbose)
 
             if s in predictions:
                 if params_prediction['pos_unk']:
@@ -439,23 +439,20 @@ class Sample(KerasCallback):
                         samples = samples[self.out_pred_idx]
                     # Convert predictions into sentences
                     if self.beam_search:
-                        predictions = self.model_to_eval.decode_predictions_beam_search(samples,
-                                                                                        self.index2word_y,
-                                                                                        alphas=alphas,
-                                                                                        x_text=sources,
-                                                                                        heuristic=heuristic,
-                                                                                        mapping=params_prediction
-                                                                                        ['mapping'],
-                                                                                        verbose=self.verbose)
+                        predictions = decode_predictions_beam_search(samples,
+                                                                     self.index2word_y,
+                                                                     alphas=alphas,
+                                                                     x_text=sources,
+                                                                     heuristic=heuristic,
+                                                                     mapping=params_prediction['mapping'],
+                                                                     verbose=self.verbose)
                     else:
-                        predictions = self.model_to_eval.decode_predictions(samples,
-                                                                            1,
-                                                                            self.index2word_y,
-                                                                            self.sampling_type,
-                                                                            verbose=self.verbose)
-                    truths = self.model_to_eval.decode_predictions_one_hot(truths,
-                                                                           self.index2word_y,
-                                                                           verbose=self.verbose)
+                        predictions = decode_predictions(samples,
+                                                         1,
+                                                         self.index2word_y,
+                                                         self.sampling_type,
+                                                         verbose=self.verbose)
+                    truths = decode_predictions_one_hot(truths, self.index2word_y, verbose=self.verbose)
 
                 # Write samples
                 if self.print_sources:
