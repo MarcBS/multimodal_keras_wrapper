@@ -10,7 +10,7 @@ from keras_wrapper.dataset import Data_Batch_Generator
 
 
 class BeamSearchEnsemble:
-    def __init__(self, models, dataset, params_prediction, verbose=0):
+    def __init__(self, models, dataset, params_prediction, n_best=False, verbose=0):
         """
 
         :param models:
@@ -21,6 +21,7 @@ class BeamSearchEnsemble:
         self.dataset = dataset
         self.params = params_prediction
         self.optimized_search = params_prediction.get('optimized_search', False)
+        self.n_best = n_best
         self.verbose = verbose
         if self.verbose > 0:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
@@ -307,6 +308,8 @@ class BeamSearchEnsemble:
             sampled = 0
             start_time = time.time()
             eta = -1
+            if self.n_best:
+                n_best_list = []
             for j in range(num_iterations):
                 data = data_gen.next()
                 X = dict()
@@ -341,6 +344,15 @@ class BeamSearchEnsemble:
                     if params['normalize']:
                         counts = [len(sample) ** params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
+                    if self.n_best:
+                        n_best_indices = np.argsort(scores)
+                        n_best_scores = np.asarray(scores)[n_best_indices]
+                        n_best_samples = np.asarray(samples)[n_best_indices]
+                        if alphas is not None:
+                            n_best_alphas = np.asarray(n_best_alphas)[n_best_indices]
+                        else:
+                            n_best_alphas = [None] * len(n_best_indices)
+                        n_best_list.append([n_best_samples, n_best_scores, n_best_alphas])
                     best_score = np.argmin(scores)
                     best_sample = samples[best_score]
                     best_samples.append(best_sample)
@@ -358,11 +370,16 @@ class BeamSearchEnsemble:
                              ((time.time() - start_time), (time.time() - start_time) / n_samples))
 
             sys.stdout.flush()
-
-            if params['pos_unk']:
-                predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
+            if self.n_best:
+                if params['pos_unk']:
+                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources), n_best_list
+                else:
+                    predictions[s] = np.asarray(best_samples), n_best_list
             else:
-                predictions[s] = np.asarray(best_samples)
+                if params['pos_unk']:
+                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
+                else:
+                    predictions[s] = np.asarray(best_samples)
 
         if params['n_samples'] < 1:
             return predictions

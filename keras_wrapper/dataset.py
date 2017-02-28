@@ -189,135 +189,134 @@ class Data_Batch_Generator(object):
                                                           normalization=self.params['normalization'],
                                                           meanSubstraction=self.params['mean_substraction'],
                                                           dataAugmentation=data_augmentation)
-                    # print 'Y_batch:', Y_batch
-                    # print 'target words:', [map(lambda x: self.dataset.vocabulary['description']['idx2words'][x], seq) for seq in [np.nonzero(sample)[1] for sample in Y_batch[0]]]
-                    # print 'Mask:', Y_batch[0][1]
                     data = self.net.prepareData(X_batch, Y_batch)
             yield (data)
 
-
 class Homogeneous_Data_Batch_Generator(object):
     """
-    Retrieves batches of the same length.
-    Parts of the code borrowed from https://github.com/kelvinxu/arctic-captions/blob/master/homogeneous_data.py
+    Batch generator class. Retrieves batches of data.
     """
 
-    def __init__(self, set_split, net, dataset, num_iterations,
-                 batch_size=50, maxlen=100,
+
+    def __init__(self,
+                 set_split,
+                 net,
+                 dataset,
+                 num_iterations,
+                 batch_size=50,
+                 joint_batches=20,
                  normalization=False,
                  data_augmentation=True,
                  mean_substraction=True,
-                 predict=False
-                 ):
+                 predict=False,
+                 random_samples=-1,
+                 shuffle=True):
+        """
+        Initializes the Data_Batch_Generator
+        :param set_split: Split (train, val, test) to retrieve data
+        :param net: Net which use the data
+        :param dataset: Dataset instance
+        :param num_iterations: Maximum number of iterations
+        :param batch_size: Size of the minibatch
+        :param normalization: Switches on/off the normalization of images
+        :param data_augmentation: Switches on/off the data augmentation of the input
+        :param mean_substraction: Switches on/off the mean substraction for images
+        :param predict: Whether we are predicting or training
+        :param random_samples: Retrieves this number of training samples
+        :param shuffle: Shuffle the training dataset
+        :param temporally_linked: Indicates if we are using a temporally-linked model
+        """
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
         self.predict = predict
-        self.maxlen = maxlen
+        self.first_idx = -1
         self.batch_size = batch_size
+        self.it = 0
+
         # Several parameters
         self.params = {'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
                        'num_iterations': num_iterations,
-                       'batch_size': batch_size}
-        self.prepare()
+                       'random_samples': random_samples,
+                       'shuffle': shuffle,
+                       'joint_batches': joint_batches}
         self.reset()
 
-    def prepare(self):
-        self.lengths = []
-
-        it = 0
-        finished_iterations = False
-        while not finished_iterations:
-            it += 1
-
-            # Checks if we are finishing processing the data split
-            init_sample = (it - 1) * self.params['batch_size']
-            final_sample = it * self.params['batch_size']
-            batch_size = self.params['batch_size']
-            n_samples_split = eval("self.dataset.len_" + self.set_split)
-            if final_sample >= n_samples_split:
-                final_sample = n_samples_split
-                batch_size = final_sample - init_sample
-                finished_iterations = True
-
-            # TODO: Deal with multiple outputs!
-            Y_batch = self.dataset.getY(self.set_split, init_sample, final_sample,
-                                        normalization=self.params['normalization'],
-                                        meanSubstraction=self.params['mean_substraction'])[
-                0]  # TODO: first output selection, this 0 is harcoded!
-            Y_batch = Y_batch[1]  # just use mask
-
-            batch_lengths = [int(np.sum(cc)) for cc in Y_batch]
-            self.lengths += batch_lengths
-
-        # find the unique lengths
-        self.len_unique = np.unique(self.lengths)
-
-        # remove any overly long captions
-        if self.maxlen:
-            self.len_unique = [ll for ll in self.len_unique if ll <= self.maxlen]
-
-        # indices of unique lengths
-        self.len_indices = dict()
-        self.len_counts = dict()
-        for ll in self.len_unique:
-            self.len_indices[ll] = np.where(self.lengths == ll)[0]
-            self.len_counts[ll] = len(self.len_indices[ll])
-
-        # current counter
-        self.len_curr_counts = copy.copy(self.len_counts)
-
-    def reset(self):
-        self.len_curr_counts = copy.copy(self.len_counts)
-        self.len_unique = np.random.permutation(self.len_unique)
-        self.len_indices_pos = dict()
-        for ll in self.len_unique:
-            self.len_indices_pos[ll] = 0
-            self.len_indices[ll] = np.random.permutation(self.len_indices[ll])
-        self.len_idx = -1
-
-    def generator(self):
+    def retrieve_batch(self):
 
         if self.set_split == 'train' and not self.predict:
             data_augmentation = self.params['data_augmentation']
         else:
             data_augmentation = False
 
-        it = 0
-        while 1:
-            it += 1
-            if self.predict:
-                raise Exception, 'Homogeneous data should not be used in predict mode!'
+        if self.set_split == 'train' and self.it % self.params['num_iterations'] == 0 and \
+                not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+            silence = self.dataset.silence
+            self.dataset.silence = True
+            self.dataset.shuffleTraining()
+            self.dataset.silence = silence
+        if self.it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
+            self.dataset.resetCounters(set_name=self.set_split)
+        self.it += 1
 
-            else:
-                while True:
-                    self.len_idx = np.mod(self.len_idx + 1, len(self.len_unique))
-                    if self.len_curr_counts[self.len_unique[self.len_idx]] > 0:
-                        break
-                    it += 1
-                    if it >= len(self.len_unique):
-                        break
-                if it >= len(self.len_unique):
-                    self.reset()
-                # raise StopIteration()
+        # Checks if we are finishing processing the data split
+        init_sample = (self.it - 1) * self.batch_size
+        final_sample = self.it * self.batch_size
+        batch_size = self.batch_size
+        joint_batches = self.params['joint_batches']
+        n_samples_split = eval("self.dataset.len_" + self.set_split)
+        if final_sample >= n_samples_split:
+            final_sample = n_samples_split
+            batch_size = final_sample - init_sample
+            self.it = 0
 
-                # get the batch size
-                curr_batch_size = np.minimum(self.batch_size, self.len_curr_counts[self.len_unique[self.len_idx]])
-                curr_pos = self.len_indices_pos[self.len_unique[self.len_idx]]
-                # get the indices for the current batch
-                curr_indices = self.len_indices[self.len_unique[self.len_idx]][curr_pos:curr_pos + curr_batch_size]
-                self.len_indices_pos[self.len_unique[self.len_idx]] += curr_batch_size
-                self.len_curr_counts[self.len_unique[self.len_idx]] -= curr_batch_size
+        X_batch, Y_batch = self.dataset.getXY(self.set_split,
+                                              batch_size * joint_batches,
+                                              normalization=self.params['normalization'],
+                                              meanSubstraction=self.params['mean_substraction'],
+                                              dataAugmentation=data_augmentation)
 
-                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split, curr_indices,
-                                                                  normalization=self.params['normalization'],
-                                                                  meanSubstraction=self.params['mean_substraction'],
-                                                                  dataAugmentation=data_augmentation)
-                data = self.net.prepareData(X_batch, Y_batch)
+        self.X_batch = X_batch
+        self.Y_batch = Y_batch
 
-            yield (data)
+    def reset(self):
+        self.retrieve_batch()
+        text_Y_batch = self.Y_batch[0][1]  # just use mask
+        batch_lengths = np.asarray([int(np.sum(cc)) for cc in text_Y_batch])
+        self.tidx = batch_lengths.argsort()
+        self.curr_idx = 0
+
+    def get_data(self):
+        new_X = []
+        new_Y = []
+        next_idx = min(self.curr_idx + self.batch_size, len(self.tidx))
+        self.batch_tidx = self.tidx[self.curr_idx:next_idx]
+
+        for x_input_idx in range(len(self.X_batch)):
+            x_to_add = [self.X_batch[x_input_idx][i] for i in self.batch_tidx]
+            new_X.append(np.asarray(x_to_add))
+        for y_input_idx in range(len(self.Y_batch)):
+            Y_batch_ = []
+            for data_mask_idx in range(len(self.Y_batch[y_input_idx])):
+                y_to_add = np.asarray([self.Y_batch[y_input_idx][data_mask_idx][i] for i in self.batch_tidx])
+                Y_batch_.append(y_to_add)
+            new_Y.append(tuple(Y_batch_))
+
+        data = self.net.prepareData(new_X, new_Y)
+        self.curr_idx = next_idx
+        if self.curr_idx >= len(self.tidx):
+            self.reset()
+        return data
+
+    def generator(self):
+        """
+        Gets and processes the data
+        :return: generator with the data
+        """
+        while True:
+            yield self.get_data()
 
 
 # ------------------------------------------------------- #
@@ -1549,7 +1548,7 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end, 'center': the vector will be surrounded by 0s, both at beginning and end
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
@@ -1591,7 +1590,9 @@ class Dataset(object):
                 x = X[i].strip().split(' ')
                 len_j = len(x)
                 if fill == 'start':
-                    offset_j = max_len_batch - len_j
+                    offset_j = max_len_batch - len_j - 1
+                elif fill == 'center':
+                    offset_j = (max_len_batch - len_j) / 2
                 else:
                     offset_j = 0
                     len_j = min(len_j, max_len_batch)
@@ -1644,7 +1645,7 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end, 'center': the vector will be surrounded by 0s, both at beginning and end
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
@@ -2885,7 +2886,6 @@ class Dataset(object):
         # Recover input samples
         X = []
         for id_in, type_in in zip(self.ids_inputs, self.types_inputs):
-
             if id_in in self.optional_inputs:
                 try:
                     if surpassed:
@@ -2901,9 +2901,6 @@ class Dataset(object):
                         'self.X_' + set_name + '[id_in][0:new_last]')
                 else:
                     x = eval('self.X_' + set_name + '[id_in][last:new_last]')
-
-            # if(set_name=='val'):
-            #    logging.info(x)
 
             # Pre-process inputs
             if not debug:
