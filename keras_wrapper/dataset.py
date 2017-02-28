@@ -388,6 +388,7 @@ class Dataset(object):
         # (which will define the preprocessing applied)
         self.ids_inputs = []
         self.types_inputs = []  # see accepted types in self.__accepted_types_inputs
+        self.inputs_data_augmentation_types = dict() # see accepted types in self._available_augm_<input_type>
         self.optional_inputs = []
 
         self.ids_outputs = []
@@ -410,6 +411,9 @@ class Dataset(object):
         # List of implemented input normalization functions
         self.__available_norm_im_vid = ['0-1']  # 'image' and 'video' only
         self.__available_norm_feat = ['L2']  # 'image-features' and 'video-features' only
+
+        # List of implemented input data augmentation functions
+        self.__available_augm_vid_feat = ['random_selection', 'noise']  # 'video-features' only
         #################################################
 
 
@@ -657,7 +661,7 @@ class Dataset(object):
             logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
     def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
-                 overwrite_split=False,
+                 overwrite_split=False, normalization_types=None, data_augmentation_types=None,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,
                  # 'raw-image' / 'video'   (height, width, depth)
                  max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0,  # 'text'
@@ -677,7 +681,9 @@ class Dataset(object):
             :param id: identifier of the input data loaded
             :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
             :param required: flag for optional inputs
-            :param: overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
+            :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
+            :param normalization_types: type of normalization applied to the current input if we activate the data normalization while loading
+            :param data_augmentation_types: type of data augmentation applied to the current input if we activate the data augmentation while loading
 
             
             # 'raw-image'-related parameters
@@ -738,16 +744,25 @@ class Dataset(object):
         elif type == 'image-features':
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif type == 'video-features':
+            # Check if the chosen data augmentation types exists
+            if data_augmentation_types is not None:
+                for da in data_augmentation_types:
+                    if da not in self.__available_augm_vid_feat:
+                        raise NotImplementedError(
+                            'The chosen data augmentation type ' + da + ' is not implemented for the type "video-features".')
+            self.inputs_data_augmentation_types[id] = data_augmentation_types
             data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop,
                                                 feat_len)
         elif type == 'id':
             data = self.preprocessIDs(path_list, id, set_name)
         elif type == 'ghost':
             data = []
+
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
 
         self.__setInput(data, set_name, type, id, overwrite_split)
+
 
     def __setInput(self, set, set_name, type, id, overwrite_split):
         exec ('self.X_' + set_name + '[id] = set')
@@ -761,6 +776,7 @@ class Dataset(object):
             logging.info(
                 'Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '" and length ' + str(
                     eval('self.len_' + set_name)) + '.')
+
 
     def removeInput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
@@ -820,10 +836,11 @@ class Dataset(object):
             logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
+                  sample_weights=False,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
-                  associated_id_in=None,  # '3DLabel' or '3DSemanticLabel'
-                  sample_weights=False):
+                  associated_id_in=None  # '3DLabel' or '3DSemanticLabel'
+                  ):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
             
@@ -834,7 +851,8 @@ class Dataset(object):
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).
             :param id: identifier of the input data loaded.
             :param repeat_set: repeats the outputs given (useful when we have more inputs than outputs). Int or array of ints.
-            :param: overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
+            :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
+            :param sample_weights: switch on/off sample weights usage for the current output
             
             # 'text'-related parameters
             
@@ -871,7 +889,7 @@ class Dataset(object):
         # Preprocess the output data depending on its type
         if type == 'categorical':
             self.setClasses(path_list, id)
-            data = self.preprocessCategorical(path_list)
+            data = self.preprocessCategorical(path_list, id, sample_weights=True if sample_weights and set_name=='train' else False)
         elif type == 'text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
@@ -954,7 +972,7 @@ class Dataset(object):
         if not self.silence:
             logging.info('Loaded classes list with ' + str(len(self.dic_classes[id])) + " different labels.")
 
-    def preprocessCategorical(self, labels_list):
+    def preprocessCategorical(self, labels_list, id, sample_weights=False):
         """
         Preprocesses categorical data.
 
@@ -974,8 +992,37 @@ class Dataset(object):
             raise Exception(
                 'Wrong type for "path_list". It must be a path to a text file with the labels or an instance of the class list.')
 
+        if sample_weights:
+            n_classes = len(set(labels))
+            counts_per_class = np.zeros((n_classes,))
+            for lab in labels:
+                counts_per_class[lab] += 1
+
+            # Apply balanced weights per class
+            inverse_counts_per_class = [sum(counts_per_class)-c_i for c_i in counts_per_class]
+            weights_per_class = [float(c_i)/sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
+            self.extra_variables['class_weights_'+id] = weights_per_class
+            
         return labels
 
+    def loadCategorical(self, y_raw, nClasses, id, load_sample_weights):
+        y = np_utils.to_categorical(y_raw, nClasses).astype(np.uint8)
+        #if load_sample_weights:
+        #    sw = self.getCategoricalSampleWeights(y_raw, id)
+        #    y = (y, sw)
+            
+        return y
+    
+    """
+    def getCategoricalSampleWeights(self, y, id):
+        n_samples = len(y)
+        sw = np.zeros((n_samples,))
+        all_sw = self.extra_variables['sample_weights_'+id]
+        for i,y_ in enumerate(y):
+            sw[i] = all_sw[y_]
+        return sw
+    """
+    
     # ------------------------------------------------------- #
     #       TYPE 'binary' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -2043,6 +2090,24 @@ class Dataset(object):
 
     def loadVideoFeatures(self, idx_videos, id, set_name, max_len, normalization_type, normalization, feat_len,
                           external=False, data_augmentation=True):
+        """
+
+        :param idx_videos: indices of the videos in the complete list of the current set_name
+        :param id: identifier of the input/output that we are loading
+        :param set_name: 'train', 'val' or 'test'
+        :param max_len: maximum video length (number of frames)
+        :param normalization_type: type of data normalization applied
+        :param normalization: Switch on/off data normalization
+        :param feat_len: length of the features about to load
+        :param external: Switch on/off data loading from external dataset (not sharing self.path)
+        :param data_augmentation: Switch on/off data augmentation
+        :return:
+        """
+
+        # recover chosen data augmentation types
+        data_augmentation_types = self.inputs_data_augmentation_types[id]
+        if data_augmentation_types is None:
+            data_augmentation_types = []
 
         n_videos = len(idx_videos)
         if isinstance(feat_len, list):
@@ -2062,7 +2127,7 @@ class Dataset(object):
         for enum, (n, i) in enumerate(zip(n_frames, idx)):
             paths = self.paths_frames[id][set_name][i:i + n]
 
-            if data_augmentation:  # apply random frames selection
+            if data_augmentation and 'random_selection' in data_augmentation_types:  # apply random frames selection
                 selected_idx = sorted(random.sample(range(n), min(max_len, n)))
             else:  # apply equidistant frames selection
                 selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
@@ -2081,7 +2146,7 @@ class Dataset(object):
                 # Check if the filename includes the extension
                 feat = np.load(feat)
 
-                if data_augmentation:
+                if data_augmentation and 'noise' in data_augmentation_types:
                     noise_mean = 0.0
                     noise_dev = 0.01
                     noise = np.random.normal(noise_mean, noise_dev, feat.shape)
@@ -2092,31 +2157,6 @@ class Dataset(object):
                         feat = feat / np.linalg.norm(feat, ord=2)
 
                 features[i, j] = feat
-
-        '''
-        # load images from each video
-        for enum, (n, i) in enumerate(zip(n_frames, idx)):
-            paths = self.paths_frames[id][set_name][i:i+n]
-        
-            for j, feat in enumerate(paths):
-                if(not external):
-                    feat = self.path +'/'+ feat
-
-                # Check if the filename includes the extension
-                feat = np.load(feat)
-
-                if(data_augmentation):
-                    noise_mean = 0.0
-                    noise_dev = 0.01
-                    noise = np.random.normal(noise_mean, noise_dev, feat.shape)
-                    feat += noise
-
-                if(normalization):
-                    if normalization_type == 'L2':
-                        feat = feat / np.linalg.norm(feat,ord=2)
-
-                features[enum,j] = feat
-        '''
 
         return np.array(features)
 
@@ -2604,6 +2644,7 @@ class Dataset(object):
                         raise Exception('Non existent image ' + im)
                     else:
                         im = path + '/' + filename[0]
+                        imname = im
 
                 # Read image
                 try:
@@ -2626,19 +2667,31 @@ class Dataset(object):
             # Data augmentation
             if not dataAugmentation:
                 # Use whole image
-                im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
                 im = np.asarray(im, dtype=type_imgs)
+                im = misc.imresize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                #im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                #im = np.asarray(im, dtype=type_imgs)
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
-                im = im.resize((self.img_size[id][1], self.img_size[id][0]))
                 im = np.asarray(im, dtype=type_imgs)
+                im = misc.imresize(im, (self.img_size[id][1], self.img_size[id][0]))
+                #im = im.resize((self.img_size[id][1], self.img_size[id][0]))
+                #im = np.asarray(im, dtype=type_imgs)
 
                 # Take random crop
                 left = randomParams["left"]
                 right = np.add(left, self.img_size_crop[id][0:2])
                 if self.use_RGB[id]:
-                    im = im[left[0]:right[0], left[1]:right[1], :]
+                    try:
+                        im = im[left[0]:right[0], left[1]:right[1], :]
+                    except:
+                        print '------- ERROR -------'
+                        print left
+                        print right
+                        print im.shape
+                        print imname
+                        raise Exception('Error with image '+imname)
                 else:
                     im = im[left[0]:right[0], left[1]:right[1]]
 
@@ -2889,7 +2942,8 @@ class Dataset(object):
             if not debug:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
+                    load_sample_weights = self.sample_weights[id_out][set_name]
+                    y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
                 elif type_out == 'binary':
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
@@ -3029,7 +3083,8 @@ class Dataset(object):
             if not debug:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
+                    load_sample_weights = self.sample_weights[id_out][set_name]
+                    y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
                 elif type_out == 'binary':
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
@@ -3192,7 +3247,8 @@ class Dataset(object):
             if not debug:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    y = np_utils.to_categorical(y, nClasses).astype(np.uint8)
+                    load_sample_weights = self.sample_weights[id_out][set_name]
+                    y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
                 elif type_out == 'binary':
                     y = np.array(y).astype(np.uint8)
                 elif type_out == 'real':
