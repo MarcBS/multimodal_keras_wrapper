@@ -15,6 +15,8 @@ from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_G
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
+from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
+    decode_predictions_beam_search, replace_unknown_words, sample, sampling
 
 mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
@@ -526,6 +528,11 @@ class Model_Wrapper(object):
             if create_plots:
                 if not os.path.isdir(self.plot_path):
                     os.makedirs(self.plot_path)
+
+
+    def setParams(self, params):
+        self.params = params
+
 
     def checkParameters(self, input_params, default_params):
         """
@@ -2162,9 +2169,9 @@ class Model_Wrapper(object):
         :param temperature: The higher, the flatter probabilities. Hence more random outputs.
         :return:
         """
-        a = np.log(a) / temperature
-        a = np.exp(a) / np.sum(np.exp(a))
-        return np.argmax(np.random.multinomial(1, a, 1))
+
+        print "WARNING!: deprecated function, use utils.sample() instead"
+        return sample(a, temperature=temperature)
 
     def sampling(self, scores, sampling_type='max_likelihood', temperature=1.0):
         """
@@ -2176,20 +2183,8 @@ class Model_Wrapper(object):
         :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples
         """
-        if isinstance(scores, dict):
-            scores = scores['output']
-
-        if sampling_type == 'multinomial':
-            preds = np.asarray(scores).astype('float64')
-            preds = np.log(preds) / temperature
-            exp_preds = np.exp(preds)
-            preds = exp_preds / np.sum(exp_preds)
-            probas = np.random.multinomial(1, preds, 1)
-            return np.argmax(probas)
-        elif sampling_type == 'max_likelihood':
-            return np.argmax(scores, axis=-1)
-        else:
-            raise NotImplementedError()
+        print "WARNING!: deprecated function, use utils.sampling() instead"
+        return sampling(scores, sampling_type=sampling_type, temperature=temperature)
 
     def decode_predictions(self, preds, temperature, index2word, sampling_type, verbose=0):
         """
@@ -2201,26 +2196,9 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions.
         """
+        print "WARNING!: deprecated function, use utils.decode_predictions() instead"
+        return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
-        if verbose > 0:
-            logging.info('Decoding prediction ...')
-        flattened_preds = preds.reshape(-1, preds.shape[-1])
-        flattened_answer_pred = map(lambda x: index2word[x],
-                                    self.sampling(scores=flattened_preds,
-                                                  sampling_type=sampling_type,
-                                                  temperature=temperature))
-        answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:2])
-        answer_pred = []
-        EOS = '<eos>'
-        PAD = '<pad>'
-
-        for a_no in answer_pred_matrix:
-            init_token_pos = 0
-            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
-            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
-            answer_pred.append(tmp)
-        return answer_pred
 
     def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                               heuristic=0, mapping=None, verbose=0):
@@ -2236,34 +2214,9 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level
         :return: trg_word_seq with replaced unknown words
         """
-        trans_words = trg_word_seq
-        new_trans_words = []
-        if verbose > 2:
-            print "Input sentence:", src_word_seq
-            print "Hard alignments", hard_alignment
-        for j in xrange(len(trans_words)):
-            if trans_words[j] == unk_symbol:
-                UNK_src = src_word_seq[hard_alignment[j]]
-                if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
-                    new_trans_words.append(UNK_src)
-                elif heuristic == 1:
-                    # Use the most likely translation (with t-table). If not found, copy the source word.
-                    # Ok for small vocabulary (~30k) models
-                    if mapping.get(UNK_src) is not None:
-                        new_trans_words.append(mapping[UNK_src])
-                    else:
-                        new_trans_words.append(UNK_src)
-                elif heuristic == 2:
-                    # Use t-table if the source word starts with a lowercase letter. Otherwise copy
-                    # Sometimes works better than other heuristics
-                    if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
-                        new_trans_words.append(mapping[UNK_src])
-                    else:
-                        new_trans_words.append(UNK_src)
-            else:
-                new_trans_words.append(trans_words[j])
-
-        return new_trans_words
+        print "WARNING!: deprecated function, use utils.replace_unknown_words() instead"
+        return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
+                                     heuristic=heuristic, mapping=mapping, verbose=verbose)
 
     def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
                                        x_text=None, unk_symbol='<unk>', pad_sequences=False,
@@ -2276,48 +2229,10 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        if verbose > 0:
-            logging.info('Decoding beam search prediction ...')
-
-        if alphas is not None:
-            assert x_text is not None, 'When using POS_UNK, you must provide the input ' \
-                                       'text to decode_predictions_beam_search!'
-            if verbose > 0:
-                logging.info('Using heuristic %d' % heuristic)
-        if pad_sequences:
-            preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-        flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
-        answer_pred = []
-
-        if alphas is not None:
-            x_text = map(lambda x: x.split(), x_text)
-            hard_alignments = map(
-                lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
-                alphas, x_text)
-            for i, a_no in enumerate(flattened_answer_pred):
-                if unk_symbol in a_no:
-                    if verbose > 1:
-                        print unk_symbol, "at sentence number", i
-                        print "hypothesis:", a_no
-                        if verbose > 2:
-                            print "alphas:", alphas[i]
-
-                    a_no = self.replace_unknown_words(x_text[i],
-                                                      a_no,
-                                                      hard_alignments[i],
-                                                      unk_symbol,
-                                                      heuristic=heuristic,
-                                                      mapping=mapping,
-                                                      verbose=verbose)
-                    if verbose > 1:
-                        print "After unk_replace:", a_no
-                tmp = ' '.join(a_no[:-1])
-                answer_pred.append(tmp)
-        else:
-            for a_no in flattened_answer_pred:
-                tmp = ' '.join(a_no[:-1])
-                answer_pred.append(tmp)
-        return answer_pred
+        print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
+        return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
+                                          x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
+                                          mapping=mapping, verbose=0)
 
 
     def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
@@ -2327,12 +2242,8 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of convertedpredictions
         """
-        if verbose > 0:
-            logging.info('Converting one hot prediction into indices...')
-        preds = map(lambda x: np.nonzero(x)[1], preds)
-        if pad_sequences:
-            preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-        return preds
+        print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
+        return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
 
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
@@ -2343,20 +2254,8 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        if verbose > 0:
-            logging.info('Decoding one hot prediction ...')
-        preds = map(lambda x: np.nonzero(x)[1], preds)
-        PAD = '<pad>'
-        flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
-        answer_pred_matrix = np.asarray(flattened_answer_pred)
-        answer_pred = []
-
-        for a_no in answer_pred_matrix:
-            end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
-            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            tmp = ' '.join(a_no[:end_token_pos])
-            answer_pred.append(tmp)
-        return answer_pred
+        print "WARNING!: deprecated function, use utils.decode_predictions_one_hot() instead"
+        return decode_predictions_one_hot(preds, index2word, verbose=verbose)
 
     def prepareData(self, X_batch, Y_batch=None):
         """
