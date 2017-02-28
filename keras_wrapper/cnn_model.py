@@ -15,7 +15,8 @@ from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_G
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
-from keras_wrapper.utils import one_hot_2_indices
+from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
+    decode_predictions_beam_search, replace_unknown_words, sample, sampling
 
 mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
@@ -527,6 +528,11 @@ class Model_Wrapper(object):
             if create_plots:
                 if not os.path.isdir(self.plot_path):
                     os.makedirs(self.plot_path)
+
+
+    def setParams(self, params):
+        self.params = params
+
 
     def checkParameters(self, input_params, default_params):
         """
@@ -2034,7 +2040,6 @@ class Model_Wrapper(object):
 
         return score
 
-
     def scoreNet(self):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
@@ -2133,7 +2138,7 @@ class Model_Wrapper(object):
 
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
-                    y = one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
+                    y = self.models[0].one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
                                                          pad_sequences=True, verbose=0)[0]
                     score = self.score_cond_model(x, y, params, null_sym=self.dataset.extra_words['<null>'])
                     if params['normalize']:
@@ -2152,6 +2157,105 @@ class Model_Wrapper(object):
             scores_dict[s] = scores
         return scores_dict
 
+    # ------------------------------------------------------- #
+    #       DECODING FUNCTIONS
+    #           Functions for decoding predictions
+    # ------------------------------------------------------- #
+
+    def sample(self, a, temperature=1.0):
+        """
+        Helper function to sample an index from a probability array
+        :param a: Probability array
+        :param temperature: The higher, the flatter probabilities. Hence more random outputs.
+        :return:
+        """
+
+        print "WARNING!: deprecated function, use utils.sample() instead"
+        return sample(a, temperature=temperature)
+
+    def sampling(self, scores, sampling_type='max_likelihood', temperature=1.0):
+        """
+        Sampling words (each sample is drawn from a categorical distribution).
+        Or picks up words that maximize the likelihood.
+        :param scores: array of size #samples x #classes;
+        every entry determines a score for sample i having class j
+        :param sampling_type:
+        :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
+        :return: set of indices chosen as output, a vector of size #samples
+        """
+        print "WARNING!: deprecated function, use utils.sampling() instead"
+        return sampling(scores, sampling_type=sampling_type, temperature=temperature)
+
+    def decode_predictions(self, preds, temperature, index2word, sampling_type, verbose=0):
+        """
+        Decodes predictions
+        :param preds: Predictions codified as the output of a softmax activation function.
+        :param temperature: Temperature for sampling.
+        :param index2word: Mapping from word indices into word characters.
+        :param sampling_type: 'max_likelihood' or 'multinomial'.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of decoded predictions.
+        """
+        print "WARNING!: deprecated function, use utils.decode_predictions() instead"
+        return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
+
+
+    def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
+                              heuristic=0, mapping=None, verbose=0):
+        """
+        Replaces unknown words from the target sentence according to some heuristic.
+        Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
+        :param src_word_seq: Source sentence words
+        :param trg_word_seq: Hypothesis words
+        :param hard_alignment: Target-Source alignments
+        :param unk_symbol: Symbol in trg_word_seq to replace
+        :param heuristic: Heuristic (0, 1, 2)
+        :param mapping: External alignment dictionary
+        :param verbose: Verbosity level
+        :return: trg_word_seq with replaced unknown words
+        """
+        print "WARNING!: deprecated function, use utils.replace_unknown_words() instead"
+        return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
+                                     heuristic=heuristic, mapping=mapping, verbose=verbose)
+
+    def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
+                                       x_text=None, unk_symbol='<unk>', pad_sequences=False,
+                                       mapping=None, verbose=0):
+        """
+        Decodes predictions from the BeamSearch method.
+        :param preds: Predictions codified as word indices.
+        :param index2word: Mapping from word indices into word characters.
+        :param pad_sequences: Whether we should make a zero-pad on the input sequence.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of decoded predictions
+        """
+        print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
+        return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
+                                          x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
+                                          mapping=mapping, verbose=0)
+
+
+    def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
+        """
+        Converts a one-hot codification into a index-based one
+        :param preds: Predictions codified as one-hot vectors.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of convertedpredictions
+        """
+        print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
+        return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
+
+
+    def decode_predictions_one_hot(self, preds, index2word, verbose=0):
+        """
+        Decodes predictions following a one-hot codification.
+        :param preds: Predictions codified as one-hot vectors.
+        :param index2word: Mapping from word indices into word characters.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of decoded predictions
+        """
+        print "WARNING!: deprecated function, use utils.decode_predictions_one_hot() instead"
+        return decode_predictions_one_hot(preds, index2word, verbose=verbose)
 
     def prepareData(self, X_batch, Y_batch=None):
         """
