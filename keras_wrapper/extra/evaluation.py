@@ -6,14 +6,8 @@ import logging
 
 from sklearn import metrics as sklearn_metrics
 
-from pycocoevalcap.bleu.bleu import Bleu
-from pycocoevalcap.meteor.meteor import Meteor
-from pycocoevalcap.cider.cider import Cider
-from pycocoevalcap.rouge.rouge import Rouge
-from pycocoevalcap.vqa import vqaEval, visual_qa
 from read_write import list2vqa
 import numpy as np
-from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
 from localization_utilities import *
 
@@ -33,6 +27,13 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
             extra_vars['references'] - dictionary mapping sample indices to list with all their valid captions (id, [sentences])
             extra_vars['tokenize_f'] - tokenization function used during model training (used again for validation)
     """
+    
+    from pycocoevalcap.bleu.bleu import Bleu
+    from pycocoevalcap.meteor.meteor import Meteor
+    from pycocoevalcap.cider.cider import Cider
+    from pycocoevalcap.rouge.rouge import Rouge
+    from pycocoevalcap.vqa import vqaEval, visual_qa
+    from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
     gts = extra_vars[split]['references']
     hypo = {idx: map(extra_vars['tokenize_f'], [lines.strip()]) for (idx, lines) in enumerate(pred_list)}
@@ -180,16 +181,27 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
         values_gt = gt_list.values()
     except:
         values_gt = gt_list
+    
+    counts_per_class = np.zeros((n_classes,))
     for i_s, gt_class in enumerate(values_gt):
         y_gt[i_s, gt_class] = 1
-
+        counts_per_class[gt_class] += 1
+        
+    # Apply balanced accuracy per class
+    inverse_counts_per_class = [sum(counts_per_class)-c_i for c_i in counts_per_class]
+    weights_per_class = [float(c_i)/sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
+    sample_weights = np.zeros((n_samples,))
+    for i_s, gt_class in enumerate(values_gt):
+        sample_weights[i_s] = weights_per_class[gt_class]
+        
     # Compute Coverage Error
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
+    accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights)
     if verbose > 0:
-        logging.info('Accuracy: %f' %
-                     (accuracy))
+        logging.info('Accuracy: %f' % (accuracy))
+        logging.info('Balanced Accuracy: %f' % (accuracy_balanced))
 
-    return {'accuracy': accuracy}
+    return {'accuracy': accuracy, 'accuracy_balanced': accuracy_balanced}
 
     """
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')

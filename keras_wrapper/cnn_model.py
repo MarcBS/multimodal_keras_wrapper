@@ -651,6 +651,7 @@ class Model_Wrapper(object):
                           'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0,
                           'extra_callbacks': [],
+                          'class_weights': None,
                           'shuffle': True,
                           'epoch_offset': 0,
                           'patience': 0,
@@ -837,10 +838,16 @@ class Model_Wrapper(object):
             val_gen = None
             n_valid_samples = None
 
+        # Are we going to use class weights?
+        class_weight = {}
+        if params['class_weights'] is not None:
+            class_weight = ds.extra_variables['class_weights_'+params['class_weights']]
+            
         # Train model
         self.model.fit_generator(train_gen,
                                  validation_data=val_gen,
                                  nb_val_samples=n_valid_samples,
+                                 class_weight=class_weight,
                                  samples_per_epoch=state['samples_per_epoch'],
                                  nb_epoch=params['n_epochs'],
                                  max_q_size=params['n_parallel_loaders'],
