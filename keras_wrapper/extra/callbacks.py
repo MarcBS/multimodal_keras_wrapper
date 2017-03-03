@@ -276,8 +276,8 @@ class EvalPerformance(KerasCallback):
                     self.model_to_eval.log(s, counter_name, epoch)
                     for metric_ in sorted(metrics):
                         value = metrics[metric_]
-                        header += metric_ + ', '
-                        line += str(value) + ', '
+                        header += metric_ + ','
+                        line += str(value) + ','
                         # Store in model log
                         self.model_to_eval.log(s, metric_, value)
                     if not self.written_header:
