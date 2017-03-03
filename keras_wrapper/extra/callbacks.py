@@ -132,6 +132,7 @@ class EvalPerformance(KerasCallback):
         self.cum_update = 0
         self.epoch = reload_epoch
         self.save_each_evaluation = save_each_evaluation
+        self.written_header = False
         create_dir_if_not_exists(self.save_path)
         super(PrintPerformanceMetricOnEpochEndOrEachNUpdates, self).__init__()
 
@@ -279,8 +280,9 @@ class EvalPerformance(KerasCallback):
                         line += str(value) + ', '
                         # Store in model log
                         self.model_to_eval.log(s, metric_, value)
-                    if epoch == 1 or epoch == self.start_eval_on_epoch:
+                    if not self.written_header:
                         f.write(header + '\n')
+                        self.written_header = True
                     f.write(line + '\n')
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
