@@ -1,7 +1,6 @@
 import matplotlib as mpl
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, \
-    ArbitraryDeconvolution2D
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, ArbitraryDeconvolution2D, Concat
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -15,6 +14,8 @@ from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_G
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
+from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
+    decode_predictions_beam_search, replace_unknown_words, sample, sampling
 
 mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
@@ -35,7 +36,7 @@ import logging
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
 
-from keras.optimizers import Adam, RMSprop, Nadam, Adadelta
+from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
 from keras.applications.vgg19 import VGG19
 
 
@@ -108,7 +109,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=dict(), full_path=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -123,7 +124,11 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     if full_path:
         model_name = model_path
     else:
-        model_name = model_path + "/epoch_" + iter
+        if reload_epoch:
+            model_name = model_path + "/epoch_" + iter
+        else:
+            model_name = model_path + "/update_" + iter
+
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
 
     # Load model structure
@@ -158,10 +163,10 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except:  # backwards compatibility
-        try:
-            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
-        except:
-            raise Exception(ValueError)
+        #try:
+        model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
+        #except:
+        #    raise Exception(ValueError)
 
     # Add logger for backwards compatibility (old pre-trained models) if it does not exist
     model_wrapper.updateLogger()
@@ -178,6 +183,50 @@ def loadModel(model_path, update_num, custom_objects=dict(), full_path=False):
     return model_wrapper
 
 
+def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False):
+    """
+    Loads a the weights from files to a Model_Wrapper object.
+
+    :param model: Model_Wrapper object to update
+    :param model_path: path to the weights to load
+    :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :return: updated Model_Wrapper
+    """
+    t = time.time()
+    model_name = model.name
+    iter = str(update_num)
+
+    if not full_path:
+        if reload_epoch:
+            model_path = model_path + "/epoch_" + iter
+        else:
+            model_path = model_path + "/update_" + iter
+
+    logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
+
+    # Load model weights
+    model.model.load_weights(model_path + '_weights.h5')
+
+    # Load auxiliar models for optimized search
+    if os.path.exists(model_path + '_weights_init.h5') and os.path.exists(model_path + '_weights_next.h5'):
+        loaded_optimized = True
+    else:
+        loaded_optimized = False
+
+    if loaded_optimized:
+        # Load model structure
+        logging.info("<<< Updating optimized model... >>>")
+        logging.info("\t <<< Updating model_init from " + model_path + "_structure_init.json ... >>>")
+        model.model_init.load_weights(model_path + '_weights_init.h5')
+        # Load model structure
+        logging.info("\t <<< Updating model_next from " + model_path + "_structure_next.json ... >>>")
+        # Load model weights
+        model.model_next.load_weights(model_path + '_weights_next.h5')
+
+    logging.info("<<< Model updated in %0.6s seconds. >>>" % str(time.time() - t))
+    return model
+
+
 def transferWeights(old_model, new_model, layers_mapping):
     """
     Transfers all existent layer' weights from an old model to a new model.
@@ -188,7 +237,7 @@ def transferWeights(old_model, new_model, layers_mapping):
     :return: new model with weights transfered
     """
 
-    logging.info("<<< Transfering weights from models. >>>")
+    logging.info("<<< Transferring weights from models. >>>")
 
     old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(old_model.model.layers)])
     new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(new_model.model.layers)])
@@ -213,6 +262,18 @@ def transferWeights(old_model, new_model, layers_mapping):
                             mapping_weights[ind] = pos_old
                             break
 
+            # Alert for any weight matrix not inserted to new model
+            for pos_old, wo in enumerate(old):
+                if pos_old not in mapping_weights.values():
+                    logging.info('  Pre-trained weight matrix of layer "' + lold +
+                                 '" with dimensions '+str(wo.shape)+' can not be inserted to new model.')
+
+            # Alert for any weight matrix not modified
+            for pos_new, wn in enumerate(new):
+                if pos_new not in mapping_weights.keys():
+                    logging.info('  New model weight matrix of layer "' + lnew +
+                                 '" with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
+
             # Transfer weights for each layer
             for new_idx, old_idx in mapping_weights.iteritems():
                 new[new_idx] = old[old_idx]
@@ -221,7 +282,7 @@ def transferWeights(old_model, new_model, layers_mapping):
         else:
             logging.info('Can not apply weights transfer from "'+lold+'" to "'+lnew+'"')
 
-    logging.info("<<< Weights transfered successfully. >>>")
+    logging.info("<<< Weights transferred successfully. >>>")
 
     return new_model
 
@@ -363,7 +424,8 @@ class Model_Wrapper(object):
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None, decay=0.0, clipnorm=10., optimizer=None):
+    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None,
+                     decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
 
@@ -374,6 +436,7 @@ class Model_Wrapper(object):
             :param decay: lr decay
             :param clipnorm: gradients' clip norm
             :param optimizer: string identifying the type of optimizer used (default: SGD)
+            :param sample_weight_mode: 'temporal' or None
         """
         # Pick default parameters
         if lr is None:
@@ -392,15 +455,19 @@ class Model_Wrapper(object):
             metrics = []
 
         if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum, nesterov=True)
+            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=True)
         elif optimizer.lower() == 'adam':
-            optimizer = Adam(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+        elif optimizer.lower() == 'adagrad':
+            optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         elif optimizer.lower() == 'rmsprop':
-            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         elif optimizer.lower() == 'nadam':
-            optimizer = Nadam(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+        elif optimizer.lower() == 'adamax':
+            optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         elif optimizer.lower() == 'adadelta':
-            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, decay=decay, momentum=momentum)
+            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         else:
             raise Exception('\tThe chosen optimizer is not implemented.')
 
@@ -409,7 +476,8 @@ class Model_Wrapper(object):
 
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
-            self.model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
+            self.model.compile(optimizer=optimizer, metrics=metrics, loss=loss,
+                               sample_weight_mode=sample_weight_mode)
         else:
             raise NotImplementedError()
 
@@ -459,6 +527,11 @@ class Model_Wrapper(object):
             if create_plots:
                 if not os.path.isdir(self.plot_path):
                     os.makedirs(self.plot_path)
+
+
+    def setParams(self, params):
+        self.params = params
+
 
     def checkParameters(self, input_params, default_params):
         """
@@ -573,20 +646,32 @@ class Model_Wrapper(object):
         default_params = {'n_epochs': 1, 'batch_size': 50,
                           'maxlen': 100,  # sequence learning parameters (BeamSearch)
                           'homogeneous_batches': False,
+                          'joint_batches': 4,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
-                          'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True,
-                          'data_augmentation': True, 'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0, 'extra_callbacks': [], 'shuffle': True, 'epoch_offset': 0,
-                          'patience': 0, 'metric_check': None, 'eval_on_epochs': True, 'each_n_epochs': 1, 'start_eval_on_epoch':0, # early stopping parameters
-                          'lr_decay': None, 'lr_gamma': 0.1}  # LR decay parameters
-
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'data_augmentation': True,
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'class_weights': None,
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch':0, # early stopping parameters
+                          'lr_decay': None, # LR decay parameters
+                          'lr_gamma': 0.1}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
         self.training_parameters.append(save_params)
-
-        logging.info("<<< Training model >>>")
+        if params['verbose'] > 0:
+            logging.info("<<< Training model >>>")
 
         self.__train(ds, params)
 
@@ -618,9 +703,78 @@ class Model_Wrapper(object):
 
         logging.info("<<< Finished training Model_Wrapper >>>")
 
+    def trainNetFromSamples(self, x, y, parameters={}, class_weight=None, sample_weight=None, out_name=None):
+        """
+            Trains the network on the given samples x, y.
+
+            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.
+
+            The input 'parameters' is a dict() which may contain the following (optional) training parameters:
+
+            ####    Visualization parameters
+
+            :param report_iter: number of iterations between each loss report
+            :param iter_for_val: number of interations between each validation test
+            :param num_iterations_val: number of iterations applied on the validation dataset for computing the average performance (if None then all the validation data will be tested)
+
+            ####    Learning parameters
+
+            :param n_epochs: number of epochs that will be applied during training
+            :param batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
+            :param lr_decay: number of iterations passed for decreasing the learning rate
+            :param lr_gamma: proportion of learning rate kept at each decrease. It can also be a set of rules defined by a list, e.g. lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration 3000, ..., 0.8 until the end.
+            :param patience: number of epochs waiting for a possible performance increase before stopping training
+            :param metric_check: name of the metric checked for early stoppping and LR decrease
+
+            ####    Data processing parameters
+
+            :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
+            :param normalize: boolean indicating if we want to 0-1 normalize the image pixel values
+            :param mean_substraction: boolean indicating if we want to substract the training mean
+            :param data_augmentation: boolean indicating if we want to perform data augmentation (always False on validation)
+            :param shuffle: apply shuffling on training data at the beginning of each epoch.
+
+            ####    Other parameters
+
+            :param save_model: number of iterations between each model backup
+        """
+
+        # Check input parameters and recover default values if needed
+
+        default_params = {'n_epochs': 1, 'batch_size': 50,
+                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
+                          'homogeneous_batches': False,
+                          'joint_batches': 4,
+                          'epochs_for_save': 1,
+                          'num_iterations_val': None,
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'data_augmentation': True,
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch':0, # early stopping parameters
+                          'lr_decay': None, # LR decay parameters
+                          'lr_gamma': 0.1}
+        params = self.checkParameters(parameters, default_params)
+        save_params = copy.copy(params)
+        del save_params['extra_callbacks']
+        self.training_parameters.append(save_params)
+        self.__train_from_samples(x, y, params, class_weight=class_weight, sample_weight=sample_weight)
+        if params['verbose'] > 0:
+            logging.info("<<< Finished training model >>>")
+
     def __train(self, ds, params, state=dict()):
 
-        logging.info("Training parameters: " + str(params))
+        if params['verbose'] > 0:
+            logging.info("Training parameters: " + str(params))
 
         # initialize state
         state['samples_per_epoch'] = ds.len_train
@@ -649,13 +803,18 @@ class Model_Wrapper(object):
             callbacks.append(callback_early_stop)
 
         # Store model
-        callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-        callbacks.append(callback_store_model)
+        if params['epochs_for_save'] >= 0:
+            callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+            callbacks.append(callback_store_model)
 
         # Prepare data generators
         if params['homogeneous_batches']:
-            train_gen = Homogeneous_Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
-                                                         batch_size=params['batch_size'], maxlen=params['maxlen'],
+            train_gen = Homogeneous_Data_Batch_Generator('train',
+                                                         self,
+                                                         ds,
+                                                         state['n_iterations_per_epoch'],
+                                                         batch_size=params['batch_size'],
+                                                         joint_batches=params['joint_batches'],
                                                          normalization=params['normalize'],
                                                          data_augmentation=params['data_augmentation'],
                                                          mean_substraction=params['mean_substraction']).generator()
@@ -684,16 +843,66 @@ class Model_Wrapper(object):
             val_gen = None
             n_valid_samples = None
 
+        # Are we going to use class weights?
+        class_weight = {}
+        if params['class_weights'] is not None:
+            class_weight = ds.extra_variables['class_weights_'+params['class_weights']]
+            
         # Train model
         self.model.fit_generator(train_gen,
                                  validation_data=val_gen,
                                  nb_val_samples=n_valid_samples,
+                                 class_weight=class_weight,
                                  samples_per_epoch=state['samples_per_epoch'],
                                  nb_epoch=params['n_epochs'],
                                  max_q_size=params['n_parallel_loaders'],
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
                                  initial_epoch=params['epoch_offset'])
+
+    def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None, state=dict()):
+
+        if params['verbose'] > 0:
+            logging.info("Training parameters: " + str(params))
+        callbacks = []
+        ## Callbacks order:
+
+        # Extra callbacks (e.g. evaluation)
+        callbacks += params['extra_callbacks']
+
+        # LR reducer
+        if params.get('lr_decay') is not None:
+            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            callbacks.append(callback_lr_reducer)
+
+        # Early stopper
+        if params.get('metric_check') is not None:
+            callback_early_stop = EarlyStopping(self,
+                                                patience=params['patience'],
+                                                metric_check=params['metric_check'],
+                                                eval_on_epochs=params['eval_on_epochs'],
+                                                each_n_epochs=params['each_n_epochs'],
+                                                start_eval_on_epoch=params['start_eval_on_epoch'])
+            callbacks.append(callback_early_stop)
+
+        # Store model
+        if params['epochs_for_save'] >= 0:
+            callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
+            callbacks.append(callback_store_model)
+
+        # Train model
+        self.model.fit(x,
+                       y,
+                       batch_size=min(params['batch_size'], len(x)),
+                       nb_epoch=params['n_epochs'],
+                       verbose=params['verbose'],
+                       callbacks=callbacks,
+                       validation_data=None,
+                       validation_split=params.get('val_split', 0.),
+                       shuffle=params['shuffle'],
+                       class_weight=class_weight,
+                       sample_weight=sample_weight,
+                       initial_epoch=params['epoch_offset'])
 
     def __train_deprecated(self, ds, params, state=dict(), out_name=None):
         """
@@ -1205,7 +1414,7 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
         elif ii == 0:  # first timestep
-            for model_input in params['model_inputs'][:-1]:
+            for model_input in params['model_inputs']:#[:-1]:
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, 1)
@@ -1607,7 +1816,6 @@ class Model_Wrapper(object):
                                                                  loading_X=True)[0]
                             else:
                                 x[input_id] = np.asarray([X[input_id][i]])
-
                         if params['pos_unk']:
                             samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                         else:
@@ -1773,6 +1981,182 @@ class Model_Wrapper(object):
         return predictions
 
     # ------------------------------------------------------- #
+    #       SCORING FUNCTIONS
+    #           Functions for making scoring (x, y) samples
+    # ------------------------------------------------------- #
+
+    def score_cond_model(self, X, Y, params, null_sym=2):
+        """
+        Scoring for Cond models.
+        :param X: Model inputs
+        :param Y: Model outputs
+        :param params: Search parameters
+        :param null_sym: <null> symbol
+        :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
+        """
+        # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
+        pad_on_batch = params['pad_on_batch']
+        score = 0.0
+        if params['words_so_far']:
+            state_below = np.asarray([[null_sym]]) \
+                if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))])
+        else:
+            state_below = np.asarray([null_sym]) \
+                if pad_on_batch else np.asarray([np.zeros(params['maxlen'])])
+
+        prev_out = None
+        for ii in xrange(len(Y)):
+            # for every possible live sample calc prob for every possible label
+            if params['optimized_search']:  # use optimized search model if available
+                [probs, prev_out, alphas] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
+            else:
+                probs = self.predict_cond(X, state_below, params, ii)
+            # total score for every sample is sum of -log of word prb
+            score -= np.log(probs[0, int(Y[ii])])
+            state_below = np.asarray([Y[:ii]], dtype='int64')
+            # we must include an additional dimension if the input for each timestep are all the generated words so far
+            if pad_on_batch:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+            else:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
+                                         np.zeros((state_below.shape[0],
+                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                  dtype='int64')))
+
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+                    state_below = np.hstack((state_below,
+                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                                       state_below.shape[2]))))
+
+
+            if params['optimized_search'] and ii > 0:
+                # filter next search inputs w.r.t. remaining samples
+                for idx_vars in range(len(prev_out)):
+                    prev_out[idx_vars] = prev_out[idx_vars]
+
+        return score
+
+    def scoreNet(self):
+        """
+        Approximates by beam search the best predictions of the net on the dataset splits chosen.
+        Params from config that affect the sarch process:
+            * batch_size: size of the batch
+            * n_parallel_loaders: number of parallel data batch loaders
+            * normalization: apply data normalization on images/features or not (only if using images/features as input)
+            * mean_substraction: apply mean data normalization on images or not (only if using images as input)
+            * predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+            * optimized_search: boolean indicating if the used model has the optimized Beam Search implemented
+             (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
+
+        The following attributes must be inserted to the model when building an optimized search model:
+
+            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
+            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
+            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                                the number of out variables must match the number of in variables)
+            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
+            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
+
+        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        """
+
+        # Check input parameters and recover default values if needed
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
+                          'normalize': False, 'mean_substraction': True,
+                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description'],
+                          'alpha_factor': 1.0,
+                          'sampling_type': 'max_likelihood',
+                          'words_so_far': False,
+                          'optimized_search': False,
+                          'state_below_index': -1,
+                          'output_text_index': 0,
+                          'pos_unk': False,
+                          'heuristic': 0,
+                          'mapping': None
+                          }
+        params = self.checkParameters(self.params, default_params)
+
+        scores_dict = dict()
+
+        for s in params['predict_on_sets']:
+            logging.info("<<< Scoring outputs of " + s + " set >>>")
+            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if not params['optimized_search']:  # use optimized search model if available
+                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+            params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
+            # Calculate how many interations are we going to perform
+            n_samples = eval("self.dataset.len_" + s)
+            num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+
+            # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+            # TODO: We prepare data as model 0... Different data preparators for each model?
+            data_gen = Data_Batch_Generator(s,
+                                            self.models[0],
+                                            self.dataset,
+                                            num_iterations,
+                                            shuffle=False,
+                                            batch_size=params['batch_size'],
+                                            normalization=params['normalize'],
+                                            data_augmentation=False,
+                                            mean_substraction=params['mean_substraction'],
+                                            predict=False).generator()
+            sources_sampling = []
+            scores = []
+            total_cost = 0
+            sampled = 0
+            start_time = time.time()
+            eta = -1
+            for j in range(num_iterations):
+                data = data_gen.next()
+                X = dict()
+                s_dict = {}
+                for input_id in params['model_inputs']:
+                    X[input_id] = data[0][input_id]
+                    s_dict[input_id] = X[input_id]
+                sources_sampling.append(s_dict)
+
+                Y = dict()
+                for output_id in params['model_outputs']:
+                    Y[output_id] = data[1][output_id]
+
+                for i in range(len(X[params['model_inputs'][0]])):
+                    sampled += 1
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Scored %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                    sys.stdout.flush()
+                    x = dict()
+                    y = dict()
+
+                    for input_id in params['model_inputs']:
+                        x[input_id] = np.asarray([X[input_id][i]])
+                    y = self.models[0].one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
+                                                         pad_sequences=True, verbose=0)[0]
+                    score = self.score_cond_model(x, y, params, null_sym=self.dataset.extra_words['<null>'])
+                    if params['normalize']:
+                        counts = float(len(y) ** params['alpha_factor'])
+                        score /= counts
+                    scores.append(score)
+                    total_cost += score
+                    eta = (n_samples - sampled) * (time.time() - start_time) / sampled
+
+            sys.stdout.write('Total cost of the translations: %f \t '
+                             'Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
+            sys.stdout.write('The scoring took: %f secs (Speed: %f sec/sample)\n' %
+                             ((time.time() - start_time), (time.time() - start_time) / n_samples))
+
+            sys.stdout.flush()
+            scores_dict[s] = scores
+        return scores_dict
+
+    # ------------------------------------------------------- #
     #       DECODING FUNCTIONS
     #           Functions for decoding predictions
     # ------------------------------------------------------- #
@@ -1784,9 +2168,9 @@ class Model_Wrapper(object):
         :param temperature: The higher, the flatter probabilities. Hence more random outputs.
         :return:
         """
-        a = np.log(a) / temperature
-        a = np.exp(a) / np.sum(np.exp(a))
-        return np.argmax(np.random.multinomial(1, a, 1))
+
+        print "WARNING!: deprecated function, use utils.sample() instead"
+        return sample(a, temperature=temperature)
 
     def sampling(self, scores, sampling_type='max_likelihood', temperature=1.0):
         """
@@ -1798,20 +2182,8 @@ class Model_Wrapper(object):
         :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples
         """
-        if isinstance(scores, dict):
-            scores = scores['output']
-
-        if sampling_type == 'multinomial':
-            preds = np.asarray(scores).astype('float64')
-            preds = np.log(preds) / temperature
-            exp_preds = np.exp(preds)
-            preds = exp_preds / np.sum(exp_preds)
-            probas = np.random.multinomial(1, preds, 1)
-            return np.argmax(probas)
-        elif sampling_type == 'max_likelihood':
-            return np.argmax(scores, axis=-1)
-        else:
-            raise NotImplementedError()
+        print "WARNING!: deprecated function, use utils.sampling() instead"
+        return sampling(scores, sampling_type=sampling_type, temperature=temperature)
 
     def decode_predictions(self, preds, temperature, index2word, sampling_type, verbose=0):
         """
@@ -1823,26 +2195,9 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions.
         """
+        print "WARNING!: deprecated function, use utils.decode_predictions() instead"
+        return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
-        if verbose > 0:
-            logging.info('Decoding prediction ...')
-        flattened_preds = preds.reshape(-1, preds.shape[-1])
-        flattened_answer_pred = map(lambda x: index2word[x],
-                                    self.sampling(scores=flattened_preds,
-                                                  sampling_type=sampling_type,
-                                                  temperature=temperature))
-        answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:2])
-        answer_pred = []
-        EOS = '<eos>'
-        PAD = '<pad>'
-
-        for a_no in answer_pred_matrix:
-            init_token_pos = 0
-            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
-            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
-            answer_pred.append(tmp)
-        return answer_pred
 
     def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                               heuristic=0, mapping=None, verbose=0):
@@ -1858,34 +2213,9 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level
         :return: trg_word_seq with replaced unknown words
         """
-        trans_words = trg_word_seq
-        new_trans_words = []
-        if verbose > 2:
-            print "Input sentence:", src_word_seq
-            print "Hard alignments", hard_alignment
-        for j in xrange(len(trans_words)):
-            if trans_words[j] == unk_symbol:
-                UNK_src = src_word_seq[hard_alignment[j]]
-                if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
-                    new_trans_words.append(UNK_src)
-                elif heuristic == 1:
-                    # Use the most likely translation (with t-table). If not found, copy the source word.
-                    # Ok for small vocabulary (~30k) models
-                    if mapping.get(UNK_src) is not None:
-                        new_trans_words.append(mapping[UNK_src])
-                    else:
-                        new_trans_words.append(UNK_src)
-                elif heuristic == 2:
-                    # Use t-table if the source word starts with a lowercase letter. Otherwise copy
-                    # Sometimes works better than other heuristics
-                    if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
-                        new_trans_words.append(mapping[UNK_src])
-                    else:
-                        new_trans_words.append(UNK_src)
-            else:
-                new_trans_words.append(trans_words[j])
-
-        return new_trans_words
+        print "WARNING!: deprecated function, use utils.replace_unknown_words() instead"
+        return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
+                                     heuristic=heuristic, mapping=mapping, verbose=verbose)
 
     def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
                                        x_text=None, unk_symbol='<unk>', pad_sequences=False,
@@ -1898,48 +2228,22 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        if verbose > 0:
-            logging.info('Decoding beam search prediction ...')
+        print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
+        return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
+                                          x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
+                                          mapping=mapping, verbose=0)
 
-        if alphas is not None:
-            assert x_text is not None, 'When using POS_UNK, you must provide the input ' \
-                                       'text to decode_predictions_beam_search!'
-            if verbose > 0:
-                logging.info('Using heuristic %d' % heuristic)
-        if pad_sequences:
-            preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-        flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
-        answer_pred = []
 
-        if alphas is not None:
-            x_text = map(lambda x: x.split(), x_text)
-            hard_alignments = map(
-                lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
-                alphas, x_text)
-            for i, a_no in enumerate(flattened_answer_pred):
-                if unk_symbol in a_no:
-                    if verbose > 1:
-                        print unk_symbol, "at sentence number", i
-                        print "hypothesis:", a_no
-                        if verbose > 2:
-                            print "alphas:", alphas[i]
+    def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
+        """
+        Converts a one-hot codification into a index-based one
+        :param preds: Predictions codified as one-hot vectors.
+        :param verbose: Verbosity level, by default 0.
+        :return: List of convertedpredictions
+        """
+        print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
+        return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
 
-                    a_no = self.replace_unknown_words(x_text[i],
-                                                      a_no,
-                                                      hard_alignments[i],
-                                                      unk_symbol,
-                                                      heuristic=heuristic,
-                                                      mapping=mapping,
-                                                      verbose=verbose)
-                    if verbose > 1:
-                        print "After unk_replace:", a_no
-                tmp = ' '.join(a_no[:-1])
-                answer_pred.append(tmp)
-        else:
-            for a_no in flattened_answer_pred:
-                tmp = ' '.join(a_no[:-1])
-                answer_pred.append(tmp)
-        return answer_pred
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
         """
@@ -1949,20 +2253,8 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        if verbose > 0:
-            logging.info('Decoding one hot prediction ...')
-        preds = map(lambda x: np.nonzero(x)[1], preds)
-        PAD = '<pad>'
-        flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
-        answer_pred_matrix = np.asarray(flattened_answer_pred)
-        answer_pred = []
-
-        for a_no in answer_pred_matrix:
-            end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
-            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            tmp = ' '.join(a_no[:end_token_pos])
-            answer_pred.append(tmp)
-        return answer_pred
+        print "WARNING!: deprecated function, use utils.decode_predictions_one_hot() instead"
+        return decode_predictions_one_hot(preds, index2word, verbose=verbose)
 
     def prepareData(self, X_batch, Y_batch=None):
         """
@@ -2181,7 +2473,86 @@ class Model_Wrapper(object):
         else:
             return self.__logger[mode][data_type]
 
-    def plot(self):
+
+    def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict={}):
+        """
+        Plots the training progress information
+
+        Example of input:
+        model.plot('epoch', ['accuracy'], ['val', 'test'],
+                   upperbound=1, colours_dict={'accuracy_val', 'b', 'accuracy_test', 'g'})
+
+        :param time_measure: either 'epoch' or 'iteration'
+        :param metrics: list of metrics that we want to plot
+        :param splits: list of data splits that we want to plot
+        :param upperbound: upper bound of the metrics about to plot (usually upperbound=1.0)
+        :param colours_shapes_dict: dictionary of '<metric>_<split>' and the colour and/or shape
+                that we want them to have in the plot
+        """
+
+        # Build default colours_shapes_dict if not provided
+        if not colours_shapes_dict:
+            default_colours = ['b','g','y','k']
+            default_shapes = ['-', 'o', '.']
+            m = 0
+            for met in metrics:
+                s = 0
+                for sp in splits:
+                    colours_shapes_dict[met+'_'+sp] = default_colours[m]+default_shapes[s]
+                    s += 1
+                    s = s%len(default_shapes)
+                m += 1
+                m = m % len(default_colours)
+
+        plt.figure(1)
+
+        all_iterations = []
+        for sp in splits:
+            if sp not in self.__logger:
+                raise Exception("There is no performance data from split '"+sp+"' in the model log.")
+            if time_measure not in self.__logger[sp]:
+                raise Exception("There is no performance data on each '"+time_measure+"' in the model log for split '"+sp+"'.")
+
+            iterations = self.__logger[sp][time_measure]
+            all_iterations = all_iterations + iterations
+
+            for met in metrics:
+                if met not in self.__logger[sp]:
+                    raise Exception("There is no performance data for metric '"+met+"' in the model log for split '"+sp+"'.")
+
+                measure = self.__logger[sp][met]
+                #plt.subplot(211)
+                # plt.plot(iterations, loss, colours['train_loss']+'o')
+                plt.plot(iterations, measure, colours_shapes_dict[met+'_'+sp])
+
+        max_iter = np.max(all_iterations + [0])
+
+        # Plot upperbound
+        if upperbound is not None:
+            #plt.subplot(211)
+            plt.plot([0, max_iter], [upperbound, upperbound], 'r-')
+            plt.axis([0, max_iter, 0, upperbound])  # limit height to 1
+
+        # Fill labels
+        plt.xlabel(time_measure)
+        #plt.subplot(211)
+        plt.title('Training progress')
+
+        # Create plots dir
+        if not os.path.isdir(self.model_path):
+            os.makedirs(self.model_path)
+
+        # Save figure
+        plot_file = self.model_path + '/'+time_measure+'_' + str(max_iter) + '.jpg'
+        plt.savefig(plot_file)
+        if not self.silence:
+            logging.info("<<< Progress plot saved in " +plot_file+' >>>')
+
+        # Close plot window
+        plt.close()
+
+
+    def plot_old(self):
         """
             Plots the training progress information.
         """
@@ -3222,7 +3593,7 @@ class Model_Wrapper(object):
         :return: output layer
         """
 
-        out_layer = BatchNormalization(mode=2)(in_layer)
+        out_layer = BatchNormalization(mode=2, axis=1)(in_layer)
         out_layer = Activation('relu')(out_layer)
         out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same')(out_layer)
         if drop > 0.0:
@@ -3270,7 +3641,7 @@ class Model_Wrapper(object):
         skip = merge([x, x_dense], mode='concat', concat_axis=axis)
 
         # Transition Down
-        x_out = BatchNormalization(mode=2)(skip)
+        x_out = BatchNormalization(mode=2, axis=1)(skip)
         x_out = Activation('relu')(x_out)
         x_out = Convolution2D(nb_filters_conv, 1, 1, init=init_weights, border_mode='same')(x_out)
         if drop > 0.0:
@@ -3312,14 +3683,16 @@ class Model_Wrapper(object):
         else:
             raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
-        # Transition Up
-        x = Deconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
-                                     subsample=(2, 2), border_mode='same')(x)
-        #x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
-        #                             subsample=(2, 2), border_mode='same')(x)
+        x = Deconvolution2D(nb_filters_deconv, 3, 3,
+                            subsample=(2, 2),
+                            init=init_weights, border_mode='same')(x)
+        #x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, input_deconv,
+        #                             init=init_weights, subsample=(2, 2), border_mode='same')(x)
 
         # Skip connection concatenation
         x = merge([skip_conn, x], mode='concat', concat_axis=axis)
+        #x = Concat(cropping=[None, None, 'center', 'center'])([skip_conn, x])
+
         # Dense Block
         x = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
         return x
