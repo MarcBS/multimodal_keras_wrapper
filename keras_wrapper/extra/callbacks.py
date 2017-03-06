@@ -72,6 +72,7 @@ class EvalPerformance(KerasCallback):
                  sampling_type='max_likelihood',
                  save_each_evaluation=True,
                  out_pred_idx=None,
+                 max_plot=1.0,
                  verbose=1):
         """
         Evaluates a model each N epochs or updates
@@ -100,6 +101,7 @@ class EvalPerformance(KerasCallback):
         :param sampling_type: type of sampling used (multinomial or max_likelihood)
         :param save_each_evaluation: save the model each time we evaluate (epochs or updates)
         :param out_pred_idx: index of the output prediction used for evaluation (only applicable if model has more than one output, else set to None)
+        :param max_plot: maximum value shown on the performance plots generated
         :param verbose: verbosity level; by default 1
         """
         self.model_to_eval = model
@@ -130,6 +132,7 @@ class EvalPerformance(KerasCallback):
         self.verbose = verbose
         self.cum_update = 0
         self.epoch = reload_epoch
+        self.max_plot = max_plot
         self.save_each_evaluation = save_each_evaluation
         create_dir_if_not_exists(self.save_path)
         super(PrintPerformanceMetricOnEpochEndOrEachNUpdates, self).__init__()
@@ -168,6 +171,7 @@ class EvalPerformance(KerasCallback):
     def evaluate(self, epoch, counter_name='epoch'):
 
         # Evaluate on each set separately
+        all_metrics = []
         for s in self.set_name:
             # Apply model predictions
             if self.beam_search:
@@ -274,6 +278,7 @@ class EvalPerformance(KerasCallback):
                     # Store in model log
                     self.model_to_eval.log(s, counter_name, epoch)
                     for metric_ in sorted(metrics):
+                        all_metrics.append(metric_)
                         value = metrics[metric_]
                         header += metric_ + ', '
                         line += str(value) + ', '
@@ -282,8 +287,13 @@ class EvalPerformance(KerasCallback):
                     if epoch == 1 or epoch == self.start_eval_on_epoch:
                         f.write(header + '\n')
                     f.write(line + '\n')
+
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
+
+        # Plot results so far
+        self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
+
         # Save the model
         if self.save_each_evaluation:
             from keras_wrapper.cnn_model import saveModel

@@ -2105,38 +2105,12 @@ class Dataset(object):
         :return:
         """
 
-        # recover chosen data augmentation types
-        data_augmentation_types = self.inputs_data_augmentation_types[id]
-        if data_augmentation_types is None:
-            data_augmentation_types = []
-
         n_videos = len(idx_videos)
         if isinstance(feat_len, list):
             feat_len = feat_len[0]
         features = np.zeros((n_videos, max_len, feat_len))
 
-        n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
-
-        idx = [0 for i_nvid in range(n_videos)]
-        # recover all initial indices from image's paths of all videos
-        for v in range(n_videos):
-            last_idx = idx_videos[v]
-            idx[v] = int(sum(self.counts_frames[id][set_name][:last_idx]))
-
-        # select subset of max_len from n_frames[i]
-        selected_frames = [0 for i_nvid in range(n_videos)]
-        for enum, (n, i) in enumerate(zip(n_frames, idx)):
-            paths = self.paths_frames[id][set_name][i:i + n]
-
-            if data_augmentation and 'random_selection' in data_augmentation_types:  # apply random frames selection
-                selected_idx = sorted(random.sample(range(n), min(max_len, n)))
-            else:  # apply equidistant frames selection
-                selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
-                # splits = np.array_split(range(n), min(max_len, n))
-                # selected_idx = [s[0] for s in splits]
-
-            selected_paths = [paths[int(idx)] for idx in selected_idx]
-            selected_frames[enum] = selected_paths
+        selected_frames = self.getFramesPaths(idx_videos, id, set_name, max_len, data_augmentation)
 
         # load features from selected paths
         for i, vid_paths in enumerate(selected_frames):
@@ -2160,7 +2134,44 @@ class Dataset(object):
                 features[i, j] = feat
 
         return np.array(features)
+    
+    
+    def getFramesPaths(self, idx_videos, id, set_name, max_len, data_augmentation):
+        """
+        Recovers the paths from the selected video frames.
+        """
+        
+        # recover chosen data augmentation types
+        data_augmentation_types = self.inputs_data_augmentation_types[id]
+        if data_augmentation_types is None:
+            data_augmentation_types = []
+        
+        n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
+        
+        n_videos = len(idx_videos)
+        idx = [0 for i_nvid in range(n_videos)]
+        # recover all initial indices from image's paths of all videos
+        for v in range(n_videos):
+            last_idx = idx_videos[v]
+            idx[v] = int(sum(self.counts_frames[id][set_name][:last_idx]))
 
+        # select subset of max_len from n_frames[i]
+        selected_frames = [0 for i_nvid in range(n_videos)]
+        for enum, (n, i) in enumerate(zip(n_frames, idx)):
+            paths = self.paths_frames[id][set_name][i:i + n]
+
+            if data_augmentation and 'random_selection' in data_augmentation_types:  # apply random frames selection
+                selected_idx = sorted(random.sample(range(n), min(max_len, n)))
+            else:  # apply equidistant frames selection
+                selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
+                # splits = np.array_split(range(n), min(max_len, n))
+                # selected_idx = [s[0] for s in splits]
+
+            selected_paths = [paths[int(idx)] for idx in selected_idx]
+            selected_frames[enum] = selected_paths
+            
+        return selected_frames
+            
     def loadVideosByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization,
                           meanSubstraction, dataAugmentation):
         n_videos = len(indices)

@@ -142,16 +142,24 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     avgprec = sklearn_metrics.label_ranking_average_precision_score(y_gt, y_pred)
     # Compute Label Ranking Loss
     rankloss = sklearn_metrics.label_ranking_loss(y_gt, y_pred)
+    # Compute Precision, Recall and F1 score
+    precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
 
     if verbose > 0:
         logging.info(
             'Coverage Error (best: avg labels per sample = %f): %f' % (np.sum(y_gt) / float(n_samples), coverr))
         logging.info('Label Ranking Average Precision (best: 1.0): %f' % avgprec)
         logging.info('Label Ranking Loss (best: 0.0): %f' % rankloss)
+        logging.info('Precision: %f' % (precision))
+        logging.info('Recall: %f' % (recall))
+        logging.info('F1 score: %f' % (f1))
 
     return {'coverage error': coverr,
             'average precision': avgprec,
-            'ranking loss': rankloss}
+            'ranking loss': rankloss,
+            'precision': precision,
+            'recall': recall,
+            'f1': f1}
 
 
 def multiclass_metrics(pred_list, verbose, extra_vars, split):
@@ -194,27 +202,25 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     for i_s, gt_class in enumerate(values_gt):
         sample_weights[i_s] = weights_per_class[gt_class]
         
-    # Compute Coverage Error
+    # Compute accuracy
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
     accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights)
-    if verbose > 0:
-        logging.info('Accuracy: %f' % (accuracy))
-        logging.info('Balanced Accuracy: %f' % (accuracy_balanced))
-
-    return {'accuracy': accuracy, 'accuracy_balanced': accuracy_balanced}
-
-    """
+    # Compute Precision, Recall and F1 score
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
 
     if verbose > 0:
-        logging.info('Accuracy: %f \t Precision: %f \t Recall: %f \t F1: %f' %
-                     (accuracy, precision, recall, f1))
+        logging.info('Accuracy: %f' % (accuracy))
+        logging.info('Balanced Accuracy: %f' % (accuracy_balanced))
+        logging.info('Precision: %f' % (precision))
+        logging.info('Recall: %f' % (recall))
+        logging.info('F1 score: %f' % (f1))
 
     return {'accuracy': accuracy,
+            'accuracy_balanced': accuracy_balanced,
             'precision': precision,
             'recall': recall,
             'f1': f1}
-    """
+
 
 
 def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):

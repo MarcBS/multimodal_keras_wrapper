@@ -2575,7 +2575,86 @@ class Model_Wrapper(object):
         else:
             return self.__logger[mode][data_type]
 
-    def plot(self):
+
+    def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict={}):
+        """
+        Plots the training progress information
+
+        Example of input:
+        model.plot('epoch', ['accuracy'], ['val', 'test'],
+                   upperbound=1, colours_dict={'accuracy_val', 'b', 'accuracy_test', 'g'})
+
+        :param time_measure: either 'epoch' or 'iteration'
+        :param metrics: list of metrics that we want to plot
+        :param splits: list of data splits that we want to plot
+        :param upperbound: upper bound of the metrics about to plot (usually upperbound=1.0)
+        :param colours_shapes_dict: dictionary of '<metric>_<split>' and the colour and/or shape
+                that we want them to have in the plot
+        """
+
+        # Build default colours_shapes_dict if not provided
+        if not colours_shapes_dict:
+            default_colours = ['b','g','y','k']
+            default_shapes = ['-', 'o', '.']
+            m = 0
+            for met in metrics:
+                s = 0
+                for sp in splits:
+                    colours_shapes_dict[met+'_'+sp] = default_colours[m]+default_shapes[s]
+                    s += 1
+                    s = s%len(default_shapes)
+                m += 1
+                m = m % len(default_colours)
+
+        plt.figure(1)
+
+        all_iterations = []
+        for sp in splits:
+            if sp not in self.__logger:
+                raise Exception("There is no performance data from split '"+sp+"' in the model log.")
+            if time_measure not in self.__logger[sp]:
+                raise Exception("There is no performance data on each '"+time_measure+"' in the model log for split '"+sp+"'.")
+
+            iterations = self.__logger[sp][time_measure]
+            all_iterations = all_iterations + iterations
+
+            for met in metrics:
+                if met not in self.__logger[sp]:
+                    raise Exception("There is no performance data for metric '"+met+"' in the model log for split '"+sp+"'.")
+
+                measure = self.__logger[sp][met]
+                #plt.subplot(211)
+                # plt.plot(iterations, loss, colours['train_loss']+'o')
+                plt.plot(iterations, measure, colours_shapes_dict[met+'_'+sp])
+
+        max_iter = np.max(all_iterations + [0])
+
+        # Plot upperbound
+        if upperbound is not None:
+            #plt.subplot(211)
+            plt.plot([0, max_iter], [upperbound, upperbound], 'r-')
+            plt.axis([0, max_iter, 0, upperbound])  # limit height to 1
+
+        # Fill labels
+        plt.xlabel(time_measure)
+        #plt.subplot(211)
+        plt.title('Training progress')
+
+        # Create plots dir
+        if not os.path.isdir(self.model_path):
+            os.makedirs(self.model_path)
+
+        # Save figure
+        plot_file = self.model_path + '/'+time_measure+'_' + str(max_iter) + '.jpg'
+        plt.savefig(plot_file)
+        if not self.silence:
+            logging.info("<<< Progress plot saved in " +plot_file+' >>>')
+
+        # Close plot window
+        plt.close()
+
+
+    def plot_old(self):
         """
             Plots the training progress information.
         """
