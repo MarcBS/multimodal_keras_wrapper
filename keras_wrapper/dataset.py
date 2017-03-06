@@ -2213,23 +2213,24 @@ class Dataset(object):
     def resize_semantic_output(self, predictions, ids_out):
         out_pred = []
 
-        n_classes = len(self.classes)
-
         for pred, id_out in zip(predictions, ids_out):
 
             assoc_id_in = self.id_in_3DLabel[id_out]
             in_size = self.img_size_crop[assoc_id_in]
             out_size = self.img_size[assoc_id_in]
+            n_classes = len(self.classes[id_out])
 
             pred = np.transpose(pred, [1, 0])
             pred = np.reshape(pred, (-1, in_size[0], in_size[1]))
 
-            pred = misc.imresize(pred, [[n_classes] + out_size[0:2]])
+            new_pred = np.zeros(tuple([n_classes]+out_size[0:2]))
+            for pos,p in enumerate(pred):
+                new_pred[pos] = misc.imresize(p, tuple(out_size[0:2]))
 
-            pred = np.reshape(pred, (-1, out_size[0], out_size[1]))
-            pred = np.transpose(pred, [1, 0])
+            new_pred = np.reshape(new_pred, (-1, out_size[0]* out_size[1]))
+            new_pred = np.transpose(new_pred, [1, 0])
 
-            out_pred.append(pred)
+            out_pred.append(new_pred)
 
         return out_pred
 
