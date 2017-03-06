@@ -232,11 +232,13 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
         extra_vars - dictionary extra variables. Must contain:
                 - ['n_classes'] with the total number of existent classes
                 - [split]['references'] with the GT values corresponding to each sample of the current data split
+                - [discard_classes] with the classes not taken into account in the performance evaluation
         split - split of the data where we are applying the evaluation
     '''
 
     n_classes = extra_vars['n_classes']
     gt_list = extra_vars[split]['references']
+    discard_classes = extra_vars['discard_classes'] # [11]
 
     pred_class_list = []
     for sample_score in pred_list:
@@ -247,15 +249,21 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
     for gt in gt_list:
         values_gt += list(gt)
 
-    # Create prediction matrix
-    y_pred = np.zeros((n_samples, n_classes))
+    # Create ground truth and prediction matrices
     y_gt = np.zeros((n_samples, n_classes))
+    y_pred = np.zeros((n_samples, n_classes))
 
-    for i_s, pred_class in enumerate(pred_class_list):
-        y_pred[i_s, pred_class] = 1
+    ind_i = 0
+    for i_s, (gt_class, pred_class) in enumerate(zip(values_gt, pred_class_list)):
+        if not any([d == gt_class for d in discard_classes]):
+            y_pred[ind_i, pred_class] = 1
+            y_gt[ind_i, gt_class] = 1
+            ind_i += 1
+    n_samples = ind_i
 
-    for i_s, gt_class in enumerate(values_gt):
-        y_gt[i_s, gt_class] = 1
+    # Cut to real n_samples size
+    y_gt = y_gt[:n_samples]
+    y_pred = y_pred[:n_samples]
 
     # Compute Coverage Error
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
@@ -278,6 +286,75 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
             'f1': f1}
     """
 
+
+def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
+    '''
+    Semantic Segmentation Mean IoU metric
+    # Arguments
+        pred_list, list of predictions
+        verbose - if greater than 0 the metric measures are printed out
+        extra_vars - dictionary extra variables. Must contain:
+                - ['n_classes'] with the total number of existent classes
+                - [split]['references'] with the GT values corresponding to each sample of the current data split
+                - [discard_classes] with the classes not taken into account in the performance evaluation
+        split - split of the data where we are applying the evaluation
+    '''
+
+    n_classes = extra_vars['n_classes']
+    gt_list = extra_vars[split]['references']
+    discard_classes = extra_vars['discard_classes']  # [11]
+
+    pred_class_list = []
+    for sample_score in pred_list:
+        pred_class_list += list(np.argmax(sample_score, axis=1))
+    n_samples = len(pred_class_list)
+
+    values_gt = []
+    for gt in gt_list:
+        values_gt += list(gt)
+
+    # Create ground truth and prediction matrices
+    y_gt = np.zeros((n_samples, ))
+    y_pred = np.zeros((n_samples, ))
+
+    ind_i = 0
+    for i_s, (gt_class, pred_class) in enumerate(zip(values_gt, pred_class_list)):
+        if not any([d == gt_class for d in discard_classes]):
+            y_gt[ind_i] = gt_class
+            y_pred[ind_i] = pred_class
+            ind_i += 1
+    n_samples = ind_i
+
+    # Cut to real n_samples size
+    y_gt = y_gt[:n_samples]
+    y_pred = y_pred[:n_samples]
+
+    # Computer mean IoU (Jaccard index) and pixel accuracy
+    cm = sklearn_metrics.confusion_matrix(y_gt, y_pred)
+    cm_t = cm.transpose()
+
+    inter = np.zeros(n_classes-len(discard_classes))
+    union = np.zeros(n_classes-len(discard_classes))
+    ind_i = 0
+    
+    for l in range(0,n_classes):
+        if not any([d == l for d in discard_classes]):
+            tp = cm[l][l]
+            fn = np.sum(cm[l])-tp
+            fp = np.sum(cm_t[l])-tp
+            inter[ind_i] = float(tp)
+            union[ind_i] = float(tp+fp+fn)
+            ind_i += 1
+    
+    mean_iou = np.mean(inter/union)
+    acc = np.sum(inter)/np.sum(cm)
+    if verbose > 0:
+        logging.info('Mean IoU: %f' %
+                     (mean_iou))
+        logging.info('Accuracy: %f' %
+                     (acc))
+
+    return {'mean IoU': mean_iou, 'semantic global accuracy': acc}
 
 def averagePrecision(pred_list, verbose, extra_vars, split):
     '''
@@ -615,6 +692,7 @@ selectMetric = {
     'multiclass_metrics': multiclass_metrics,  # Set of multiclass classification metrics from sklearn
     'AP': averagePrecision,
     'sem_seg_acc': semantic_segmentation_accuracy,
+    'sem_seg_iou': semantic_segmentation_meaniou,
     'ppl': compute_perplexity,
 
 }

@@ -460,6 +460,7 @@ class Dataset(object):
 
         ############################ Parameters used for outputs of type '3DLabels' or '3DSemanticLabel'
         self.id_in_3DLabel = dict()
+        self.num_poolings_model = dict()
         #################################################
 
         ############################ Parameters used for outputs of type '3DSemanticLabel'
@@ -838,7 +839,7 @@ class Dataset(object):
                   sample_weights=False,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
-                  associated_id_in=None  # '3DLabel' or '3DSemanticLabel'
+                  associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
                   ):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -868,6 +869,7 @@ class Dataset(object):
             # '3DLabel' or '3DSemanticLabel'-related parameters
             
             :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
+            :param num_poolings: number of pooling layers used in the model (used for calculating output dimensions)
 
         """
         self.__checkSetName(set_name)
@@ -901,9 +903,9 @@ class Dataset(object):
         elif type == 'id':
             data = self.preprocessIDs(path_list, id)
         elif (type == '3DLabel'):
-            data = self.preprocess3DLabel(path_list, id, associated_id_in)
+            data = self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
         elif (type == '3DSemanticLabel'):
-            data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in)
+            data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in, num_poolings)
 
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
@@ -2226,8 +2228,8 @@ class Dataset(object):
     #       TYPE '3DSemanticLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocess3DSemanticLabel(self, path_list, id, associated_id_in):
-        return self.preprocess3DLabel(path_list, id, associated_id_in)
+    def preprocess3DSemanticLabel(self, path_list, id, associated_id_in, num_poolings):
+        return self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
 
     def setSemanticClasses(self, path_classes, id):
         """
@@ -2270,10 +2272,16 @@ class Dataset(object):
         assoc_id_in = self.id_in_3DLabel[id]
         img_size = self.img_size[assoc_id_in]
         size_crop = self.img_size_crop[assoc_id_in]
+        num_poolings = self.num_poolings_model[id]
 
         n_samples = len(gt)
         h, w, d = img_size
         h_crop, w_crop, d_crop = size_crop
+
+        # Modify output dimensions depending on number of poolings applied
+        if num_poolings is not None:
+            h_crop = int(np.floor(h_crop/np.power(2, num_poolings)))
+            w_crop = int(np.floor(w_crop / np.power(2, num_poolings)))
 
         for i in range(n_samples):
             labels = np.zeros((h_crop, w_crop), dtype=np.float32)
@@ -2338,7 +2346,7 @@ class Dataset(object):
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocess3DLabel(self, path_list, id, associated_id_in):
+    def preprocess3DLabel(self, path_list, id, associated_id_in, num_poolings):
         if (isinstance(path_list, str) and os.path.isfile(path_list)):
             path_list_3DLabel = []
             with open(path_list, 'r') as list_:
@@ -2347,7 +2355,7 @@ class Dataset(object):
         else:
             raise Exception(
                 'Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
-
+        self.num_poolings_model[id] = num_poolings
         self.id_in_3DLabel[id] = associated_id_in
 
         return path_list_3DLabel
