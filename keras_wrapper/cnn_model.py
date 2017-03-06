@@ -1,7 +1,6 @@
 import matplotlib as mpl
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, \
-    ArbitraryDeconvolution2D
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, ArbitraryDeconvolution2D, Concat
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -3605,15 +3604,16 @@ class Model_Wrapper(object):
         else:
             raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
-        # Transition Up
-        #x = Deconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
-        #                             subsample=(2, 2), border_mode='same')(x)
-        x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, [None, nb_filters_deconv, None, None],
-                                     init=init_weights,
-                                     subsample=(2, 2), border_mode='same')(x)
+        x = Deconvolution2D(nb_filters_deconv, 3, 3,
+                            subsample=(2, 2),
+                            init=init_weights, border_mode='same')(x)
+        #x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, input_deconv,
+        #                             init=init_weights, subsample=(2, 2), border_mode='same')(x)
 
         # Skip connection concatenation
         x = merge([skip_conn, x], mode='concat', concat_axis=axis)
+        #x = Concat(cropping=[None, None, 'center', 'center'])([skip_conn, x])
+
         # Dense Block
         x = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
         return x
