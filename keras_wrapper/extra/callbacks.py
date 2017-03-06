@@ -9,7 +9,7 @@ import warnings
 import numpy as np
 import logging
 from keras.callbacks import Callback as KerasCallback
-from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions
+from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, decode_multilabel
 
 import evaluation
 from read_write import *
@@ -58,6 +58,8 @@ class EvalPerformance(KerasCallback):
                  each_n_epochs=1,
                  extra_vars=None,
                  is_text=False,
+                 is_multilabel=False,
+                 min_pred_multilabel=0.5,
                  index2word_y=None,
                  input_text_id=None,
                  index2word_x=None,
@@ -87,6 +89,8 @@ class EvalPerformance(KerasCallback):
         :param each_n_epochs: sampling each this number of epochs or updates
         :param extra_vars: dictionary of extra variables
         :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
+        :param is_multilabel: are we applying multi-label prediction?
+        :param min_pred_multilabel: minimum prediction value considered for positive prediction
         :param index2word_y: mapping from the indices to words (only needed if is_text==True)
         :param input_text_id:
         :param index2word_x: mapping from the indices to words (only needed if is_text==True)
@@ -112,6 +116,8 @@ class EvalPerformance(KerasCallback):
         self.index2word_x = index2word_x
         self.index2word_y = index2word_y
         self.is_text = is_text
+        self.is_multilabel = is_multilabel
+        self.min_pred_multilabel = min_pred_multilabel
         self.is_3DLabel = is_3DLabel
         self.sampling = sampling
         self.beam_search = beam_search
@@ -239,6 +245,12 @@ class EvalPerformance(KerasCallback):
                                                      self.sampling_type,
                                                      verbose=self.verbose)
 
+            elif self.is_multilabel:
+                predictions = decode_multilabel(predictions, 
+                                                self.index2word_y, 
+                                                min_val=self.min_pred_multilabel, 
+                                                verbose=self.verbose)
+                    
             # Store predictions
             if self.write_samples:
                 # Store result

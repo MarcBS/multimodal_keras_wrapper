@@ -127,6 +127,11 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     n_classes = len(word2idx)
     n_samples = len(pred_list)
 
+    """
+    with open('/media/HDD_3TB/marc/food_ingredients_recognition/pred_out', 'w') as file:
+        for pred in pred_list:
+            file.write(str(pred)+'\n')
+    """    
     # Create prediction matrix
     y_pred = np.zeros((n_samples, n_classes))
     for i_s, sample in enumerate(pred_list):
