@@ -2688,17 +2688,17 @@ class Dataset(object):
             # Data augmentation
             if not dataAugmentation:
                 # Use whole image
-                im = np.asarray(im, dtype=type_imgs)
-                im = misc.imresize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
-                #im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
                 #im = np.asarray(im, dtype=type_imgs)
+                #im = misc.imresize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                im = np.asarray(im, dtype=type_imgs)
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
-                im = np.asarray(im, dtype=type_imgs)
-                im = misc.imresize(im, (self.img_size[id][1], self.img_size[id][0]))
-                #im = im.resize((self.img_size[id][1], self.img_size[id][0]))
                 #im = np.asarray(im, dtype=type_imgs)
+                #im = misc.imresize(im, (self.img_size[id][1], self.img_size[id][0]))
+                im = im.resize((self.img_size[id][1], self.img_size[id][0]))
+                im = np.asarray(im, dtype=type_imgs)
 
                 # Take random crop
                 left = randomParams["left"]
