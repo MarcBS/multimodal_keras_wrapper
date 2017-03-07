@@ -425,7 +425,7 @@ class Model_Wrapper(object):
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None,
+    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None, nesterov=True,
                      decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
@@ -456,7 +456,7 @@ class Model_Wrapper(object):
             metrics = []
 
         if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=True)
+            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=nesterov)
         elif optimizer.lower() == 'adam':
             optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
         elif optimizer.lower() == 'adagrad':
