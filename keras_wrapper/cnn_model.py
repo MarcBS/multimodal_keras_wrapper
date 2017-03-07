@@ -1,7 +1,6 @@
 import matplotlib as mpl
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, \
-    ArbitraryDeconvolution2D
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, ArbitraryDeconvolution2D, Concat
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -2474,7 +2473,86 @@ class Model_Wrapper(object):
         else:
             return self.__logger[mode][data_type]
 
-    def plot(self):
+
+    def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict={}):
+        """
+        Plots the training progress information
+
+        Example of input:
+        model.plot('epoch', ['accuracy'], ['val', 'test'],
+                   upperbound=1, colours_dict={'accuracy_val', 'b', 'accuracy_test', 'g'})
+
+        :param time_measure: either 'epoch' or 'iteration'
+        :param metrics: list of metrics that we want to plot
+        :param splits: list of data splits that we want to plot
+        :param upperbound: upper bound of the metrics about to plot (usually upperbound=1.0)
+        :param colours_shapes_dict: dictionary of '<metric>_<split>' and the colour and/or shape
+                that we want them to have in the plot
+        """
+
+        # Build default colours_shapes_dict if not provided
+        if not colours_shapes_dict:
+            default_colours = ['b','g','y','k']
+            default_shapes = ['-', 'o', '.']
+            m = 0
+            for met in metrics:
+                s = 0
+                for sp in splits:
+                    colours_shapes_dict[met+'_'+sp] = default_colours[m]+default_shapes[s]
+                    s += 1
+                    s = s%len(default_shapes)
+                m += 1
+                m = m % len(default_colours)
+
+        plt.figure(1)
+
+        all_iterations = []
+        for sp in splits:
+            if sp not in self.__logger:
+                raise Exception("There is no performance data from split '"+sp+"' in the model log.")
+            if time_measure not in self.__logger[sp]:
+                raise Exception("There is no performance data on each '"+time_measure+"' in the model log for split '"+sp+"'.")
+
+            iterations = self.__logger[sp][time_measure]
+            all_iterations = all_iterations + iterations
+
+            for met in metrics:
+                if met not in self.__logger[sp]:
+                    raise Exception("There is no performance data for metric '"+met+"' in the model log for split '"+sp+"'.")
+
+                measure = self.__logger[sp][met]
+                #plt.subplot(211)
+                # plt.plot(iterations, loss, colours['train_loss']+'o')
+                plt.plot(iterations, measure, colours_shapes_dict[met+'_'+sp])
+
+        max_iter = np.max(all_iterations + [0])
+
+        # Plot upperbound
+        if upperbound is not None:
+            #plt.subplot(211)
+            plt.plot([0, max_iter], [upperbound, upperbound], 'r-')
+            plt.axis([0, max_iter, 0, upperbound])  # limit height to 1
+
+        # Fill labels
+        plt.xlabel(time_measure)
+        #plt.subplot(211)
+        plt.title('Training progress')
+
+        # Create plots dir
+        if not os.path.isdir(self.model_path):
+            os.makedirs(self.model_path)
+
+        # Save figure
+        plot_file = self.model_path + '/'+time_measure+'_' + str(max_iter) + '.jpg'
+        plt.savefig(plot_file)
+        if not self.silence:
+            logging.info("<<< Progress plot saved in " +plot_file+' >>>')
+
+        # Close plot window
+        plt.close()
+
+
+    def plot_old(self):
         """
             Plots the training progress information.
         """
@@ -3605,15 +3683,16 @@ class Model_Wrapper(object):
         else:
             raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
-        # Transition Up
-        #x = Deconvolution2D(nb_filters_deconv, 3, 3, init=init_weights,
-        #                             subsample=(2, 2), border_mode='same')(x)
-        x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, [None, nb_filters_deconv, None, None],
-                                     init=init_weights,
-                                     subsample=(2, 2), border_mode='same')(x)
+        x = Deconvolution2D(nb_filters_deconv, 3, 3,
+                            subsample=(2, 2),
+                            init=init_weights, border_mode='same')(x)
+        #x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, input_deconv,
+        #                             init=init_weights, subsample=(2, 2), border_mode='same')(x)
 
         # Skip connection concatenation
         x = merge([skip_conn, x], mode='concat', concat_axis=axis)
+        #x = Concat(cropping=[None, None, 'center', 'center'])([skip_conn, x])
+
         # Dense Block
         x = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
         return x
