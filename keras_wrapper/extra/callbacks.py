@@ -234,7 +234,8 @@ class EvalPerformance(KerasCallback):
                                                      self.index2word_y,
                                                      self.sampling_type,
                                                      verbose=self.verbose)
-
+                # Apply detokenization function if needed
+                predictions = map(self.extra_vars['detokenize_f'], predictions)
             # Store predictions
             if self.write_samples:
                 # Store result

@@ -1844,6 +1844,43 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
+    def detokenize_none_char(self,caption):
+	"""
+	Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by 
+	the <space> token. If found an special character is converted to the escaped char.
+	# List of escaped chars (by moses tokenizer)
+        & ->  &amp;
+        | ->  &#124;
+        < ->  &lt;
+        > ->  &gt;
+        ' ->  &apos;
+        " ->  &quot;
+        [ ->  &#91;
+        ] ->  &#93;
+        :param caption: String to de-tokenize
+        :return: Detokenized version of caption
+	"""
+	
+	def deconvert_chars(x):
+            if x == '<space>':
+                return ' '
+	    else:
+		return x.encode('utf-8')
+	
+	detokenized = re.sub(' & ', ' &amp; ', str(caption).strip())
+	detokenized = re.sub(' \| ', ' &#124; ', detokenized)
+	detokenized = re.sub(' > ', ' &gt; ', detokenized)
+	detokenized = re.sub(' < ', ' &lt; ', detokenized)
+	detokenized = re.sub( "' ", ' &apos; ', detokenized)
+	detokenized = re.sub( '" ', ' &quot; ', detokenized)
+	detokenized = re.sub( '\[ ', ' &#91; ', detokenized)
+	detokenized = re.sub( '\] ', ' &#93; ', detokenized)
+        detokenized = re.sub( ' ', '', detokenized)
+        detokenized = re.sub( '<space>', ' ', detokenized)
+	#detokenized = [deconvert_chars(char) for char in detokenized.decode('utf-8')]
+        #detokenized = "".join(detokenized)
+	return detokenized
+
     def tokenize_CNN_sentence(self, caption):
         """
         Tokenization employed in the CNN_sentence package
@@ -3319,9 +3356,18 @@ class Dataset(object):
         str_ += '[ OUTPUTS ]\n'
         for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
             str_ += type_out + ': ' + id_out + '\n'
-
-        str_ += '---------------------------------------------\n'
-        return str_
+            lengths = []
+            for id_in in self.ids_inputs:
+                if id_in not in self.optional_inputs:
+                    exec ('lengths.append(len(self.X_' + set_name + '[id_in]))')
+            for id_out in self.ids_outputs:
+                exec ('lengths.append(len(self.Y_' + set_name + '[id_out]))')
+            if lengths[1:] != lengths[:-1]:
+                raise Exception('Inputs and outputs size '
+                                '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
+                                                                            '\t Inputs:' + str(self.ids_inputs) + ''
+                                                                                                                  '\t Outputs:' + str(
+                    self.ids_outputs))
 
     def __isLoaded(self, set_name, pos):
         """
@@ -3366,9 +3412,7 @@ class Dataset(object):
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
                                                                             '\t Inputs:' + str(self.ids_inputs) + ''
-                                                                                                                  '\t Outputs:' + str(
-                    self.ids_outputs))
-
+                                                                                                                  '\t Outputs:' + str(self.ids_outputs))
     def __getNextSamples(self, k, set_name):
         """
             Gets the indices to the next K samples we are going to read.
