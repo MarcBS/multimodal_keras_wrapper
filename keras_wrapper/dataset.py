@@ -460,6 +460,7 @@ class Dataset(object):
 
         ############################ Parameters used for outputs of type '3DLabels' or '3DSemanticLabel'
         self.id_in_3DLabel = dict()
+        self.num_poolings_model = dict()
         #################################################
 
         ############################ Parameters used for outputs of type '3DSemanticLabel'
@@ -838,7 +839,7 @@ class Dataset(object):
                   sample_weights=False,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
-                  associated_id_in=None  # '3DLabel' or '3DSemanticLabel'
+                  associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
                   ):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -868,6 +869,7 @@ class Dataset(object):
             # '3DLabel' or '3DSemanticLabel'-related parameters
             
             :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
+            :param num_poolings: number of pooling layers used in the model (used for calculating output dimensions)
 
         """
         self.__checkSetName(set_name)
@@ -901,9 +903,9 @@ class Dataset(object):
         elif type == 'id':
             data = self.preprocessIDs(path_list, id)
         elif (type == '3DLabel'):
-            data = self.preprocess3DLabel(path_list, id, associated_id_in)
+            data = self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
         elif (type == '3DSemanticLabel'):
-            data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in)
+            data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in, num_poolings)
 
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
@@ -2142,38 +2144,12 @@ class Dataset(object):
         :return:
         """
 
-        # recover chosen data augmentation types
-        data_augmentation_types = self.inputs_data_augmentation_types[id]
-        if data_augmentation_types is None:
-            data_augmentation_types = []
-
         n_videos = len(idx_videos)
         if isinstance(feat_len, list):
             feat_len = feat_len[0]
         features = np.zeros((n_videos, max_len, feat_len))
 
-        n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
-
-        idx = [0 for i_nvid in range(n_videos)]
-        # recover all initial indices from image's paths of all videos
-        for v in range(n_videos):
-            last_idx = idx_videos[v]
-            idx[v] = int(sum(self.counts_frames[id][set_name][:last_idx]))
-
-        # select subset of max_len from n_frames[i]
-        selected_frames = [0 for i_nvid in range(n_videos)]
-        for enum, (n, i) in enumerate(zip(n_frames, idx)):
-            paths = self.paths_frames[id][set_name][i:i + n]
-
-            if data_augmentation and 'random_selection' in data_augmentation_types:  # apply random frames selection
-                selected_idx = sorted(random.sample(range(n), min(max_len, n)))
-            else:  # apply equidistant frames selection
-                selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
-                # splits = np.array_split(range(n), min(max_len, n))
-                # selected_idx = [s[0] for s in splits]
-
-            selected_paths = [paths[int(idx)] for idx in selected_idx]
-            selected_frames[enum] = selected_paths
+        selected_frames = self.getFramesPaths(idx_videos, id, set_name, max_len, data_augmentation)
 
         # load features from selected paths
         for i, vid_paths in enumerate(selected_frames):
@@ -2197,7 +2173,44 @@ class Dataset(object):
                 features[i, j] = feat
 
         return np.array(features)
+    
+    
+    def getFramesPaths(self, idx_videos, id, set_name, max_len, data_augmentation):
+        """
+        Recovers the paths from the selected video frames.
+        """
+        
+        # recover chosen data augmentation types
+        data_augmentation_types = self.inputs_data_augmentation_types[id]
+        if data_augmentation_types is None:
+            data_augmentation_types = []
+        
+        n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
+        
+        n_videos = len(idx_videos)
+        idx = [0 for i_nvid in range(n_videos)]
+        # recover all initial indices from image's paths of all videos
+        for v in range(n_videos):
+            last_idx = idx_videos[v]
+            idx[v] = int(sum(self.counts_frames[id][set_name][:last_idx]))
 
+        # select subset of max_len from n_frames[i]
+        selected_frames = [0 for i_nvid in range(n_videos)]
+        for enum, (n, i) in enumerate(zip(n_frames, idx)):
+            paths = self.paths_frames[id][set_name][i:i + n]
+
+            if data_augmentation and 'random_selection' in data_augmentation_types:  # apply random frames selection
+                selected_idx = sorted(random.sample(range(n), min(max_len, n)))
+            else:  # apply equidistant frames selection
+                selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
+                # splits = np.array_split(range(n), min(max_len, n))
+                # selected_idx = [s[0] for s in splits]
+
+            selected_paths = [paths[int(idx)] for idx in selected_idx]
+            selected_frames[enum] = selected_paths
+            
+        return selected_frames
+            
     def loadVideosByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization,
                           meanSubstraction, dataAugmentation):
         n_videos = len(indices)
@@ -2252,8 +2265,8 @@ class Dataset(object):
     #       TYPE '3DSemanticLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocess3DSemanticLabel(self, path_list, id, associated_id_in):
-        return self.preprocess3DLabel(path_list, id, associated_id_in)
+    def preprocess3DSemanticLabel(self, path_list, id, associated_id_in, num_poolings):
+        return self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
 
     def setSemanticClasses(self, path_classes, id):
         """
@@ -2296,10 +2309,16 @@ class Dataset(object):
         assoc_id_in = self.id_in_3DLabel[id]
         img_size = self.img_size[assoc_id_in]
         size_crop = self.img_size_crop[assoc_id_in]
+        num_poolings = self.num_poolings_model[id]
 
         n_samples = len(gt)
         h, w, d = img_size
         h_crop, w_crop, d_crop = size_crop
+
+        # Modify output dimensions depending on number of poolings applied
+        if num_poolings is not None:
+            h_crop = int(np.floor(h_crop/np.power(2, num_poolings)))
+            w_crop = int(np.floor(w_crop / np.power(2, num_poolings)))
 
         for i in range(n_samples):
             labels = np.zeros((h_crop, w_crop), dtype=np.float32)
@@ -2340,23 +2359,24 @@ class Dataset(object):
     def resize_semantic_output(self, predictions, ids_out):
         out_pred = []
 
-        n_classes = len(self.classes)
-
         for pred, id_out in zip(predictions, ids_out):
 
             assoc_id_in = self.id_in_3DLabel[id_out]
             in_size = self.img_size_crop[assoc_id_in]
             out_size = self.img_size[assoc_id_in]
+            n_classes = len(self.classes[id_out])
 
             pred = np.transpose(pred, [1, 0])
             pred = np.reshape(pred, (-1, in_size[0], in_size[1]))
 
-            pred = misc.imresize(pred, [[n_classes] + out_size[0:2]])
+            new_pred = np.zeros(tuple([n_classes]+out_size[0:2]))
+            for pos,p in enumerate(pred):
+                new_pred[pos] = misc.imresize(p, tuple(out_size[0:2]))
 
-            pred = np.reshape(pred, (-1, out_size[0], out_size[1]))
-            pred = np.transpose(pred, [1, 0])
+            new_pred = np.reshape(new_pred, (-1, out_size[0]* out_size[1]))
+            new_pred = np.transpose(new_pred, [1, 0])
 
-            out_pred.append(pred)
+            out_pred.append(new_pred)
 
         return out_pred
 
@@ -2364,7 +2384,7 @@ class Dataset(object):
     #       TYPE '3DLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocess3DLabel(self, path_list, id, associated_id_in):
+    def preprocess3DLabel(self, path_list, id, associated_id_in, num_poolings):
         if (isinstance(path_list, str) and os.path.isfile(path_list)):
             path_list_3DLabel = []
             with open(path_list, 'r') as list_:
@@ -2373,7 +2393,7 @@ class Dataset(object):
         else:
             raise Exception(
                 'Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
-
+        self.num_poolings_model[id] = num_poolings
         self.id_in_3DLabel[id] = associated_id_in
 
         return path_list_3DLabel
@@ -2705,17 +2725,17 @@ class Dataset(object):
             # Data augmentation
             if not dataAugmentation:
                 # Use whole image
-                im = np.asarray(im, dtype=type_imgs)
-                im = misc.imresize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
-                #im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
                 #im = np.asarray(im, dtype=type_imgs)
+                #im = misc.imresize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                im = np.asarray(im, dtype=type_imgs)
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
-                im = np.asarray(im, dtype=type_imgs)
-                im = misc.imresize(im, (self.img_size[id][1], self.img_size[id][0]))
-                #im = im.resize((self.img_size[id][1], self.img_size[id][0]))
                 #im = np.asarray(im, dtype=type_imgs)
+                #im = misc.imresize(im, (self.img_size[id][1], self.img_size[id][0]))
+                im = im.resize((self.img_size[id][1], self.img_size[id][0]))
+                im = np.asarray(im, dtype=type_imgs)
 
                 # Take random crop
                 left = randomParams["left"]
