@@ -646,7 +646,8 @@ class Dataset(object):
         if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
-            self.optional_inputs.append(id)  # This is always optional
+            if id not in self.optional_inputs:
+                self.optional_inputs.append(id)  # This is always optional
         elif id in keys_X_set and not overwrite_split:
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
@@ -723,7 +724,7 @@ class Dataset(object):
         elif id in keys_X_set and not overwrite_split:
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
-        if not required:
+        if not required and id not in self.optional_inputs:
             self.optional_inputs.append(id)
 
         if type not in self.__accepted_types_inputs:
@@ -819,7 +820,8 @@ class Dataset(object):
         if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
-            self.optional_inputs.append(id)  # This is always optional
+            if id not in self.optional_inputs:
+                self.optional_inputs.append(id)  # This is always optional
 
         elif id in keys_Y_set and not overwrite_split:
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
@@ -2638,6 +2640,11 @@ class Dataset(object):
                     train_mean = train_mean[:, :, ::-1]
                 train_mean = train_mean.transpose(2, 0, 1)
 
+            # Also normalize training mean image if we are applying normalization to images
+            if normalization:
+                if normalization_type == '0-1':
+                    train_mean = train_mean / 255.0
+
         nImages = len(images)
 
         type_imgs = np.float32
@@ -3377,17 +3384,18 @@ class Dataset(object):
         """
         if eval('self.loaded_' + set_name + '[0] and self.loaded_' + set_name + '[1]'):
             lengths = []
+            plot_ids_in = []
             for id_in in self.ids_inputs:
                 if id_in not in self.optional_inputs:
-                    exec ('lengths.append(len(self.X_' + set_name + '[id_in]))')
+                    plot_ids_in.append(id_in)
+                    exec('lengths.append(len(self.X_' + set_name + '[id_in]))')
             for id_out in self.ids_outputs:
                 exec ('lengths.append(len(self.Y_' + set_name + '[id_out]))')
             if lengths[1:] != lengths[:-1]:
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
-                                                                            '\t Inputs:' + str(self.ids_inputs) + ''
-                                                                                                                  '\t Outputs:' + str(
-                    self.ids_outputs))
+                                '\t Inputs:' + str(plot_ids_in) + ''
+                                '\t Outputs:' + str(self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
         """

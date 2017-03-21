@@ -124,22 +124,45 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
                 extra_vars['references'] - list of GT labels
     '''
     word2idx = extra_vars[split]['word2idx']
-    n_classes = len(word2idx)
+    
+    # check if an additional dictionary matching raw to basic and general labels is provided
+    # in that case a more general evaluation will be considered
+    raw2basic = extra_vars[split].get('raw2basic', None)
+    if raw2basic is not None:
+        logging.info('Applying general evaluation with raw2basic dictionary.')
+    
+    if raw2basic is None:
+        n_classes = len(word2idx)
+    else:
+        basic_values = set(raw2basic.values())
+        n_classes = len(basic_values)
     n_samples = len(pred_list)
 
-    """
-    with open('/media/HDD_3TB/marc/food_ingredients_recognition/pred_out', 'w') as file:
-        for pred in pred_list:
-            file.write(str(pred)+'\n')
-    """    
+    
     # Create prediction matrix
     y_pred = np.zeros((n_samples, n_classes))
     for i_s, sample in enumerate(pred_list):
         for word in sample:
-            y_pred[i_s, word2idx[word]] = 1
+            if raw2basic is None:
+                y_pred[i_s, word2idx[word]] = 1
+            else:
+                word = word.strip()
+                y_pred[i_s, raw2basic[word]] = 1
 
+    # Prepare GT
     gt_list = extra_vars[split]['references']
-    y_gt = np.array(gt_list)
+    
+    if raw2basic is None:
+        y_gt = np.array(gt_list)
+    else:
+        idx2word = {v:k for k,v in word2idx.iteritems()}
+        y_gt = np.zeros((n_samples, n_classes))
+        for i_s, sample in enumerate(gt_list):
+            for raw_idx, is_active in enumerate(sample):
+                if is_active:
+                    word = idx2word[raw_idx].strip()
+                    y_gt[i_s, raw2basic[word]] = 1
+        
 
     # Compute Coverage Error
     coverr = sklearn_metrics.coverage_error(y_gt, y_pred)
