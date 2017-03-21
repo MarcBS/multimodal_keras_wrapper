@@ -2640,6 +2640,11 @@ class Dataset(object):
                     train_mean = train_mean[:, :, ::-1]
                 train_mean = train_mean.transpose(2, 0, 1)
 
+            # Also normalize training mean image if we are applying normalization to images
+            if normalization:
+                if normalization_type == '0-1':
+                    train_mean = train_mean / 255.0
+
         nImages = len(images)
 
         type_imgs = np.float32
