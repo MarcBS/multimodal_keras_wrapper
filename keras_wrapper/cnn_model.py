@@ -447,14 +447,14 @@ class Model_Wrapper(object):
         self.acc_output = acc_output
 
     def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None, epsilon=1e-8,
-                     decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
+                     nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
 
             :param lr: learning rate of the network
             :param momentum: momentum of the network (if None, then momentum = 1-lr)
             :param loss: loss function applied for optimization
-	    :param loss_weights: weights given to multi-loss models
+	        :param loss_weights: weights given to multi-loss models
             :param metrics: list of Keras' metrics used for evaluating the model. To specify different metrics for different outputs of a multi-output model, you could also pass a dictionary, such as `metrics={'output_a': 'accuracy'}`.
             :param epsilon: fuzz factor
             :param decay: lr decay
@@ -479,7 +479,7 @@ class Model_Wrapper(object):
             metrics = []
 
         if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=True)
+            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=nesterov)
         elif optimizer.lower() == 'adam':
             optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'adagrad':
