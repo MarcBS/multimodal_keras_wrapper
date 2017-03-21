@@ -59,6 +59,7 @@ class EvalPerformance(KerasCallback):
                  extra_vars=None,
                  is_text=False,
                  is_multilabel=False,
+		 multilabel_idx=None,
                  min_pred_multilabel=0.5,
                  index2word_y=None,
                  input_text_id=None,
@@ -90,6 +91,7 @@ class EvalPerformance(KerasCallback):
         :param extra_vars: dictionary of extra variables
         :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
         :param is_multilabel: are we applying multi-label prediction?
+        :param multilabel_idx: output index where to apply the evaluation (set to None if the model has a single output)
         :param min_pred_multilabel: minimum prediction value considered for positive prediction
         :param index2word_y: mapping from the indices to words (only needed if is_text==True)
         :param input_text_id:
@@ -117,6 +119,7 @@ class EvalPerformance(KerasCallback):
         self.index2word_y = index2word_y
         self.is_text = is_text
         self.is_multilabel = is_multilabel
+        self.multilabel_idx = multilabel_idx
         self.min_pred_multilabel = min_pred_multilabel
         self.is_3DLabel = is_3DLabel
         self.sampling = sampling
@@ -246,6 +249,8 @@ class EvalPerformance(KerasCallback):
                                                      verbose=self.verbose)
 
             elif self.is_multilabel:
+                if self.multilabel_idx is not None:
+                    predictions = predictions[self.multilabel_idx]
                 predictions = decode_multilabel(predictions, 
                                                 self.index2word_y, 
                                                 min_val=self.min_pred_multilabel, 

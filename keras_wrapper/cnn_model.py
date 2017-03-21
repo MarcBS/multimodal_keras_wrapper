@@ -387,13 +387,13 @@ class Model_Wrapper(object):
                     logging.info("<<< Loading weights from file " + weights_path + " >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
 
-    def updateLogger(self):
+    def updateLogger(self, force=False):
         """
             Checks if the model contains an updated logger.
             If it doesn't then it updates it, which will store evaluation results.
         """
         compulsory_data_types = ['iteration', 'loss', 'accuracy', 'accuracy top-5']
-        if '_Model_Wrapper__logger' not in self.__dict__:
+        if '_Model_Wrapper__logger' not in self.__dict__ or force:
             self.__logger = dict()
         if '_Model_Wrapper__data_types' not in self.__dict__:
             self.__data_types = compulsory_data_types
@@ -424,7 +424,7 @@ class Model_Wrapper(object):
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, metrics=None,
+    def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None,
                      decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
@@ -432,6 +432,7 @@ class Model_Wrapper(object):
             :param lr: learning rate of the network
             :param momentum: momentum of the network (if None, then momentum = 1-lr)
             :param loss: loss function applied for optimization
+	    :param loss_weights: weights given to multi-loss models
             :param metrics: list of Keras' metrics used for evaluating the model. To specify different metrics for different outputs of a multi-output model, you could also pass a dictionary, such as `metrics={'output_a': 'accuracy'}`.
             :param decay: lr decay
             :param clipnorm: gradients' clip norm
@@ -476,7 +477,7 @@ class Model_Wrapper(object):
 
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
-            self.model.compile(optimizer=optimizer, metrics=metrics, loss=loss,
+            self.model.compile(optimizer=optimizer, metrics=metrics, loss=loss, loss_weights=loss_weights,
                                sample_weight_mode=sample_weight_mode)
         else:
             raise NotImplementedError()
