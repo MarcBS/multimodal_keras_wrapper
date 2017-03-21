@@ -1,6 +1,6 @@
 import matplotlib as mpl
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, ArbitraryDeconvolution2D, Concat
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, ArbitraryDeconvolution2D, Concat, Conv2DTranspose
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -229,7 +229,7 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
 
 def transferWeights(old_model, new_model, layers_mapping):
     """
-    Transfers all existent layer' weights from an old model to a new model.
+    Transfers all existent layers' weights from an old model to a new model.
 
     :param old_model: old version of the model, where the weights will be picked
     :param new_model: new version of the model, where the weights will be transfered to
@@ -286,6 +286,28 @@ def transferWeights(old_model, new_model, layers_mapping):
 
     return new_model
 
+def read_layer_names(model, starting_name=None):
+    """
+        Reads the existent layers' names from a model starting after a layer specified by its name
+
+        :param model: model whose layers' names will be read
+        :param starting_name: name of the layer after which the layers' names will be read (if None, then all the layers' names will be read)
+        :return: list of layers' names
+        """
+
+    if starting_name is None:
+        read = True
+    else:
+        read = False
+
+    layers_names = []
+    for layer in model.layers:
+        if read:
+            layers_names.append(layer.name)
+        elif layer.name == starting_name:
+            read = True
+
+    return layers_names
 
 # ------------------------------------------------------- #
 #       MAIN CLASS
@@ -424,7 +446,7 @@ class Model_Wrapper(object):
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None,
+    def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None, epsilon=1e-8,
                      decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
@@ -434,6 +456,7 @@ class Model_Wrapper(object):
             :param loss: loss function applied for optimization
 	    :param loss_weights: weights given to multi-loss models
             :param metrics: list of Keras' metrics used for evaluating the model. To specify different metrics for different outputs of a multi-output model, you could also pass a dictionary, such as `metrics={'output_a': 'accuracy'}`.
+            :param epsilon: fuzz factor
             :param decay: lr decay
             :param clipnorm: gradients' clip norm
             :param optimizer: string identifying the type of optimizer used (default: SGD)
@@ -458,17 +481,17 @@ class Model_Wrapper(object):
         if optimizer is None or optimizer.lower() == 'sgd':
             optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=True)
         elif optimizer.lower() == 'adam':
-            optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+            optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'adagrad':
-            optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+            optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'rmsprop':
-            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'nadam':
-            optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+            optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'adamax':
-            optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+            optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'adadelta':
-            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay)
+            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         else:
             raise Exception('\tThe chosen optimizer is not implemented.')
 
@@ -3545,7 +3568,7 @@ class Model_Wrapper(object):
     #       DENSE NETS
     ##############################
 
-    def add_dense_block(self, in_layer, nb_layers, k, drop, init_weights):
+    def add_dense_block(self, in_layer, nb_layers, k, drop, init_weights, name=None):
         """
         Adds a Dense Block for the transition down path.
 
@@ -3571,14 +3594,22 @@ class Model_Wrapper(object):
         list_outputs = []
         prev_layer = in_layer
         for n in range(nb_layers):
+            if name is not None:
+                name_dense = name+'_'+str(n)
+                name_merge = 'merge'+name+'_'+str(n)
+            else:
+                name_dense = None
+                name_merge = None
+
             # Insert dense layer
-            new_layer = self.add_dense_layer(prev_layer, k, drop, init_weights)
+            new_layer = self.add_dense_layer(prev_layer, k, drop, init_weights, name=name_dense)
             list_outputs.append(new_layer)
             # Merge with previous layer
-            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=axis)
-        return merge(list_outputs, mode='concat', concat_axis=axis)
+            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=axis, name=name_merge)
 
-    def add_dense_layer(self, in_layer, k, drop, init_weights):
+        return merge(list_outputs, mode='concat', concat_axis=axis, name=name_merge)
+
+    def add_dense_layer(self, in_layer, k, drop, init_weights, name=None):
         """
         Adds a Dense Layer inside a Dense Block, which is composed of BN, ReLU, Conv and Dropout
 
@@ -3594,11 +3625,22 @@ class Model_Wrapper(object):
         :return: output layer
         """
 
-        out_layer = BatchNormalization(mode=2, axis=1)(in_layer)
-        out_layer = Activation('relu')(out_layer)
-        out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same')(out_layer)
+        if name is not None:
+            name_batch = 'batchnormalization'+name
+            name_activ = 'activation'+name
+            name_conv = 'convolution2d'+name
+            name_drop = 'dropout'+name
+        else:
+            name_batch = None
+            name_activ = None
+            name_conv = None
+            name_drop = None
+
+        out_layer = BatchNormalization(mode=2, axis=1, name=name_batch)(in_layer)
+        out_layer = Activation('relu', name=name_activ)(out_layer)
+        out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same', name=name_conv)(out_layer)
         if drop > 0.0:
-            out_layer = Dropout(drop)(out_layer)
+            out_layer = Dropout(drop, name=name_drop)(out_layer)
         return out_layer
 
     def add_transitiondown_block(self, x,
@@ -3653,7 +3695,7 @@ class Model_Wrapper(object):
 
     def add_transitionup_block(self, x, skip_conn,
                                nb_filters_deconv, init_weights,
-                               nb_layers, growth, drop):
+                               nb_layers, growth, drop, name=None):
         """
         Adds a Transition Up Block. Consisting of Deconv, Skip Connection, Dense Block.
 
@@ -3689,13 +3731,21 @@ class Model_Wrapper(object):
                             init=init_weights, border_mode='same')(x)
         #x = ArbitraryDeconvolution2D(nb_filters_deconv, 3, 3, input_deconv,
         #                             init=init_weights, subsample=(2, 2), border_mode='same')(x)
+        # x = Conv2DTranspose(nb_filters_deconv, 3,
+        #                     strides=(2, 2),
+        #                     kernel_initializer=init_weights, padding='same')(x)
 
         # Skip connection concatenation
-        x = merge([skip_conn, x], mode='concat', concat_axis=axis)
+        if name is not None:
+            name_merge = 'merge'+name
+        else:
+            name_merge = None
+
+        x = merge([skip_conn, x], mode='concat', concat_axis=axis, name=name_merge)
         #x = Concat(cropping=[None, None, 'center', 'center'])([skip_conn, x])
 
         # Dense Block
-        x = self.add_dense_block(x, nb_layers, growth, drop, init_weights)  # (growth*nb_layers) feature maps added
+        x = self.add_dense_block(x, nb_layers, growth, drop, init_weights, name=name)  # (growth*nb_layers) feature maps added
         return x
 
     def Empty(self, nOutput, input):
