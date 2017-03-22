@@ -26,6 +26,8 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
         extra_vars - extra variables, here are:
             extra_vars['references'] - dictionary mapping sample indices to list with all their valid captions (id, [sentences])
             extra_vars['tokenize_f'] - tokenization function used during model training (used again for validation)
+	    extra_vars['detokenize_f'] - detokenization function used during model training (used again for validation)
+	    extra_vars['tokenize_hypotheses'] - Whether tokenize or not the hypotheses during evaluation
     """
     
     from pycocoevalcap.bleu.bleu import Bleu
@@ -36,9 +38,21 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
     from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
     gts = extra_vars[split]['references']
-    hypo = {idx: map(extra_vars['tokenize_f'], [lines.strip()]) for (idx, lines) in enumerate(pred_list)}
-    refs = {idx: map(extra_vars['tokenize_f'], gts[idx]) for idx in gts.keys()}
+    if extra_vars.get('tokenize_hypotheses', True):
+        hypo = {idx: map(extra_vars['tokenize_f'], [lines.strip()]) for (idx, lines) in enumerate(pred_list)}
+    else:
+        hypo = {idx: [lines.strip()] for (idx, lines) in enumerate(pred_list)}
+    
+    # Tokenize refereces if needed
+    if extra_vars.get('tokenize_references', True):
+        refs = {idx: map(extra_vars['tokenize_f'], gts[idx]) for idx in gts.keys()}
+    else:
+        refs = gts
 
+    # Detokenize references if needed.    
+    if extra_vars.get('apply_detokenization', False) :
+        refs = {idx: map(extra_vars['detokenize_f'], refs[idx]) for idx in refs}
+    
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
         (Meteor(language=extra_vars['language']), "METEOR"),
