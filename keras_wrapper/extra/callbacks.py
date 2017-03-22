@@ -254,7 +254,8 @@ class EvalPerformance(KerasCallback):
                                                      verbose=self.verbose)
 
                 # Apply detokenization function if needed
-                predictions = map(self.extra_vars['detokenize_f'], predictions)
+                if self.extra_vars.get('apply_detokenization',False):
+                    predictions = map(self.extra_vars['detokenize_f'], predictions)
 
 
             elif self.is_multilabel:

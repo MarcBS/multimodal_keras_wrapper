@@ -50,7 +50,8 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
         refs = gts
 
     # Detokenize references if needed.    
-    refs = {idx: map(extra_vars['detokenize_f'], refs[idx]) for idx in refs}
+    if extra_vars.get('apply_detokenization', False) :
+        refs = {idx: map(extra_vars['detokenize_f'], refs[idx]) for idx in refs}
     
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),

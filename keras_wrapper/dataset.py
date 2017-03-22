@@ -3383,18 +3383,9 @@ class Dataset(object):
         str_ += '[ OUTPUTS ]\n'
         for id_out, type_out in zip(self.ids_outputs, self.types_outputs):
             str_ += type_out + ': ' + id_out + '\n'
-            lengths = []
-            for id_in in self.ids_inputs:
-                if id_in not in self.optional_inputs:
-                    exec ('lengths.append(len(self.X_' + set_name + '[id_in]))')
-            for id_out in self.ids_outputs:
-                exec ('lengths.append(len(self.Y_' + set_name + '[id_out]))')
-            if lengths[1:] != lengths[:-1]:
-                raise Exception('Inputs and outputs size '
-                                '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
-                                                                            '\t Inputs:' + str(self.ids_inputs) + ''
-                                                                                                                  '\t Outputs:' + str(
-                    self.ids_outputs))
+
+        str_ += '---------------------------------------------\n'
+        return str_
 
     def __isLoaded(self, set_name, pos):
         """
