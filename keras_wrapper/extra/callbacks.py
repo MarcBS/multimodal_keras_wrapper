@@ -57,8 +57,10 @@ class EvalPerformance(KerasCallback):
                  batch_size,
                  each_n_epochs=1,
                  extra_vars=None,
+                 normalize=False,
                  is_text=False,
                  is_multilabel=False,
+		         multilabel_idx=None,
                  min_pred_multilabel=0.5,
                  index2word_y=None,
                  input_text_id=None,
@@ -88,8 +90,10 @@ class EvalPerformance(KerasCallback):
         :param batch_size: batch size used during sampling
         :param each_n_epochs: sampling each this number of epochs or updates
         :param extra_vars: dictionary of extra variables
+        :param normalize: switch on/off data normalization
         :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
         :param is_multilabel: are we applying multi-label prediction?
+        :param multilabel_idx: output index where to apply the evaluation (set to None if the model has a single output)
         :param min_pred_multilabel: minimum prediction value considered for positive prediction
         :param index2word_y: mapping from the indices to words (only needed if is_text==True)
         :param input_text_id:
@@ -117,6 +121,7 @@ class EvalPerformance(KerasCallback):
         self.index2word_y = index2word_y
         self.is_text = is_text
         self.is_multilabel = is_multilabel
+        self.multilabel_idx = multilabel_idx
         self.min_pred_multilabel = min_pred_multilabel
         self.is_3DLabel = is_3DLabel
         self.sampling = sampling
@@ -126,6 +131,7 @@ class EvalPerformance(KerasCallback):
         self.batch_size = batch_size
         self.each_n_epochs = each_n_epochs
         self.extra_vars = extra_vars
+        self.normalize = normalize
         self.save_path = save_path
         self.eval_on_epochs = eval_on_epochs
         self.start_eval_on_epoch = start_eval_on_epoch
@@ -188,14 +194,16 @@ class EvalPerformance(KerasCallback):
                                      'predict_on_sets': [s],
                                      'pos_unk': False,
                                      'heuristic': 0,
-                                     'mapping': None}
+                                     'mapping': None,
+                                     'normalize': self.normalize}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
                 orig_size = self.extra_vars.get('eval_orig_size', False)
                 params_prediction = {'batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                                     'predict_on_sets': [s]}
+                                     'predict_on_sets': [s],
+                                     'normalize': self.normalize}
                 # Convert predictions
                 postprocess_fun = None
                 if self.is_3DLabel:
@@ -250,6 +258,8 @@ class EvalPerformance(KerasCallback):
 
 
             elif self.is_multilabel:
+                if self.multilabel_idx is not None:
+                    predictions = predictions[self.multilabel_idx]
                 predictions = decode_multilabel(predictions, 
                                                 self.index2word_y, 
                                                 min_val=self.min_pred_multilabel, 
