@@ -253,6 +253,11 @@ class EvalPerformance(KerasCallback):
                                                      self.sampling_type,
                                                      verbose=self.verbose)
 
+                # Apply detokenization function if needed
+                if self.extra_vars.get('apply_detokenization',False):
+                    predictions = map(self.extra_vars['detokenize_f'], predictions)
+
+
             elif self.is_multilabel:
                 if self.multilabel_idx is not None:
                     predictions = predictions[self.multilabel_idx]
@@ -261,6 +266,7 @@ class EvalPerformance(KerasCallback):
                                                 min_val=self.min_pred_multilabel, 
                                                 verbose=self.verbose)
                     
+
             # Store predictions
             if self.write_samples:
                 # Store result
