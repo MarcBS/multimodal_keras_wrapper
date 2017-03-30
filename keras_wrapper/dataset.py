@@ -1848,42 +1848,47 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
+    def detokenize_bpe(self,caption):
+        """
+        Reverts BPE segmentation (https://github.com/rsennrich/subword-nmt)
+        """
+        detokenized = re.sub('@@ ', '', str(caption).strip())
+        return detokenized
+
     def detokenize_none_char(self,caption):
-	"""
-	Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by 
-	the <space> token. If found an special character is converted to the escaped char.
-	# List of escaped chars (by moses tokenizer)
-        & ->  &amp;
-        | ->  &#124;
-        < ->  &lt;
-        > ->  &gt;
-        ' ->  &apos;
-        " ->  &quot;
-        [ ->  &#91;
-        ] ->  &#93;
-        :param caption: String to de-tokenize
-        :return: Detokenized version of caption
-	"""
-	
-	def deconvert_chars(x):
+        """
+        Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by
+        the <space> token. If found an special character is converted to the escaped char.
+        # List of escaped chars (by moses tokenizer)
+            & ->  &amp;
+            | ->  &#124;
+            < ->  &lt;
+            > ->  &gt;
+            ' ->  &apos;
+            " ->  &quot;
+            [ ->  &#91;
+            ] ->  &#93;
+            :param caption: String to de-tokenize
+            :return: Detokenized version of caption
+        """
+
+        def deconvert_chars(x):
             if x == '<space>':
                 return ' '
-	    else:
-		return x.encode('utf-8')
-	
-	detokenized = re.sub(' & ', ' &amp; ', str(caption).strip())
-	detokenized = re.sub(' \| ', ' &#124; ', detokenized)
-	detokenized = re.sub(' > ', ' &gt; ', detokenized)
-	detokenized = re.sub(' < ', ' &lt; ', detokenized)
-	detokenized = re.sub( "' ", ' &apos; ', detokenized)
-	detokenized = re.sub( '" ', ' &quot; ', detokenized)
-	detokenized = re.sub( '\[ ', ' &#91; ', detokenized)
-	detokenized = re.sub( '\] ', ' &#93; ', detokenized)
+            else:
+                return x.encode('utf-8')
+
+        detokenized = re.sub(' & ', ' &amp; ', str(caption).strip())
+        detokenized = re.sub(' \| ', ' &#124; ', detokenized)
+        detokenized = re.sub(' > ', ' &gt; ', detokenized)
+        detokenized = re.sub(' < ', ' &lt; ', detokenized)
+        detokenized = re.sub( "' ", ' &apos; ', detokenized)
+        detokenized = re.sub( '" ', ' &quot; ', detokenized)
+        detokenized = re.sub( '\[ ', ' &#91; ', detokenized)
+        detokenized = re.sub( '\] ', ' &#93; ', detokenized)
         detokenized = re.sub( ' ', '', detokenized)
         detokenized = re.sub( '<space>', ' ', detokenized)
-	#detokenized = [deconvert_chars(char) for char in detokenized.decode('utf-8')]
-        #detokenized = "".join(detokenized)
-	return detokenized
+        return detokenized
 
     def tokenize_CNN_sentence(self, caption):
         """
