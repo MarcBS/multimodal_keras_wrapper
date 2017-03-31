@@ -89,7 +89,7 @@ class EvalPerformance(KerasCallback):
         :param set_name:  name of the set split that will be evaluated
         :param batch_size: batch size used during sampling
         :param each_n_epochs: sampling each this number of epochs or updates
-        :param extra_vars: dictionary of extra variables
+        :param extra_vars: dictionary of extra variables. See evaluation metrics in keras_wrapper/extra/evaluation.py for assigning the needed extra variables.
         :param normalize: switch on/off data normalization
         :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
         :param is_multilabel: are we applying multi-label prediction?
@@ -201,7 +201,7 @@ class EvalPerformance(KerasCallback):
             else:
                 orig_size = self.extra_vars.get('eval_orig_size', False)
                 params_prediction = {'batch_size': self.batch_size,
-                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'n_parallel_loaders': self.extra_vars.get('n_parallel_loaders', 8),
                                      'predict_on_sets': [s],
                                      'normalize': self.normalize}
                 # Convert predictions
