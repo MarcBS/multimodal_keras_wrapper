@@ -56,7 +56,7 @@ class EvalPerformance(KerasCallback):
                  set_name,
                  batch_size,
                  each_n_epochs=1,
-                 extra_vars=None,
+                 extra_vars=dict(),
                  normalize=False,
                  is_text=False,
                  is_multilabel=False,
