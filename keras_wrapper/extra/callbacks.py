@@ -254,7 +254,7 @@ class EvalPerformance(KerasCallback):
                                                      verbose=self.verbose)
 
                 # Apply detokenization function if needed
-                if self.extra_vars.get('apply_detokenization',False):
+                if self.extra_vars.get('apply_detokenization', False):
                     predictions = map(self.extra_vars['detokenize_f'], predictions)
 
 
@@ -485,6 +485,7 @@ class Sample(KerasCallback):
                                                                      heuristic=heuristic,
                                                                      mapping=params_prediction['mapping'],
                                                                      verbose=self.verbose)
+
                     else:
                         predictions = decode_predictions(samples,
                                                          1,
@@ -492,6 +493,13 @@ class Sample(KerasCallback):
                                                          self.sampling_type,
                                                          verbose=self.verbose)
                     truths = decode_predictions_one_hot(truths, self.index2word_y, verbose=self.verbose)
+
+                    # Apply detokenization function if needed
+                    if self.extra_vars.get('apply_detokenization', False):
+                        if self.print_sources:
+                            sources = map(self.extra_vars['detokenize_f'], sources)
+                        predictions = map(self.extra_vars['detokenize_f'], predictions)
+                        truths = map(self.extra_vars['detokenize_f'], truths)
 
                 # Write samples
                 if self.print_sources:
