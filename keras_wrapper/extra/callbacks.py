@@ -60,7 +60,7 @@ class EvalPerformance(KerasCallback):
                  normalize=False,
                  is_text=False,
                  is_multilabel=False,
-		         multilabel_idx=None,
+                 multilabel_idx=None,
                  min_pred_multilabel=0.5,
                  index2word_y=None,
                  input_text_id=None,
@@ -285,7 +285,6 @@ class EvalPerformance(KerasCallback):
                 else:
                     raise NotImplementedError(
                         'The store type "' + self.write_type + '" is not implemented.')
-
 
             # Evaluate on each metric
             for metric in self.metric_name:
@@ -599,6 +598,7 @@ class EarlyStopping(KerasCallback):
                     logging.info("---%s %d: early stopping. Best %s found at %s %d: %f" % (
                     str(counter_name), epoch, self.metric_check,  str(counter_name), self.best_epoch, self.best_score))
                 self.model.stop_training = True
+                exit(1)
 
 
 class LearningRateReducer(KerasCallback):
