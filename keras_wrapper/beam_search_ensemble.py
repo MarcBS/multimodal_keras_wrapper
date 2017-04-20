@@ -243,8 +243,11 @@ class BeamSearchEnsemble:
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
-                          'normalize': False, 'mean_substraction': True,
+        default_params = {'batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'beam_size': 5,
+                          'normalize': False,
+                          'mean_substraction': True,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],
@@ -252,6 +255,7 @@ class BeamSearchEnsemble:
                           'dataset_outputs': ['description'],
                           'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
+                          'normalize_probs': False,
                           'words_so_far': False,
                           'optimized_search': False,
                           'pos_unk': False,
@@ -344,7 +348,7 @@ class BeamSearchEnsemble:
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores, alphas = self.beam_search(x, params, null_sym=self.dataset.extra_words['<null>'])
-                    if params['normalize']:
+                    if params['normalize_probs']:
                         counts = [len(sample) ** params['alpha_factor'] for sample in samples]
                         scores = [co / cn for co, cn in zip(scores, counts)]
                     if self.n_best:
@@ -458,7 +462,7 @@ class BeamSearchEnsemble:
                                              np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
                                                        state_below.shape[2]))))
 
-            if params['optimized_search'] and ii > 0:
+            if self.optimized_search and ii > 0:
                 for n_model in range(len(self.models)):
                     # filter next search inputs w.r.t. remaining samples
                     for idx_vars in range(len(prev_outs[n_model])):
@@ -492,15 +496,21 @@ class BeamSearchEnsemble:
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
-                          'normalize': False, 'mean_substraction': True,
-                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
+        default_params = {'batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'beam_size': 5,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'predict_on_sets': ['val'],
+                          'maxlen': 20,
+                          'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
                           'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
+                          'normalize_probs': False,
                           'words_so_far': False,
                           'optimized_search': False,
                           'state_below_index': -1,
@@ -567,7 +577,7 @@ class BeamSearchEnsemble:
                     y = one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
                                           pad_sequences=True, verbose=0)[0]
                     score = self.score_cond_model(x, y, params, null_sym=self.dataset.extra_words['<null>'])
-                    if params['normalize']:
+                    if params['normalize_probs']:
                         counts = float(len(y) ** params['alpha_factor'])
                         score /= counts
                     scores.append(score)

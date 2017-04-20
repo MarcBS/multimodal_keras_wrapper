@@ -1685,15 +1685,21 @@ class Model_Wrapper(object):
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
-                          'normalize': False, 'mean_substraction': True,
-                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
+        default_params = {'batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'beam_size': 5,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'predict_on_sets': ['val'],
+                          'maxlen': 20,
+                          'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
                           'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
+                          'normalize_probs': False,
                           'words_so_far': False,
                           'optimized_search': False,
                           'pos_unk': False,
@@ -1846,7 +1852,7 @@ class Model_Wrapper(object):
                             samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
                         else:
                             samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                        if params['normalize']:
+                        if params['normalize_probs']:
                             counts = [len(sample) ** params['alpha_factor'] for sample in samples]
                             scores = [co / cn for co, cn in zip(scores, counts)]
                         best_score = np.argmin(scores)
