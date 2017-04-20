@@ -1,10 +1,10 @@
-from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
-
-from keras.layers import Dense
-from keras.engine.training import Model
+import logging
 
 import numpy as np
-import logging
+
+from keras.engine.training import Model
+from keras.layers import Dense
+from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
 
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
@@ -163,6 +163,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
                 print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
 
     return True
+
 
 def main_test():
     # loadFlickr8k() # load Flickr8k dataset for Image Description

@@ -1,11 +1,11 @@
-from keras.layers.convolutional import ZeroPadding2D
+import copy
+import itertools
+import logging
+import time
 
 import numpy as np
 
-import copy
-import itertools
-import time
-import logging
+from keras.layers.convolutional import ZeroPadding2D
 
 
 def bbox(img, mode='max'):
@@ -491,6 +491,7 @@ def simplifyDataset(ds, id_classes, n_classes=50):
         exec ('ds.Y_' + s + ' = copy.copy(kept_Y)')
         exec ('ds.len_' + s + ' = len(kept_Y[id_labels])')
 
+
 # Text-related utils
 def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     """
@@ -505,6 +506,7 @@ def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
     return preds
+
 
 # ------------------------------------------------------- #
 #       DECODING FUNCTIONS
@@ -579,7 +581,7 @@ def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0
 
     if verbose > 0:
         logging.info('Decoding prediction ...')
-        
+
     answer_pred = []
     probs_pred = []
     for pred in preds:

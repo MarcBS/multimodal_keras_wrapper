@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import numpy as np
 import copy
-import math
 import logging
+import math
 import sys
 import time
+
+import numpy as np
+
 from keras_wrapper.dataset import Data_Batch_Generator
 from keras_wrapper.utils import one_hot_2_indices
+
 
 class BeamSearchEnsemble:
     def __init__(self, models, dataset, params_prediction, n_best=False, verbose=0):
@@ -562,7 +565,7 @@ class BeamSearchEnsemble:
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
                     y = one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
-                                                         pad_sequences=True, verbose=0)[0]
+                                          pad_sequences=True, verbose=0)[0]
                     score = self.score_cond_model(x, y, params, null_sym=self.dataset.extra_words['<null>'])
                     if params['normalize']:
                         counts = float(len(y) ** params['alpha_factor'])

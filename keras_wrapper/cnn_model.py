@@ -1,15 +1,14 @@
 import matplotlib as mpl
+
+from keras import backend as K
 from keras.engine.training import Model
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, Concat
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
-from keras.optimizers import SGD
 from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
-from keras import backend as K
-
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.extra.callbacks import *
@@ -163,9 +162,9 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=dict(), 
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except:  # backwards compatibility
-        #try:
+        # try:
         model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
-        #except:
+        # except:
         #    raise Exception(ValueError)
 
     # Add logger for backwards compatibility (old pre-trained models) if it does not exist
@@ -266,7 +265,7 @@ def transferWeights(old_model, new_model, layers_mapping):
             for pos_old, wo in enumerate(old):
                 if pos_old not in mapping_weights.values():
                     logging.info('  Pre-trained weight matrix of layer "' + lold +
-                                 '" with dimensions '+str(wo.shape)+' can not be inserted to new model.')
+                                 '" with dimensions ' + str(wo.shape) + ' can not be inserted to new model.')
 
             # Alert for any weight matrix not modified
             for pos_new, wn in enumerate(new):
@@ -280,11 +279,12 @@ def transferWeights(old_model, new_model, layers_mapping):
             new_model.model.layers[new_layer_dict[lnew][1]].set_weights(new)
 
         else:
-            logging.info('Can not apply weights transfer from "'+lold+'" to "'+lnew+'"')
+            logging.info('Can not apply weights transfer from "' + lold + '" to "' + lnew + '"')
 
     logging.info("<<< Weights transferred successfully. >>>")
 
     return new_model
+
 
 def read_layer_names(model, starting_name=None):
     """
@@ -308,6 +308,7 @@ def read_layer_names(model, starting_name=None):
             read = True
 
     return layers_names
+
 
 # ------------------------------------------------------- #
 #       MAIN CLASS
@@ -479,7 +480,8 @@ class Model_Wrapper(object):
             metrics = []
 
         if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=nesterov)
+            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum,
+                            nesterov=nesterov)
         elif optimizer.lower() == 'adam':
             optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'adagrad':
@@ -552,10 +554,8 @@ class Model_Wrapper(object):
                 if not os.path.isdir(self.plot_path):
                     os.makedirs(self.plot_path)
 
-
     def setParams(self, params):
         self.params = params
-
 
     def checkParameters(self, input_params, default_params):
         """
@@ -687,8 +687,8 @@ class Model_Wrapper(object):
                           'metric_check': None,
                           'eval_on_epochs': True,
                           'each_n_epochs': 1,
-                          'start_eval_on_epoch':0, # early stopping parameters
-                          'lr_decay': None, # LR decay parameters
+                          'start_eval_on_epoch': 0,  # early stopping parameters
+                          'lr_decay': None,  # LR decay parameters
                           'lr_gamma': 0.1}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -784,8 +784,8 @@ class Model_Wrapper(object):
                           'metric_check': None,
                           'eval_on_epochs': True,
                           'each_n_epochs': 1,
-                          'start_eval_on_epoch':0, # early stopping parameters
-                          'lr_decay': None, # LR decay parameters
+                          'start_eval_on_epoch': 0,  # early stopping parameters
+                          'lr_decay': None,  # LR decay parameters
                           'lr_gamma': 0.1}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -870,8 +870,8 @@ class Model_Wrapper(object):
         # Are we going to use class weights?
         class_weight = {}
         if params['class_weights'] is not None:
-            class_weight = ds.extra_variables['class_weights_'+params['class_weights']]
-            
+            class_weight = ds.extra_variables['class_weights_' + params['class_weights']]
+
         # Train model
         self.model.fit_generator(train_gen,
                                  validation_data=val_gen,
@@ -1438,7 +1438,7 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
         elif ii == 0:  # first timestep
-            for model_input in params['model_inputs']:#[:-1]:
+            for model_input in params['model_inputs']:  # [:-1]:
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, 1)
@@ -1763,11 +1763,11 @@ class Model_Wrapper(object):
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                    batch_size=params['batch_size'],
-                                                    normalization=params['normalize'],
-                                                    data_augmentation=False,
-                                                    mean_substraction=params['mean_substraction'],
-                                                    predict=True)
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=True)
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
@@ -1775,13 +1775,13 @@ class Model_Wrapper(object):
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                    batch_size=params['batch_size'],
-                                                    normalization=params['normalize'],
-                                                    data_augmentation=False,
-                                                    mean_substraction=params['mean_substraction'],
-                                                    predict=False,
-                                                    random_samples=n_samples,
-                                                    temporally_linked=params['temporally_linked'])
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=False,
+                                                             random_samples=n_samples,
+                                                             temporally_linked=params['temporally_linked'])
                     data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
@@ -1827,17 +1827,19 @@ class Model_Wrapper(object):
 
                         for input_id in params['model_inputs']:
                             if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
-                                    link = int(X[params['link_index_id']][i])
-                                    if link not in previous_outputs[input_id].keys():  # input to current sample was not processed yet
-                                        link = -1
-                                    prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in previous_outputs[input_id][link]]
-                                    x[input_id] = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
-                                                                 ds.max_text_len[input_id][s],
-                                                                 ds.text_offset[input_id],
-                                                                 fill=ds.fill_text[input_id],
-                                                                 pad_on_batch=ds.pad_on_batch[input_id],
-                                                                 words_so_far=ds.words_so_far[input_id],
-                                                                 loading_X=True)[0]
+                                link = int(X[params['link_index_id']][i])
+                                if link not in previous_outputs[
+                                    input_id].keys():  # input to current sample was not processed yet
+                                    link = -1
+                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
+                                          previous_outputs[input_id][link]]
+                                x[input_id] = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
+                                                          ds.max_text_len[input_id][s],
+                                                          ds.text_offset[input_id],
+                                                          fill=ds.fill_text[input_id],
+                                                          pad_on_batch=ds.pad_on_batch[input_id],
+                                                          words_so_far=ds.words_so_far[input_id],
+                                                          loading_X=True)[0]
                             else:
                                 x[input_id] = np.asarray([X[input_id][i]])
                         if params['pos_unk']:
@@ -1864,7 +1866,8 @@ class Model_Wrapper(object):
                             # TODO: Make it more general
                             for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
                                 # Get all words previous to the padding
-                                previous_outputs[input_id][first_idx+sampled-1] = best_sample[:sum([int(elem > 0) for elem in best_sample])]
+                                previous_outputs[input_id][first_idx + sampled - 1] = best_sample[:sum(
+                                    [int(elem > 0) for elem in best_sample])]
 
                 sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
                     total_cost, total_cost / n_samples))
@@ -2055,7 +2058,6 @@ class Model_Wrapper(object):
                                              np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
                                                        state_below.shape[2]))))
 
-
             if params['optimized_search'] and ii > 0:
                 # filter next search inputs w.r.t. remaining samples
                 for idx_vars in range(len(prev_out)):
@@ -2222,7 +2224,6 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use utils.decode_predictions() instead"
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
-
     def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                               heuristic=0, mapping=None, verbose=0):
         """
@@ -2254,9 +2255,8 @@ class Model_Wrapper(object):
         """
         print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
         return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
-                                          x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
-                                          mapping=mapping, verbose=0)
-
+                                              x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
+                                              mapping=mapping, verbose=0)
 
     def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
         """
@@ -2267,7 +2267,6 @@ class Model_Wrapper(object):
         """
         print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
         return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
-
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
         """
@@ -2497,7 +2496,6 @@ class Model_Wrapper(object):
         else:
             return self.__logger[mode][data_type]
 
-
     def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict={}):
         """
         Plots the training progress information
@@ -2516,15 +2514,15 @@ class Model_Wrapper(object):
 
         # Build default colours_shapes_dict if not provided
         if not colours_shapes_dict:
-            default_colours = ['b','g','y','k']
+            default_colours = ['b', 'g', 'y', 'k']
             default_shapes = ['-', 'o', '.']
             m = 0
             for met in metrics:
                 s = 0
                 for sp in splits:
-                    colours_shapes_dict[met+'_'+sp] = default_colours[m]+default_shapes[s]
+                    colours_shapes_dict[met + '_' + sp] = default_colours[m] + default_shapes[s]
                     s += 1
-                    s = s%len(default_shapes)
+                    s = s % len(default_shapes)
                 m += 1
                 m = m % len(default_colours)
 
@@ -2533,33 +2531,35 @@ class Model_Wrapper(object):
         all_iterations = []
         for sp in splits:
             if sp not in self.__logger:
-                raise Exception("There is no performance data from split '"+sp+"' in the model log.")
+                raise Exception("There is no performance data from split '" + sp + "' in the model log.")
             if time_measure not in self.__logger[sp]:
-                raise Exception("There is no performance data on each '"+time_measure+"' in the model log for split '"+sp+"'.")
+                raise Exception(
+                    "There is no performance data on each '" + time_measure + "' in the model log for split '" + sp + "'.")
 
             iterations = self.__logger[sp][time_measure]
             all_iterations = all_iterations + iterations
 
             for met in metrics:
                 if met not in self.__logger[sp]:
-                    raise Exception("There is no performance data for metric '"+met+"' in the model log for split '"+sp+"'.")
+                    raise Exception(
+                        "There is no performance data for metric '" + met + "' in the model log for split '" + sp + "'.")
 
                 measure = self.__logger[sp][met]
-                #plt.subplot(211)
+                # plt.subplot(211)
                 # plt.plot(iterations, loss, colours['train_loss']+'o')
-                plt.plot(iterations, measure, colours_shapes_dict[met+'_'+sp])
+                plt.plot(iterations, measure, colours_shapes_dict[met + '_' + sp])
 
         max_iter = np.max(all_iterations + [0])
 
         # Plot upperbound
         if upperbound is not None:
-            #plt.subplot(211)
+            # plt.subplot(211)
             plt.plot([0, max_iter], [upperbound, upperbound], 'r-')
             plt.axis([0, max_iter, 0, upperbound])  # limit height to 1
 
         # Fill labels
         plt.xlabel(time_measure)
-        #plt.subplot(211)
+        # plt.subplot(211)
         plt.title('Training progress')
 
         # Create plots dir
@@ -2567,14 +2567,13 @@ class Model_Wrapper(object):
             os.makedirs(self.model_path)
 
         # Save figure
-        plot_file = self.model_path + '/'+time_measure+'_' + str(max_iter) + '.jpg'
+        plot_file = self.model_path + '/' + time_measure + '_' + str(max_iter) + '.jpg'
         plt.savefig(plot_file)
         if not self.silence:
-            logging.info("<<< Progress plot saved in " +plot_file+' >>>')
+            logging.info("<<< Progress plot saved in " + plot_file + ' >>>')
 
         # Close plot window
         plt.close()
-
 
     def plot_old(self):
         """
@@ -3595,8 +3594,8 @@ class Model_Wrapper(object):
         prev_layer = in_layer
         for n in range(nb_layers):
             if name is not None:
-                name_dense = name+'_'+str(n)
-                name_merge = 'merge'+name+'_'+str(n)
+                name_dense = name + '_' + str(n)
+                name_merge = 'merge' + name + '_' + str(n)
             else:
                 name_dense = None
                 name_merge = None
@@ -3626,10 +3625,10 @@ class Model_Wrapper(object):
         """
 
         if name is not None:
-            name_batch = 'batchnormalization'+name
-            name_activ = 'activation'+name
-            name_conv = 'convolution2d'+name
-            name_drop = 'dropout'+name
+            name_batch = 'batchnormalization' + name
+            name_activ = 'activation' + name
+            name_conv = 'convolution2d' + name
+            name_drop = 'dropout' + name
         else:
             name_batch = None
             name_activ = None
@@ -3727,7 +3726,8 @@ class Model_Wrapper(object):
         x = Concat(cropping=[None, None, 'center', 'center'])([skip_conn, x])
 
         # Dense Block
-        x = self.add_dense_block(x, nb_layers, growth, drop, init_weights, name=name)  # (growth*nb_layers) feature maps added
+        x = self.add_dense_block(x, nb_layers, growth, drop, init_weights,
+                                 name=name)  # (growth*nb_layers) feature maps added
         return x
 
     def Empty(self, nOutput, input):
