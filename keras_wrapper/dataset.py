@@ -1,23 +1,25 @@
 # -*- coding: utf-8 -*-
-from keras.utils import np_utils
-import sys
-import random
-import math
-import os
+import cPickle as pk
 import copy
-import ntpath
 import fnmatch
-import threading
 import logging
+import math
+import ntpath
+import os
+import random
 import re
+import sys
+import threading
 from collections import Counter
 from operator import add
-import cPickle as pk
+
+import numpy as np
+from PIL import Image as pilimage
 from scipy import misc
 from scipy import ndimage
-from PIL import Image as pilimage
-import numpy as np
+
 from extra.read_write import create_dir_if_not_exists
+from keras.utils import np_utils
 from .utils import bbox
 
 
@@ -192,11 +194,11 @@ class Data_Batch_Generator(object):
                     data = self.net.prepareData(X_batch, Y_batch)
             yield (data)
 
+
 class Homogeneous_Data_Batch_Generator(object):
     """
     Batch generator class. Retrieves batches of data.
     """
-
 
     def __init__(self,
                  set_split,
@@ -381,13 +383,12 @@ class Dataset(object):
 
         #################################################
 
-
         ############################ Parameters for managing all the inputs and outputs
         # List of identifiers for the inputs and outputs and their respective types 
         # (which will define the preprocessing applied)
         self.ids_inputs = []
         self.types_inputs = []  # see accepted types in self.__accepted_types_inputs
-        self.inputs_data_augmentation_types = dict() # see accepted types in self._available_augm_<input_type>
+        self.inputs_data_augmentation_types = dict()  # see accepted types in self._available_augm_<input_type>
         self.optional_inputs = []
 
         self.ids_outputs = []
@@ -415,7 +416,6 @@ class Dataset(object):
         self.__available_augm_vid_feat = ['random_selection', 'noise']  # 'video-features' only
         #################################################
 
-
         ############################ Parameters used for inputs/outputs of type 'text'
         self.extra_words = {'<pad>': 0, '<unk>': 1, '<null>': 2}  # extra words introduced in all vocabularies
         self.vocabulary = dict()  # vocabularies (words2idx and idx2words)
@@ -430,7 +430,6 @@ class Dataset(object):
         # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
         self.mapping = dict()  # Source -- Target predefined word mapping
         #################################################
-
 
         ############################ Parameters used for inputs of type 'video' or 'video-features'
         self.counts_frames = dict()
@@ -560,63 +559,8 @@ class Dataset(object):
         """
             Deprecated
         """
-        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInputGeneral() instead.")
-        self.setInputGeneral(path_list, split, shuffle, type, id)
-
-    def setInputGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='raw-image', id='image'):
-        """ 
-            DEPRECATED
-        
-            Loads a single list of samples from which train/val/test divisions will be applied. 
-            
-            :param path_list: path to the text file with the list of images.
-            :param split: percentage of images used for [training, validation, test].
-            :param shuffle: whether we are randomly shuffling the input samples or not.
-            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
-            :param id: identifier of the input data loaded
-        """
-
-        raise NotImplementedError("This function is deprecated use setInput instead.")
-
-        if sum(split) != 1:
-            raise Exception('"split" values must sum 1.')
-        if len(split) != 3:
-            raise Exception('The length of "split" must be equal to 3.')
-
-        # Read list
-        set = []
-        with open(path_list, 'r') as list_:
-            for line in list_:
-                set.append(line.rstrip('\n'))
-        nSamples = len(set)
-
-        # Randomize list of samples
-        set_num = [i for i in range(nSamples)]
-        if shuffle:
-            set_num = random.sample(set_num, nSamples)
-
-        # Insert type and id of input data
-        if id not in self.ids_inputs:
-            self.ids_inputs.append(id)
-            if type not in self.__accepted_types_inputs:
-                raise NotImplementedError(
-                    'The input type ' + type + ' is not implemented. The list of valid types are the following: ' + str(
-                        self.__accepted_types_inputs))
-            self.types_inputs.append(type)
-        else:
-            raise Exception('An input with id ' + id + ' is already loaded into the Database instance.')
-
-        offset = 0
-        order = ['train', 'val', 'test']
-        set_split = []
-        for i in range(len(split)):
-            last = int(math.ceil(nSamples * split[i]))
-            set_split.append(set_num[offset:offset + last])
-            offset += last
-
-            # Insert into the corresponding list
-            if len(set_split[i]) > 0:
-                self.__setInput([set[elem] for elem in set_split[i]], order[i], id=id)
+        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
+        self.setInput(path_list, split, type=type, id=id)
 
     def setList(self, path_list, set_name, type='raw-image', id='image'):
         """
@@ -764,7 +708,6 @@ class Dataset(object):
 
         self.__setInput(data, set_name, type, id, overwrite_split)
 
-
     def __setInput(self, set, set_name, type, id, overwrite_split):
         exec ('self.X_' + set_name + '[id] = set')
         exec ('self.loaded_' + set_name + '[0] = True')
@@ -777,7 +720,6 @@ class Dataset(object):
             logging.info(
                 'Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '" and length ' + str(
                     eval('self.len_' + set_name)) + '.')
-
 
     def removeInput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
@@ -796,8 +738,8 @@ class Dataset(object):
         """
             DEPRECATED
         """
-        logging.info("WARNING: The method setLabels() is deprecated, consider using () instead.")
-        self.setOutput(self, labels_list, set_name, type, id)
+        logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
+        self.setOutput(labels_list, set_name, type=type, id=id)
 
     def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
         """
@@ -892,7 +834,8 @@ class Dataset(object):
         # Preprocess the output data depending on its type
         if type == 'categorical':
             self.setClasses(path_list, id)
-            data = self.preprocessCategorical(path_list, id, sample_weights=True if sample_weights and set_name=='train' else False)
+            data = self.preprocessCategorical(path_list, id,
+                                              sample_weights=True if sample_weights and set_name == 'train' else False)
         elif type == 'text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
@@ -1002,20 +945,20 @@ class Dataset(object):
                 counts_per_class[lab] += 1
 
             # Apply balanced weights per class
-            inverse_counts_per_class = [sum(counts_per_class)-c_i for c_i in counts_per_class]
-            weights_per_class = [float(c_i)/sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
-            self.extra_variables['class_weights_'+id] = weights_per_class
-            
+            inverse_counts_per_class = [sum(counts_per_class) - c_i for c_i in counts_per_class]
+            weights_per_class = [float(c_i) / sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
+            self.extra_variables['class_weights_' + id] = weights_per_class
+
         return labels
 
     def loadCategorical(self, y_raw, nClasses, id, load_sample_weights):
         y = np_utils.to_categorical(y_raw, nClasses).astype(np.uint8)
-        #if load_sample_weights:
+        # if load_sample_weights:
         #    sw = self.getCategoricalSampleWeights(y_raw, id)
         #    y = (y, sw)
-            
+
         return y
-    
+
     """
     def getCategoricalSampleWeights(self, y, id):
         n_samples = len(y)
@@ -1025,7 +968,7 @@ class Dataset(object):
             sw[i] = all_sw[y_]
         return sw
     """
-    
+
     # ------------------------------------------------------- #
     #       TYPE 'binary' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -1656,7 +1599,7 @@ class Dataset(object):
         :return: Text as sequence of number. Mask for each sentence.
         """
 
-        y = self.loadText(X, vocabularies, max_len, offset,fill, pad_on_batch,
+        y = self.loadText(X, vocabularies, max_len, offset, fill, pad_on_batch,
                           words_so_far, loading_X=loading_X)
         # Use whole sentence as class (classifier model)
         if max_len == 0:
@@ -1670,8 +1613,6 @@ class Dataset(object):
             if sample_weights:
                 y_aux = (y_aux, y[1])  # join data and mask
         return y_aux
-
-
 
     def loadMapping(self, path_list):
         """
@@ -1778,7 +1719,6 @@ class Dataset(object):
         Tokenization used for the icann paper:
             * Removes very little punctuation
             * Lowercase
-
         :param caption: String to tokenize
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption
@@ -1848,52 +1788,12 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
-    def detokenize_bpe(self,caption):
-        """
-        Reverts BPE segmentation (https://github.com/rsennrich/subword-nmt)
-        """
-        detokenized = re.sub('@@ ', '', str(caption).strip())
-        return detokenized
-
-    def detokenize_none_char(self,caption):
-        """
-        Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by
-        the <space> token. If found an special character is converted to the escaped char.
-        # List of escaped chars (by moses tokenizer)
-            & ->  &amp;
-            | ->  &#124;
-            < ->  &lt;
-            > ->  &gt;
-            ' ->  &apos;
-            " ->  &quot;
-            [ ->  &#91;
-            ] ->  &#93;
-            :param caption: String to de-tokenize
-            :return: Detokenized version of caption
-        """
-
-        def deconvert_chars(x):
-            if x == '<space>':
-                return ' '
-            else:
-                return x.encode('utf-8')
-
-        detokenized = re.sub(' & ', ' &amp; ', str(caption).strip())
-        detokenized = re.sub(' \| ', ' &#124; ', detokenized)
-        detokenized = re.sub(' > ', ' &gt; ', detokenized)
-        detokenized = re.sub(' < ', ' &lt; ', detokenized)
-        detokenized = re.sub( "' ", ' &apos; ', detokenized)
-        detokenized = re.sub( '" ', ' &quot; ', detokenized)
-        detokenized = re.sub( '\[ ', ' &#91; ', detokenized)
-        detokenized = re.sub( '\] ', ' &#93; ', detokenized)
-        detokenized = re.sub( ' ', '', detokenized)
-        detokenized = re.sub( '<space>', ' ', detokenized)
-        return detokenized
-
     def tokenize_CNN_sentence(self, caption):
         """
         Tokenization employed in the CNN_sentence package
         (https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97).
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
         """
         tokenized = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", caption)
         tokenized = re.sub(r"\'s", " \'s", tokenized)
@@ -2004,6 +1904,51 @@ class Dataset(object):
 
         return resAns
 
+    def detokenize_bpe(self, caption, separator='@@'):
+        """
+        Reverts BPE segmentation (https://github.com/rsennrich/subword-nmt)
+        :param caption: Caption to detokenize.
+        :param separator: BPE separator.
+        :return: Detokenized version of caption.
+        """
+        detokenized = re.sub(separator + ' ', '', str(caption).strip())
+        return detokenized
+
+    def detokenize_none_char(self, caption):
+        """
+        Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by
+        the <space> token. If found an special character is converted to the escaped char.
+        # List of escaped chars (by moses tokenizer)
+            & ->  &amp;
+            | ->  &#124;
+            < ->  &lt;
+            > ->  &gt;
+            ' ->  &apos;
+            " ->  &quot;
+            [ ->  &#91;
+            ] ->  &#93;
+            :param caption: String to de-tokenize.
+            :return: Detokenized version of caption.
+        """
+
+        def deconvert_chars(x):
+            if x == '<space>':
+                return ' '
+            else:
+                return x.encode('utf-8')
+
+        detokenized = re.sub(' & ', ' &amp; ', str(caption).strip())
+        detokenized = re.sub(' \| ', ' &#124; ', detokenized)
+        detokenized = re.sub(' > ', ' &gt; ', detokenized)
+        detokenized = re.sub(' < ', ' &lt; ', detokenized)
+        detokenized = re.sub("' ", ' &apos; ', detokenized)
+        detokenized = re.sub('" ', ' &quot; ', detokenized)
+        detokenized = re.sub('\[ ', ' &#91; ', detokenized)
+        detokenized = re.sub('\] ', ' &#93; ', detokenized)
+        detokenized = re.sub(' ', '', detokenized)
+        detokenized = re.sub('<space>', ' ', detokenized)
+        return detokenized
+
     # ------------------------------------------------------- #
     #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
@@ -2043,7 +1988,7 @@ class Dataset(object):
                 with open(path_list[0], 'r') as list_:
                     for line in list_:
                         paths_frames.append(line.rstrip('\n'))
-            elif  isinstance(path_list[0], list):
+            elif isinstance(path_list[0], list):
                 paths_frames = path_list[0]
             else:
                 raise Exception(
@@ -2180,20 +2125,19 @@ class Dataset(object):
                 features[i, j] = feat
 
         return np.array(features)
-    
-    
+
     def getFramesPaths(self, idx_videos, id, set_name, max_len, data_augmentation):
         """
         Recovers the paths from the selected video frames.
         """
-        
+
         # recover chosen data augmentation types
         data_augmentation_types = self.inputs_data_augmentation_types[id]
         if data_augmentation_types is None:
             data_augmentation_types = []
-        
+
         n_frames = [self.counts_frames[id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
-        
+
         n_videos = len(idx_videos)
         idx = [0 for i_nvid in range(n_videos)]
         # recover all initial indices from image's paths of all videos
@@ -2215,9 +2159,9 @@ class Dataset(object):
 
             selected_paths = [paths[int(idx)] for idx in selected_idx]
             selected_frames[enum] = selected_paths
-            
+
         return selected_frames
-            
+
     def loadVideosByIndex(self, n_frames, id, indices, set_name, max_len, normalization_type, normalization,
                           meanSubstraction, dataAugmentation):
         n_videos = len(indices)
@@ -2324,7 +2268,7 @@ class Dataset(object):
 
         # Modify output dimensions depending on number of poolings applied
         if num_poolings is not None:
-            h_crop = int(np.floor(h_crop/np.power(2, num_poolings)))
+            h_crop = int(np.floor(h_crop / np.power(2, num_poolings)))
             w_crop = int(np.floor(w_crop / np.power(2, num_poolings)))
 
         for i in range(n_samples):
@@ -2376,11 +2320,11 @@ class Dataset(object):
             pred = np.transpose(pred, [1, 0])
             pred = np.reshape(pred, (-1, in_size[0], in_size[1]))
 
-            new_pred = np.zeros(tuple([n_classes]+out_size[0:2]))
-            for pos,p in enumerate(pred):
+            new_pred = np.zeros(tuple([n_classes] + out_size[0:2]))
+            for pos, p in enumerate(pred):
                 new_pred[pos] = misc.imresize(p, tuple(out_size[0:2]))
 
-            new_pred = np.reshape(new_pred, (-1, out_size[0]* out_size[1]))
+            new_pred = np.reshape(new_pred, (-1, out_size[0] * out_size[1]))
             new_pred = np.transpose(new_pred, [1, 0])
 
             out_pred.append(new_pred)
@@ -2737,15 +2681,15 @@ class Dataset(object):
             # Data augmentation
             if not dataAugmentation:
                 # Use whole image
-                #im = np.asarray(im, dtype=type_imgs)
-                #im = misc.imresize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                # im = np.asarray(im, dtype=type_imgs)
+                # im = misc.imresize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
                 im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
                 im = np.asarray(im, dtype=type_imgs)
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
-                #im = np.asarray(im, dtype=type_imgs)
-                #im = misc.imresize(im, (self.img_size[id][1], self.img_size[id][0]))
+                # im = np.asarray(im, dtype=type_imgs)
+                # im = misc.imresize(im, (self.img_size[id][1], self.img_size[id][0]))
                 im = im.resize((self.img_size[id][1], self.img_size[id][0]))
                 im = np.asarray(im, dtype=type_imgs)
 
@@ -2761,7 +2705,7 @@ class Dataset(object):
                         print right
                         print im.shape
                         print imname
-                        raise Exception('Error with image '+imname)
+                        raise Exception('Error with image ' + imname)
                 else:
                     im = im[left[0]:right[0], left[1]:right[1]]
 
@@ -3430,14 +3374,15 @@ class Dataset(object):
             for id_in in self.ids_inputs:
                 if id_in not in self.optional_inputs:
                     plot_ids_in.append(id_in)
-                    exec('lengths.append(len(self.X_' + set_name + '[id_in]))')
+                    exec ('lengths.append(len(self.X_' + set_name + '[id_in]))')
             for id_out in self.ids_outputs:
                 exec ('lengths.append(len(self.Y_' + set_name + '[id_out]))')
             if lengths[1:] != lengths[:-1]:
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
-                                '\t Inputs:' + str(plot_ids_in) + ''
-                                '\t Outputs:' + str(self.ids_outputs))
+                                                                            '\t Inputs:' + str(plot_ids_in) + ''
+                                                                                                              '\t Outputs:' + str(
+                    self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
         """

@@ -1,15 +1,14 @@
 import matplotlib as mpl
+
+from keras import backend as K
 from keras.engine.training import Model
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, Concat
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
-from keras.optimizers import SGD
 from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
-from keras import backend as K
-
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 from keras_wrapper.extra.callbacks import *
@@ -163,9 +162,9 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=dict(), 
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except:  # backwards compatibility
-        #try:
+        # try:
         model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
-        #except:
+        # except:
         #    raise Exception(ValueError)
 
     # Add logger for backwards compatibility (old pre-trained models) if it does not exist
@@ -266,7 +265,7 @@ def transferWeights(old_model, new_model, layers_mapping):
             for pos_old, wo in enumerate(old):
                 if pos_old not in mapping_weights.values():
                     logging.info('  Pre-trained weight matrix of layer "' + lold +
-                                 '" with dimensions '+str(wo.shape)+' can not be inserted to new model.')
+                                 '" with dimensions ' + str(wo.shape) + ' can not be inserted to new model.')
 
             # Alert for any weight matrix not modified
             for pos_new, wn in enumerate(new):
@@ -280,11 +279,12 @@ def transferWeights(old_model, new_model, layers_mapping):
             new_model.model.layers[new_layer_dict[lnew][1]].set_weights(new)
 
         else:
-            logging.info('Can not apply weights transfer from "'+lold+'" to "'+lnew+'"')
+            logging.info('Can not apply weights transfer from "' + lold + '" to "' + lnew + '"')
 
     logging.info("<<< Weights transferred successfully. >>>")
 
     return new_model
+
 
 def read_layer_names(model, starting_name=None):
     """
@@ -308,6 +308,7 @@ def read_layer_names(model, starting_name=None):
             read = True
 
     return layers_names
+
 
 # ------------------------------------------------------- #
 #       MAIN CLASS
@@ -479,7 +480,8 @@ class Model_Wrapper(object):
             metrics = []
 
         if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum, nesterov=nesterov)
+            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum,
+                            nesterov=nesterov)
         elif optimizer.lower() == 'adam':
             optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
         elif optimizer.lower() == 'adagrad':
@@ -552,10 +554,8 @@ class Model_Wrapper(object):
                 if not os.path.isdir(self.plot_path):
                     os.makedirs(self.plot_path)
 
-
     def setParams(self, params):
         self.params = params
-
 
     def checkParameters(self, input_params, default_params):
         """
@@ -687,8 +687,8 @@ class Model_Wrapper(object):
                           'metric_check': None,
                           'eval_on_epochs': True,
                           'each_n_epochs': 1,
-                          'start_eval_on_epoch':0, # early stopping parameters
-                          'lr_decay': None, # LR decay parameters
+                          'start_eval_on_epoch': 0,  # early stopping parameters
+                          'lr_decay': None,  # LR decay parameters
                           'lr_gamma': 0.1}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -700,32 +700,6 @@ class Model_Wrapper(object):
         self.__train(ds, params)
 
         logging.info("<<< Finished training model >>>")
-
-    def resumeTrainNet(self, ds, parameters, out_name=None):
-        """
-            DEPRECATED
-
-            Resumes the last training state of a stored model keeping also its training parameters.
-            If we introduce any parameter through the argument 'parameters', it will be replaced by the old one.
-
-            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.
-        """
-
-        raise NotImplementedError('Deprecated')
-
-        # Recovers the old training parameters (replacing them by the new ones if any)
-        default_params = self.training_parameters[-1]
-        params = self.checkParameters(parameters, default_params)
-        self.training_parameters.append(copy.copy(params))
-
-        # Recovers the last training state
-        state = self.training_state
-
-        logging.info("<<< Resuming training model >>>")
-
-        self.__train(ds, params, state)
-
-        logging.info("<<< Finished training Model_Wrapper >>>")
 
     def trainNetFromSamples(self, x, y, parameters={}, class_weight=None, sample_weight=None, out_name=None):
         """
@@ -784,8 +758,8 @@ class Model_Wrapper(object):
                           'metric_check': None,
                           'eval_on_epochs': True,
                           'each_n_epochs': 1,
-                          'start_eval_on_epoch':0, # early stopping parameters
-                          'lr_decay': None, # LR decay parameters
+                          'start_eval_on_epoch': 0,  # early stopping parameters
+                          'lr_decay': None,  # LR decay parameters
                           'lr_gamma': 0.1}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
@@ -870,8 +844,8 @@ class Model_Wrapper(object):
         # Are we going to use class weights?
         class_weight = {}
         if params['class_weights'] is not None:
-            class_weight = ds.extra_variables['class_weights_'+params['class_weights']]
-            
+            class_weight = ds.extra_variables['class_weights_' + params['class_weights']]
+
         # Train model
         self.model.fit_generator(train_gen,
                                  validation_data=val_gen,
@@ -928,245 +902,6 @@ class Model_Wrapper(object):
                        sample_weight=sample_weight,
                        initial_epoch=params['epoch_offset'])
 
-    def __train_deprecated(self, ds, params, state=dict(), out_name=None):
-        """
-            Main training function, which will only be called from self.trainNet(...) or self.resumeTrainNet(...)
-        """
-        scores_train = []
-        losses_train = []
-        top_scores_train = []
-
-        logging.info("Training parameters: " + str(params))
-
-        # Calculate how many iterations are we going to perform
-        if not state.has_key('n_iterations_per_epoch'):
-            state['n_iterations_per_epoch'] = int(math.ceil(float(ds.len_train) / params['batch_size']))
-            state['count_iteration'] = 0
-            state['epoch'] = 0
-            state['it'] = -1
-        else:
-            state['count_iteration'] -= 1
-            state['it'] -= 1
-
-        # Calculate how many validation interations are we going to perform per test
-        if params['num_iterations_val'] == None:
-            params['num_iterations_val'] = int(math.ceil(float(ds.len_val) / params['batch_size']))
-
-        # Apply params['n_epochs'] for training
-        for state['epoch'] in range(state['epoch'], params['n_epochs']):
-            logging.info("<<< Starting epoch " + str(state['epoch'] + 1) + "/" + str(params['n_epochs']) + " >>>")
-
-            # Shuffle the training samples before each epoch
-            ds.shuffleTraining()
-
-            # Initialize queue of parallel data loaders
-            t_queue = []
-            for t_ind in range(state['n_iterations_per_epoch']):
-                t = ThreadDataLoader(retrieveXY, ds, 'train', params['batch_size'],
-                                     params['normalize'], params['mean_substraction'], params['data_augmentation'])
-                if t_ind > state['it'] and t_ind < params['n_parallel_loaders'] + state['it'] + 1:
-                    t.start()
-                t_queue.append(t)
-
-            for state['it'] in range(state['it'] + 1, state['n_iterations_per_epoch']):
-                state['count_iteration'] += 1
-
-                # Recovers a pre-loaded batch of data
-                time_load = time.time() * 1000.0
-                t = t_queue[state['it']]
-                t.join()
-                time_load = time.time() * 1000.0 - time_load
-                if params['verbose'] > 0:
-                    logging.info("DEBUG: Batch loaded in %0.8s ms" % str(time_load))
-
-                if t.resultOK:
-                    X_batch = t.X
-                    Y_batch = t.Y
-                else:
-                    if params['verbose'] > 1:
-                        logging.info("DEBUG: Exception occurred.")
-                    exc_type, exc_obj, exc_trace = t.exception
-                    # deal with the exception
-                    print exc_type, exc_obj
-                    print exc_trace
-                    raise Exception('Exception occurred in ThreadLoader.')
-                t_queue[state['it']] = None
-                if state['it'] + params['n_parallel_loaders'] < state['n_iterations_per_epoch']:
-                    if params['verbose'] > 1:
-                        logging.info("DEBUG: Starting new thread loader.")
-                    t = t_queue[state['it'] + params['n_parallel_loaders']]
-                    t.start()
-
-                # Forward and backward passes on the current batch
-                time_train = time.time() * 1000.0
-                if isinstance(self.model, Sequential):
-                    [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
-                    loss = self.model.train_on_batch(X_batch, Y_batch)
-                    loss = loss[0]
-                    [score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch)[0])
-                elif isinstance(self.model, Model):
-                    t1 = time.time() * 1000.0
-                    [X_batch, Y_batch] = self._prepareSequentialData(X_batch, Y_batch)
-                    if params['verbose'] > 1:
-                        t2 = time.time() * 1000.0
-                        logging.info("DEBUG: Data ready for training (%0.8s ms)." % (t2 - t1))
-                    loss = self.model.train_on_batch(X_batch, Y_batch)
-                    if params['verbose'] > 1:
-                        t3 = time.time() * 1000.0
-                        logging.info("DEBUG: Training forward & backward passes performed (%0.8s ms)." % (t3 - t2))
-                    loss = loss[0]
-                    score = loss[1]
-                    # [score, top_score] = self._getSequentialAccuracy(Y_batch, self.model.predict_on_batch(X_batch))
-                else:
-                    [data, last_output] = self._prepareGraphData(X_batch, Y_batch)
-                    loss = self.model.train_on_batch(data)
-                    loss = loss[0]
-                    score = self._getGraphAccuracy(data, self.model.predict_on_batch(data))
-                    top_score = score[1]
-                    score = score[0]
-                    if out_name:
-                        score = score[out_name]
-                        top_score = top_score[out_name]
-                    else:
-                        score = score[last_output]
-                        top_score = top_score[last_output]
-                time_train = time.time() * 1000.0 - time_train
-                if params['verbose'] > 0:
-                    logging.info("DEBUG: Train on batch performed in %0.8s ms" % str(time_train))
-
-                scores_train.append(float(score))
-                losses_train.append(float(loss))
-                top_scores_train.append(float(top_score))
-
-                # Report train info
-                if state['count_iteration'] % params['report_iter'] == 0:
-                    loss = np.mean(losses_train)
-                    score = np.mean(scores_train)
-                    top_score = np.mean(top_scores_train)
-
-                    logging.info("Train - Iteration: " + str(state['count_iteration']) + "   (" + str(
-                        state['count_iteration'] * params['batch_size']) + " samples seen)")
-                    logging.info("\tTrain loss: " + str(loss))
-                    logging.info("\tTrain accuracy: " + str(score))
-                    logging.info("\tTrain accuracy top-5: " + str(top_score))
-
-                    self.log('train', 'iteration', state['count_iteration'])
-                    self.log('train', 'loss', loss)
-                    self.log('train', 'accuracy', score)
-                    try:
-                        self.log('train', 'accuracy top-5', top_score)
-                    except:
-                        pass
-
-                    scores_train = []
-                    losses_train = []
-                    top_scores_train = []
-
-                # Test network on validation set
-                if state['count_iteration'] > 0 and state['count_iteration'] % params['iter_for_val'] == 0:
-                    logging.info("Applying validation...")
-                    scores = []
-                    losses = []
-                    top_scores = []
-
-                    t_val_queue = []
-                    for t_ind in range(params['num_iterations_val']):
-                        t = ThreadDataLoader(retrieveXY, ds, 'val', params['batch_size'],
-                                             params['normalize'], params['mean_substraction'], False)
-                        if t_ind < params['n_parallel_loaders']:
-                            t.start()
-                        t_val_queue.append(t)
-
-                    for it_val in range(params['num_iterations_val']):
-
-                        # Recovers a pre-loaded batch of data
-                        t_val = t_val_queue[it_val]
-                        t_val.join()
-                        if t_val.resultOK:
-                            X_val = t_val.X
-                            Y_val = t_val.Y
-                        else:
-                            exc_type, exc_obj, exc_trace = t.exception
-                            # deal with the exception
-                            print exc_type, exc_obj
-                            print exc_trace
-                            raise Exception('Exception occurred in ThreadLoader.')
-                        t_val_queue[it_val] = None
-                        if it_val + params['n_parallel_loaders'] < params['num_iterations_val']:
-                            t_val = t_val_queue[it_val + params['n_parallel_loaders']]
-                            t_val.start()
-
-                        # Forward prediction pass
-                        if isinstance(self.model, Sequential) or isinstance(self.model, Model):
-                            [X_val, Y_val] = self._prepareSequentialData(X_val, Y_val)
-                            loss = self.model.test_on_batch(X_val, Y_val, accuracy=False)
-                            loss = loss[0]
-                            [score, top_score] = self._getSequentialAccuracy(Y_val,
-                                                                             self.model.predict_on_batch(X_val)[0])
-                        else:
-                            [data, last_output] = self._prepareGraphData(X_val, Y_val)
-                            loss = self.model.test_on_batch(data)
-                            loss = loss[0]
-                            score = self._getGraphAccuracy(data, self.model.predict_on_batch(data))
-                            top_score = score[1]
-                            score = score[0]
-                            if out_name:
-                                score = score[out_name]
-                                top_score = top_score[out_name]
-                            else:
-                                score = score[last_output]
-                                top_score = top_score[last_output]
-                        losses.append(float(loss))
-                        scores.append(float(score))
-                        top_scores.append(float(top_score))
-
-                    ds.resetCounters(set_name='val')
-                    logging.info("Val - Iteration: " + str(state['count_iteration']))
-                    loss = np.mean(losses)
-                    logging.info("\tValidation loss: " + str(loss))
-                    score = np.mean(scores)
-                    logging.info("\tValidation accuracy: " + str(score))
-                    top_score = np.mean(top_scores)
-                    logging.info("\tValidation accuracy top-5: " + str(top_score))
-
-                    self.log('val', 'iteration', state['count_iteration'])
-                    self.log('val', 'loss', loss)
-                    self.log('val', 'accuracy', score)
-                    try:
-                        self.log('val', 'accuracy top-5', top_score)
-                    except:
-                        pass
-
-                    self.plot()
-
-                # Save the model
-                if state['count_iteration'] % params['save_model'] == 0:
-                    self.training_state = state
-                    saveModel(self, state['count_iteration'])
-
-                # Decrease the current learning rate
-                if state['count_iteration'] % params['lr_decay'] == 0:
-                    # Check if we have a set of rules
-                    if isinstance(params['lr_gamma'], list):
-                        # Check if the current lr_gamma rule is still valid
-                        if params['lr_gamma'][0][0] == None or params['lr_gamma'][0][0] > state['count_iteration']:
-                            lr_gamma = params['lr_gamma'][0][1]
-                        else:
-                            # Find next valid lr_gamma
-                            while params['lr_gamma'][0][0] != None and params['lr_gamma'][0][0] <= state[
-                                'count_iteration']:
-                                params['lr_gamma'].pop(0)
-                            lr_gamma = params['lr_gamma'][0][1]
-                    # Else, we have a single lr_gamma for the whole training
-                    else:
-                        lr_gamma = params['lr_gamma']
-                    lr = self.lr * lr_gamma
-                    momentum = 1 - lr
-                    self.setOptimizer(lr, momentum)
-
-            self.training_state = state
-            state['it'] = -1  # start again from the first iteration of the next epoch
-
     def testNet(self, ds, parameters, out_name=None):
 
         # Check input parameters and recover default values if needed
@@ -1204,88 +939,6 @@ class Model_Wrapper(object):
             # acc_final = out[4]
             # logging.info('Test loss: %0.8s' % loss_final)
             # logging.info('Test accuracy: %0.8s' % acc_final)
-
-    def testNet_deprecated(self, ds, parameters, out_name=None):
-        """
-            Applies a complete round of tests using the test set in the provided Dataset instance.
-
-            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.
-
-            The available (optional) testing parameters are the following ones:
-
-            :param batch_size: size of the batch (number of images) applied on each interation
-
-            ####    Data processing parameters
-
-            :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
-            :param normalization: boolean indicating if we want to 0-1 normalize the image pixel values
-            :param mean_substraction: boolean indicating if we want to substract the training mean
-        """
-        # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize': False, 'mean_substraction': True};
-        params = self.checkParameters(parameters, default_params)
-        self.testing_parameters.append(copy.copy(params))
-
-        logging.info("<<< Testing model >>>")
-
-        numIterationsTest = int(math.ceil(float(ds.len_test) / params['batch_size']))
-        scores = []
-        losses = []
-        top_scores = []
-
-        t_test_queue = []
-        for t_ind in range(numIterationsTest):
-            t = ThreadDataLoader(retrieveXY, ds, 'test', params['batch_size'],
-                                 params['normalize'], params['mean_substraction'], False)
-            if t_ind < params['n_parallel_loaders']:
-                t.start()
-            t_test_queue.append(t)
-
-        for it_test in range(numIterationsTest):
-
-            t_test = t_test_queue[it_test]
-            t_test.join()
-            if t_test.resultOK:
-                X_test = t_test.X
-                Y_test = t_test.Y
-            else:
-                exc_type, exc_obj, exc_trace = t.exception
-                # deal with the exception
-                print exc_type, exc_obj
-                print exc_trace
-                raise Exception('Exception occurred in ThreadLoader.')
-            t_test_queue[it_test] = None
-            if it_test + params['n_parallel_loaders'] < numIterationsTest:
-                t_test = t_test_queue[it_test + params['n_parallel_loaders']]
-                t_test.start()
-
-            if isinstance(self.model, Sequential) or isinstance(self.model, Model):
-                # (loss, score) = self.model.evaluate(X_test, Y_test, show_accuracy=True)
-                [X_test, Y_test] = self._prepareSequentialData(X_test, Y_test)
-                loss = self.model.test_on_batch(X_test, Y_test, accuracy=False)
-                loss = loss[0]
-                [score, top_score] = self._getSequentialAccuracy(Y_test, self.model.predict_on_batch(X_test)[0])
-            else:
-                [data, last_output] = self._prepareGraphData(X_test, Y_test)
-                loss = self.model.test_on_batch(data)
-                loss = loss[0]
-                score = self._getGraphAccuracy(data, self.model.predict_on_batch(data))
-                top_score = score[1]
-                score = score[0]
-                if out_name:
-                    score = score[out_name]
-                    top_score = top_score[out_name]
-                else:
-                    score = score[last_output]
-                    top_score = top_score[last_output]
-            losses.append(float(loss))
-            scores.append(float(score))
-            top_scores.append(float(top_score))
-
-        ds.resetCounters(set_name='test')
-        logging.info("\tTest loss: " + str(np.mean(losses)))
-        logging.info("\tTest accuracy: " + str(np.mean(scores)))
-        logging.info("\tTest accuracy top-5: " + str(np.mean(top_scores)))
 
     def testNetSamples(self, X, batch_size=50):
         """
@@ -1438,7 +1091,7 @@ class Model_Wrapper(object):
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
         elif ii == 0:  # first timestep
-            for model_input in params['model_inputs']:#[:-1]:
+            for model_input in params['model_inputs']:  # [:-1]:
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, 1)
@@ -1769,11 +1422,11 @@ class Model_Wrapper(object):
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                    batch_size=params['batch_size'],
-                                                    normalization=params['normalize'],
-                                                    data_augmentation=False,
-                                                    mean_substraction=params['mean_substraction'],
-                                                    predict=True)
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=True)
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
@@ -1781,13 +1434,13 @@ class Model_Wrapper(object):
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                    batch_size=params['batch_size'],
-                                                    normalization=params['normalize'],
-                                                    data_augmentation=False,
-                                                    mean_substraction=params['mean_substraction'],
-                                                    predict=False,
-                                                    random_samples=n_samples,
-                                                    temporally_linked=params['temporally_linked'])
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=False,
+                                                             random_samples=n_samples,
+                                                             temporally_linked=params['temporally_linked'])
                     data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
@@ -1833,17 +1486,19 @@ class Model_Wrapper(object):
 
                         for input_id in params['model_inputs']:
                             if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
-                                    link = int(X[params['link_index_id']][i])
-                                    if link not in previous_outputs[input_id].keys():  # input to current sample was not processed yet
-                                        link = -1
-                                    prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in previous_outputs[input_id][link]]
-                                    x[input_id] = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
-                                                                 ds.max_text_len[input_id][s],
-                                                                 ds.text_offset[input_id],
-                                                                 fill=ds.fill_text[input_id],
-                                                                 pad_on_batch=ds.pad_on_batch[input_id],
-                                                                 words_so_far=ds.words_so_far[input_id],
-                                                                 loading_X=True)[0]
+                                link = int(X[params['link_index_id']][i])
+                                if link not in previous_outputs[
+                                    input_id].keys():  # input to current sample was not processed yet
+                                    link = -1
+                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
+                                          previous_outputs[input_id][link]]
+                                x[input_id] = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
+                                                          ds.max_text_len[input_id][s],
+                                                          ds.text_offset[input_id],
+                                                          fill=ds.fill_text[input_id],
+                                                          pad_on_batch=ds.pad_on_batch[input_id],
+                                                          words_so_far=ds.words_so_far[input_id],
+                                                          loading_X=True)[0]
                             else:
                                 x[input_id] = np.asarray([X[input_id][i]])
                         if params['pos_unk']:
@@ -1870,7 +1525,8 @@ class Model_Wrapper(object):
                             # TODO: Make it more general
                             for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
                                 # Get all words previous to the padding
-                                previous_outputs[input_id][first_idx+sampled-1] = best_sample[:sum([int(elem > 0) for elem in best_sample])]
+                                previous_outputs[input_id][first_idx + sampled - 1] = best_sample[:sum(
+                                    [int(elem > 0) for elem in best_sample])]
 
                 sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
                     total_cost, total_cost / n_samples))
@@ -2061,7 +1717,6 @@ class Model_Wrapper(object):
                                              np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
                                                        state_below.shape[2]))))
 
-
             if params['optimized_search'] and ii > 0:
                 # filter next search inputs w.r.t. remaining samples
                 for idx_vars in range(len(prev_out)):
@@ -2228,7 +1883,6 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use utils.decode_predictions() instead"
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
-
     def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                               heuristic=0, mapping=None, verbose=0):
         """
@@ -2260,9 +1914,8 @@ class Model_Wrapper(object):
         """
         print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
         return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
-                                          x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
-                                          mapping=mapping, verbose=0)
-
+                                              x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
+                                              mapping=mapping, verbose=0)
 
     def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
         """
@@ -2273,7 +1926,6 @@ class Model_Wrapper(object):
         """
         print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
         return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
-
 
     def decode_predictions_one_hot(self, preds, index2word, verbose=0):
         """
@@ -2353,31 +2005,6 @@ class Model_Wrapper(object):
                     Y_new[out_model] = Y[out_ds]
 
         return [X_new, Y_new] if Y_sample_weights == dict() else [X_new, Y_new, Y_sample_weights]
-
-    def _prepareGraphData(self, X, Y=None):
-
-        data = dict()
-        data_sample_weight = dict()
-        any_sample_weight = False
-        last_out = self.acc_output
-
-        # Format input data
-        for in_model, in_ds in self.inputsMapping.iteritems():
-            data[in_model] = X[in_ds]
-
-        # Format output data
-        for out_model, out_ds in self.outputsMapping.iteritems():
-            if Y is None:
-                data[out_model] = None
-            else:
-                if isinstance(Y[out_ds], tuple):
-                    data[out_model] = Y[out_ds][0]
-                    data_sample_weight[out_model] = Y[out_ds][1]
-                    any_sample_weight = True
-                else:
-                    data[out_model] = Y[out_ds]
-
-        return [(data, data_sample_weight), last_out] if any_sample_weight else [data, last_out]
 
     def _getGraphAccuracy(self, data, prediction, topN=5):
         """
@@ -2503,7 +2130,6 @@ class Model_Wrapper(object):
         else:
             return self.__logger[mode][data_type]
 
-
     def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict={}):
         """
         Plots the training progress information
@@ -2522,15 +2148,15 @@ class Model_Wrapper(object):
 
         # Build default colours_shapes_dict if not provided
         if not colours_shapes_dict:
-            default_colours = ['b','g','y','k']
+            default_colours = ['b', 'g', 'y', 'k']
             default_shapes = ['-', 'o', '.']
             m = 0
             for met in metrics:
                 s = 0
                 for sp in splits:
-                    colours_shapes_dict[met+'_'+sp] = default_colours[m]+default_shapes[s]
+                    colours_shapes_dict[met + '_' + sp] = default_colours[m] + default_shapes[s]
                     s += 1
-                    s = s%len(default_shapes)
+                    s = s % len(default_shapes)
                 m += 1
                 m = m % len(default_colours)
 
@@ -2539,33 +2165,35 @@ class Model_Wrapper(object):
         all_iterations = []
         for sp in splits:
             if sp not in self.__logger:
-                raise Exception("There is no performance data from split '"+sp+"' in the model log.")
+                raise Exception("There is no performance data from split '" + sp + "' in the model log.")
             if time_measure not in self.__logger[sp]:
-                raise Exception("There is no performance data on each '"+time_measure+"' in the model log for split '"+sp+"'.")
+                raise Exception(
+                    "There is no performance data on each '" + time_measure + "' in the model log for split '" + sp + "'.")
 
             iterations = self.__logger[sp][time_measure]
             all_iterations = all_iterations + iterations
 
             for met in metrics:
                 if met not in self.__logger[sp]:
-                    raise Exception("There is no performance data for metric '"+met+"' in the model log for split '"+sp+"'.")
+                    raise Exception(
+                        "There is no performance data for metric '" + met + "' in the model log for split '" + sp + "'.")
 
                 measure = self.__logger[sp][met]
-                #plt.subplot(211)
+                # plt.subplot(211)
                 # plt.plot(iterations, loss, colours['train_loss']+'o')
-                plt.plot(iterations, measure, colours_shapes_dict[met+'_'+sp])
+                plt.plot(iterations, measure, colours_shapes_dict[met + '_' + sp])
 
         max_iter = np.max(all_iterations + [0])
 
         # Plot upperbound
         if upperbound is not None:
-            #plt.subplot(211)
+            # plt.subplot(211)
             plt.plot([0, max_iter], [upperbound, upperbound], 'r-')
             plt.axis([0, max_iter, 0, upperbound])  # limit height to 1
 
         # Fill labels
         plt.xlabel(time_measure)
-        #plt.subplot(211)
+        # plt.subplot(211)
         plt.title('Training progress')
 
         # Create plots dir
@@ -2573,127 +2201,10 @@ class Model_Wrapper(object):
             os.makedirs(self.model_path)
 
         # Save figure
-        plot_file = self.model_path + '/'+time_measure+'_' + str(max_iter) + '.jpg'
+        plot_file = self.model_path + '/' + time_measure + '_' + str(max_iter) + '.jpg'
         plt.savefig(plot_file)
         if not self.silence:
-            logging.info("<<< Progress plot saved in " +plot_file+' >>>')
-
-        # Close plot window
-        plt.close()
-
-
-    def plot_old(self):
-        """
-            Plots the training progress information.
-        """
-        colours = {'train_accuracy_top-5': 'y', 'train_accuracy': 'y', 'train_loss': 'k',
-                   'val_accuracy_top-5': 'g', 'val_accuracy': 'g', 'val_loss': 'b',
-                   'max_accuracy': 'r'}
-
-        plt.figure(1)
-
-        all_iterations = []
-        # Plot train information
-        if 'train' in self.__logger:
-            if 'iteration' not in self.__logger['train']:
-                raise Exception("The training 'iteration' must be logged into the model for plotting.")
-            if 'accuracy' not in self.__logger['train'] and 'loss' not in self.__logger['train']:
-                raise Exception("Either train 'accuracy' and/or 'loss' must be logged into the model for plotting.")
-
-            iterations = self.__logger['train']['iteration']
-            all_iterations = all_iterations + iterations
-
-            # Loss
-            if 'loss' in self.__logger['train']:
-                loss = self.__logger['train']['loss']
-                plt.subplot(211)
-                # plt.plot(iterations, loss, colours['train_loss']+'o')
-                plt.plot(iterations, loss, colours['train_loss'])
-                plt.subplot(212)
-                plt.plot(iterations, loss, colours['train_loss'])
-
-            # Accuracy
-            if 'accuracy' in self.__logger['train']:
-                accuracy = self.__logger['train']['accuracy']
-                plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['train_accuracy'] + 'o')
-                plt.plot(iterations, accuracy, colours['train_accuracy'])
-                plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['train_accuracy'] + 'o')
-                plt.plot(iterations, accuracy, colours['train_accuracy'])
-
-            # Accuracy Top-5
-            if 'accuracy top-5' in self.__logger['train']:
-                accuracy = self.__logger['train']['accuracy top-5']
-                plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['train_accuracy_top-5'] + '.')
-                plt.plot(iterations, accuracy, colours['train_accuracy_top-5'])
-                plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['train_accuracy_top-5'] + '.')
-                plt.plot(iterations, accuracy, colours['train_accuracy_top-5'])
-
-        # Plot val information
-        if 'val' in self.__logger:
-            if 'iteration' not in self.__logger['val']:
-                raise Exception("The validation 'iteration' must be logged into the model for plotting.")
-            if 'accuracy' not in self.__logger['val'] and 'loss' not in self.__logger['train']:
-                raise Exception("Either val 'accuracy' and/or 'loss' must be logged into the model for plotting.")
-
-            iterations = self.__logger['val']['iteration']
-            all_iterations = all_iterations + iterations
-
-            # Loss
-            if 'loss' in self.__logger['val']:
-                loss = self.__logger['val']['loss']
-                plt.subplot(211)
-                # plt.plot(iterations, loss, colours['val_loss']+'o')
-                plt.plot(iterations, loss, colours['val_loss'])
-                plt.subplot(212)
-                plt.plot(iterations, loss, colours['val_loss'])
-
-            # Accuracy
-            if 'accuracy' in self.__logger['val']:
-                accuracy = self.__logger['val']['accuracy']
-                plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['val_accuracy'] + 'o')
-                plt.plot(iterations, accuracy, colours['val_accuracy'])
-                plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['val_accuracy'] + 'o')
-                plt.plot(iterations, accuracy, colours['val_accuracy'])
-
-            # Accuracy Top-5
-            if 'accuracy top-5' in self.__logger['val']:
-                accuracy = self.__logger['val']['accuracy top-5']
-                plt.subplot(211)
-                plt.plot(iterations, accuracy, colours['val_accuracy_top-5'] + '.')
-                plt.plot(iterations, accuracy, colours['val_accuracy_top-5'])
-                plt.subplot(212)
-                plt.plot(iterations, accuracy, colours['val_accuracy_top-5'] + '.')
-                plt.plot(iterations, accuracy, colours['val_accuracy_top-5'])
-
-        # Plot max accuracy
-        max_iter = np.max(all_iterations + [0])
-        plt.subplot(211)
-        plt.plot([0, max_iter], [1, 1], colours['max_accuracy'] + '-')
-        plt.subplot(212)
-        plt.plot([0, max_iter], [1, 1], colours['max_accuracy'] + '-')
-        plt.axis([0, max_iter, 0, 1])  # limit height to 1
-
-        # Fill labels
-        # plt.ylabel('Loss/Accuracy')
-        plt.xlabel('Iteration')
-        plt.subplot(211)
-        plt.title('Training progress')
-
-        # Create plots dir
-        if not os.path.isdir(self.plot_path):
-            os.makedirs(self.plot_path)
-
-        # Save figure
-        plot_file = self.plot_path + '/iter_' + str(max_iter) + '.jpg'
-        plt.savefig(plot_file)
-        if not self.silence:
-            logging.info("Progress plot saved in " + plot_file)
+            logging.info("<<< Progress plot saved in " + plot_file + ' >>>')
 
         # Close plot window
         plt.close()
@@ -3601,8 +3112,8 @@ class Model_Wrapper(object):
         prev_layer = in_layer
         for n in range(nb_layers):
             if name is not None:
-                name_dense = name+'_'+str(n)
-                name_merge = 'merge'+name+'_'+str(n)
+                name_dense = name + '_' + str(n)
+                name_merge = 'merge' + name + '_' + str(n)
             else:
                 name_dense = None
                 name_merge = None
@@ -3632,10 +3143,10 @@ class Model_Wrapper(object):
         """
 
         if name is not None:
-            name_batch = 'batchnormalization'+name
-            name_activ = 'activation'+name
-            name_conv = 'convolution2d'+name
-            name_drop = 'dropout'+name
+            name_batch = 'batchnormalization' + name
+            name_activ = 'activation' + name
+            name_conv = 'convolution2d' + name
+            name_drop = 'dropout' + name
         else:
             name_batch = None
             name_activ = None
@@ -3733,7 +3244,8 @@ class Model_Wrapper(object):
         x = Concat(cropping=[None, None, 'center', 'center'])([skip_conn, x])
 
         # Dense Block
-        x = self.add_dense_block(x, nb_layers, growth, drop, init_weights, name=name)  # (growth*nb_layers) feature maps added
+        x = self.add_dense_block(x, nb_layers, growth, drop, init_weights,
+                                 name=name)  # (growth*nb_layers) feature maps added
         return x
 
     def Empty(self, nOutput, input):
