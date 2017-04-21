@@ -559,63 +559,8 @@ class Dataset(object):
         """
             Deprecated
         """
-        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInputGeneral() instead.")
-        self.setInputGeneral(path_list, split, shuffle, type, id)
-
-    def setInputGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='raw-image', id='image'):
-        """ 
-            DEPRECATED
-        
-            Loads a single list of samples from which train/val/test divisions will be applied. 
-            
-            :param path_list: path to the text file with the list of images.
-            :param split: percentage of images used for [training, validation, test].
-            :param shuffle: whether we are randomly shuffling the input samples or not.
-            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
-            :param id: identifier of the input data loaded
-        """
-
-        raise NotImplementedError("This function is deprecated use setInput instead.")
-
-        if sum(split) != 1:
-            raise Exception('"split" values must sum 1.')
-        if len(split) != 3:
-            raise Exception('The length of "split" must be equal to 3.')
-
-        # Read list
-        set = []
-        with open(path_list, 'r') as list_:
-            for line in list_:
-                set.append(line.rstrip('\n'))
-        nSamples = len(set)
-
-        # Randomize list of samples
-        set_num = [i for i in range(nSamples)]
-        if shuffle:
-            set_num = random.sample(set_num, nSamples)
-
-        # Insert type and id of input data
-        if id not in self.ids_inputs:
-            self.ids_inputs.append(id)
-            if type not in self.__accepted_types_inputs:
-                raise NotImplementedError(
-                    'The input type ' + type + ' is not implemented. The list of valid types are the following: ' + str(
-                        self.__accepted_types_inputs))
-            self.types_inputs.append(type)
-        else:
-            raise Exception('An input with id ' + id + ' is already loaded into the Database instance.')
-
-        offset = 0
-        order = ['train', 'val', 'test']
-        set_split = []
-        for i in range(len(split)):
-            last = int(math.ceil(nSamples * split[i]))
-            set_split.append(set_num[offset:offset + last])
-            offset += last
-
-            # Insert into the corresponding list
-            if len(set_split[i]) > 0:
-                self.__setInput([set[elem] for elem in set_split[i]], order[i], id=id)
+        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
+        self.setInput(path_list, split, type=type, id=id)
 
     def setList(self, path_list, set_name, type='raw-image', id='image'):
         """
@@ -793,8 +738,8 @@ class Dataset(object):
         """
             DEPRECATED
         """
-        logging.info("WARNING: The method setLabels() is deprecated, consider using () instead.")
-        self.setOutput(self, labels_list, set_name, type, id)
+        logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
+        self.setOutput(labels_list, set_name, type=type, id=id)
 
     def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
         """
