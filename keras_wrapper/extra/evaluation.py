@@ -32,11 +32,10 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
     
     from pycocoevalcap.bleu.bleu import Bleu
     from pycocoevalcap.meteor.meteor import Meteor
+    from pycocoevalcap.meteor import accepted_langs
     from pycocoevalcap.cider.cider import Cider
     from pycocoevalcap.rouge.rouge import Rouge
     from pycocoevalcap.ter.ter import Ter
-    from pycocoevalcap.vqa import vqaEval, visual_qa
-    from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
     gts = extra_vars[split]['references']
     if extra_vars.get('tokenize_hypotheses', True):
@@ -56,11 +55,12 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
 
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
-        (Meteor(language=extra_vars['language']), "METEOR"),
         (Ter(), "TER"),
         (Rouge(), "ROUGE_L"),
         (Cider(), "CIDEr")
     ]
+    if extra_vars['language'] in accepted_langs:
+        scorers.append((Meteor(language=extra_vars['language']), "METEOR"))
 
     final_scores = {}
     for scorer, method in scorers:
