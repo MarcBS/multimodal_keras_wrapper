@@ -49,7 +49,7 @@ You can see more practical examples in projects which use this library:
 
 [TMA for Egocentric Video Captioning based on Temporally-linked Sequences](https://github.com/MarcBS/TMA).
 
-[NMT-Keras for Neural Machine Translation](https://github.com/MarcBS/TMA).
+[NMT-Keras: Neural Machine Translation](https://github.com/lvapeab/nmt-keras).
 
 [VIBIKNet for Visual Question Answering](https://github.com/MarcBS/VIBIKNet)
 
