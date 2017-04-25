@@ -1572,16 +1572,23 @@ class Model_Wrapper(object):
                           'normalize': False,
                           'mean_substraction': True,
                           'n_samples': None,
-                          'predict_on_sets': ['val']}
+                          'init_sample': -1,
+                          'final_sample': -1,
+                          'predict_on_sets': ['val'],
+                          'verbose': 1}
         params = self.checkParameters(parameters, default_params)
         predictions = dict()
         for s in params['predict_on_sets']:
             predictions[s] = []
-
-            logging.info("<<< Predicting outputs of " + s + " set >>>")
+            if params['verbose'] > 0:
+                logging.info("<<< Predicting outputs of " + s + " set >>>")
             # Calculate how many interations are we going to perform
             if params['n_samples'] is None:
-                n_samples = eval("ds.len_" + s)
+
+                if params['init_sample'] > -1 and params['final_sample'] > -1:
+                    n_samples = params['final_sample'] - params['init_sample']
+                else:
+                    n_samples = eval("ds.len_" + s)
                 num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
                 # Prepare data generator
                 data_gen = Data_Batch_Generator(s,
@@ -1592,6 +1599,8 @@ class Model_Wrapper(object):
                                                 normalization=params['normalize'],
                                                 data_augmentation=False,
                                                 mean_substraction=params['mean_substraction'],
+                                                init_sample=params['init_sample'],
+                                                final_sample=params['final_sample'],
                                                 predict=True).generator()
 
             else:

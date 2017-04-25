@@ -12,6 +12,7 @@ import json
 import numpy as np
 import os
 import logging
+import tables
 
 ###
 # Helpers
@@ -40,11 +41,23 @@ def file2list(filepath):
     return lines
 
 
+def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
+    if permission == 'w':
+        f = tables.open_file(filepath, mode=permission)
+        atom = tables.Float32Atom()
+        array_c = f.create_earray(f.root, data_name, atom,
+                                  tuple([0] + [mylist.shape[i] for i in range(1, len(mylist.shape))]))
+        array_c.append(mylist)
+        f.close()
+    elif permission == 'a':
+        f = tables.open_file(filepath, mode='a')
+        f.root.data.append(mylist)
+        f.close()
+
 def numpy2file(filepath, mylist, permission='w'):
     mylist = np.asarray(mylist)
     with open(filepath, permission) as f:
         np.save(f, mylist)
-
 
 def listoflists2file(filepath, mylist, permission='w'):
     mylist = [str(sublist) for sublist in mylist]
@@ -96,7 +109,7 @@ def dump_hdf5_simple(filepath, dataset_name, data):
     h5f.close()
 
 
-def load_hdf5_simple(filepath, dataset_name):
+def load_hdf5_simple(filepath, dataset_name='data'):
     import h5py
     h5f = h5py.File(filepath, 'r')
     tmp = h5f[dataset_name][:]
