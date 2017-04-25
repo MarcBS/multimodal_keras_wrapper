@@ -41,11 +41,12 @@ def file2list(filepath):
     return lines
 
 
-def numpy2hdf5(filepath, mylist, permission='w'):
+def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
     if permission == 'w':
         f = tables.open_file(filepath, mode=permission)
         atom = tables.Float32Atom()
-        array_c = f.create_earray(f.root, 'data', atom, tuple([0] + [mylist.shape[i] for i in range(1, len(mylist.shape))]))
+        array_c = f.create_earray(f.root, data_name, atom,
+                                  tuple([0] + [mylist.shape[i] for i in range(1, len(mylist.shape))]))
         array_c.append(mylist)
         f.close()
     elif permission == 'a':
