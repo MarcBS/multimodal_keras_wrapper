@@ -81,7 +81,9 @@ class Data_Batch_Generator(object):
                  predict=False,
                  random_samples=-1,
                  shuffle=True,
-                 temporally_linked=False):
+                 temporally_linked=False,
+                 init_sample=-1,
+                 final_sample=-1):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -103,6 +105,9 @@ class Data_Batch_Generator(object):
         self.predict = predict
         self.temporally_linked = temporally_linked
         self.first_idx = -1
+        self.init_sample = init_sample
+        self.final_sample = final_sample
+
         # Several parameters
         self.params = {'batch_size': batch_size,
                        'data_augmentation': data_augmentation,
@@ -125,7 +130,6 @@ class Data_Batch_Generator(object):
 
         it = 0
         while 1:
-
             if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
                     not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
                 silence = self.dataset.silence
@@ -175,6 +179,25 @@ class Data_Batch_Generator(object):
                                                                       meanSubstraction=self.params['mean_substraction'],
                                                                       dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, Y_batch)
+
+            elif self.init_sample > -1 and self.final_sample > -1:
+                indices = range(self.init_sample, self.final_sample)
+                if self.predict:
+                    X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                            indices,
+                                                            normalization=self.params['normalization'],
+                                                            meanSubstraction=self.params['mean_substraction'],
+                                                            dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, None)[0]
+
+                else:
+                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                      indices,
+                                                                      normalization=self.params['normalization'],
+                                                                      meanSubstraction=self.params['mean_substraction'],
+                                                                      dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
+
 
             else:
                 if self.predict:
@@ -3167,7 +3190,6 @@ class Dataset(object):
 
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
-        self.__isLoaded(set_name, 1)
 
         # Recover input samples
         X = []
