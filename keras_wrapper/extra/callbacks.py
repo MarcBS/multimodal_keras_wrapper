@@ -530,6 +530,7 @@ class EarlyStopping(KerasCallback):
                  patience=0,
                  check_split='val',
                  metric_check='acc',
+                 want_to_minimize=False,
                  eval_on_epochs=True,
                  each_n_epochs=1,
                  start_eval_on_epoch=0,
@@ -549,6 +550,7 @@ class EarlyStopping(KerasCallback):
         self.eval_on_epochs = eval_on_epochs
         self.start_eval_on_epoch = start_eval_on_epoch
         self.each_n_epochs = each_n_epochs
+        self.want_to_minimize = want_to_minimize
 
         self.verbose = verbose
         self.cum_update = 0
@@ -588,14 +590,17 @@ class EarlyStopping(KerasCallback):
             warnings.warn('The chosen metric' + str(self.metric_check) + ' does not exist;'
                                                                          ' this reducer works only with a valid metric.')
             return
-
+        if self.want_to_minimize:
+            current_score = -current_score
         # Check if the best score has been outperformed in the current epoch
         if current_score > self.best_score:
             self.best_epoch = epoch
             self.best_score = current_score
             self.wait = 0
             if self.verbose > 0:
-                logging.info('---current best %s %s: %.3f' % (self.check_split, self.metric_check, current_score))
+                logging.info('---current best %s %s: %.3f' % (self.check_split, self.metric_check,
+                                                              current_score if not self.want_to_minimize
+                                                              else -current_score))
 
         # Stop training if performance has not improved for self.patience epochs
         elif self.patience > 0:
@@ -604,7 +609,8 @@ class EarlyStopping(KerasCallback):
             if self.wait >= self.patience:
                 if self.verbose > 0:
                     logging.info("---%s %d: early stopping. Best %s found at %s %d: %f" % (
-                    str(counter_name), epoch, self.metric_check,  str(counter_name), self.best_epoch, self.best_score))
+                    str(counter_name), epoch, self.metric_check,  str(counter_name), self.best_epoch,
+                    self.best_score if not self.want_to_minimize else -self.best_score))
                 self.model.stop_training = True
                 exit(1)
 

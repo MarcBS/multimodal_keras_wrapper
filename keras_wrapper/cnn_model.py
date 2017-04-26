@@ -795,6 +795,7 @@ class Model_Wrapper(object):
             callback_early_stop = EarlyStopping(self,
                                                 patience=params['patience'],
                                                 metric_check=params['metric_check'],
+                                                want_to_minimize=True if 'TER' in params['metric_check'] else False,
                                                 eval_on_epochs=params['eval_on_epochs'],
                                                 each_n_epochs=params['each_n_epochs'],
                                                 start_eval_on_epoch=params['start_eval_on_epoch'])
@@ -878,6 +879,7 @@ class Model_Wrapper(object):
             callback_early_stop = EarlyStopping(self,
                                                 patience=params['patience'],
                                                 metric_check=params['metric_check'],
+                                                want_to_minimize=True if 'TER' in params['metric_check'] else False,
                                                 eval_on_epochs=params['eval_on_epochs'],
                                                 each_n_epochs=params['each_n_epochs'],
                                                 start_eval_on_epoch=params['start_eval_on_epoch'])
