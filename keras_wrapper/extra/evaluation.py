@@ -93,6 +93,8 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
                 extra_vars['annFile'] - path to the .json file where the annotated answers are stored
                 extra_vars['question_ids'] - question identifiers
     '''
+    from pycocoevalcap.vqa import vqaEval, visual_qa
+
     quesFile = extra_vars[split]['quesFile']
     annFile = extra_vars[split]['annFile']
 
