@@ -1521,6 +1521,7 @@ class Model_Wrapper(object):
         return [probs, out_data]
 
     def beam_search(self, X, params, null_sym=2, debug=False):
+        #def beam_search_NEW(self, X, params, null_sym=2, debug=False):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
@@ -1555,17 +1556,17 @@ class Model_Wrapper(object):
         sample_identifier_prediction = [[i] for i in range(n_samples_batch)]
         
         k = params['beam_size']
-        samples = [[]] * n_samples_batch
-        sample_scores = [[]] * n_samples_batch
+        samples = [[] for i in range(n_samples_batch)]
+        sample_scores = [[] for i in range(n_samples_batch)]
         pad_on_batch = params['pad_on_batch']
         dead_k = [0] * n_samples_batch  # samples that reached eos
         live_k = [1] * n_samples_batch  # samples that did not yet reach eos
         all_live_k = sum(live_k)
-        hyp_samples = [[[]]] * n_samples_batch
-        hyp_scores = [np.zeros(1).astype('float32')] * n_samples_batch
+        hyp_samples = [[[]] for i in range(n_samples_batch)]
+        hyp_scores = [np.zeros(1).astype('float32') for i in range(n_samples_batch)]
         if params['pos_unk']:
-            sample_alphas = [[]] * n_samples_batch
-            hyp_alphas = [[[]]] * n_samples_batch
+            sample_alphas = [[] for i in range(n_samples_batch)]
+            hyp_alphas = [[[]] for i in range(n_samples_batch)]
             
         # Create 'X_next' for initial step
         X_next = dict()
@@ -1674,7 +1675,7 @@ class Model_Wrapper(object):
                         state_below.append(np.asarray(hyp_samples[pos_sample], dtype='int64'))
 
                     # keep every remaining one
-                    if live_k[pos_sample] > 0:
+                    if live_k[pos_sample] > 0 and params['optimized_search']:
                         for idx_vars in range(len(prev_out)):
                             these_indices = np.asarray(sample_identifier_prediction[pos_sample])[indices_alive]
                             prev_out_new[idx_vars].append(np.asarray(prev_out[idx_vars][these_indices]))
@@ -1736,19 +1737,27 @@ class Model_Wrapper(object):
                 num_up_to_here = sum(live_k[:i])
                 sample_identifier_prediction += [range(num_up_to_here, num_up_to_here+live)]
 
-        if live_k[pos_sample] > 0:
-            for idx in xrange(live_k[pos_sample]):
-                samples[pos_sample].append(hyp_samples[pos_sample][idx])
-                sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
-                if params['pos_unk']:
-                    sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
+        for pos_sample, sample_identifier in enumerate(sample_identifier_prediction):  # process one sample at a time
+            if live_k[pos_sample] > 0:
+                for idx in xrange(live_k[pos_sample]):
+                    samples[pos_sample].append(hyp_samples[pos_sample][idx])
+                    sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
+                    if params['pos_unk']:
+                        sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
         if params['pos_unk']:
             return samples, sample_scores, sample_alphas
         else:
+            for pos_sample, sample_identifier in enumerate(
+                    sample_identifier_prediction):  # process one sample at a time
+                print pos_sample
+                print len(samples[pos_sample])
+                print samples[pos_sample][0]
+                print samples[pos_sample][-1]
+                print
             return samples, sample_scores
-        
-        
+
     def beam_search_DEPRECATED(self, X, params, null_sym=2):
+        #def beam_search(self, X, params, null_sym=2):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
@@ -1905,6 +1914,7 @@ class Model_Wrapper(object):
         return self.predictBeamSearchNet(ds, parameters)
 
     def predictBeamSearchNet(self, ds, parameters={}):
+        #def predictBeamSearchNet_NEW(self, ds, parameters={}):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
@@ -2152,8 +2162,9 @@ class Model_Wrapper(object):
             return predictions
         else:
             return predictions, references, sources_sampling
-    
+
     def predictBeamSearchNet_DEPRECATED(self, ds, parameters={}):
+        #def predictBeamSearchNet(self, ds, parameters={}):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
