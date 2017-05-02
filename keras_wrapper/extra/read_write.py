@@ -32,6 +32,21 @@ def create_dir_if_not_exists(directory):
         logging.info("<<< creating directory " + directory + " ... >>>")
         os.makedirs(directory)
 
+def clean_dir(directory):
+    """
+    Creates (or empties) a directory
+    :param directory: Directory to create
+    :return: None
+    """
+
+    if os.path.exists(directory):
+        import shutil
+        print '<<< Warning!: Deleting directory: %s >>>' % directory
+        shutil.rmtree(directory)
+        os.makedirs(directory)
+    else:
+        os.makedirs(directory)
+
 ###
 # Main functions
 ###
