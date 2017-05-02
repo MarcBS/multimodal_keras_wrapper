@@ -1574,7 +1574,6 @@ class Model_Wrapper(object):
             for i_sample, live in enumerate(live_k):
                 if debug:
                     print 'repeating X live', live
-                #X_next[model_input].append(np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), live, axis=0))
                 X_next[model_input].append(np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), 1, axis=0))
             X_next[model_input] = np.concatenate(X_next[model_input])
             if debug:
@@ -1676,12 +1675,6 @@ class Model_Wrapper(object):
 
                     # keep every remaining one
                     if live_k[pos_sample] > 0:
-                        for idx in xrange(live_k[pos_sample]):
-                            samples[pos_sample].append(hyp_samples[pos_sample][idx])
-                            sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
-                            if params['pos_unk']:
-                                sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
-
                         for idx_vars in range(len(prev_out)):
                             these_indices = np.asarray(sample_identifier_prediction[pos_sample])[indices_alive]
                             prev_out_new[idx_vars].append(np.asarray(prev_out[idx_vars][these_indices]))
@@ -1721,8 +1714,7 @@ class Model_Wrapper(object):
                                              state_below.shape[2]))))
 
             # Create 'prev_out_next' for next step
-            if params['optimized_search']: # and ii > 0:
-                #print ii
+            if params['optimized_search']:
                 for idx_vars in range(len(prev_out)):
                     try:
                         prev_out[idx_vars] = np.concatenate(prev_out_new[idx_vars])
@@ -1743,8 +1735,13 @@ class Model_Wrapper(object):
             for i, live in zip(range(n_samples_batch), live_k):
                 num_up_to_here = sum(live_k[:i])
                 sample_identifier_prediction += [range(num_up_to_here, num_up_to_here+live)]
-            
 
+        if live_k[pos_sample] > 0:
+            for idx in xrange(live_k[pos_sample]):
+                samples[pos_sample].append(hyp_samples[pos_sample][idx])
+                sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
+                if params['pos_unk']:
+                    sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
         if params['pos_unk']:
             return samples, sample_scores, sample_alphas
         else:
@@ -2185,7 +2182,8 @@ class Model_Wrapper(object):
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
+                          'beam_size': 5, 'beam_batch_size': 50,
                           'normalize': False, 'mean_substraction': True,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
