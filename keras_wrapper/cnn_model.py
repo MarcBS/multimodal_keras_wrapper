@@ -1520,8 +1520,8 @@ class Model_Wrapper(object):
         ##########################################
         return [probs, out_data]
 
-    def beam_search(self, X, params, null_sym=2, debug=False):
-        #def beam_search_NEW(self, X, params, null_sym=2, debug=False):
+        #    def beam_search(self, X, params, null_sym=2, debug=False):
+    def beam_search_NEW(self, X, params, null_sym=2, debug=False):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
@@ -1747,17 +1747,10 @@ class Model_Wrapper(object):
         if params['pos_unk']:
             return samples, sample_scores, sample_alphas
         else:
-            for pos_sample, sample_identifier in enumerate(
-                    sample_identifier_prediction):  # process one sample at a time
-                print pos_sample
-                print len(samples[pos_sample])
-                print samples[pos_sample][0]
-                print samples[pos_sample][-1]
-                print
             return samples, sample_scores
 
-    def beam_search_DEPRECATED(self, X, params, null_sym=2):
-        #def beam_search(self, X, params, null_sym=2):
+        #    def beam_search_DEPRECATED(self, X, params, null_sym=2):
+    def beam_search(self, X, params, null_sym=2):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
@@ -1913,8 +1906,8 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
         return self.predictBeamSearchNet(ds, parameters)
 
-    def predictBeamSearchNet(self, ds, parameters={}):
-        #def predictBeamSearchNet_NEW(self, ds, parameters={}):
+        #    def predictBeamSearchNet(self, ds, parameters={}):
+    def predictBeamSearchNet_NEW(self, ds, parameters={}):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
@@ -1960,7 +1953,8 @@ class Model_Wrapper(object):
                           'mapping': None,
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
-                          'state_below_index': -1
+                          'state_below_index': -1,
+                          'max_eval_samples': None,
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -2017,8 +2011,12 @@ class Model_Wrapper(object):
 
                 # Calculate how many iterations are we going to perform
                 if params['n_samples'] < 1:
-                    n_samples = eval("ds.len_" + s)
+                    if params['max_eval_samples'] is not None:
+                        n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
+                    else:
+                        n_samples = eval("ds.len_" + s)
                     num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                    n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
@@ -2131,7 +2129,7 @@ class Model_Wrapper(object):
                         eta = (n_samples - sampled+i_sample+1) * (time.time() - start_time) / (sampled+i_sample+1)
                         if params['n_samples'] > 0:
                             for output_id in params['model_outputs']:
-                                references.append(Y[output_id][i])
+                                references.append(Y[output_id][i_sample])
 
                         # store outputs for temporally-linked models
                         if params['temporally_linked']:
@@ -2163,8 +2161,8 @@ class Model_Wrapper(object):
         else:
             return predictions, references, sources_sampling
 
-    def predictBeamSearchNet_DEPRECATED(self, ds, parameters={}):
-        #def predictBeamSearchNet(self, ds, parameters={}):
+        #    def predictBeamSearchNet_DEPRECATED(self, ds, parameters={}):
+    def predictBeamSearchNet(self, ds, parameters={}):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
@@ -2210,8 +2208,10 @@ class Model_Wrapper(object):
                           'mapping': None,
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
-                          'state_below_index': -1
+                          'state_below_index': -1,
+                          'max_eval_samples': None,
                           }
+
         params = self.checkParameters(parameters, default_params)
 
         # Check if the model is ready for applying an optimized search
@@ -2267,8 +2267,13 @@ class Model_Wrapper(object):
 
                 # Calculate how many iterations are we going to perform
                 if params['n_samples'] < 1:
-                    n_samples = eval("ds.len_" + s)
+                    print params
+                    if params['max_eval_samples'] is not None:
+                        n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
+                    else:
+                        n_samples = eval("ds.len_" + s)
                     num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                    n_samples = min(eval("ds.len_" + s), num_iterations*params['batch_size'])
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
@@ -2419,7 +2424,9 @@ class Model_Wrapper(object):
                           'normalize': False,
                           'mean_substraction': True,
                           'n_samples': None,
-                          'predict_on_sets': ['val']}
+                          'predict_on_sets': ['val'],
+                          'max_eval_samples': None,
+                          }
         params = self.checkParameters(parameters, default_params)
         predictions = dict()
         for s in params['predict_on_sets']:
@@ -2428,8 +2435,13 @@ class Model_Wrapper(object):
             logging.info("<<< Predicting outputs of " + s + " set >>>")
             # Calculate how many interations are we going to perform
             if params['n_samples'] is None:
-                n_samples = eval("ds.len_" + s)
+                if params['max_eval_samples'] is not None:
+                    n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
+                else:
+                    n_samples = eval("ds.len_" + s)
                 num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
+
                 # Prepare data generator
                 data_gen = Data_Batch_Generator(s,
                                                 self,
