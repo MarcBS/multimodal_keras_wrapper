@@ -17,10 +17,10 @@ from read_write import *
 
 def checkDefaultParamsBeamSearch(params):
     required_params = ['model_inputs', 'model_outputs', 'dataset_inputs', 'dataset_outputs']
-    default_params = {'beam_size': 5,
+    default_params = {'max_batch_size': 50,
+                      'beam_size': 5,
                       'maxlen': 30,
                       'normalize': False,
-                      'alpha_factor': 1.0,
                       'words_so_far': False,
                       'n_parallel_loaders': 5,
                       'optimized_search': False,
@@ -29,7 +29,13 @@ def checkDefaultParamsBeamSearch(params):
                       'state_below_index': -1,
                       'pos_unk': False,
                       'heuristic': 0,
-                      'mapping': None
+                      'mapping': None,
+                      'normalize_probs': False,
+                      'alpha_factor': 0.0,
+                      'coverage_penalty': False,
+                      'length_penalty': False,
+                      'length_norm_factor': 0.0,
+                      'coverage_norm_factor': 0.0
                       }
 
     for k, v in params.iteritems():
@@ -189,7 +195,7 @@ class EvalPerformance(KerasCallback):
         for s in self.set_name:
             # Apply model predictions
             if self.beam_search:
-                params_prediction = {'batch_size': self.batch_size,
+                params_prediction = {'max_batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
                                      'pos_unk': False,
@@ -436,17 +442,21 @@ class Sample(KerasCallback):
         # Evaluate on each set separately
         for s in self.set_name:
             # Apply model predictions
-            params_prediction = {'batch_size': self.batch_size,
-                                 'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                                 'predict_on_sets': [s],
-                                 'n_samples': self.n_samples,
-                                 'pos_unk': False,
-                                 'heuristic': 0,
-                                 'mapping': None}
             if self.beam_search:
+                params_prediction = {'max_batch_size': self.batch_size,
+                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                     'predict_on_sets': [s],
+                     'n_samples': self.n_samples,
+                     'pos_unk': False,
+                     'heuristic': 0,
+                     'mapping': None}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
+                params_prediction = {'batch_size': self.batch_size,
+                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                     'predict_on_sets': [s],
+                     'n_samples': self.n_samples}
                 # Convert predictions
                 postprocess_fun = None
                 if self.is_3DLabel:

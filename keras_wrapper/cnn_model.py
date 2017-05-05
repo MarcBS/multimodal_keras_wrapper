@@ -667,7 +667,8 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
 
-        default_params = {'n_epochs': 1, 'batch_size': 50,
+        default_params = {'n_epochs': 1,
+                          'batch_size': 50,
                           'maxlen': 100,  # sequence learning parameters (BeamSearch)
                           'homogeneous_batches': False,
                           'joint_batches': 4,
@@ -739,7 +740,8 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
 
-        default_params = {'n_epochs': 1, 'batch_size': 50,
+        default_params = {'n_epochs': 1,
+                          'batch_size': 50,
                           'maxlen': 100,  # sequence learning parameters (BeamSearch)
                           'homogeneous_batches': False,
                           'joint_batches': 4,
@@ -1020,7 +1022,7 @@ class Model_Wrapper(object):
         ##########################################
         # Apply prediction on current timestep
         ##########################################
-        if params['batch_size'] >= n_samples:  # The model inputs beam will fit into one batch in memory
+        if params['max_batch_size'] >= n_samples:  # The model inputs beam will fit into one batch in memory
             out_data = model.predict_on_batch(in_data)
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
@@ -1121,7 +1123,7 @@ class Model_Wrapper(object):
         ##########################################
         # Apply prediction on current timestep
         ##########################################
-        if params['batch_size'] >= n_samples:  # The model inputs beam will fit into one batch in memory
+        if params['max_batch_size'] >= n_samples:  # The model inputs beam will fit into one batch in memory
             out_data = model.predict_on_batch(in_data)
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
@@ -1155,7 +1157,7 @@ class Model_Wrapper(object):
         ##########################################
         return [probs, out_data]
 
-    def beam_search(self, X, params, null_sym=2):
+    def beam_search(self, X, params, null_sym=2, return_alphas=False):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
@@ -1194,7 +1196,8 @@ class Model_Wrapper(object):
         live_k = 1  # samples that did not yet reached eos
         hyp_samples = [[]] * live_k
         hyp_scores = np.zeros(live_k).astype('float32')
-        if params['pos_unk']:
+        return_alphas = return_alphas or params['pos_unk']
+        if return_alphas:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
@@ -1213,7 +1216,7 @@ class Model_Wrapper(object):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
-                if params['pos_unk']:
+                if return_alphas:
                     alphas = prev_out[-1][0]  # Shape: (k, n_steps)
                     prev_out = prev_out[:-1]
             else:
@@ -1232,13 +1235,13 @@ class Model_Wrapper(object):
             new_hyp_samples = []
             new_trans_indices = []
             new_hyp_scores = np.zeros(k - dead_k).astype('float32')
-            if params['pos_unk']:
+            if return_alphas:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                 new_hyp_samples.append(hyp_samples[ti] + [wi])
                 new_trans_indices.append(ti)
                 new_hyp_scores[idx] = copy.copy(costs[idx])
-                if params['pos_unk']:
+                if return_alphas:
                     new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
 
             # check the finished samples
@@ -1251,7 +1254,7 @@ class Model_Wrapper(object):
                 if new_hyp_samples[idx][-1] == 0:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
-                    if params['pos_unk']:
+                    if return_alphas:
                         sample_alphas.append(new_hyp_alphas[idx])
                     dead_k += 1
                 else:
@@ -1259,7 +1262,7 @@ class Model_Wrapper(object):
                     new_live_k += 1
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
-                    if params['pos_unk']:
+                    if return_alphas:
                         hyp_alphas.append(new_hyp_alphas[idx])
             hyp_scores = np.array(hyp_scores)
             live_k = new_live_k
@@ -1297,12 +1300,12 @@ class Model_Wrapper(object):
             for idx in xrange(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
-                if params['pos_unk']:
+                if return_alphas:
                     sample_alphas.append(hyp_alphas[idx])
-        if params['pos_unk']:
-            return samples, sample_scores, sample_alphas
+        if return_alphas:
+            return samples, sample_scores, np.asarray(sample_alphas)
         else:
-            return samples, sample_scores
+            return samples, sample_scores, None
 
     def BeamSearchNet(self, ds, parameters):
         """
@@ -1315,7 +1318,7 @@ class Model_Wrapper(object):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
-        :param batch_size: size of the batch
+        :param max_batch_size: Maximum batch size loaded into memory
         :param n_parallel_loaders: number of parallel data batch loaders
         :param normalization: apply data normalization on images/features or not (only if using images/features as input)
         :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
@@ -1340,7 +1343,7 @@ class Model_Wrapper(object):
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
+        default_params = {'max_batch_size': 50,
                           'n_parallel_loaders': 8,
                           'beam_size': 5,
                           'normalize': False,
@@ -1352,9 +1355,7 @@ class Model_Wrapper(object):
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
                           'dataset_outputs': ['description'],
-                          'alpha_factor': 1.0,
                           'sampling_type': 'max_likelihood',
-                          'normalize_probs': False,
                           'words_so_far': False,
                           'optimized_search': False,
                           'pos_unk': False,
@@ -1362,10 +1363,15 @@ class Model_Wrapper(object):
                           'mapping': None,
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
-                          'state_below_index': -1
+                          'state_below_index': -1,
+                          'normalize_probs': False,
+                          'alpha_factor': 0.0,
+                          'coverage_penalty': False,
+                          'length_penalty': False,
+                          'length_norm_factor': 0.0,
+                          'coverage_norm_factor': 0.0
                           }
         params = self.checkParameters(parameters, default_params)
-
         # Check if the model is ready for applying an optimized search
         if params['optimized_search']:
             if 'matchings_init_to_next' not in dir(self) or \
@@ -1420,11 +1426,11 @@ class Model_Wrapper(object):
                 # Calculate how many iterations are we going to perform
                 if params['n_samples'] < 1:
                     n_samples = eval("ds.len_" + s)
-                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                    num_iterations = int(math.ceil(float(n_samples))) # / params['max_batch_size']))
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                             batch_size=params['batch_size'],
+                                                             batch_size=1,
                                                              normalization=params['normalize'],
                                                              data_augmentation=False,
                                                              mean_substraction=params['mean_substraction'],
@@ -1432,11 +1438,11 @@ class Model_Wrapper(object):
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
-                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                    num_iterations = int(math.ceil(float(n_samples))) #/ params['batch_size']))
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                             batch_size=params['batch_size'],
+                                                             batch_size=1,
                                                              normalization=params['normalize'],
                                                              data_augmentation=False,
                                                              mean_substraction=params['mean_substraction'],
@@ -1503,13 +1509,39 @@ class Model_Wrapper(object):
                                                           loading_X=True)[0]
                             else:
                                 x[input_id] = np.asarray([X[input_id][i]])
-                        if params['pos_unk']:
-                            samples, scores, alphas = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                        else:
-                            samples, scores = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                        if params['normalize_probs']:
+                        samples, scores, alphas = self.beam_search(x, params,
+                                                                   null_sym=ds.extra_words['<null>'],
+                                                                   return_alphas=params['coverage_penalty'])
+
+                        if params['length_penalty'] or params['coverage_penalty']:
+                            if params['length_penalty']:
+                                length_penalties = [((5 + len(sample)) ** params['length_norm_factor']
+                                                     / (5+1) ** params['length_norm_factor']) # this 5 is a magic number by Google...
+                                  for sample in samples]
+                            else:
+                                length_penalties = [1.0 for _ in len(samples)]
+
+                            if params['coverage_penalty']:
+                                coverage_penalties = []
+                                for k, sample in enumerate(samples):
+                                    # We assume that source sentences are at the first position of x
+                                    x_sentence = x[params['model_inputs'][0]][0]
+                                    alpha = np.asarray(alphas[k])
+                                    cp_penalty = 0.0
+                                    for cp_i in range(len(x_sentence)):
+                                        att_weight = 0.0
+                                        for cp_j in range(len(sample)):
+                                            att_weight += alpha[cp_j, cp_i]
+                                        cp_penalty += np.log(min(att_weight, 1.0))
+                                    coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
+                            else:
+                                coverage_penalties = [0.0 for _ in len(samples)]
+                            scores = [co / lp + cp for co, lp, cp in zip(scores, length_penalties, coverage_penalties)]
+
+                        elif params['normalize_probs']:
                             counts = [len(sample) ** params['alpha_factor'] for sample in samples]
                             scores = [co / cn for co, cn in zip(scores, counts)]
+
                         best_score = np.argmin(scores)
                         best_sample = samples[best_score]
                         best_samples.append(best_sample)
