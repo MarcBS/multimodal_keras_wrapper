@@ -1402,7 +1402,7 @@ class Model_Wrapper(object):
         references = []
         sources_sampling = []
         for s in params['predict_on_sets']:
-            logging.info("<<< Predicting outputs of " + s + " set >>>")
+            logging.info("\n<<< Predicting outputs of " + s + " set >>>")
 
             # TODO: enable 'train' sampling on temporally-linked models
             if params['temporally_linked'] and s == 'train':
@@ -1562,7 +1562,7 @@ class Model_Wrapper(object):
                                 previous_outputs[input_id][first_idx + sampled - 1] = best_sample[:sum(
                                     [int(elem > 0) for elem in best_sample])]
 
-                sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
+                sys.stdout.write('\n Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
                     total_cost, total_cost / n_samples))
                 sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
                     time.time() - start_time) / n_samples))

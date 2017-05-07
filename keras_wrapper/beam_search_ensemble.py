@@ -272,7 +272,7 @@ class BeamSearchEnsemble:
 
         predictions = dict()
         for s in params['predict_on_sets']:
-            logging.info("<<< Predicting outputs of " + s + " set >>>")
+            logging.info("\n <<< Predicting outputs of " + s + " set >>>")
             assert len(params['model_inputs']) > 0, 'We need at least one input!'
             if not params['optimized_search']:  # use optimized search model if available
                 assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
