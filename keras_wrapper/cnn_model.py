@@ -1364,6 +1364,7 @@ class Model_Wrapper(object):
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
                           'state_below_index': -1,
+                          'max_eval_samples': None,
                           'normalize_probs': False,
                           'alpha_factor': 0.0,
                           'coverage_penalty': False,
@@ -1425,9 +1426,13 @@ class Model_Wrapper(object):
 
                 # Calculate how many iterations are we going to perform
                 if params['n_samples'] < 1:
-                    n_samples = eval("ds.len_" + s)
-                    num_iterations = int(math.ceil(float(n_samples))) # / params['max_batch_size']))
+                    if params['max_eval_samples'] is not None:
+                        n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
+                    else:
+                        n_samples = eval("ds.len_" + s)
 
+                    num_iterations = int(math.ceil(float(n_samples))) # / params['max_batch_size']))
+                    n_samples = min(eval("ds.len_" + s), num_iterations)# * params['batch_size'])
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
                                                              batch_size=1,
