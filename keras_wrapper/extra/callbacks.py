@@ -30,6 +30,7 @@ def checkDefaultParamsBeamSearch(params):
                       'pos_unk': False,
                       'heuristic': 0,
                       'mapping': None,
+                      'max_eval_samples': None,
                       'normalize_probs': False,
                       'alpha_factor': 0.0,
                       'coverage_penalty': False,
@@ -62,6 +63,7 @@ class EvalPerformance(KerasCallback):
                  set_name,
                  batch_size,
                  each_n_epochs=1,
+                 max_eval_samples=None,
                  extra_vars=dict(),
                  normalize=False,
                  is_text=False,
@@ -95,6 +97,7 @@ class EvalPerformance(KerasCallback):
         :param set_name:  name of the set split that will be evaluated
         :param batch_size: batch size used during sampling
         :param each_n_epochs: sampling each this number of epochs or updates
+        :param max_eval_samples: maximum number of samples evaluated
         :param extra_vars: dictionary of extra variables. See evaluation metrics in keras_wrapper/extra/evaluation.py for assigning the needed extra variables.
         :param normalize: switch on/off data normalization
         :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
@@ -134,6 +137,7 @@ class EvalPerformance(KerasCallback):
         self.beam_search = beam_search
         self.metric_name = metric_name
         self.set_name = set_name
+        self.max_eval_samples = max_eval_samples
         self.batch_size = batch_size
         self.each_n_epochs = each_n_epochs
         self.extra_vars = extra_vars
@@ -198,10 +202,8 @@ class EvalPerformance(KerasCallback):
                 params_prediction = {'max_batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
-                                     'pos_unk': False,
-                                     'heuristic': 0,
-                                     'mapping': None,
-                                     'normalize': self.normalize}
+                                     'normalize': self.normalize,
+                                     'max_eval_samples': self.max_eval_samples}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
@@ -209,7 +211,8 @@ class EvalPerformance(KerasCallback):
                 params_prediction = {'batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars.get('n_parallel_loaders', 8),
                                      'predict_on_sets': [s],
-                                     'normalize': self.normalize}
+                                     'normalize': self.normalize,
+                                     'max_eval_samples': self.max_eval_samples}
                 # Convert predictions
                 postprocess_fun = None
                 if self.is_3DLabel:
