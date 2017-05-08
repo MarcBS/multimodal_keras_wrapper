@@ -2267,7 +2267,6 @@ class Model_Wrapper(object):
 
                 # Calculate how many iterations are we going to perform
                 if params['n_samples'] < 1:
-                    print params
                     if params['max_eval_samples'] is not None:
                         n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
                     else:
