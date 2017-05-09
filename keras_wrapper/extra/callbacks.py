@@ -263,20 +263,11 @@ class EvalPerformance(KerasCallback):
                                                                  mapping=params_prediction['mapping'],
                                                                  verbose=self.verbose)
                 else:
-                    print('callback predictions before decode')
-                    print(predictions[0])
-                    print(predictions[1])
-                    print(predictions[-1])
                     predictions = decode_predictions(predictions,
                                                      1, # always set temperature to 1
                                                      self.index2word_y,
                                                      self.sampling_type,
                                                      verbose=self.verbose)
-
-                print('callback predictions after decode')
-                print(predictions[0])
-                print(predictions[1])
-                print(predictions[-1])
 
                 # Apply detokenization function if needed
                 if self.extra_vars.get('apply_detokenization', False):
