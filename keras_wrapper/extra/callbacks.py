@@ -202,16 +202,18 @@ class EvalPerformance(KerasCallback):
         for s in self.set_name:
             # Apply model predictions
             if self.beam_search:
-                params_prediction = {'max_batch_size': self.batch_size,
-                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                                     'predict_on_sets': [s],
-                                     'beam_batch_size': self.beam_batch_size if self.beam_batch_size is not None else self.batch_size,
-                                     'pos_unk': False,
-                                     'heuristic': 0,
-                                     'mapping': None,
-                                     'normalize': self.normalize,
-                                     'max_eval_samples': self.max_eval_samples}
-                params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
+                params_prediction = checkDefaultParamsBeamSearch(self.extra_vars)
+                params_prediction.update({   'max_batch_size': self.batch_size,
+                                             'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                             'predict_on_sets': [s],
+                                             'beam_batch_size': self.beam_batch_size if self.beam_batch_size is not None else self.batch_size,
+                                             'pos_unk': False,
+                                             'heuristic': 0,
+                                             'mapping': None,
+                                             'normalize': self.normalize,
+                                             'max_eval_samples': self.max_eval_samples}
+                                         )
+
                 predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
                 orig_size = self.extra_vars.get('eval_orig_size', False)
