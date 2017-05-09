@@ -1407,7 +1407,7 @@ class Model_Wrapper(object):
             return samples, sample_scores
 
         #    def beam_search_DEPRECATED(self, X, params, null_sym=2):
-    def beam_search(self, X, params, null_sym=2):
+    def beam_search(self, X, params, return_alphas=False, null_sym=2):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
