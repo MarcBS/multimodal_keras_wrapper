@@ -2505,7 +2505,8 @@ class Dataset(object):
             data = path_list
         else:
             raise Exception(
-                'Wrong type for "path_list". It must be a path to a text file with an image path in each line or an instance of the class list with an image path in each position.')
+                'Wrong type for "path_list". It must be a path to a text file with an image '
+                'path in each line or an instance of the class list with an image path in each position.')
 
         self.img_size[id] = img_size
         self.img_size_crop[id] = img_size_crop
@@ -2681,7 +2682,7 @@ class Dataset(object):
                         raise Exception('Non existent image ' + im)
                     else:
                         im = path + '/' + filename[0]
-                        imname = im
+                imname = im
 
                 # Read image
                 try:

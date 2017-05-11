@@ -6,6 +6,8 @@ import logging
 
 from sklearn import metrics as sklearn_metrics
 
+from pycocoevalcap.vqa import vqaEval, visual_qa
+
 from read_write import list2vqa
 import numpy as np
 

@@ -555,15 +555,19 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
                                                                   sampling_type=sampling_type,
                                                                   temperature=temperature))
     answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
+
     answer_pred = []
     EOS = '<eos>'
     PAD = '<pad>'
 
     for a_no in answer_pred_matrix:
-        init_token_pos = 0
-        end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
-        end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+        if len(a_no.shape) > 1: # only process word by word if our prediction has more than one output
+            init_token_pos = 0
+            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
+            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
+            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+        else:
+            tmp = a_no
         answer_pred.append(tmp)
     return answer_pred
 
