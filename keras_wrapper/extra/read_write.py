@@ -91,6 +91,12 @@ def list2file(filepath, mylist, permission='w'):
     with open(filepath, permission) as f:
         f.writelines(mylist)
 
+def list2stdout(mylist):
+    mylist = [str(l) for l in mylist]
+    mylist = '\n'.join(mylist)
+    if type(mylist[0]) is unicode:
+        mylist = mylist.encode('utf-8')
+    print mylist
 
 def nbest2file(filepath, mylist, separator='|||', permission='w'):
     newlist = []
