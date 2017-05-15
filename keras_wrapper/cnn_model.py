@@ -1446,8 +1446,8 @@ class Model_Wrapper(object):
         live_k = 1  # samples that did not yet reach eos
         hyp_samples = [[]] * live_k
         hyp_scores = np.zeros(live_k).astype('float32')
-        return_alphas = return_alphas or params['pos_unk']
-        if return_alphas:
+        ret_alphas = return_alphas or params['pos_unk']
+        if ret_alphas:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
@@ -1466,7 +1466,7 @@ class Model_Wrapper(object):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
-                if return_alphas:
+                if ret_alphas:
                     alphas = prev_out[-1][0]  # Shape: (k, n_steps)
                     prev_out = prev_out[:-1]
             else:
@@ -1485,13 +1485,13 @@ class Model_Wrapper(object):
             new_hyp_samples = []
             new_trans_indices = []
             new_hyp_scores = np.zeros(k - dead_k).astype('float32')
-            if return_alphas:
+            if ret_alphas:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
                 new_hyp_samples.append(hyp_samples[ti] + [wi])
                 new_trans_indices.append(ti)
                 new_hyp_scores[idx] = copy.copy(costs[idx])
-                if return_alphas:
+                if ret_alphas:
                     new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
 
             # check the finished samples
@@ -1504,7 +1504,7 @@ class Model_Wrapper(object):
                 if new_hyp_samples[idx][-1] == 0:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
-                    if return_alphas:
+                    if ret_alphas:
                         sample_alphas.append(new_hyp_alphas[idx])
                     dead_k += 1
                 else:
@@ -1512,7 +1512,7 @@ class Model_Wrapper(object):
                     new_live_k += 1
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
-                    if return_alphas:
+                    if ret_alphas:
                         hyp_alphas.append(new_hyp_alphas[idx])
             hyp_scores = np.array(hyp_scores)
             live_k = new_live_k
@@ -1550,9 +1550,9 @@ class Model_Wrapper(object):
             for idx in xrange(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
-                if return_alphas:
+                if ret_alphas:
                     sample_alphas.append(hyp_alphas[idx])
-        if return_alphas:
+        if ret_alphas:
             return samples, sample_scores, np.asarray(sample_alphas)
         else:
             return samples, sample_scores, None
@@ -1763,11 +1763,8 @@ class Model_Wrapper(object):
                             x[input_id] = np.array(X[input_id])
                             
                     # Apply beam search
-                    if params['pos_unk']:
-                        samples_all, scores_all, alphas_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                    else:
-                        samples_all, scores_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                    
+                    samples_all, scores_all, alphas_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+
                     # Recover most probable output for each sample
                     for i_sample in range(n_samples_batch):
                         samples = samples_all[i_sample]
@@ -1905,7 +1902,6 @@ class Model_Wrapper(object):
                     "The following attributes must be inserted to the model when building a temporally_linked model:\n",
                     "- matchings_sample_to_next_sample\n",
                     "- ids_temporally_linked_inputs\n")
-
         predictions = dict()
         references = []
         sources_sampling = []
@@ -1918,7 +1914,6 @@ class Model_Wrapper(object):
                 data_gen = -1
                 data_gen_instance = -1
             else:
-
                 assert len(params['model_inputs']) > 0, 'We need at least one input!'
                 if not params['optimized_search']:  # use optimized search model if available
                     assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
