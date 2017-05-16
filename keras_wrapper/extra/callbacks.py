@@ -577,6 +577,7 @@ class EarlyStopping(KerasCallback):
 
         self.verbose = verbose
         self.cum_update = 0
+        self.epoch = 0
         # check already stored scores in case we have loaded a pre-trained model
         all_scores = self.model_to_eval.getLog(self.check_split, self.metric_check)
         if self.eval_on_epochs:
@@ -610,13 +611,15 @@ class EarlyStopping(KerasCallback):
             return
         if self.cum_update % self.each_n_epochs != 0:
             return
+        if self.epoch - self.start_eval_on_epoch < 0:
+            return
         self.evaluate(self.cum_update, counter_name='update')
 
     def evaluate(self, epoch, counter_name='epoch'):
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         # Get last metric value from logs
         if current_score is None:
-            warnings.warn('The chosen metric' + str(self.metric_check) + ' does not exist;'
+            warnings.warn('The chosen metric ' + str(self.metric_check) + ' does not exist;'
                                                                          ' this reducer works only with a valid metric.')
             return
         if self.want_to_minimize:
