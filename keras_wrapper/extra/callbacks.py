@@ -263,6 +263,7 @@ class EvalPerformance(KerasCallback):
                                                                  mapping=params_prediction['mapping'],
                                                                  verbose=self.verbose)
                 else:
+                    probs = predictions
                     predictions = decode_predictions(predictions,
                                                      1,  # always set temperature to 1
                                                      self.index2word_y,
@@ -289,7 +290,10 @@ class EvalPerformance(KerasCallback):
                 if self.write_type == 'list':
                     list2file(filepath, predictions)
                 elif self.write_type == 'vqa':
-                    list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'])
+                    exec('refs = self.ds.Y_'+s+'[self.gt_id]')
+                    extra_data_plot = {'reference': refs,
+                                       'probs': probs}
+                    list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'], extra=extra_data_plot)
                 elif self.write_type == 'listoflists':
                     listoflists2file(filepath, predictions)
                 elif self.write_type == 'numpy':
@@ -675,6 +679,7 @@ class LearningRateReducer(KerasCallback):
         if self.last_lr_decrease >= self.lr_decay:
             self.current_reduce_nb += 1
             if self.current_reduce_nb <= self.reduce_nb:
+                self.last_lr_decrease = 0
                 lr = self.model.optimizer.lr.get_value()
                 self.model.optimizer.lr.set_value(np.float32(lr * self.reduce_rate))
                 if self.verbose > 0:

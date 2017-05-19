@@ -115,13 +115,17 @@ def nbest2file(filepath, mylist, separator='|||', permission='w'):
     with open(filepath, permission) as f:
         f.writelines(mylist)
 
-def list2vqa(filepath, mylist, qids, permission='w'):
+def list2vqa(filepath, mylist, qids, permission='w', extra=None):
     res = []
-    for ans, qst in zip(mylist, qids):
-        res.append({'answer': ans, 'question_id': int(qst)})
+    for i, (ans, qst) in enumerate(zip(mylist, qids)):
+        line = {'answer': ans, 'question_id': int(qst)}
+        if extra is not None:
+            line['reference'] = extra['reference'][i]
+            #line['probs'] = str(extra['probs'][i]) # vector of probabilities for all outputs
+            line['max_prob'] = str(max(extra['probs'][i]))
+        res.append(line)
     with open(filepath, permission) as f:
         json.dump(res, f)
-
 
 def dump_hdf5_simple(filepath, dataset_name, data):
     import h5py
