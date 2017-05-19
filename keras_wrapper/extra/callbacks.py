@@ -4,12 +4,10 @@ from __future__ import print_function
 Extra set of callbacks.
 """
 
-import random
 import warnings
-import numpy as np
-import logging
 from keras.callbacks import Callback as KerasCallback
-from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, decode_multilabel
+from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
+    decode_multilabel
 
 import evaluation
 from read_write import *
@@ -202,18 +200,18 @@ class EvalPerformance(KerasCallback):
         for s in self.set_name:
             # Apply model predictions
             if self.beam_search:
-                params_prediction = checkDefaultParamsBeamSearch(self.extra_vars)
-                params_prediction.update({   'max_batch_size': self.batch_size,
-                                             'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                                             'predict_on_sets': [s],
-                                             'beam_batch_size': self.beam_batch_size if self.beam_batch_size is not None else self.batch_size,
-                                             'pos_unk': False,
-                                             'heuristic': 0,
-                                             'mapping': None,
-                                             'normalize': self.normalize,
-                                             'max_eval_samples': self.max_eval_samples}
-                                         )
+                params_prediction = {'max_batch_size': self.batch_size,
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'predict_on_sets': [s],
+                                     'beam_batch_size': self.beam_batch_size if self.beam_batch_size is not None else self.batch_size,
+                                     'pos_unk': False,
+                                     'heuristic': 0,
+                                     'mapping': None,
+                                     'normalize': self.normalize,
+                                     'max_eval_samples': self.max_eval_samples
+                                     }
 
+                params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
                 orig_size = self.extra_vars.get('eval_orig_size', False)
@@ -267,7 +265,7 @@ class EvalPerformance(KerasCallback):
                 else:
                     probs = predictions
                     predictions = decode_predictions(predictions,
-                                                     1, # always set temperature to 1
+                                                     1,  # always set temperature to 1
                                                      self.index2word_y,
                                                      self.sampling_type,
                                                      verbose=self.verbose)
@@ -280,11 +278,10 @@ class EvalPerformance(KerasCallback):
             elif self.is_multilabel:
                 if self.multilabel_idx is not None:
                     predictions = predictions[self.multilabel_idx]
-                predictions = decode_multilabel(predictions, 
-                                                self.index2word_y, 
-                                                min_val=self.min_pred_multilabel, 
+                predictions = decode_multilabel(predictions,
+                                                self.index2word_y,
+                                                min_val=self.min_pred_multilabel,
                                                 verbose=self.verbose)
-
 
             # Store predictions
             if self.write_samples:
@@ -350,6 +347,7 @@ class EvalPerformance(KerasCallback):
             from keras_wrapper.cnn_model import saveModel
             saveModel(self.model_to_eval, epoch, store_iter=not self.eval_on_epochs)
 
+
 PrintPerformanceMetricOnEpochEndOrEachNUpdates = EvalPerformance
 
 
@@ -382,7 +380,9 @@ class StoreModel(KerasCallback):
             #        print('')
             #        self.store_function(self.model_to_save, n_update)
 
+
 StoreModelWeightsOnEpochEnd = StoreModel
+
 
 ###################################################
 # Sampling callbacks
@@ -392,7 +392,7 @@ class Sample(KerasCallback):
     def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=None,
                  is_text=False, index2word_x=None, index2word_y=None, input_text_id=None, print_sources=False,
                  sampling='max_likelihood', temperature=1.,
-                 beam_search=False, beam_batch_size=None, 
+                 beam_search=False, beam_batch_size=None,
                  batch_size=50, reload_epoch=0, start_sampling_on_epoch=0, is_3DLabel=False,
                  write_type='list', sampling_type='max_likelihood', out_pred_idx=None, in_pred_idx=None, verbose=1):
         """
@@ -459,45 +459,35 @@ class Sample(KerasCallback):
 
         # Evaluate on each set separately
         for s in self.set_name:
-            # Apply model predictions
-            params_prediction = {'batch_size': self.batch_size,
-                                 'beam_batch_size': self.beam_batch_size if self.beam_batch_size is not None else self.batch_size,
-                                 'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                                 'predict_on_sets': [s],
-                                 'n_samples': self.n_samples,
-                                 'pos_unk': False,
-                                 'heuristic': 0,
-                                 'mapping': None}
             if self.beam_search:
                 params_prediction = {'max_batch_size': self.batch_size,
-                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                     'predict_on_sets': [s],
-                     'n_samples': self.n_samples,
-                     'pos_unk': False,
-                     'heuristic': 0,
-                     'mapping': None}
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'predict_on_sets': [s],
+                                     'n_samples': self.n_samples,
+                                     'pos_unk': False,
+                                     'heuristic': 0,
+                                     'mapping': None}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
                 params_prediction = {'batch_size': self.batch_size,
-                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                     'predict_on_sets': [s],
-                     'n_samples': self.n_samples}
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'predict_on_sets': [s],
+                                     'n_samples': self.n_samples}
                 # Convert predictions
                 postprocess_fun = None
                 if self.is_3DLabel:
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
                 predictions = self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
 
-
             if self.print_sources:
                 if self.in_pred_idx is not None:
-                    sources = [srcs for srcs in sources[0][self.in_pred_idx]]
+                    sources = [srcs[self.in_pred_idx][0] for srcs in sources]
+
                 sources = decode_predictions_beam_search(sources,
                                                          self.index2word_x,
                                                          pad_sequences=True,
                                                          verbose=self.verbose)
-
             if s in predictions:
                 if params_prediction['pos_unk']:
                     samples = predictions[s][0]
@@ -521,7 +511,6 @@ class Sample(KerasCallback):
                                                                      heuristic=heuristic,
                                                                      mapping=params_prediction['mapping'],
                                                                      verbose=self.verbose)
-
                     else:
                         predictions = decode_predictions(samples,
                                                          1,
@@ -541,17 +530,19 @@ class Sample(KerasCallback):
                 if self.print_sources:
                     # Write samples
                     for i, (source, sample, truth) in enumerate(zip(sources, predictions, truths)):
-                        print ("Source     (%d): %s" % (i, source))
-                        print ("Hypothesis (%d): %s" % (i, sample))
-                        print ("Reference  (%d): %s" % (i, truth))
-                        print ("")
+                        print("Source     (%d): %s" % (i, source))
+                        print("Hypothesis (%d): %s" % (i, sample))
+                        print("Reference  (%d): %s" % (i, truth))
+                        print("")
                 else:
                     for i, (sample, truth) in enumerate(zip(predictions, truths)):
-                        print ("Hypothesis (%d): %s" % (i, sample))
-                        print ("Reference  (%d): %s" % (i, truth))
-                        print ("")
+                        print("Hypothesis (%d): %s" % (i, sample))
+                        print("Reference  (%d): %s" % (i, truth))
+                        print("")
+
 
 SampleEachNUpdates = Sample
+
 
 ###################################################
 # Learning modifiers callbacks
@@ -590,6 +581,7 @@ class EarlyStopping(KerasCallback):
 
         self.verbose = verbose
         self.cum_update = 0
+        self.epoch = 0
         # check already stored scores in case we have loaded a pre-trained model
         all_scores = self.model_to_eval.getLog(self.check_split, self.metric_check)
         if self.eval_on_epochs:
@@ -623,14 +615,16 @@ class EarlyStopping(KerasCallback):
             return
         if self.cum_update % self.each_n_epochs != 0:
             return
+        if self.epoch - self.start_eval_on_epoch < 0:
+            return
         self.evaluate(self.cum_update, counter_name='update')
 
     def evaluate(self, epoch, counter_name='epoch'):
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         # Get last metric value from logs
         if current_score is None:
-            warnings.warn('The chosen metric' + str(self.metric_check) + ' does not exist;'
-                                                                         ' this reducer works only with a valid metric.')
+            warnings.warn('The chosen metric ' + str(self.metric_check) + ' does not exist;'
+                                                                          ' this reducer works only with a valid metric.')
             return
         if self.want_to_minimize:
             current_score = -current_score
@@ -651,8 +645,8 @@ class EarlyStopping(KerasCallback):
             if self.wait >= self.patience:
                 if self.verbose > 0:
                     logging.info("---%s %d: early stopping. Best %s found at %s %d: %f" % (
-                    str(counter_name), epoch, self.metric_check,  str(counter_name), self.best_epoch,
-                    self.best_score if not self.want_to_minimize else -self.best_score))
+                        str(counter_name), epoch, self.metric_check, str(counter_name), self.best_epoch,
+                        self.best_score if not self.want_to_minimize else -self.best_score))
                 self.model.stop_training = True
                 exit(1)
 
