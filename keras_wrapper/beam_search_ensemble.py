@@ -140,7 +140,7 @@ class BeamSearchEnsemble:
             trans_indices = ranks_flat / voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
-
+            best_cost = costs[0]
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_trans_indices = []
@@ -148,11 +148,21 @@ class BeamSearchEnsemble:
             if self.return_alphas:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
-                new_hyp_samples.append(hyp_samples[ti] + [wi])
-                new_trans_indices.append(ti)
-                new_hyp_scores[idx] = copy.copy(costs[idx])
-                if self.return_alphas:
-                    new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
+                if params['search_pruning']:
+                    if costs[idx] < k * best_cost:
+                        new_hyp_samples.append(hyp_samples[ti] + [wi])
+                        new_trans_indices.append(ti)
+                        new_hyp_scores[idx] = copy.copy(costs[idx])
+                        if self.return_alphas:
+                            new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
+                    else:
+                        dead_k += 1
+                else:
+                    new_hyp_samples.append(hyp_samples[ti] + [wi])
+                    new_trans_indices.append(ti)
+                    new_hyp_scores[idx] = copy.copy(costs[idx])
+                    if self.return_alphas:
+                        new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
 
             # check the finished samples
             new_live_k = 0
@@ -263,6 +273,7 @@ class BeamSearchEnsemble:
                           'heuristic': 0,
                           'mapping': None,
                           'state_below_index': -1,
+                          'search_pruning': False,
                           'normalize_probs': False,
                           'alpha_factor': 0.0,
                           'coverage_penalty': False,
@@ -271,7 +282,7 @@ class BeamSearchEnsemble:
                           'coverage_norm_factor': 0.0
                           }
         params = self.checkParameters(self.params, default_params)
-
+        print params
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
