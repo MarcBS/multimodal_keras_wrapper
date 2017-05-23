@@ -29,6 +29,7 @@ def checkDefaultParamsBeamSearch(params):
                       'heuristic': 0,
                       'mapping': None,
                       'max_eval_samples': None,
+                      'search_pruning': False,
                       'normalize_probs': False,
                       'alpha_factor': 0.0,
                       'coverage_penalty': False,

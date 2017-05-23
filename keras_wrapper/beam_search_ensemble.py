@@ -140,7 +140,7 @@ class BeamSearchEnsemble:
             trans_indices = ranks_flat / voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
-
+            best_cost = costs[0]
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_trans_indices = []
@@ -148,11 +148,21 @@ class BeamSearchEnsemble:
             if self.return_alphas:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
-                new_hyp_samples.append(hyp_samples[ti] + [wi])
-                new_trans_indices.append(ti)
-                new_hyp_scores[idx] = copy.copy(costs[idx])
-                if self.return_alphas:
-                    new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
+                if params['search_pruning']:
+                    if costs[idx] < k * best_cost:
+                        new_hyp_samples.append(hyp_samples[ti] + [wi])
+                        new_trans_indices.append(ti)
+                        new_hyp_scores[idx] = copy.copy(costs[idx])
+                        if self.return_alphas:
+                            new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
+                    else:
+                        dead_k += 1
+                else:
+                    new_hyp_samples.append(hyp_samples[ti] + [wi])
+                    new_trans_indices.append(ti)
+                    new_hyp_scores[idx] = copy.copy(costs[idx])
+                    if self.return_alphas:
+                        new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
 
             # check the finished samples
             new_live_k = 0
@@ -200,7 +210,7 @@ class BeamSearchEnsemble:
                                              np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
                                                        state_below.shape[2]))))
 
-            if params['optimized_search'] and ii > 0:
+            if self.optimized_search and ii > 0:
                 for n_model in range(len(self.models)):
                     # filter next search inputs w.r.t. remaining samples
                     for idx_vars in range(len(prev_outs[n_model])):
@@ -249,7 +259,9 @@ class BeamSearchEnsemble:
                           'beam_size': 5,
                           'normalize': False,
                           'mean_substraction': True,
-                          'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
+                          'predict_on_sets': ['val'],
+                          'maxlen': 20,
+                          'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],
                           'dataset_inputs': ['source_text', 'state_below'],
@@ -261,6 +273,7 @@ class BeamSearchEnsemble:
                           'heuristic': 0,
                           'mapping': None,
                           'state_below_index': -1,
+                          'search_pruning': False,
                           'normalize_probs': False,
                           'alpha_factor': 0.0,
                           'coverage_penalty': False,
@@ -269,7 +282,7 @@ class BeamSearchEnsemble:
                           'coverage_norm_factor': 0.0
                           }
         params = self.checkParameters(self.params, default_params)
-
+        print params
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
@@ -424,6 +437,107 @@ class BeamSearchEnsemble:
             return predictions
         else:
             return predictions, references, sources_sampling
+
+    def sample_beam_search(self, src_sentence):
+        """
+
+        :param src_sentence:
+        :return:
+        """
+        # Check input parameters and recover default values if needed
+        default_params = {'max_batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'beam_size': 5,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'predict_on_sets': ['val'],
+                          'maxlen': 20,
+                          'n_samples': 1,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description'],
+                          'sampling_type': 'max_likelihood',
+                          'words_so_far': False,
+                          'optimized_search': False,
+                          'state_below_index': -1,
+                          'output_text_index': 0,
+                          'pos_unk': False,
+                          'heuristic': 0,
+                          'mapping': None,
+                          'normalize_probs': False,
+                          'alpha_factor': 0.0,
+                          'coverage_penalty': False,
+                          'length_penalty': False,
+                          'length_norm_factor': 0.0,
+                          'coverage_norm_factor': 0.0
+                          }
+        params = self.checkParameters(self.params, default_params)
+        params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
+        params['n_samples'] = 1
+        if self.n_best:
+            n_best_list = []
+            if self.return_alphas:
+                n_best_alphas = []
+        X = dict()
+        for input_id in params['model_inputs']:
+            X[input_id] = src_sentence
+        x = dict()
+        for input_id in params['model_inputs']:
+            x[input_id] = np.asarray([X[input_id]])
+        samples, scores, alphas = self.beam_search(x,
+                                                   params,
+                                                   null_sym=self.dataset.extra_words['<null>'])
+
+        if params['length_penalty'] or params['coverage_penalty']:
+            if params['length_penalty']:
+                length_penalties = [((5 + len(sample)) ** params['length_norm_factor']
+                                     / (5+1) ** params['length_norm_factor']) # this 5 is a magic number by Google...
+                  for sample in samples]
+            else:
+                length_penalties = [1.0 for _ in len(samples)]
+
+            if params['coverage_penalty']:
+                coverage_penalties = []
+                for k, sample in enumerate(samples):
+                    # We assume that source sentences are at the first position of x
+                    x_sentence = x[params['model_inputs'][0]][0]
+                    alpha = np.asarray(alphas[k])
+                    cp_penalty = 0.0
+                    for cp_i in range(len(x_sentence)):
+                        att_weight = 0.0
+                        for cp_j in range(len(sample)):
+                            att_weight += alpha[cp_j, cp_i]
+                        cp_penalty += np.log(min(att_weight, 1.0))
+                    coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
+            else:
+                coverage_penalties = [0.0 for _ in len(samples)]
+            scores = [co / lp + cp for co, lp, cp in zip(scores, length_penalties, coverage_penalties)]
+
+        elif params['normalize_probs']:
+            counts = [len(sample) ** params['alpha_factor'] for sample in samples]
+            scores = [co / cn for co, cn in zip(scores, counts)]
+
+        if self.n_best:
+            n_best_indices = np.argsort(scores)
+            n_best_scores = np.asarray(scores)[n_best_indices]
+            n_best_samples = np.asarray(samples)[n_best_indices]
+            if alphas is not None:
+                n_best_alphas = np.asarray(n_best_alphas)[n_best_indices]
+            else:
+                n_best_alphas = [None] * len(n_best_indices)
+            n_best_list.append([n_best_samples, n_best_scores, n_best_alphas])
+
+        best_score_idx = np.argmin(scores)
+        best_sample = samples[best_score_idx]
+        if params['pos_unk']:
+            best_alphas = np.asarray(alphas[best_score_idx])
+        else:
+            best_alphas = None
+        if self.n_best:
+            return (np.asarray(best_sample), scores[best_score_idx], np.asarray(best_alphas)), n_best_list
+        else:
+            return np.asarray(best_sample), scores[best_score_idx], np.asarray(best_alphas)
 
     def score_cond_model(self, X, Y, params, null_sym=2):
         """
@@ -659,6 +773,114 @@ class BeamSearchEnsemble:
             scores_dict[s] = scores
         return scores_dict
 
+    def scoreSample(self, data):
+        """
+        Approximates by beam search the best predictions of the net on the dataset splits chosen.
+        Params from config that affect the sarch process:
+            * batch_size: size of the batch
+            * n_parallel_loaders: number of parallel data batch loaders
+            * normalization: apply data normalization on images/features or not (only if using images/features as input)
+            * mean_substraction: apply mean data normalization on images or not (only if using images as input)
+            * predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+            * optimized_search: boolean indicating if the used model has the optimized Beam Search implemented
+             (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
+
+        The following attributes must be inserted to the model when building an optimized search model:
+
+            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
+            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
+            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                                the number of out variables must match the number of in variables)
+            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
+            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
+
+        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        """
+
+        # Check input parameters and recover default values if needed
+        default_params = {'max_batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'beam_size': 5,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'predict_on_sets': ['val'],
+                          'maxlen': 20,
+                          'n_samples': -1,
+                          'pad_on_batch': True,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description'],
+                          'sampling_type': 'max_likelihood',
+                          'words_so_far': False,
+                          'optimized_search': False,
+                          'state_below_index': -1,
+                          'output_text_index': 0,
+                          'pos_unk': False,
+                          'heuristic': 0,
+                          'mapping': None,
+                          'normalize_probs': False,
+                          'alpha_factor': 0.0,
+                          'coverage_penalty': False,
+                          'length_penalty': False,
+                          'length_norm_factor': 0.0,
+                          'coverage_norm_factor': 0.0
+                          }
+        params = self.checkParameters(self.params, default_params)
+
+        scores = []
+        total_cost = 0
+        sampled = 0
+        X = dict()
+        for i, input_id in enumerate(params['model_inputs']):
+            X[input_id] = data[0][i]
+        Y = dict()
+        for i, output_id in enumerate(params['model_outputs']):
+            Y[output_id] = data[1][i]
+
+        for i in range(len(X[params['model_inputs'][0]])):
+            sampled += 1
+            x = dict()
+
+            for input_id in params['model_inputs']:
+                x[input_id] = np.asarray([X[input_id][i]])
+            sample = one_hot_2_indices([Y[params['dataset_outputs'][params['output_text_index']]][i]],
+                                  pad_sequences=params['pad_on_batch'], verbose=0)[0]
+            score, alphas = self.score_cond_model(x, sample,
+                                          params,
+                                          null_sym=self.dataset.extra_words['<null>'])
+
+            if params['length_penalty'] or params['coverage_penalty']:
+                if params['length_penalty']:
+                    length_penalty = ((5 + len(sample)) ** params['length_norm_factor']
+                                         / (5+1) ** params['length_norm_factor']) # this 5 is a magic number by Google...
+                else:
+                    length_penalty = 1.0
+
+                if params['coverage_penalty']:
+                    coverage_penalties = []
+                    # We assume that source sentences are at the first position of x
+                    x_sentence = x[params['model_inputs'][0]][0]
+                    alpha = np.asarray(alphas)
+                    cp_penalty = 0.0
+                    for cp_i in range(len(x_sentence)):
+                        att_weight = 0.0
+                        for cp_j in range(len(sample)):
+                            att_weight += alpha[cp_j, cp_i]
+                        cp_penalty += np.log(min(att_weight, 1.0))
+                    coverage_penalty = params['coverage_norm_factor'] * cp_penalty
+                else:
+                    coverage_penalty = 0.0
+                score = score / length_penalty + coverage_penalty
+            elif params['normalize_probs']:
+                counts = float(len(sample) ** params['alpha_factor'])
+                score /= counts
+
+            scores.append(score)
+            total_cost += score
+        return scores
+
     def BeamSearchNet(self):
         """
         DEPRECATED, use predictBeamSearchNet() instead.
@@ -678,8 +900,6 @@ class BeamSearchEnsemble:
         for key, val in input_params.iteritems():
             if key in valid_params:
                 params[key] = val
-            else:
-                raise Exception("Parameter '" + key + "' is not a valid parameter.")
 
         # Use default parameters if not provided
         for key, default_val in default_params.iteritems():
