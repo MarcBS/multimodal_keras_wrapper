@@ -31,7 +31,6 @@ class BeamSearchEnsemble:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
 
     # PREDICTION FUNCTIONS: Functions for making prediction on input samples
-
     def predict_cond(self, models, X, states_below, params, ii, prev_outs=None):
         """
         Call the prediction functions of all models, according to their inputs
@@ -282,7 +281,6 @@ class BeamSearchEnsemble:
                           'coverage_norm_factor': 0.0
                           }
         params = self.checkParameters(self.params, default_params)
-        print params
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
@@ -887,6 +885,215 @@ class BeamSearchEnsemble:
         """
         print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
         return self.predictBeamSearchNet()
+
+    @staticmethod
+    def checkParameters(input_params, default_params):
+        """
+            Validates a set of input parameters and uses the default ones if not specified.
+        """
+        valid_params = [key for key in default_params]
+        params = dict()
+
+        # Check input parameters' validity
+        for key, val in input_params.iteritems():
+            if key in valid_params:
+                params[key] = val
+
+        # Use default parameters if not provided
+        for key, default_val in default_params.iteritems():
+            if key not in params:
+                params[key] = default_val
+
+        return params
+
+
+
+class PredictEnsemble:
+    def __init__(self, models, dataset, params_prediction, postprocess_fun=None, verbose=0):
+        """
+
+        :param models:
+        :param dataset:
+        :param params_prediction:
+        """
+        self.models = models
+        self.postprocess_fun = postprocess_fun
+        self.dataset = dataset
+        self.params = params_prediction
+        self.verbose = verbose
+
+    # PREDICTION FUNCTIONS: Functions for making prediction on input samples
+
+    def predict_generator(self, models, data_gen, val_samples=1, max_q_size=1):
+        """
+        Call the prediction functions of all models, according to their inputs
+        The generator should return the same kind of data as accepted by
+        `predict_on_batch`.
+
+        # Arguments
+            generator: generator yielding batches of input samples.
+            val_samples: total number of samples to generate from `generator`
+                before returning.
+            max_q_size: maximum size for the generator queue
+            nb_worker: maximum number of processes to spin up
+            pickle_safe: if True, use process based threading. Note that because
+                this implementation relies on multiprocessing, you should not pass non
+                non picklable arguments to the generator as they can't be passed
+                easily to children processes.
+
+        # Returns
+            A Numpy array of predictions.
+        """
+
+
+        outs_list = []
+        for i, m in enumerate(models):
+            outs_list.append(m.model.predict_on_batch(data_gen, val_samples, max_q_size))
+        outs = sum(outs_list[i] for i in xrange(len(models))) / float(len(models))
+        return outs
+
+    def predict_on_batch(self, models, X, in_name=None, out_name=None, expand=False):
+        """
+        Applies a forward pass and returns the predicted values of all models.
+
+        # Arguments
+            generator: generator yielding batches of input samples.
+            val_samples: total number of samples to generate from `generator`
+                before returning.
+            max_q_size: maximum size for the generator queue
+            nb_worker: maximum number of processes to spin up
+            pickle_safe: if True, use process based threading. Note that because
+                this implementation relies on multiprocessing, you should not pass non
+                non picklable arguments to the generator as they can't be passed
+                easily to children processes.
+
+        # Returns
+            A Numpy array of predictions.
+        """
+
+        outs_list = []
+        for i, m in enumerate(models):
+            outs_list.append(m.model.predict_on_batch(X))
+        outs = sum(outs_list[i] for i in xrange(len(models))) / float(len(models))
+        return outs
+
+    def predictNet(self):
+        '''
+            Returns the predictions of the net on the dataset splits chosen. The input 'parameters' is a dict()
+            which may contain the following parameters:
+
+            :param batch_size: size of the batch
+            :param n_parallel_loaders: number of parallel data batch loaders
+            :param normalize: apply data normalization on images/features or not (only if using images/features as input)
+            :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
+            :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+
+            Additional parameters:
+
+            :param postprocess_fun : post-processing function applied to all predictions before returning the result. The output of the function must be a list of results, one per sample. If postprocess_fun is a list, the second element will be used as an extra input to the function.
+
+            :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        '''
+
+        # Check input parameters and recover default values if needed
+        default_params = {'batch_size': 50,
+                          'n_parallel_loaders': 8,
+                          'normalize': False,
+                          'mean_substraction': True,
+                          'model_inputs': ['input1'],
+                          'model_outputs': ['output1'],
+                          'dataset_inputs': ['input1'],
+                          'dataset_outputs': ['output1'],
+                          'n_samples': None,
+                          'init_sample': -1,
+                          'final_sample': -1,
+                          'verbose': 1,
+                          'predict_on_sets': ['val'],
+                          'max_eval_samples': None
+                          }
+
+        params = self.checkParameters(self.params, default_params)
+        predictions = dict()
+
+        for s in params['predict_on_sets']:
+            logging.info("\n <<< Predicting outputs of " + s + " set >>>")
+            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+
+            # Calculate how many interations are we going to perform
+            if params['n_samples'] is None:
+                if params['init_sample'] > -1 and params['final_sample'] > -1:
+                    n_samples = params['final_sample'] - params['init_sample']
+                else:
+                    n_samples = eval("self.dataset.len_" + s)
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                n_samples = min(eval("self.dataset.len_" + s), num_iterations * params['batch_size'])
+
+                # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                # TODO: We prepare data as model 0... Different data preparators for each model?
+                data_gen = Data_Batch_Generator(s,
+                                                self.models[0],
+                                                self.dataset,
+                                                num_iterations,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                init_sample=params['init_sample'],
+                                                final_sample=params['final_sample'],
+                                                predict=True).generator()
+            else:
+                n_samples = params['n_samples']
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+
+                # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                data_gen = Data_Batch_Generator(s,
+                                                self.models[0],
+                                                self.dataset,
+                                                num_iterations,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=True,
+                                                random_samples=n_samples).generator()
+            # Predict on model
+            """
+            if self.postprocess_fun is None:
+
+                out = self.predict_generator(self.models,
+                                             data_gen,
+                                             val_samples=n_samples,
+                                             max_q_size=params['n_parallel_loaders'])
+                predictions[s] = out
+            """
+            processed_samples = 0
+            start_time = time.time()
+            while processed_samples < n_samples:
+                out = self.predict_on_batch(self.models, data_gen.next())
+                # Apply post-processing function
+                if self.postprocess_fun is not None:
+                    if isinstance(self.postprocess_fun, list):
+                        last_processed = min(processed_samples + params['batch_size'], n_samples)
+                        out = self.postprocess_fun[0](out, self.postprocess_fun[1][processed_samples:last_processed])
+                    else:
+                        out = self.postprocess_fun(out)
+
+                if predictions.get(s) is None:
+                    predictions[s] = [out]
+                else:
+                    predictions[s].append(out)
+                # Show progress
+                processed_samples += params['batch_size']
+                if processed_samples > n_samples:
+                    processed_samples = n_samples
+                eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
+                sys.stdout.write('\r')
+                sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
+                sys.stdout.flush()
+            predictions[s] = np.concatenate([pred for pred in predictions[s]])
+
+
+        return predictions
 
     @staticmethod
     def checkParameters(input_params, default_params):
