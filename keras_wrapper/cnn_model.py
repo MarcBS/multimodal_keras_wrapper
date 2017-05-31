@@ -1620,8 +1620,6 @@ class Model_Wrapper(object):
                           'optimized_search': False,
                           'search_pruning': False,
                           'pos_unk': False,
-                          'heuristic': 0,
-                          'mapping': None,
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
                           'state_below_index': -1,
@@ -1876,8 +1874,6 @@ class Model_Wrapper(object):
                           'optimized_search': False,
                           'search_pruning': False,
                           'pos_unk': False,
-                          'heuristic': 0,
-                          'mapping': None,
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
                           'state_below_index': -1,
@@ -2330,9 +2326,7 @@ class Model_Wrapper(object):
                           'optimized_search': False,
                           'state_below_index': -1,
                           'output_text_index': 0,
-                          'pos_unk': False,
-                          'heuristic': 0,
-                          'mapping': None
+                          'pos_unk': False
                           }
         params = self.checkParameters(self.params, default_params)
 
