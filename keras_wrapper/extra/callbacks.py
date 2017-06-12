@@ -33,7 +33,9 @@ def checkDefaultParamsBeamSearch(params):
                       'coverage_penalty': False,
                       'length_penalty': False,
                       'length_norm_factor': 0.0,
-                      'coverage_norm_factor': 0.0
+                      'coverage_norm_factor': 0.0,
+                      'output_length_depending_on_x': False,
+                      'output_length_depending_on_x_factor': 3
                       }
 
     for k, v in params.iteritems():
