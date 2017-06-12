@@ -1287,6 +1287,7 @@ class Dataset(object):
         for w, k in self.extra_words.iteritems():
             dictionary[w] = k
 
+
         # Store dictionary and append to previously existent if needed.
         if id not in self.vocabulary:
             self.vocabulary[id] = dict()
