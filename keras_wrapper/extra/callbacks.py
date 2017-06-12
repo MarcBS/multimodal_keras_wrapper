@@ -26,15 +26,16 @@ def checkDefaultParamsBeamSearch(params):
                       'link_index_id': 'link_index',
                       'state_below_index': -1,
                       'pos_unk': False,
-                      'heuristic': 0,
-                      'mapping': None,
                       'max_eval_samples': None,
+                      'search_pruning': False,
                       'normalize_probs': False,
                       'alpha_factor': 0.0,
                       'coverage_penalty': False,
                       'length_penalty': False,
                       'length_norm_factor': 0.0,
-                      'coverage_norm_factor': 0.0
+                      'coverage_norm_factor': 0.0,
+                      'output_length_depending_on_x': False,
+                      'output_length_depending_on_x_factor': 3
                       }
 
     for k, v in params.iteritems():
@@ -205,8 +206,6 @@ class EvalPerformance(KerasCallback):
                                      'predict_on_sets': [s],
                                      'beam_batch_size': self.beam_batch_size if self.beam_batch_size is not None else self.batch_size,
                                      'pos_unk': False,
-                                     'heuristic': 0,
-                                     'mapping': None,
                                      'normalize': self.normalize,
                                      'max_eval_samples': self.max_eval_samples
                                      }
@@ -245,7 +244,7 @@ class EvalPerformance(KerasCallback):
                                                                  self.index2word_x,
                                                                  pad_sequences=True,
                                                                  verbose=self.verbose)
-                    heuristic = params_prediction['heuristic']
+                    heuristic = self.extra_vars['heuristic']
                 else:
                     samples = predictions
                     alphas = None
@@ -260,7 +259,7 @@ class EvalPerformance(KerasCallback):
                                                                  alphas=alphas,
                                                                  x_text=sources,
                                                                  heuristic=heuristic,
-                                                                 mapping=params_prediction['mapping'],
+                                                                 mapping=self.extra_vars.get('mapping', None),
                                                                  verbose=self.verbose)
                 else:
                     probs = predictions
@@ -468,9 +467,7 @@ class Sample(KerasCallback):
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
                                      'n_samples': self.n_samples,
-                                     'pos_unk': False,
-                                     'heuristic': 0,
-                                     'mapping': None}
+                                     'pos_unk': False}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
@@ -496,7 +493,7 @@ class Sample(KerasCallback):
                 if params_prediction['pos_unk']:
                     samples = predictions[s][0]
                     alphas = predictions[s][1]
-                    heuristic = params_prediction['heuristic']
+                    heuristic = self.extra_vars['heuristic']
                 else:
                     samples = predictions[s]
                     alphas = None
@@ -513,7 +510,7 @@ class Sample(KerasCallback):
                                                                      alphas=alphas,
                                                                      x_text=sources,
                                                                      heuristic=heuristic,
-                                                                     mapping=params_prediction['mapping'],
+                                                                     mapping=self.extra_vars.get('mapping', None),
                                                                      verbose=self.verbose)
                     else:
                         predictions = decode_predictions(samples,
