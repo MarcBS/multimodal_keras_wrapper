@@ -96,12 +96,13 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
                 extra_vars['question_ids'] - question identifiers
     '''
     from pycocoevalcap.vqa import vqaEval, visual_qa
+    import datetime
 
     quesFile = extra_vars[split]['quesFile']
     annFile = extra_vars[split]['annFile']
 
     # create temporal resFile
-    resFile = 'tmp_res_file.json'
+    resFile = 'tmp_res_file_'+str(datetime.datetime.now())+'.json'
     list2vqa(resFile, pred_list, extra_vars[split]['question_ids'])
 
     # create vqa object and vqaRes object

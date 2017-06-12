@@ -122,6 +122,7 @@ def list2vqa(filepath, mylist, qids, permission='w', extra=None):
         if extra is not None:
             line['reference'] = extra['reference'][i]
             #line['probs'] = str(extra['probs'][i]) # vector of probabilities for all outputs
+            line['top5'] = str([[extra['vocab'][p], extra['probs'][i][p]] for p in np.argsort(extra['probs'][i])[::-1][:5]])
             line['max_prob'] = str(max(extra['probs'][i]))
         res.append(line)
     with open(filepath, permission) as f:
