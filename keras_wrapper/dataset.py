@@ -201,12 +201,27 @@ class Data_Batch_Generator(object):
 
             else:
                 if self.predict:
+
                     X_batch = self.dataset.getX(self.set_split,
                                                 init_sample,
                                                 final_sample,
                                                 normalization=self.params['normalization'],
                                                 meanSubstraction=self.params['mean_substraction'],
                                                 dataAugmentation=False)
+                    """
+                    if init_sample < 10:
+
+                        Y_batch = self.dataset.getY(self.set_split,
+                                                    init_sample,
+                                                    final_sample,
+                                                    normalization=self.params['normalization'],
+                                                    meanSubstraction=self.params['mean_substraction'],
+                                                    dataAugmentation=False)
+
+                        for e,i in enumerate(range(init_sample, final_sample)):
+                            np.save(self.set_split + '_im_in_%d.npy' % (i), X_batch[0][e])
+                            np.save(self.set_split + '_lab_in_%d.npy' % (i), Y_batch[0][e])
+                    """
                     data = self.net.prepareData(X_batch, None)[0]
                 else:
                     X_batch, Y_batch = self.dataset.getXY(self.set_split,
@@ -2281,6 +2296,8 @@ class Dataset(object):
         out_list = []
 
         assoc_id_in = self.id_in_3DLabel[id]
+        classes_to_colour = self.semantic_classes[id]
+        nClasses = len(classes_to_colour.keys())
         img_size = self.img_size[assoc_id_in]
         size_crop = self.img_size_crop[assoc_id_in]
         num_poolings = self.num_poolings_model[id]
@@ -2295,7 +2312,8 @@ class Dataset(object):
             w_crop = int(np.floor(w_crop / np.power(2, num_poolings)))
 
         for i in range(n_samples):
-            labels = np.zeros((h_crop, w_crop), dtype=np.float32)
+            pre_labels = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
+            #labels = np.zeros((h_crop, w_crop), dtype=np.uint8)
             line = gt[i]
 
             ### Load labeled GT image
@@ -2322,10 +2340,29 @@ class Dataset(object):
                 logging.warning("Can't load image " + labeled_im)
                 labeled_im = np.zeros((h, w))
 
-            labeled_im = misc.imresize(labeled_im, (h_crop, w_crop))
+            label3D = np.zeros((nClasses, h, w), dtype=np.float32)
 
-            # Reshape labels to (width*height, classes) before returning
-            labels = np.reshape(labeled_im, (w_crop * h_crop))
+            # Insert 1s in the corresponding positions for each class
+            for class_id, colour in classes_to_colour.iteritems():
+                # indices = np.where(np.all(labeled_im == colour, axis=-1))
+                indices = np.where(labeled_im == class_id)
+                num_vals = len(indices[0])
+                if num_vals > 0:
+                    for idx_pos in range(num_vals):
+                        x, y = indices[0][idx_pos], indices[1][idx_pos]
+                        label3D[class_id, x, y] = 1.
+
+            # Resize 3DLabel to crop size.
+            for j in range(nClasses):
+                label2D = misc.imresize(label3D[j], (h_crop, w_crop))
+                maxval = np.max(label2D)
+                if maxval > 0: label2D /= maxval
+                pre_labels[j] = label2D
+
+            # Convert to single matrix with class IDs
+            labels = np.argmax(pre_labels, axis=0)
+            labels = np.reshape(labels, (w_crop * h_crop))
+
             out_list.append(labels)
 
         return out_list
@@ -3298,7 +3335,7 @@ class Dataset(object):
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
-                    y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
+                    y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, None,
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                                   imlist)
                 elif type_out == 'text':

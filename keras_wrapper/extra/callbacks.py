@@ -310,6 +310,10 @@ class EvalPerformance(KerasCallback):
                     logging.info('Evaluating on metric ' + metric)
                 filepath = self.save_path + '/' + s + '.' + metric  # results file
 
+                if s == 'train':
+                    logging.info("WARNING: evaluation results on 'train' split might be incorrect when"
+                                 "applying random image shuffling.")
+
                 # Evaluate on the chosen metric
                 metrics = evaluation.select[metric](
                     pred_list=predictions,
