@@ -1448,27 +1448,32 @@ class Model_Wrapper(object):
         live_k = 1  # samples that did not yet reach eos
         hyp_samples = [[]] * live_k
         hyp_scores = np.zeros(live_k).astype('float32')
-        return_alphas = return_alphas or params['pos_unk']
-        if return_alphas:
+        ret_alphas = return_alphas or params['pos_unk']
+        if ret_alphas:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
+
+        maxlen = len(X[params['dataset_inputs'][0]][0]) * int(params['output_length_depending_on_x_factor']) if \
+            params['output_length_depending_on_x'] else params['maxlen']
+
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
-            if k > params['maxlen']:
+            if k > maxlen:
                 raise NotImplementedError(
                     "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
             state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray(
-                [np.zeros((params['maxlen'], params['maxlen']))] * live_k)
+                [np.zeros((maxlen, maxlen))] * live_k)
         else:
             state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray(
-                [np.zeros(params['maxlen'])] * live_k)
+                [np.zeros(maxlen)] * live_k)
 
         prev_out = None
-        for ii in xrange(params['maxlen']):
+
+        for ii in xrange(maxlen):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
-                if return_alphas:
+                if ret_alphas:
                     alphas = prev_out[-1][0]  # Shape: (k, n_steps)
                     prev_out = prev_out[:-1]
             else:
@@ -1483,19 +1488,29 @@ class Model_Wrapper(object):
             trans_indices = ranks_flat / voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
+            best_cost = costs[0]
             # Form a beam for the next iteration
             new_hyp_samples = []
             new_trans_indices = []
             new_hyp_scores = np.zeros(k - dead_k).astype('float32')
-            if return_alphas:
+            if ret_alphas:
                 new_hyp_alphas = []
             for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
-                new_hyp_samples.append(hyp_samples[ti] + [wi])
-                new_trans_indices.append(ti)
-                new_hyp_scores[idx] = copy.copy(costs[idx])
-                if return_alphas:
-                    new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
-
+                if params['search_pruning']:
+                    if costs[idx] < k * best_cost:
+                        new_hyp_samples.append(hyp_samples[ti] + [wi])
+                        new_trans_indices.append(ti)
+                        new_hyp_scores[idx] = copy.copy(costs[idx])
+                        if ret_alphas:
+                            new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
+                    else:
+                        dead_k += 1
+                else:
+                    new_hyp_samples.append(hyp_samples[ti] + [wi])
+                    new_trans_indices.append(ti)
+                    new_hyp_scores[idx] = copy.copy(costs[idx])
+                    if ret_alphas:
+                        new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
             # check the finished samples
             new_live_k = 0
             hyp_samples = []
@@ -1506,7 +1521,7 @@ class Model_Wrapper(object):
                 if new_hyp_samples[idx][-1] == 0:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
-                    if return_alphas:
+                    if ret_alphas:
                         sample_alphas.append(new_hyp_alphas[idx])
                     dead_k += 1
                 else:
@@ -1514,7 +1529,7 @@ class Model_Wrapper(object):
                     new_live_k += 1
                     hyp_samples.append(new_hyp_samples[idx])
                     hyp_scores.append(new_hyp_scores[idx])
-                    if return_alphas:
+                    if ret_alphas:
                         hyp_alphas.append(new_hyp_alphas[idx])
             hyp_scores = np.array(hyp_scores)
             live_k = new_live_k
@@ -1533,13 +1548,13 @@ class Model_Wrapper(object):
             else:
                 state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
                                          np.zeros((state_below.shape[0],
-                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                   max(maxlen - state_below.shape[1] - 1, 0)),
                                                   dtype='int64')))
 
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
                     state_below = np.hstack((state_below,
-                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                             np.zeros((state_below.shape[0], maxlen - state_below.shape[1],
                                                        state_below.shape[2]))))
 
             if params['optimized_search'] and ii > 0:
@@ -1552,9 +1567,9 @@ class Model_Wrapper(object):
             for idx in xrange(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
-                if return_alphas:
+                if ret_alphas:
                     sample_alphas.append(hyp_alphas[idx])
-        if return_alphas:
+        if ret_alphas:
             return samples, sample_scores, np.asarray(sample_alphas)
         else:
             return samples, sample_scores, None
@@ -1608,9 +1623,8 @@ class Model_Wrapper(object):
                           'sampling_type': 'max_likelihood',
                           'words_so_far': False,
                           'optimized_search': False,
+                          'search_pruning': False,
                           'pos_unk': False,
-                          'heuristic': 0,
-                          'mapping': None,
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
                           'state_below_index': -1,
@@ -1765,11 +1779,8 @@ class Model_Wrapper(object):
                             x[input_id] = np.array(X[input_id])
                             
                     # Apply beam search
-                    if params['pos_unk']:
-                        samples_all, scores_all, alphas_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                    else:
-                        samples_all, scores_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-                    
+                    samples_all, scores_all, alphas_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+
                     # Recover most probable output for each sample
                     for i_sample in range(n_samples_batch):
                         samples = samples_all[i_sample]
@@ -1866,9 +1877,8 @@ class Model_Wrapper(object):
                           'sampling_type': 'max_likelihood',
                           'words_so_far': False,
                           'optimized_search': False,
+                          'search_pruning': False,
                           'pos_unk': False,
-                          'heuristic': 0,
-                          'mapping': None,
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
                           'state_below_index': -1,
@@ -1879,6 +1889,8 @@ class Model_Wrapper(object):
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
                           'coverage_norm_factor': 0.0,
+                          'output_length_depending_on_x': False,
+                          'output_length_depending_on_x_factor': 3
                           }
 
         params = self.checkParameters(parameters, default_params)
@@ -1907,7 +1919,6 @@ class Model_Wrapper(object):
                     "The following attributes must be inserted to the model when building a temporally_linked model:\n",
                     "- matchings_sample_to_next_sample\n",
                     "- ids_temporally_linked_inputs\n")
-
         predictions = dict()
         references = []
         sources_sampling = []
@@ -1920,7 +1931,6 @@ class Model_Wrapper(object):
                 data_gen = -1
                 data_gen_instance = -1
             else:
-
                 assert len(params['model_inputs']) > 0, 'We need at least one input!'
                 if not params['optimized_search']:  # use optimized search model if available
                     assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
@@ -2323,9 +2333,7 @@ class Model_Wrapper(object):
                           'optimized_search': False,
                           'state_below_index': -1,
                           'output_text_index': 0,
-                          'pos_unk': False,
-                          'heuristic': 0,
-                          'mapping': None
+                          'pos_unk': False
                           }
         params = self.checkParameters(self.params, default_params)
 

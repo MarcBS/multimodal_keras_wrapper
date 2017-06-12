@@ -504,6 +504,10 @@ class Dataset(object):
         self.semantic_classes = dict()
         #################################################
 
+        ############################ Parameters used for outputs of type 'sparse'
+        self.sparse_binary = dict()
+        #################################################
+
         # Reset counters to start loading data in batches
         self.resetCounters()
 
@@ -822,6 +826,7 @@ class Dataset(object):
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
                   associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
+                  sparse=False, # 'binary'
                   ):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -853,6 +858,10 @@ class Dataset(object):
             :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
             :param num_poolings: number of pooling layers used in the model (used for calculating output dimensions)
 
+            # 'binary'-related parameters
+
+            :param sparse: indicates if the data is stored as a list of lists with class indices, e.g. [[4, 234],[87, 222, 4568],[3],...]
+
         """
         self.__checkSetName(set_name)
 
@@ -880,7 +889,7 @@ class Dataset(object):
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                                        max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
         elif type == 'binary':
-            data = self.preprocessBinary(path_list)
+            data = self.preprocessBinary(path_list, id, sparse)
         elif type == 'real':
             data = self.preprocessReal(path_list)
         elif type == 'id':
@@ -989,42 +998,56 @@ class Dataset(object):
 
         return labels
 
-    def loadCategorical(self, y_raw, nClasses, id, load_sample_weights):
+    def loadCategorical(self, y_raw, nClasses):
         y = np_utils.to_categorical(y_raw, nClasses).astype(np.uint8)
-        # if load_sample_weights:
-        #    sw = self.getCategoricalSampleWeights(y_raw, id)
-        #    y = (y, sw)
-
         return y
-
-    """
-    def getCategoricalSampleWeights(self, y, id):
-        n_samples = len(y)
-        sw = np.zeros((n_samples,))
-        all_sw = self.extra_variables['sample_weights_'+id]
-        for i,y_ in enumerate(y):
-            sw[i] = all_sw[y_]
-        return sw
-    """
 
     # ------------------------------------------------------- #
     #       TYPE 'binary' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocessBinary(self, labels_list):
+    def preprocessBinary(self, labels_list, id, sparse):
         """
         Preprocesses binary classes.
 
         :param labels_list: Binary label list given as an instance of the class list.
+        :param sparse: indicates if the data is stored as a list of lists with class indices, e.g. [[4, 234],[87, 222, 4568],[3],...]
 
         :return: Preprocessed labels.
         """
-        if isinstance(labels_list, list):
-            labels = labels_list
-        else:
+        if not isinstance(labels_list, list):
             raise Exception('Wrong type for "path_list". It must be an instance of the class list.')
 
+        if sparse:
+            labels = labels_list
+        else: # convert to sparse representation
+            labels = [[i for i, x in enumerate(y) if x == 1] for y in labels_list]
+        self.sparse_binary[id] = True
+
+        y_vocab = [':::'.join(y) for y in labels]
+        self.build_vocabulary(y_vocab, id, split_symbol=':::')
+
         return labels
+
+    def loadBinary(self, y_raw, id):
+
+        try:
+            sparse = self.sparse_binary[id]
+        except: # allows retrocompatibility
+            sparse = False
+
+        if sparse: # convert sparse into numpy array
+            n_samples = len(y_raw)
+            voc = self.vocabulary[id]['words2idx']
+            num_words = len(voc.keys())
+            y = np.zeros((n_samples, num_words), type=np.uint8)
+            for i, y_ in enumerate(y_raw):
+                for elem in y_:
+                    y[i,voc[elem]] = 1
+        else:
+            y = np.array(y_raw).astype(np.uint8)
+
+        return y
 
     # ------------------------------------------------------- #
     #       TYPE 'real' SPECIFIC FUNCTIONS
@@ -1207,14 +1230,14 @@ class Dataset(object):
 
         return sentences
 
-    def build_vocabulary(self, captions, id, tokfun, do_split, min_occ=0, n_words=0):
+    def build_vocabulary(self, captions, id, do_split=True, min_occ=0, n_words=0, split_symbol=' '):
         """
         Vocabulary builder for data of type 'text'
 
         :param captions: Corpus sentences
         :param id: Dataset id of the text
-        :param tokfun: Tokenization function. (used?)
         :param do_split: Split sentence by words or use the full sentence as a class.
+        :param split_symbol: symbol used for separating the elements in each sentence
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
         :param n_words: Maximum number of words to include in the dictionary.
         :return: None.
@@ -1228,9 +1251,7 @@ class Dataset(object):
         sentence_count = 0
         for line in captions:
             if do_split:
-                # tokenized = tokfun(line)º
-                # words = tokenized.strip().split(' ')
-                words = line.strip().split(' ')
+                words = line.strip().split(split_symbol)
                 counter.update(words)
             else:
                 counter.update([line])
@@ -2140,6 +2161,7 @@ class Dataset(object):
         features = np.zeros((n_videos, max_len, feat_len))
 
         selected_frames = self.getFramesPaths(idx_videos, id, set_name, max_len, data_augmentation)
+        data_augmentation_types = self.inputs_data_augmentation_types[id]
 
         # load features from selected paths
         for i, vid_paths in enumerate(selected_frames):
@@ -3016,7 +3038,7 @@ class Dataset(object):
                     load_sample_weights = self.sample_weights[id_out][set_name]
                     y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
                 elif type_out == 'binary':
-                    y = np.array(y).astype(np.uint8)
+                    y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
                 elif (type_out == '3DLabel'):
@@ -3157,7 +3179,7 @@ class Dataset(object):
                     load_sample_weights = self.sample_weights[id_out][set_name]
                     y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
                 elif type_out == 'binary':
-                    y = np.array(y).astype(np.uint8)
+                    y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
                 elif (type_out == '3DLabel'):
@@ -3320,7 +3342,7 @@ class Dataset(object):
                     load_sample_weights = self.sample_weights[id_out][set_name]
                     y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
                 elif type_out == 'binary':
-                    y = np.array(y).astype(np.uint8)
+                    y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
                 elif (type_out == '3DLabel'):
