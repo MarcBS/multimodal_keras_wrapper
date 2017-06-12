@@ -314,6 +314,7 @@ class EvalPerformance(KerasCallback):
                         raise NotImplementedError(
                             'The store type "' + self.write_type + '" is not implemented.')
 
+<<<<<<< HEAD
                 # Evaluate on each metric
                 for metric in self.metric_name:
                     if self.verbose > 0:
@@ -331,6 +332,36 @@ class EvalPerformance(KerasCallback):
                     with open(filepath, 'a') as f:
                         header = counter_name + ','
                         line = str(epoch) + ','
+=======
+            # Evaluate on each metric
+            for metric in self.metric_name:
+                if self.verbose > 0:
+                    logging.info('Evaluating on metric ' + metric)
+                filepath = self.save_path + '/' + s + '.' + metric  # results file
+
+                if s == 'train':
+                    logging.info("WARNING: evaluation results on 'train' split might be incorrect when"
+                                 "applying random image shuffling.")
+
+                # Evaluate on the chosen metric
+                metrics = evaluation.select[metric](
+                    pred_list=predictions,
+                    verbose=self.verbose,
+                    extra_vars=self.extra_vars,
+                    split=s)
+
+                # Print results to file and store in model log
+                with open(filepath, 'a') as f:
+                    header = counter_name + ','
+                    line = str(epoch) + ','
+                    # Store in model log
+                    self.model_to_eval.log(s, counter_name, epoch)
+                    for metric_ in sorted(metrics):
+                        all_metrics.append(metric_)
+                        value = metrics[metric_]
+                        header += metric_ + ','
+                        line += str(value) + ','
+>>>>>>> ea79eeb94a10b8bebd1aa846b82fbe453a9a7296
                         # Store in model log
                         self.model_to_eval.log(s, counter_name, epoch)
                         for metric_ in sorted(metrics):
