@@ -110,18 +110,21 @@ class BeamSearchEnsemble:
         if self.return_alphas:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
+
+        maxlen = len(X[params['dataset_inputs'][0]][0]) * int(params['output_length_depending_on_x_factor']) if \
+            params['output_length_depending_on_x'] else params['maxlen']
+
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
-            if k > params['maxlen']:
+            if k > maxlen:
                 raise NotImplementedError("BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN!")
             state_below = np.asarray([[null_sym]] * live_k) \
-                if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))] * live_k)
+                if pad_on_batch else np.asarray([np.zeros((maxlen, maxlen))] * live_k)
         else:
             state_below = np.asarray([null_sym] * live_k) \
-                if pad_on_batch else np.asarray([np.zeros(params['maxlen'])] * live_k)
-
+                if pad_on_batch else np.asarray([np.zeros(maxlen)] * live_k)
         prev_outs = [None] * len(self.models)
-        for ii in xrange(params['maxlen']):
+        for ii in xrange(maxlen):
             # for every possible live sample calc prob for every possible label
             if self.optimized_search:  # use optimized search model if available
                 [probs, prev_outs, alphas] = self.predict_cond(self.models, X, state_below, params, ii,
@@ -133,7 +136,6 @@ class BeamSearchEnsemble:
             cand_flat = cand_scores.flatten()
             # Find the best options by calling argsort of flatten array
             ranks_flat = cand_flat.argsort()[:(k - dead_k)]
-
             # Decypher flatten indices
             voc_size = probs.shape[1]
             trans_indices = ranks_flat / voc_size  # index of row
@@ -200,13 +202,13 @@ class BeamSearchEnsemble:
             else:
                 state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
                                          np.zeros((state_below.shape[0],
-                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                   max(maxlen - state_below.shape[1] - 1, 0)),
                                                   dtype='int64')))
 
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
                     state_below = np.hstack((state_below,
-                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                             np.zeros((state_below.shape[0], maxlen - state_below.shape[1],
                                                        state_below.shape[2]))))
 
             if self.optimized_search and ii > 0:
@@ -276,7 +278,9 @@ class BeamSearchEnsemble:
                           'coverage_penalty': False,
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
-                          'coverage_norm_factor': 0.0
+                          'coverage_norm_factor': 0.0,
+                          'output_length_depending_on_x': False,
+                          'output_length_depending_on_x_factor': 3
                           }
         params = self.checkParameters(self.params, default_params)
         predictions = dict()
@@ -464,7 +468,9 @@ class BeamSearchEnsemble:
                           'coverage_penalty': False,
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
-                          'coverage_norm_factor': 0.0
+                          'coverage_norm_factor': 0.0,
+                          'output_length_depending_on_x': False,
+                          'output_length_depending_on_x_factor': 3
                           }
         params = self.checkParameters(self.params, default_params)
         params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
@@ -665,7 +671,9 @@ class BeamSearchEnsemble:
                           'coverage_penalty': False,
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
-                          'coverage_norm_factor': 0.0
+                          'coverage_norm_factor': 0.0,
+                          'output_length_depending_on_x': False,
+                          'output_length_depending_on_x_factor': 3
                           }
         params = self.checkParameters(self.params, default_params)
 
@@ -816,7 +824,9 @@ class BeamSearchEnsemble:
                           'coverage_penalty': False,
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
-                          'coverage_norm_factor': 0.0
+                          'coverage_norm_factor': 0.0,
+                          'output_length_depending_on_x': False,
+                          'output_length_depending_on_x_factor': 3
                           }
         params = self.checkParameters(self.params, default_params)
 

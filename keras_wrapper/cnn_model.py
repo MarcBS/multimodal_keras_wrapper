@@ -1452,19 +1452,24 @@ class Model_Wrapper(object):
         if ret_alphas:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
+
+        maxlen = len(X[params['dataset_inputs'][0]][0]) * int(params['output_length_depending_on_x_factor']) if \
+            params['output_length_depending_on_x'] else params['maxlen']
+
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
-            if k > params['maxlen']:
+            if k > maxlen:
                 raise NotImplementedError(
                     "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
             state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray(
-                [np.zeros((params['maxlen'], params['maxlen']))] * live_k)
+                [np.zeros((maxlen, maxlen))] * live_k)
         else:
             state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray(
-                [np.zeros(params['maxlen'])] * live_k)
+                [np.zeros(maxlen)] * live_k)
 
         prev_out = None
-        for ii in xrange(params['maxlen']):
+
+        for ii in xrange(maxlen):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
@@ -1543,13 +1548,13 @@ class Model_Wrapper(object):
             else:
                 state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
                                          np.zeros((state_below.shape[0],
-                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                   max(maxlen - state_below.shape[1] - 1, 0)),
                                                   dtype='int64')))
 
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
                     state_below = np.hstack((state_below,
-                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                             np.zeros((state_below.shape[0], maxlen - state_below.shape[1],
                                                        state_below.shape[2]))))
 
             if params['optimized_search'] and ii > 0:
@@ -1884,6 +1889,8 @@ class Model_Wrapper(object):
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
                           'coverage_norm_factor': 0.0,
+                          'output_length_depending_on_x': False,
+                          'output_length_depending_on_x_factor': 3
                           }
 
         params = self.checkParameters(parameters, default_params)
