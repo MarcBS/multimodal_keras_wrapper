@@ -1203,7 +1203,7 @@ class Dataset(object):
         # Build vocabulary
         error_vocab = False
         if build_vocabulary == True:
-            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words)
+            self.build_vocabulary(sentences, id, max_text_len != 0, min_occ=min_occ, n_words=max_words)
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
