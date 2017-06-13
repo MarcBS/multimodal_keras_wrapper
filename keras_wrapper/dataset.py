@@ -1025,7 +1025,7 @@ class Dataset(object):
             n_samples = len(y_raw)
             voc = self.vocabulary[id]['words2idx']
             num_words = len(voc.keys())
-            y = np.zeros((n_samples, num_words), type=np.uint8)
+            y = np.zeros((n_samples, num_words), dtype=np.uint8)
             for i, y_ in enumerate(y_raw):
                 for elem in y_:
                     y[i,voc[elem]] = 1
