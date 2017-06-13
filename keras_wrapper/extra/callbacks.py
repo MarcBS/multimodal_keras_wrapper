@@ -61,6 +61,7 @@ class EvalPerformance(KerasCallback):
                  metric_name,
                  set_name,
                  batch_size,
+                 gt_pos=[],
                  each_n_epochs=1,
                  max_eval_samples=None,
                  extra_vars=dict(),
@@ -96,6 +97,7 @@ class EvalPerformance(KerasCallback):
         :param metric_name: name of the performance metric
         :param set_name: list with the names of the set splits that will be evaluated
         :param batch_size: batch size used during sampling
+        :param gt_pos: position of the GT output to evaluate in model's outputs
         :param each_n_epochs: sampling each this number of epochs or updates
         :param max_eval_samples: maximum number of samples evaluated
         :param extra_vars: dictionary of extra variables. See evaluation metrics in keras_wrapper/extra/evaluation.py for assigning the needed extra variables.
@@ -136,6 +138,7 @@ class EvalPerformance(KerasCallback):
         self.is_3DLabel = is_3DLabel
         self.sampling = sampling
         self.beam_search = beam_search
+        self.gt_pos = gt_pos
         self.beam_batch_size = beam_batch_size
         self.metric_name = metric_name
         self.set_name = set_name
@@ -211,7 +214,7 @@ class EvalPerformance(KerasCallback):
                                      }
 
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
-                predictions = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
+                predictions_all = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
                 orig_size = self.extra_vars.get('eval_orig_size', False)
                 params_prediction = {'batch_size': self.batch_size,
@@ -225,94 +228,102 @@ class EvalPerformance(KerasCallback):
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
                 elif orig_size:
                     postprocess_fun = [self.ds.resize_semantic_output, self.extra_vars[s]['eval_orig_size_id']]
-                predictions = \
+                predictions_all = \
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 
-            if self.is_text:
-                if params_prediction.get('pos_unk', False):
-                    samples = predictions[0]
-                    alphas = predictions[1]
+            if not self.gt_pos:
+                predictions_all = [predictions_all]
+                self.gt_pos = [0]
 
-                    if eval('self.ds.loaded_raw_' + s + '[0]'):
-                        sources = predictions[2]
+            for gt_pos in self.gt_pos:
+                predictions = predictions_all[gt_pos]
+
+                if self.is_text:
+                    if params_prediction.get('pos_unk', False):
+                        samples = predictions[0]
+                        alphas = predictions[1]
+
+                        if eval('self.ds.loaded_raw_' + s + '[0]'):
+                            sources = predictions[2]
+                        else:
+                            sources = []
+                            for preds in predictions[2]:
+                                for src in preds[self.input_text_id]:
+                                    sources.append(src)
+                            sources = decode_predictions_beam_search(sources,
+                                                                     self.index2word_x,
+                                                                     pad_sequences=True,
+                                                                     verbose=self.verbose)
+                        heuristic = self.extra_vars['heuristic']
                     else:
-                        sources = []
-                        for preds in predictions[2]:
-                            for src in preds[self.input_text_id]:
-                                sources.append(src)
-                        sources = decode_predictions_beam_search(sources,
-                                                                 self.index2word_x,
-                                                                 pad_sequences=True,
-                                                                 verbose=self.verbose)
-                    heuristic = self.extra_vars['heuristic']
-                else:
-                    samples = predictions
-                    alphas = None
-                    heuristic = None
-                    sources = None
-                if self.out_pred_idx is not None:
-                    samples = samples[self.out_pred_idx]
-                # Convert predictions into sentences
-                if self.beam_search:
-                    predictions = decode_predictions_beam_search(samples,
+                        samples = predictions
+                        alphas = None
+                        heuristic = None
+                        sources = None
+                    if self.out_pred_idx is not None:
+                        samples = samples[self.out_pred_idx]
+                    # Convert predictions into sentences
+                    if self.beam_search:
+                        predictions = decode_predictions_beam_search(samples,
                                                                  self.index2word_y,
                                                                  alphas=alphas,
                                                                  x_text=sources,
                                                                  heuristic=heuristic,
                                                                  mapping=self.extra_vars.get('mapping', None),
                                                                  verbose=self.verbose)
-                else:
-                    probs = predictions
-                    predictions = decode_predictions(predictions,
+                    else:
+                        probs = predictions
+                        predictions = decode_predictions(predictions,
                                                      1,  # always set temperature to 1
                                                      self.index2word_y,
                                                      self.sampling_type,
                                                      verbose=self.verbose)
 
-                # Apply detokenization function if needed
-                if self.extra_vars.get('apply_detokenization', False):
-                    predictions = map(self.extra_vars['detokenize_f'], predictions)
+                    # Apply detokenization function if needed
+                    if self.extra_vars.get('apply_detokenization', False):
+                        predictions = map(self.extra_vars['detokenize_f'], predictions)
 
 
-            elif self.is_multilabel:
-                if self.multilabel_idx is not None:
-                    predictions = predictions[self.multilabel_idx]
-                predictions = decode_multilabel(predictions,
-                                                self.index2word_y,
-                                                min_val=self.min_pred_multilabel,
-                                                verbose=self.verbose)
+                elif self.is_multilabel:
+                    if self.multilabel_idx is not None:
+                        predictions = predictions[self.multilabel_idx]
+                    predictions = decode_multilabel(predictions,
+                                                    self.index2word_y,
+                                                    min_val=self.min_pred_multilabel,
+                                                    verbose=self.verbose)
 
-            # Store predictions
-            if self.write_samples:
-                # Store result
-                filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '.pred'  # results file
-                if self.write_type == 'list':
-                    list2file(filepath, predictions)
-                elif self.write_type == 'vqa':
-                    try:
+                # Store predictions
+                if self.write_samples:
+                    # Store result
+                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '.pred'  # results file
+                    if self.write_type == 'list':
+                        list2file(filepath, predictions)
+                    elif self.write_type == 'vqa':
                         exec('refs = self.ds.Y_'+s+'[self.gt_id]')
-                    except:
-                        refs = ['N/A' for i in range(probs.shape[0])]
-                    extra_data_plot = {'reference': refs,
-                                       'probs': probs,
-                                       'vocab': self.index2word_y}
-                    list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'], extra=extra_data_plot)
-                elif self.write_type == 'listoflists':
-                    listoflists2file(filepath, predictions)
-                elif self.write_type == 'numpy':
-                    numpy2file(filepath, predictions)
-                elif self.write_type == '3DLabels':
-                    # TODO:
-                    print("WRITE SAMPLES FUNCTION NOT IMPLEMENTED")
-                else:
-                    raise NotImplementedError(
-                        'The store type "' + self.write_type + '" is not implemented.')
+                        extra_data_plot = {'reference': refs,
+                                           'probs': probs}
+                        list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'], extra=extra_data_plot)
+                    elif self.write_type == 'listoflists':
+                        listoflists2file(filepath, predictions)
+                    elif self.write_type == 'numpy':
+                        numpy2file(filepath, predictions)
+                    elif self.write_type == '3DLabels':
+                        # TODO:
+                        print("WRITE SAMPLES FUNCTION NOT IMPLEMENTED")
+                    else:
+                        raise NotImplementedError(
+                            'The store type "' + self.write_type + '" is not implemented.')
+
 
             # Evaluate on each metric
             for metric in self.metric_name:
                 if self.verbose > 0:
                     logging.info('Evaluating on metric ' + metric)
                 filepath = self.save_path + '/' + s + '.' + metric  # results file
+
+                if s == 'train':
+                    logging.info("WARNING: evaluation results on 'train' split might be incorrect when"
+                                 "applying random image shuffling.")
 
                 # Evaluate on the chosen metric
                 metrics = evaluation.select[metric](
@@ -333,14 +344,22 @@ class EvalPerformance(KerasCallback):
                         header += metric_ + ','
                         line += str(value) + ','
                         # Store in model log
-                        self.model_to_eval.log(s, metric_, value)
-                    if not self.written_header:
-                        f.write(header + '\n')
-                        self.written_header = True
-                    f.write(line + '\n')
+                        self.model_to_eval.log(s, counter_name, epoch)
+                        for metric_ in sorted(metrics):
+                            all_metrics.append(metric_)
+                            value = metrics[metric_]
+                            header += metric_ + ','
+                            line += str(value) + ','
+                            # Store in model log
+                            self.model_to_eval.log(s, metric_, value)
+                        if not self.written_header:
+                            f.write(header + '\n')
+                            self.written_header = True
+                        f.write(line + '\n')
 
-                if self.verbose > 0:
-                    logging.info('Done evaluating on metric ' + metric)
+                    if self.verbose > 0:
+                        logging.info('Done evaluating on metric ' + metric)
+
 
         # Plot results so far
         self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
