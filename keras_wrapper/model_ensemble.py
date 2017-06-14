@@ -111,7 +111,7 @@ class BeamSearchEnsemble:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
 
-        maxlen = len(X[params['dataset_inputs'][0]][0]) * int(params['output_length_depending_on_x_factor']) if \
+        maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_length_depending_on_x_factor']) if \
             params['output_length_depending_on_x'] else params['maxlen']
 
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
@@ -401,7 +401,7 @@ class BeamSearchEnsemble:
                         n_best_scores = np.asarray(scores)[n_best_indices]
                         n_best_samples = np.asarray(samples)[n_best_indices]
                         if alphas is not None:
-                            n_best_alphas = np.asarray(n_best_alphas)[n_best_indices]
+                            n_best_alphas = [np.stack(alphas[i]) for i in n_best_indices]
                         else:
                             n_best_alphas = [None] * len(n_best_indices)
                         n_best_list.append([n_best_samples, n_best_scores, n_best_alphas])
@@ -462,6 +462,7 @@ class BeamSearchEnsemble:
                           'optimized_search': False,
                           'state_below_index': -1,
                           'output_text_index': 0,
+                          'search_pruning': False,
                           'pos_unk': False,
                           'normalize_probs': False,
                           'alpha_factor': 0.0,
@@ -523,7 +524,7 @@ class BeamSearchEnsemble:
             n_best_scores = np.asarray(scores)[n_best_indices]
             n_best_samples = np.asarray(samples)[n_best_indices]
             if alphas is not None:
-                n_best_alphas = np.asarray(n_best_alphas)[n_best_indices]
+                n_best_alphas = [np.stack(alphas[i]) for i in n_best_indices]
             else:
                 n_best_alphas = [None] * len(n_best_indices)
             n_best_list.append([n_best_samples, n_best_scores, n_best_alphas])

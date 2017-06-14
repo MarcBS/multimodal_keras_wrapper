@@ -1971,7 +1971,8 @@ class Dataset(object):
         :param separator: BPE separator.
         :return: Detokenized version of caption.
         """
-        detokenized = re.sub(separator + ' ', '', str(caption).strip())
+        bpe_detokenization = re.compile('(' + separator + ' )|(' + separator + ' ?$)')
+        detokenized = bpe_detokenization.sub("", str(caption).strip())
         return detokenized
 
     def detokenize_none_char(self, caption):
