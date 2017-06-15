@@ -765,7 +765,7 @@ class Model_Wrapper(object):
                           'each_n_epochs': 1,
                           'start_eval_on_epoch': 0,  # early stopping parameters
                           'lr_decay': None,  # LR decay parameters
-                          'lr_gamma': 0.1
+                          'lr_gamma': 0.1,
                           'lr_reducer_type': 'linear',
                           'lr_half_life': 50000}
         params = self.checkParameters(parameters, default_params)

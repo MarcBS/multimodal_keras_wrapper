@@ -671,14 +671,14 @@ class LearningRateReducer_ExpDecay(KerasCallback):
 
     def __init__(self, half_life=50000, verbose=1):
         super(KerasCallback, self).__init__()
-        self.reduce_rate = reduce_rate
         self.half_life = half_life
-        self.current_reduce_nb = current_reduce_nb
+        self.current_reduce_nb = 0
 
     def on_batch_end(self, n_update, logs={}):
 
         self.current_reduce_nb += 1
-        new_rate = np.power(0.5, self.current_reduce_nb/half_life)
+        new_rate = np.power(0.5, self.current_reduce_nb/self.half_life)
+        lr = self.model.optimizer.lr.get_value()
         self.model.optimizer.lr.set_value(np.float32(lr * new_rate))
 
 
@@ -705,18 +705,18 @@ class LearningRateReducer_LinearDecay(KerasCallback):
 
     def on_epoch_end(self, epoch, logs={}):
 
-		# Decrease LR if self.lr_decay epochs have passed sice the last decrease
-		self.last_lr_decrease += 1
-		if self.last_lr_decrease >= self.lr_decay:
-        	    self.current_reduce_nb += 1
-		    if self.current_reduce_nb <= self.reduce_nb:
-		        self.last_lr_decrease = 0
-		        lr = self.model.optimizer.lr.get_value()
-		        self.model.optimizer.lr.set_value(np.float32(lr * self.reduce_rate))
-		        if self.verbose > 0:
-		            logging.info("LR reduction from {0:0.6f} to {1:0.6f}". \
-		                         format(float(lr), float(lr * self.reduce_rate)))
-		        if float(lr) <= self.epsilon:
-		            if self.verbose > 0:
-		                logging.info('Learning rate too small, learning stops now')
-		            self.model.stop_training = True
+        # Decrease LR if self.lr_decay epochs have passed sice the last decrease
+        self.last_lr_decrease += 1
+        if self.last_lr_decrease >= self.lr_decay:
+            self.current_reduce_nb += 1
+            if self.current_reduce_nb <= self.reduce_nb:
+                self.last_lr_decrease = 0
+		lr = self.model.optimizer.lr.get_value()
+		self.model.optimizer.lr.set_value(np.float32(lr * self.reduce_rate))
+		if self.verbose > 0:
+		    logging.info("LR reduction from {0:0.6f} to {1:0.6f}". \
+		                     format(float(lr), float(lr * self.reduce_rate)))
+		if float(lr) <= self.epsilon:
+		    if self.verbose > 0:
+		        logging.info('Learning rate too small, learning stops now')
+		    self.model.stop_training = True
