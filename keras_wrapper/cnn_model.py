@@ -692,7 +692,8 @@ class Model_Wrapper(object):
                           'start_eval_on_epoch': 0,  # early stopping parameters
                           'lr_decay': None,  # LR decay parameters
                           'lr_gamma': 0.1,
-                          'reducer_type': 'epoch',}
+                          'lr_reducer_type': 'linear',
+                          'lr_half_life': 50000}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
@@ -765,7 +766,8 @@ class Model_Wrapper(object):
                           'start_eval_on_epoch': 0,  # early stopping parameters
                           'lr_decay': None,  # LR decay parameters
                           'lr_gamma': 0.1
-                          'reducer_type': 'epoch',}
+                          'lr_reducer_type': 'linear',
+                          'lr_half_life': 50000}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
@@ -792,7 +794,10 @@ class Model_Wrapper(object):
 
         # LR reducer
         if params.get('lr_decay') is not None:
-            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'], reducer_type=params.get('reducer_type', 'epoch'))
+            if params.get('lr_reducer_type') == 'linear':
+                callback_lr_reducer = LearningRateReducer_LinearDecay(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            elif params.get('lr_reducer_type') == 'exp':
+                callback_lr_reducer = LearningRateReducer_ExpDecay(half_life=params['lr_half_life'])
             callbacks.append(callback_lr_reducer)
 
         # Early stopper
@@ -877,7 +882,10 @@ class Model_Wrapper(object):
 
         # LR reducer
         if params.get('lr_decay') is not None:
-            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'], reducer_type=params.get('reducer_type', 'epoch'))
+            if params.get('lr_reducer_type') == 'linear':
+                callback_lr_reducer = LearningRateReducer_LinearDecay(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            elif params.get('lr_reducer_type') == 'exp':
+                callback_lr_reducer = LearningRateReducer_ExpDecay(half_life=params['lr_half_life'])
             callbacks.append(callback_lr_reducer)
 
         # Early stopper

@@ -664,12 +664,30 @@ class EarlyStopping(KerasCallback):
                 exit(1)
 
 
-class LearningRateReducer(KerasCallback):
+class LearningRateReducer_ExpDecay(KerasCallback):
     """
     Reduces learning rate during the training.
     """
 
-    def __init__(self, lr_decay=1, reduce_rate=0.5, reduce_nb=99999, reducer_type='epoch', verbose=1):
+    def __init__(self, half_life=50000, verbose=1):
+        super(KerasCallback, self).__init__()
+        self.reduce_rate = reduce_rate
+        self.half_life = half_life
+        self.current_reduce_nb = current_reduce_nb
+
+    def on_batch_end(self, n_update, logs={}):
+
+        self.current_reduce_nb += 1
+        new_rate = np.power(0.5, self.current_reduce_nb/half_life)
+        self.model.optimizer.lr.set_value(np.float32(lr * new_rate))
+
+
+class LearningRateReducer_LinearDecay(KerasCallback):
+    """
+    Reduces learning rate during the training.
+    """
+
+    def __init__(self, lr_decay=1, reduce_rate=0.5, reduce_nb=99999, verbose=1):
         """
         :param lr_decay: minimum number of epochs passed before the last reduction
         :param reduce_rate: multiplicative rate reducer; by default 0.5
@@ -684,22 +702,13 @@ class LearningRateReducer(KerasCallback):
         self.epsilon = 0.1e-10
         self.lr_decay = lr_decay
         self.last_lr_decrease = 0
-	self.reducer_type = reducer_type
-
-    def on_batch_end(self, n_update, logs={}):
-
-        if reducer_type == 'update':
-            self.current_reduce_nb += 1
-            new_rate = np.power(0.5, self.current_reduce_nb/50000)
-            self.model.optimizer.lr.set_value(np.float32(lr * new_rate))
 
     def on_epoch_end(self, epoch, logs={}):
 
-	if reducer_type == 'epoch':
 		# Decrease LR if self.lr_decay epochs have passed sice the last decrease
 		self.last_lr_decrease += 1
 		if self.last_lr_decrease >= self.lr_decay:
-		    self.current_reduce_nb += 1
+        	    self.current_reduce_nb += 1
 		    if self.current_reduce_nb <= self.reduce_nb:
 		        self.last_lr_decrease = 0
 		        lr = self.model.optimizer.lr.get_value()
