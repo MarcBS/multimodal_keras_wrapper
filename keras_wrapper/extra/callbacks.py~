@@ -700,6 +700,7 @@ class LearningRateReducer(KerasCallback):
             new_rate = np.power(0.5, self.current_reduce_nb/50000)
             self.model.optimizer.lr.set_value(np.float32(lr * new_rate))
 
+
     def on_epoch_end(self, epoch, logs={}):
 
 	if reducer_type == 'epoch':
