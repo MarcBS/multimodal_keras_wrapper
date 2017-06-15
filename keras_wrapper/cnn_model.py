@@ -1454,7 +1454,7 @@ class Model_Wrapper(object):
             sample_alphas = []
             hyp_alphas = [[]] * live_k
 
-        maxlen = len(X[params['dataset_inputs'][0]][0]) * int(params['output_length_depending_on_x_factor']) if \
+        maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_length_depending_on_x_factor']) if \
             params['output_length_depending_on_x'] else params['maxlen']
 
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"

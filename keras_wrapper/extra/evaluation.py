@@ -40,13 +40,13 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
     from pycocoevalcap.ter.ter import Ter
 
     gts = extra_vars[split]['references']
-    if extra_vars.get('tokenize_hypotheses', True):
+    if extra_vars.get('tokenize_hypotheses', False):
         hypo = {idx: map(extra_vars['tokenize_f'], [lines.strip()]) for (idx, lines) in enumerate(pred_list)}
     else:
         hypo = {idx: [lines.strip()] for (idx, lines) in enumerate(pred_list)}
     
     # Tokenize refereces if needed
-    if extra_vars.get('tokenize_references', True):
+    if extra_vars.get('tokenize_references', False):
         refs = {idx: map(extra_vars['tokenize_f'], gts[idx]) for idx in gts.keys()}
     else:
         refs = gts
@@ -61,7 +61,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
         (Rouge(), "ROUGE_L"),
         (Cider(), "CIDEr")
     ]
-    if extra_vars['language'] in accepted_langs:
+    if extra_vars.get('language', 'en') in accepted_langs:
         scorers.append((Meteor(language=extra_vars['language']), "METEOR"))
 
     final_scores = {}

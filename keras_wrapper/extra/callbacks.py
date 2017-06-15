@@ -233,11 +233,11 @@ class EvalPerformance(KerasCallback):
 
             if not self.gt_pos:
                 predictions_all = [predictions_all]
-                self.gt_pos = [0]
-
-            for gt_pos in self.gt_pos:
+                gt_positions = [0]
+            else:
+                gt_positions = self.gt_post
+            for gt_pos in gt_positions:
                 predictions = predictions_all[gt_pos]
-
                 if self.is_text:
                     if params_prediction.get('pos_unk', False):
                         samples = predictions[0]
@@ -344,21 +344,14 @@ class EvalPerformance(KerasCallback):
                         header += metric_ + ','
                         line += str(value) + ','
                         # Store in model log
-                        self.model_to_eval.log(s, counter_name, epoch)
-                        for metric_ in sorted(metrics):
-                            all_metrics.append(metric_)
-                            value = metrics[metric_]
-                            header += metric_ + ','
-                            line += str(value) + ','
-                            # Store in model log
-                            self.model_to_eval.log(s, metric_, value)
-                        if not self.written_header:
-                            f.write(header + '\n')
-                            self.written_header = True
-                        f.write(line + '\n')
+                        self.model_to_eval.log(s, metric_, value)
+                    if not self.written_header:
+                        f.write(header + '\n')
+                        self.written_header = True
+                    f.write(line + '\n')
 
-                    if self.verbose > 0:
-                        logging.info('Done evaluating on metric ' + metric)
+                if self.verbose > 0:
+                    logging.info('Done evaluating on metric ' + metric)
 
 
         # Plot results so far
