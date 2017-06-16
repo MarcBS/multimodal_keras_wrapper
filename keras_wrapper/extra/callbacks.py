@@ -299,9 +299,13 @@ class EvalPerformance(KerasCallback):
                     if self.write_type == 'list':
                         list2file(filepath, predictions)
                     elif self.write_type == 'vqa':
-                        exec('refs = self.ds.Y_'+s+'[self.gt_id]')
+                        try:
+                            exec ('refs = self.ds.Y_' + s + '[self.gt_id]')
+                        except:
+                            refs = ['N/A' for i in range(probs.shape[0])]
                         extra_data_plot = {'reference': refs,
-                                           'probs': probs}
+                                           'probs': probs,
+                                           'vocab': self.index2word_y}
                         list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'], extra=extra_data_plot)
                     elif self.write_type == 'listoflists':
                         listoflists2file(filepath, predictions)
