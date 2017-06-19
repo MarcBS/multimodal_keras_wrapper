@@ -586,7 +586,7 @@ class EarlyStopping(KerasCallback):
         :param metric_check: name of the metric to check
         :param verbose: verbosity level; by default 1
         """
-        super(KerasCallback, self).__init__()
+        super(EarlyStopping, self).__init__()
         self.model_to_eval = model
         self.patience = patience
         self.check_split = check_split
@@ -668,59 +668,73 @@ class EarlyStopping(KerasCallback):
                 exit(1)
 
 
-class LearningRateReducer_ExpDecay(KerasCallback):
-    """
-    Reduces learning rate during the training.
-    """
+class LearningRateReducer(KerasCallback):
 
-    def __init__(self, half_life=50000, verbose=1):
-        super(KerasCallback, self).__init__()
-        self.half_life = half_life
-        self.current_reduce_nb = 0
-
-    def on_batch_end(self, n_update, logs={}):
-
-        self.current_reduce_nb += 1
-        new_rate = np.power(0.5, self.current_reduce_nb/self.half_life)
-        lr = self.model.optimizer.lr.get_value()
-        self.model.optimizer.lr.set_value(np.float32(lr * new_rate))
-
-
-class LearningRateReducer_LinearDecay(KerasCallback):
-    """
-    Reduces learning rate during the training.
-    """
-
-    def __init__(self, lr_decay=1, reduce_rate=0.5, reduce_nb=99999, verbose=1):
+    def __init__(self, reduce_rate=0.99, reduce_each_epochs=True, reduce_frequency=1, start_reduction_on_epoch=0,
+                 exp_base=0.5, half_life=50000, reduction_function='linear', epsilon=1e-11, verbose=1):
         """
-        :param lr_decay: minimum number of epochs passed before the last reduction
-        :param reduce_rate: multiplicative rate reducer; by default 0.5
-        :param reduce_nb: maximal number of reductions performed; by default 99999
-        :param verbose: verbosity level; by default 1
+        Reduces learning rate during the training.
+        Two different decays are implemented:
+            * linear:
+                lr = reduce_rate * lr
+            * exponential:
+                lr = exp_base^{current_step / half_life) * reduce_rate * lr
+
+        :param reduce_rate: Reduction rate.
+        :param reduce_each_epochs: Wether we reduce each epochs or each updates.
+        :param reduce_frequency: Reduce each this number of epochs/updates
+        :param start_reduction_on_epoch: Start reduction at this epoch
+        :param exp_base: Base for exponential reduction.
+        :param half_life: Half-life for exponential reduction.
+        :param reduction_function: Either 'linear' or 'exponential' reduction.
+        :param epsilon: Stop training if LR is below this value
+        :param verbose: Be verbose.
         """
-        super(KerasCallback, self).__init__()
+
+        super(LearningRateReducer, self).__init__()
+
         self.reduce_rate = reduce_rate
-        self.current_reduce_nb = 0
-        self.reduce_nb = reduce_nb
+        self.reduce_each_epochs = reduce_each_epochs
+        self.reduce_frequency = reduce_frequency
+
+        self.exp_base = exp_base
+        self.half_life = half_life
+        self.reduction_function = reduction_function
+        self.start_reduction_on_epoch = start_reduction_on_epoch
         self.verbose = verbose
-        self.epsilon = 0.1e-10
-        self.lr_decay = lr_decay
-        self.last_lr_decrease = 0
+        self.current_update_nb = 0
+        self.epsilon = epsilon
+        self.epoch = 0
 
     def on_epoch_end(self, epoch, logs={}):
 
-        # Decrease LR if self.lr_decay epochs have passed sice the last decrease
-        self.last_lr_decrease += 1
-        if self.last_lr_decrease >= self.lr_decay:
-            self.current_reduce_nb += 1
-            if self.current_reduce_nb <= self.reduce_nb:
-                self.last_lr_decrease = 0
-		lr = self.model.optimizer.lr.get_value()
-		self.model.optimizer.lr.set_value(np.float32(lr * self.reduce_rate))
-		if self.verbose > 0:
-		    logging.info("LR reduction from {0:0.6f} to {1:0.6f}". \
-		                     format(float(lr), float(lr * self.reduce_rate)))
-		if float(lr) <= self.epsilon:
-		    if self.verbose > 0:
-		        logging.info('Learning rate too small, learning stops now')
-		    self.model.stop_training = True
+        if float(self.lr) <= self.epsilon:
+            if self.verbose > 0:
+                logging.info('Learning rate too small, learning stops now')
+        self.model.stop_training = True
+
+        if not self.reduce_each_epochs:
+            return
+        elif (epoch - self.start_reduction_on_epoch) % self.reduce_frequency != 0:
+            return
+        self.reduce_lr(epoch)
+
+    def on_batch_end(self, n_update, logs={}):
+
+        self.current_update_nb += 1
+        if self.reduce_each_epochs:
+            return
+        if self.current_update_nb % self.reduce_frequency != 0:
+            return
+        if self.epoch - self.start_eval_on_epoch < 0:
+            return
+        self.reduce_lr(self.current_update_nb)
+
+    def reduce_lr(self, current_nb):
+        exp_base = 1 if self.reduction_function == 'linear' else self.exp_base
+        lr = self.model.optimizer.lr.get_value()
+        new_rate = np.power(exp_base, current_nb / self.half_life) * self.reduce_rate
+        self.new_lr = np.float32(lr * new_rate)
+        self.model.optimizer.lr.set_value(self.new_lr)
+        if self.reduce_each_epochs and self.verbose > 0:
+            logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr), float(lr * self.reduce_rate)))
