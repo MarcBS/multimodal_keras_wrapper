@@ -1017,14 +1017,15 @@ class Dataset(object):
         """
         if not isinstance(labels_list, list):
             raise Exception('Wrong type for "path_list". It must be an instance of the class list.')
-
+        import pdb; pdb.set_trace()
         if sparse:
             labels = labels_list
         else: # convert to sparse representation
             labels = [[i for i, x in enumerate(y) if x == 1] for y in labels_list]
         self.sparse_binary[id] = True
 
-        y_vocab = [':::'.join(y) for y in labels]
+        y_vocab = [':::'.join(y) for sample in labels for y in sample]
+        import pdb; pdb.set_trace()
         self.build_vocabulary(y_vocab, id, split_symbol=':::')
 
         return labels
@@ -1230,12 +1231,13 @@ class Dataset(object):
 
         return sentences
 
-    def build_vocabulary(self, captions, id, do_split=True, min_occ=0, n_words=0, split_symbol=' '):
+    def build_vocabulary(self, captions, id, tokfun=None, do_split=True, min_occ=0, n_words=0, split_symbol=' '):
         """
         Vocabulary builder for data of type 'text'
 
         :param captions: Corpus sentences
         :param id: Dataset id of the text
+        :param tokfun: Tokenization function. (used?)
         :param do_split: Split sentence by words or use the full sentence as a class.
         :param split_symbol: symbol used for separating the elements in each sentence
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
