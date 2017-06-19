@@ -705,19 +705,21 @@ class LearningRateReducer(KerasCallback):
         self.current_update_nb = 0
         self.epsilon = epsilon
         self.epoch = 0
+        assert self.reduction_function in ['linear', 'exponential'], 'Reduction function "%s" unimplemented!' %\
+                                                                     str(self.reduction_function)
 
     def on_epoch_end(self, epoch, logs={}):
-
-        if float(self.lr) <= self.epsilon:
-            if self.verbose > 0:
-                logging.info('Learning rate too small, learning stops now')
-        self.model.stop_training = True
 
         if not self.reduce_each_epochs:
             return
         elif (epoch - self.start_reduction_on_epoch) % self.reduce_frequency != 0:
             return
         self.reduce_lr(epoch)
+
+        if float(self.new_lr) <= self.epsilon:
+            if self.verbose > 0:
+                logging.info('Learning rate too small, learning stops now')
+            self.model.stop_training = True
 
     def on_batch_end(self, n_update, logs={}):
 
@@ -726,15 +728,16 @@ class LearningRateReducer(KerasCallback):
             return
         if self.current_update_nb % self.reduce_frequency != 0:
             return
-        if self.epoch - self.start_eval_on_epoch < 0:
+        if self.epoch - self.start_reduction_on_epoch < 0:
             return
         self.reduce_lr(self.current_update_nb)
 
     def reduce_lr(self, current_nb):
-        exp_base = 1 if self.reduction_function == 'linear' else self.exp_base
+        new_rate = self.reduce_rate if self.reduction_function == 'linear' else\
+            np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
         lr = self.model.optimizer.lr.get_value()
-        new_rate = np.power(exp_base, current_nb / self.half_life) * self.reduce_rate
         self.new_lr = np.float32(lr * new_rate)
         self.model.optimizer.lr.set_value(self.new_lr)
+
         if self.reduce_each_epochs and self.verbose > 0:
-            logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr), float(lr * self.reduce_rate)))
+            logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr), float(self.new_lr)))
