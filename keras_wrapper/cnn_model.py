@@ -692,7 +692,6 @@ class Model_Wrapper(object):
                           'start_eval_on_epoch': 0,  # early stopping parameters
                           'lr_decay': None,  # LR decay parameters
                           'reduce_each_epochs': True,
-                          'reduce_frequency': 1,
                           'start_reduction_on_epoch': 0,
                           'lr_gamma': 0.1,
                           'lr_reducer_type': 'linear',
@@ -771,7 +770,6 @@ class Model_Wrapper(object):
                           'start_eval_on_epoch': 0,  # early stopping parameters
                           'lr_decay': None,  # LR decay parameters
                           'reduce_each_epochs': True,
-                          'reduce_frequency': 1,
                           'start_reduction_on_epoch': 0,
                           'lr_gamma': 0.1,
                           'lr_reducer_type': 'linear',
