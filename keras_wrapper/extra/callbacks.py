@@ -72,17 +72,18 @@ class EvalPerformance(KerasCallback):
                  min_pred_multilabel=0.5,
                  index2word_y=None,
                  input_text_id=None,
+                 input_id=None,
                  index2word_x=None,
                  sampling='max_likelihood',
                  beam_search=False,
                  beam_batch_size=None,
                  write_samples=False,
+                 write_type='list',
                  save_path='logs/performance.',
                  reload_epoch=0,
                  eval_on_epochs=True,
                  start_eval_on_epoch=0,
                  is_3DLabel=False,
-                 write_type='list',
                  sampling_type='max_likelihood',
                  save_each_evaluation=True,
                  out_pred_idx=None,
@@ -108,17 +109,18 @@ class EvalPerformance(KerasCallback):
         :param min_pred_multilabel: minimum prediction value considered for positive prediction
         :param index2word_y: mapping from the indices to words (only needed if is_text==True)
         :param input_text_id:
+        :param input_id: identifier in the Dataset instance of the input data
         :param index2word_x: mapping from the indices to words (only needed if is_text==True)
         :param sampling: sampling mechanism used (only used if is_text==True)
         :param beam_search: whether to use a beam search method or not
         :param beam_batch_size: batch size allowed during beam search
-        :param write_samples: flag for indicating if we want to write the predicted data in a text file
+        :param write_samples: flag for indicating if we want to write the predicted data in a file (text or image)
+        :param write_type: type of data used for writing predictions
         :param save_path: path to dumb the logs
         :param reload_epoch: reloading epoch
         :param eval_on_epochs: eval each epochs (True) or each updates (False)
         :param start_eval_on_epoch: only starts evaluating model if a given epoch has been reached
         :param is_3DLabel: defines if the predicted info is of type 3DLabels
-        :param write_type:  method used for writing predictions
         :param sampling_type: type of sampling used (multinomial or max_likelihood)
         :param save_each_evaluation: save the model each time we evaluate (epochs or updates)
         :param out_pred_idx: index of the output prediction used for evaluation (only applicable if model has more than one output, else set to None)
@@ -129,6 +131,7 @@ class EvalPerformance(KerasCallback):
         self.ds = dataset
         self.gt_id = gt_id
         self.input_text_id = input_text_id
+        self.input_id = input_id
         self.index2word_x = index2word_x
         self.index2word_y = index2word_y
         self.is_text = is_text
@@ -279,45 +282,47 @@ class EvalPerformance(KerasCallback):
                                                      self.sampling_type,
                                                      verbose=self.verbose)
 
-                    # Apply detokenization function if needed
-                    if self.extra_vars.get('apply_detokenization', False):
-                        predictions = map(self.extra_vars['detokenize_f'], predictions)
+                # Apply detokenization function if needed
+                if self.extra_vars.get('apply_detokenization', False):
+                    predictions = map(self.extra_vars['detokenize_f'], predictions)
 
 
-                elif self.is_multilabel:
-                    if self.multilabel_idx is not None:
-                        predictions = predictions[self.multilabel_idx]
-                    predictions = decode_multilabel(predictions,
-                                                    self.index2word_y,
-                                                    min_val=self.min_pred_multilabel,
-                                                    verbose=self.verbose)
+            elif self.is_multilabel:
+                if self.multilabel_idx is not None:
+                    predictions = predictions[self.multilabel_idx]
+                predictions = decode_multilabel(predictions,
+                                                self.index2word_y,
+                                                min_val=self.min_pred_multilabel,
+                                                verbose=self.verbose)
 
-                # Store predictions
-                if self.write_samples:
-                    # Store result
-                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '.pred'  # results file
-                    if self.write_type == 'list':
-                        list2file(filepath, predictions)
-                    elif self.write_type == 'vqa':
-                        try:
-                            exec ('refs = self.ds.Y_' + s + '[self.gt_id]')
-                        except:
-                            refs = ['N/A' for i in range(probs.shape[0])]
-                        extra_data_plot = {'reference': refs,
-                                           'probs': probs,
-                                           'vocab': self.index2word_y}
-                        list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'], extra=extra_data_plot)
-                    elif self.write_type == 'listoflists':
-                        listoflists2file(filepath, predictions)
-                    elif self.write_type == 'numpy':
-                        numpy2file(filepath, predictions)
-                    elif self.write_type == '3DLabels':
-                        # TODO:
-                        print("WRITE SAMPLES FUNCTION NOT IMPLEMENTED")
-                    else:
-                        raise NotImplementedError(
-                            'The store type "' + self.write_type + '" is not implemented.')
-
+            # Store predictions
+            if self.write_samples:
+                # Store result
+                filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '.pred'  # results file
+                if self.write_type == 'list':
+                    list2file(filepath, predictions)
+                elif self.write_type == 'vqa':
+                    try:
+                        exec('refs = self.ds.Y_'+s+'[self.gt_id]')
+                    except:
+                        refs = ['N/A' for i in range(probs.shape[0])]
+                    extra_data_plot = {'reference': refs,
+                                       'probs': probs,
+                                       'vocab': self.index2word_y}
+                    list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'], extra=extra_data_plot)
+                elif self.write_type == 'listoflists':
+                    listoflists2file(filepath, predictions)
+                elif self.write_type == 'numpy':
+                    numpy2file(filepath, predictions)
+                elif self.write_type == '3DLabels':
+                    # TODO:
+                    print("WRITE SAMPLES FUNCTION NOT IMPLEMENTED")
+                elif self.write_type == '3DSemanticLabel':
+                    folder_path = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch)  # results folder
+                    numpy2imgs(folder_path, predictions, eval('self.ds.X_'+ s +'["'+self.input_id+'"]'), self.ds)
+                else:
+                    raise NotImplementedError(
+                        'The store type "' + self.write_type + '" is not implemented.')
 
             # Evaluate on each metric
             for metric in self.metric_name:
