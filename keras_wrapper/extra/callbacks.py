@@ -233,11 +233,11 @@ class EvalPerformance(KerasCallback):
 
             if not self.gt_pos:
                 predictions_all = [predictions_all]
-                self.gt_pos = [0]
-
-            for gt_pos in self.gt_pos:
+                gt_positions = [0]
+            else:
+                gt_positions = self.gt_post
+            for gt_pos in gt_positions:
                 predictions = predictions_all[gt_pos]
-
                 if self.is_text:
                     if params_prediction.get('pos_unk', False):
                         samples = predictions[0]
@@ -299,9 +299,13 @@ class EvalPerformance(KerasCallback):
                     if self.write_type == 'list':
                         list2file(filepath, predictions)
                     elif self.write_type == 'vqa':
-                        exec('refs = self.ds.Y_'+s+'[self.gt_id]')
+                        try:
+                            exec ('refs = self.ds.Y_' + s + '[self.gt_id]')
+                        except:
+                            refs = ['N/A' for i in range(probs.shape[0])]
                         extra_data_plot = {'reference': refs,
-                                           'probs': probs}
+                                           'probs': probs,
+                                           'vocab': self.index2word_y}
                         list2vqa(filepath, predictions, self.extra_vars[s]['question_ids'], extra=extra_data_plot)
                     elif self.write_type == 'listoflists':
                         listoflists2file(filepath, predictions)
@@ -344,21 +348,14 @@ class EvalPerformance(KerasCallback):
                         header += metric_ + ','
                         line += str(value) + ','
                         # Store in model log
-                        self.model_to_eval.log(s, counter_name, epoch)
-                        for metric_ in sorted(metrics):
-                            all_metrics.append(metric_)
-                            value = metrics[metric_]
-                            header += metric_ + ','
-                            line += str(value) + ','
-                            # Store in model log
-                            self.model_to_eval.log(s, metric_, value)
-                        if not self.written_header:
-                            f.write(header + '\n')
-                            self.written_header = True
-                        f.write(line + '\n')
+                        self.model_to_eval.log(s, metric_, value)
+                    if not self.written_header:
+                        f.write(header + '\n')
+                        self.written_header = True
+                    f.write(line + '\n')
 
-                    if self.verbose > 0:
-                        logging.info('Done evaluating on metric ' + metric)
+                if self.verbose > 0:
+                    logging.info('Done evaluating on metric ' + metric)
 
 
         # Plot results so far
@@ -589,7 +586,7 @@ class EarlyStopping(KerasCallback):
         :param metric_check: name of the metric to check
         :param verbose: verbosity level; by default 1
         """
-        super(KerasCallback, self).__init__()
+        super(EarlyStopping, self).__init__()
         self.model_to_eval = model
         self.patience = patience
         self.check_split = check_split
@@ -672,40 +669,75 @@ class EarlyStopping(KerasCallback):
 
 
 class LearningRateReducer(KerasCallback):
-    """
-    Reduces learning rate during the training.
-    """
 
-    def __init__(self, lr_decay=1, reduce_rate=0.5, reduce_nb=99999, verbose=1):
+    def __init__(self, reduce_rate=0.99, reduce_each_epochs=True, reduce_frequency=1, start_reduction_on_epoch=0,
+                 exp_base=0.5, half_life=50000, reduction_function='linear', epsilon=1e-11, verbose=1):
         """
-        :param lr_decay: minimum number of epochs passed before the last reduction
-        :param reduce_rate: multiplicative rate reducer; by default 0.5
-        :param reduce_nb: maximal number of reductions performed; by default 99999
-        :param verbose: verbosity level; by default 1
+        Reduces learning rate during the training.
+        Two different decays are implemented:
+            * linear:
+                lr = reduce_rate * lr
+            * exponential:
+                lr = exp_base^{current_step / half_life) * reduce_rate * lr
+
+        :param reduce_rate: Reduction rate.
+        :param reduce_each_epochs: Wether we reduce each epochs or each updates.
+        :param reduce_frequency: Reduce each this number of epochs/updates
+        :param start_reduction_on_epoch: Start reduction at this epoch
+        :param exp_base: Base for exponential reduction.
+        :param half_life: Half-life for exponential reduction.
+        :param reduction_function: Either 'linear' or 'exponential' reduction.
+        :param epsilon: Stop training if LR is below this value
+        :param verbose: Be verbose.
         """
-        super(KerasCallback, self).__init__()
+
+        super(LearningRateReducer, self).__init__()
+
         self.reduce_rate = reduce_rate
-        self.current_reduce_nb = 0
-        self.reduce_nb = reduce_nb
+        self.reduce_each_epochs = reduce_each_epochs
+        self.reduce_frequency = reduce_frequency
+
+        self.exp_base = exp_base
+        self.half_life = half_life
+        self.reduction_function = reduction_function
+        self.start_reduction_on_epoch = start_reduction_on_epoch
         self.verbose = verbose
-        self.epsilon = 0.1e-10
-        self.lr_decay = lr_decay
-        self.last_lr_decrease = 0
+        self.current_update_nb = 0
+        self.epsilon = epsilon
+        self.epoch = 0
+        assert self.reduction_function in ['linear', 'exponential'], 'Reduction function "%s" unimplemented!' %\
+                                                                     str(self.reduction_function)
 
     def on_epoch_end(self, epoch, logs={}):
 
-        # Decrease LR if self.lr_decay epochs have passed sice the last decrease
-        self.last_lr_decrease += 1
-        if self.last_lr_decrease >= self.lr_decay:
-            self.current_reduce_nb += 1
-            if self.current_reduce_nb <= self.reduce_nb:
-                self.last_lr_decrease = 0
-                lr = self.model.optimizer.lr.get_value()
-                self.model.optimizer.lr.set_value(np.float32(lr * self.reduce_rate))
-                if self.verbose > 0:
-                    logging.info("LR reduction from {0:0.6f} to {1:0.6f}". \
-                                 format(float(lr), float(lr * self.reduce_rate)))
-                if float(lr) <= self.epsilon:
-                    if self.verbose > 0:
-                        logging.info('Learning rate too small, learning stops now')
-                    self.model.stop_training = True
+        if not self.reduce_each_epochs:
+            return
+        elif (epoch - self.start_reduction_on_epoch) % self.reduce_frequency != 0:
+            return
+        self.reduce_lr(epoch)
+
+        if float(self.new_lr) <= self.epsilon:
+            if self.verbose > 0:
+                logging.info('Learning rate too small, learning stops now')
+            self.model.stop_training = True
+
+    def on_batch_end(self, n_update, logs={}):
+
+        self.current_update_nb += 1
+        if self.reduce_each_epochs:
+            return
+        if self.current_update_nb % self.reduce_frequency != 0:
+            return
+        if self.epoch - self.start_reduction_on_epoch < 0:
+            return
+        self.reduce_lr(self.current_update_nb)
+
+    def reduce_lr(self, current_nb):
+        new_rate = self.reduce_rate if self.reduction_function == 'linear' else\
+            np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
+        lr = self.model.optimizer.lr.get_value()
+        self.new_lr = np.float32(lr * new_rate)
+        self.model.optimizer.lr.set_value(self.new_lr)
+
+        if self.reduce_each_epochs and self.verbose > 0:
+            logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr), float(self.new_lr)))

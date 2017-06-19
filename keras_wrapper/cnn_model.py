@@ -691,7 +691,12 @@ class Model_Wrapper(object):
                           'each_n_epochs': 1,
                           'start_eval_on_epoch': 0,  # early stopping parameters
                           'lr_decay': None,  # LR decay parameters
-                          'lr_gamma': 0.1}
+                          'reduce_each_epochs': True,
+                          'start_reduction_on_epoch': 0,
+                          'lr_gamma': 0.1,
+                          'lr_reducer_type': 'linear',
+                          'lr_reducer_exp_base': 0.5,
+                          'lr_half_life': 50000}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
@@ -752,7 +757,8 @@ class Model_Wrapper(object):
                           'normalize': False,
                           'mean_substraction': True,
                           'data_augmentation': True,
-                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'verbose': 1,
+                          'eval_on_sets': ['val'],
                           'reload_epoch': 0,
                           'extra_callbacks': [],
                           'shuffle': True,
@@ -763,7 +769,12 @@ class Model_Wrapper(object):
                           'each_n_epochs': 1,
                           'start_eval_on_epoch': 0,  # early stopping parameters
                           'lr_decay': None,  # LR decay parameters
-                          'lr_gamma': 0.1}
+                          'reduce_each_epochs': True,
+                          'start_reduction_on_epoch': 0,
+                          'lr_gamma': 0.1,
+                          'lr_reducer_type': 'linear',
+                          'lr_reducer_exp_base': 0.5,
+                          'lr_half_life': 50000}
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
@@ -790,9 +801,15 @@ class Model_Wrapper(object):
 
         # LR reducer
         if params.get('lr_decay') is not None:
-            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            callback_lr_reducer = LearningRateReducer(reduce_rate=params['lr_gamma'],
+                                                      reduce_frequency=params['lr_decay'],
+                                                      reduce_each_epochs=params['reduce_each_epochs'],
+                                                      start_reduction_on_epoch=params['start_reduction_on_epoch'],
+                                                      exp_base=params['lr_reducer_exp_base'],
+                                                      half_life=params['lr_half_life'],
+                                                      reduction_function=params['lr_reducer_type'],
+                                                      verbose=params['verbose'])
             callbacks.append(callback_lr_reducer)
-
         # Early stopper
         if params.get('metric_check') is not None:
             callback_early_stop = EarlyStopping(self,
@@ -875,7 +892,14 @@ class Model_Wrapper(object):
 
         # LR reducer
         if params.get('lr_decay') is not None:
-            callback_lr_reducer = LearningRateReducer(lr_decay=params['lr_decay'], reduce_rate=params['lr_gamma'])
+            callback_lr_reducer = LearningRateReducer(reduce_rate=params['lr_gamma'],
+                                                      reduce_frequency=params['lr_decay'],
+                                                      reduce_each_epochs=params['reduce_each_epochs'],
+                                                      start_reduction_on_epoch=params['start_reduction_on_epoch'],
+                                                      exp_base=params['lr_reducer_exp_base'],
+                                                      half_life=params['lr_half_life'],
+                                                      reduction_function=params['lr_reducer_type'],
+                                                      verbose=params['verbose'])
             callbacks.append(callback_lr_reducer)
 
         # Early stopper
@@ -1453,7 +1477,7 @@ class Model_Wrapper(object):
             sample_alphas = []
             hyp_alphas = [[]] * live_k
 
-        maxlen = len(X[params['dataset_inputs'][0]][0]) * int(params['output_length_depending_on_x_factor']) if \
+        maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_length_depending_on_x_factor']) if \
             params['output_length_depending_on_x'] else params['maxlen']
 
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"

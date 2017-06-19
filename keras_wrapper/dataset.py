@@ -536,7 +536,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         if id_out not in self.ids_outputs:
-            raise Exception("The parameter 'id_out' must specify a valid id for an output of the dataset.")
+            raise Exception("The parameter 'id_out' must specify a valid id for an output of the dataset.\n"
+                            "Error produced because parameter %s was not in %s" % (id_out, self.ids_outputs))
 
         # type_out = self.types_outputs(self.ids_outputs.index(id_out))
         # if type_out != 'text':
@@ -955,8 +956,9 @@ class Dataset(object):
         elif isinstance(path_classes, list):
             self.classes[id] = path_classes
         else:
-            raise Exception(
-                'Wrong type for "path_classes". It must be a path to a text file with the classes or an instance of the class list.')
+            raise Exception('Wrong type for "path_classes".'
+                            ' It must be a path to a text file with the classes or an instance of the class list.\n'
+                            'It currently is: %s' % str(path_classes))
 
         self.dic_classes[id] = dict()
         for c in range(len(self.classes[id])):
@@ -982,8 +984,9 @@ class Dataset(object):
         elif isinstance(labels_list, list):
             labels = labels_list
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a path to a text file with the labels or an instance of the class list.')
+            raise Exception('Wrong type for "labels_list". '
+                            'It must be a path to a text file with the labels or an instance of the class list.\n'
+                            'It currently is: %s' % str(labels_list))
 
         if sample_weights:
             n_classes = len(set(labels))
@@ -1017,7 +1020,7 @@ class Dataset(object):
         """
         if not isinstance(labels_list, list):
             raise Exception('Wrong type for "path_list". It must be an instance of the class list.')
-        import pdb; pdb.set_trace()
+
         if sparse:
             labels = labels_list
         else: # convert to sparse representation
@@ -1041,7 +1044,7 @@ class Dataset(object):
             n_samples = len(y_raw)
             voc = self.vocabulary[id]['words2idx']
             num_words = len(voc.keys())
-            y = np.zeros((n_samples, num_words), type=np.uint8)
+            y = np.zeros((n_samples, num_words), dtype=np.uint8)
             for i, y_ in enumerate(y_raw):
                 for elem in y_:
                     y[i,voc[elem]] = 1
@@ -1070,8 +1073,10 @@ class Dataset(object):
         elif isinstance(labels_list, list):
             labels = labels_list
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a path to a text file with real values or an instance of the class list.')
+            raise Exception('Wrong type for "labels_list". '
+                            'It must be a path to a text file with real values or an instance of the class list.\n'
+                            'It currently is: %s' % str(labels_list))
+
 
         return labels
 
@@ -1101,9 +1106,10 @@ class Dataset(object):
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a path to a text file. Each line must contain a path'
-                ' to a .npy file storing a feature vector. Alternatively "path_list" can be an instance of the class list.')
+            raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path'
+                ' to a .npy file storing a feature vector. Alternatively "path_list"'
+                ' can be an instance of the class list.\n'
+                'Currently it is: %s .' % str(path_list))
 
         if not isinstance(feat_len, list):
             feat_len = [feat_len]
@@ -1211,16 +1217,20 @@ class Dataset(object):
                 if not self.silence:
                     logging.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with id "' + id + '".')
             else:
-                raise Exception(
-                    'The parameter "build_vocabulary" must be a boolean or a str containing an id of the vocabulary we want to copy.')
+                raise Exception('The parameter "build_vocabulary" must be a boolean '
+                                'or a str containing an id of the vocabulary we want to copy.\n'
+                                'It currently is: %s' % str(build_vocabulary))
+
         elif isinstance(build_vocabulary, dict):
             self.vocabulary[id] = build_vocabulary
             if not self.silence:
                 logging.info('\tReusing vocabulary from dictionary for data with id "' + id + '".')
 
         if not id in self.vocabulary:
-            raise Exception(
-                'The dataset must include a vocabulary with id "' + id + '" in order to process the type "text" data. Set "build_vocabulary" to True if you want to use the current data for building the vocabulary.')
+            raise Exception('The dataset must include a vocabulary with'
+                            ' id "' + id + '" in order to process the type "text" data. '
+                            'Set "build_vocabulary" to True if you want '
+                            'to use the current data for building the vocabulary.')
 
         # Store max text len
         self.max_text_len[id][set_name] = max_text_len
@@ -1973,7 +1983,8 @@ class Dataset(object):
         :param separator: BPE separator.
         :return: Detokenized version of caption.
         """
-        detokenized = re.sub(separator + ' ', '', str(caption).strip())
+        bpe_detokenization = re.compile('(' + separator + ' )|(' + separator + ' ?$)')
+        detokenized = bpe_detokenization.sub("", str(caption).strip())
         return detokenized
 
     def detokenize_none_char(self, caption):
@@ -2036,8 +2047,11 @@ class Dataset(object):
             self.img_size[id] = img_size
             self.img_size_crop[id] = img_size_crop
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
+            raise Exception('Wrong type for "path_list". It must be a list containing two paths: '
+                            'a path to a text file with the paths to all images in all videos in '
+                            '[0] and a path to another text file with the number of frames of '
+                            'each video in each line in [1] (which will index the paths in the first file).\n'
+                            'It currently is: %s' % str(path_list))
 
         return counts_frames
 
@@ -2053,9 +2067,9 @@ class Dataset(object):
             elif isinstance(path_list[0], list):
                 paths_frames = path_list[0]
             else:
-                raise Exception(
-                    'Wrong type for "path_frames". It must be a path to a file containing a list of frames or directly a list of frames.'
-                )
+                raise Exception('Wrong type for "path_frames". It must be a path to a file containing a'
+                                ' list of frames or directly a list of frames.\n'
+                                'It currently is: %s' % str(path_list[0]))
 
             if isinstance(path_list[1], str):
                 # frame counts
@@ -2066,9 +2080,9 @@ class Dataset(object):
             elif isinstance(path_list[1], list):
                 counts_frames = path_list[1]
             else:
-                raise Exception(
-                    'Wrong type for "counts_frames". It must be a path to a file containing a list of counts or directly a list of counts.'
-                )
+                raise Exception('Wrong type for "counts_frames".'
+                                ' It must be a path to a file containing a list of counts or directly a list of counts.\n'
+                                'It currently is: %s' % str(path_list[1]))
 
             # video indices
             video_indices = range(len(counts_frames))
@@ -2084,8 +2098,11 @@ class Dataset(object):
             self.img_size[id] = img_size
             self.img_size_crop[id] = img_size_crop
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a list containing two paths: a path to a text file with the paths to all images in all videos in [0] and a path to another text file with the number of frames of each video in each line in [1] (which will index the paths in the first file).')
+            raise Exception('Wrong type for "path_list". '
+                            'It must be a list containing two paths: a path to a text file with the paths to all '
+                            'images in all videos in [0] and a path to another text file with the number of frames '
+                            'of each video in each line in [1] (which will index the paths in the first file).'
+                            'It currently is: %s' % str(path_list[1]))
 
         if feat_len is not None:
             if not isinstance(feat_len, list):
@@ -2270,8 +2287,11 @@ class Dataset(object):
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a path to a text file with an id in each line or an instance of the class list with an id in each position.')
+            raise Exception('Wrong type for "path_list". '
+                            'It must be a path to a text file with an id in each line'
+                            ' or an instance of the class list with an id in each position.'
+                            'It currently is: %s' % str(path_list))
+
 
         return data
 
@@ -2298,14 +2318,19 @@ class Dataset(object):
                 for line in list_:
                     line = line.rstrip('\n').split(',')
                     if len(line) != 4:
-                        raise Exception(
-                            'Wrong format for semantic classes. Must contain a class name followed by the RGB colour values separated by commas.')
+                        raise Exception('Wrong format for semantic classes.'
+                                        ' Must contain a class name followed by the '
+                                        'RGB colour values separated by commas.'
+                                        'It currently has a line of length: %s' % str(len(line)))
+
                     class_id = self.dic_classes[id][line[0]]
                     semantic_classes[int(class_id)] = [int(line[1]), int(line[2]), int(line[3])]
             self.semantic_classes[id] = semantic_classes
         else:
-            raise Exception(
-                'Wrong type for "path_classes". It must be a path to a text file with the classes and their associated colour in the GT image.')
+            raise Exception('Wrong type for "path_classes".'
+                            ' It must be a path to a text file with the classes '
+                            'and their associated colour in the GT image.'
+                            'It currently is: %s' % str(path_classes))
 
         if not self.silence:
             logging.info('Loaded semantic classes list for data with id: ' + id)
@@ -2427,8 +2452,10 @@ class Dataset(object):
                 for line in list_:
                     path_list_3DLabel.append(line.strip())
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a path to a text file with the path to 3DLabel files.')
+            raise Exception('Wrong type for "path_list". '
+                            'It must be a path to a text file with the path to 3DLabel files.'
+                            'It currently is: %s' % str(path_list))
+
         self.num_poolings_model[id] = num_poolings
         self.id_in_3DLabel[id] = associated_id_in
 
@@ -2566,9 +2593,9 @@ class Dataset(object):
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception(
-                'Wrong type for "path_list". It must be a path to a text file with an image '
-                'path in each line or an instance of the class list with an image path in each position.')
+            raise Exception('Wrong type for "path_list". It must be a path to a text file with an image '
+                'path in each line or an instance of the class list with an image path in each position.'
+                            'It currently is: %s' % str(path_list))
 
         self.img_size[id] = img_size
         self.img_size_crop[id] = img_size_crop
@@ -3466,7 +3493,7 @@ class Dataset(object):
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
                                                                             '\t Inputs:' + str(plot_ids_in) + ''
-                                                                                                              '\t Outputs:' + str(
+                                                                            '\t Outputs:' + str(
                     self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
