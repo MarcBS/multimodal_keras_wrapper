@@ -351,7 +351,7 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
 
     n_classes = extra_vars['n_classes']
     gt_list = extra_vars[split]['references']
-    discard_classes = extra_vars['discard_classes']  # [11]
+    discard_classes = extra_vars['discard_classes']
 
     pred_class_list = []
     for sample_score in pred_list:

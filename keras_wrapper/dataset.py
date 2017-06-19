@@ -1460,7 +1460,7 @@ class Dataset(object):
     def load3DSemanticLabels(self, labeled_images_list, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
                              img_size, size_crop, image_list):
         '''
-        Loads a set of outputs of the type 3DSemanticLabel (used for semantic segmentation)
+        Loads a set of outputs of the type 3DSemanticLabel (used for semantic segmentation TRAINING)
 
         :param labeled_images_list: list of labeled images
         :param nClasses: number of different classes to be detected
@@ -2298,6 +2298,9 @@ class Dataset(object):
     #       TYPE '3DSemanticLabel' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
+    def getImageFromPrediction_3DSemanticLabel(self):
+        raise NotImplementedError('ToDo: implement from read_write.py')
+
     def preprocess3DSemanticLabel(self, path_list, id, associated_id_in, num_poolings):
         return self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
 
@@ -2336,7 +2339,7 @@ class Dataset(object):
 
     def load_GT_3DSemanticLabels(self, gt, id):
         '''
-        Loads a GT list of 3DSemanticLabels in a 2D matrix and reshapes them to an Nx1 array
+        Loads a GT list of 3DSemanticLabels in a 2D matrix and reshapes them to an Nx1 array (EVALUATION)
 
         :param gt: list of Dataset output of type 3DSemanticLabels
         :param id: id of the input/output we are processing
