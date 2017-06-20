@@ -1027,7 +1027,8 @@ class Dataset(object):
             labels = [[i for i, x in enumerate(y) if x == 1] for y in labels_list]
         self.sparse_binary[id] = True
 
-        y_vocab = [':::'.join(y) for sample in labels for y in sample]
+        import pdb; pdb.set_trace()
+        y_vocab = [':::'.join(sample) for sample in labels]
         import pdb; pdb.set_trace()
         self.build_vocabulary(y_vocab, id, split_symbol=':::')
 
