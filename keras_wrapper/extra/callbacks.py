@@ -366,7 +366,8 @@ class EvalPerformance(KerasCallback):
         self.model_to_eval.log('val', 'val_loss', logs['valid_loss'])
 
         # Plot results so far
-        self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
+        if self.metric_name:
+            self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
 
         # Save the model
         if self.save_each_evaluation:
