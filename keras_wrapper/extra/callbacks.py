@@ -198,9 +198,9 @@ class EvalPerformance(KerasCallback):
             return
         if self.epoch < self.start_eval_on_epoch:
             return
-        self.evaluate(self.cum_update, counter_name='iteration')
+        self.evaluate(self.cum_update, counter_name='iteration', logs=logs)
 
-    def evaluate(self, epoch, counter_name='epoch'):
+    def evaluate(self, epoch, counter_name='epoch', logs={}):
 
         # Evaluate on each set separately
         all_metrics = []
@@ -238,7 +238,7 @@ class EvalPerformance(KerasCallback):
                 predictions_all = [predictions_all]
                 gt_positions = [0]
             else:
-                gt_positions = self.gt_post
+                gt_positions = self.gt_pos
             for gt_pos in gt_positions:
                 predictions = predictions_all[gt_pos]
                 if self.is_text:
@@ -283,17 +283,17 @@ class EvalPerformance(KerasCallback):
                                                      verbose=self.verbose)
 
                 # Apply detokenization function if needed
-                if self.extra_vars.get('apply_detokenization', False):
-                    predictions = map(self.extra_vars['detokenize_f'], predictions)
+                    if self.extra_vars.get('apply_detokenization', False):
+                        predictions = map(self.extra_vars['detokenize_f'], predictions)
 
 
-            elif self.is_multilabel:
-                if self.multilabel_idx is not None:
-                    predictions = predictions[self.multilabel_idx]
-                predictions = decode_multilabel(predictions,
-                                                self.index2word_y,
-                                                min_val=self.min_pred_multilabel,
-                                                verbose=self.verbose)
+                elif self.is_multilabel:
+                    if self.multilabel_idx is not None:
+                        predictions = predictions[self.multilabel_idx]
+                    predictions = decode_multilabel(predictions,
+                                                    self.index2word_y,
+                                                    min_val=self.min_pred_multilabel,
+                                                    verbose=self.verbose)
 
             # Store predictions
             if self.write_samples:
@@ -362,6 +362,8 @@ class EvalPerformance(KerasCallback):
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
+        self.model_to_eval.log('train', 'train_loss', logs['loss'])
+        self.model_to_eval.log('val', 'val_loss', logs['valid_loss'])
 
         # Plot results so far
         self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)

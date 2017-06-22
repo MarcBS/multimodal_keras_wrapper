@@ -1027,10 +1027,13 @@ class Dataset(object):
             labels = [[i for i, x in enumerate(y) if x == 1] for y in labels_list]
         self.sparse_binary[id] = True
 
-        import pdb; pdb.set_trace()
-        y_vocab = [':::'.join(sample) for sample in labels]
-        import pdb; pdb.set_trace()
-        self.build_vocabulary(y_vocab, id, split_symbol=':::')
+        unique_label_set = []
+        for sample in labels:
+            if sample not in unique_label_set:
+                unique_label_set.append(sample)
+        y_vocab = ['::'.join(sample) for sample in unique_label_set]
+
+        self.build_vocabulary(y_vocab, id, split_symbol='::', use_extra_words=False)
 
         return labels
 
@@ -1242,7 +1245,7 @@ class Dataset(object):
 
         return sentences
 
-    def build_vocabulary(self, captions, id, tokfun=None, do_split=True, min_occ=0, n_words=0, split_symbol=' '):
+    def build_vocabulary(self, captions, id, tokfun=None, do_split=True, min_occ=0, n_words=0, split_symbol=' ', use_extra_words=True):
         """
         Vocabulary builder for data of type 'text'
 
@@ -1296,7 +1299,10 @@ class Dataset(object):
 
         # keep only top 'n_words'
         if n_words > 0:
-            vocab_count = combined_counter.most_common(n_words - len(self.extra_words))
+            if use_extra_words:
+                vocab_count = combined_counter.most_common(n_words - len(self.extra_words))
+            else:
+                vocab_count = combined_counter.most_common(n_words)
             if not self.silence:
                 logging.info("Creating dictionary of %s most common words, covering "
                              "%2.1f%% of the text."
@@ -1310,10 +1316,13 @@ class Dataset(object):
 
         dictionary = {}
         for i, (word, count) in enumerate(vocab_count):
-            dictionary[word] = i + len(self.extra_words)
+            dictionary[word] = i
+            if use_extra_words:
+                dictionary[word] += len(self.extra_words)
 
-        for w, k in self.extra_words.iteritems():
-            dictionary[w] = k
+        if use_extra_words:
+            for w, k in self.extra_words.iteritems():
+                dictionary[w] = k
 
 
         # Store dictionary and append to previously existent if needed.
@@ -1323,7 +1332,9 @@ class Dataset(object):
             inv_dictionary = {v: k for k, v in dictionary.items()}
             self.vocabulary[id]['idx2words'] = inv_dictionary
 
-            self.vocabulary_len[id] = len(vocab_count) + len(self.extra_words)
+            self.vocabulary_len[id] = len(vocab_count)
+            if use_extra_words:
+                self.vocabulary_len[id] += len(self.extra_words)
 
         else:
             old_keys = self.vocabulary[id]['words2idx'].keys()
