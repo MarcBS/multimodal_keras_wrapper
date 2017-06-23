@@ -510,13 +510,13 @@ class Dataset(object):
                 # Take central image
                 left = np.round(np.divide([self.img_size[0]-self.img_size_crop[0], self.img_size[1]-self.img_size_crop[1]], 2.0))
                 right = left + self.img_size_crop[0:2]
-                im = im[left[0]:right[0], left[1]:right[1], :]
+                im = im[int(left[0]):int(right[0]), int(left[1]):int(right[1]), :]
             else:
                 # Take random crop
                 margin = [self.img_size[0]-self.img_size_crop[0], self.img_size[1]-self.img_size_crop[1]]
                 left = random.sample([k_ for k_ in range(margin[0])], 1) + random.sample([k for k in range(margin[1])], 1)
                 right = np.add(left, self.img_size_crop[0:2])
-                im = im[left[0]:right[0], left[1]:right[1], :]
+                im = im[int(left[0]):int(right[0]), int(left[1]):int(right[1]), :]
                 
                 # Randomly flip (with a certain probability)
                 flip = random.random()
