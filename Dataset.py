@@ -447,7 +447,7 @@ class Dataset(object):
             # Take central part
             left = np.round(np.divide([self.img_size[0]-self.img_size_crop[0], self.img_size[1]-self.img_size_crop[1]], 2.0))
             right = left + self.img_size_crop[0:2]
-            train_mean = train_mean[left[0]:right[0], left[1]:right[1], :]
+            train_mean = train_mean[int(left[0]):int(right[0]), int(left[1]):int(right[1]), :]
             # Transpose dimensions
             if(len(self.img_size) == 3): # if it is a 3D image
                 # Convert RGB to BGR
