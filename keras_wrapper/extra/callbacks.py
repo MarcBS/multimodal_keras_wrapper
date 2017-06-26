@@ -34,8 +34,10 @@ def checkDefaultParamsBeamSearch(params):
                       'length_penalty': False,
                       'length_norm_factor': 0.0,
                       'coverage_norm_factor': 0.0,
-                      'output_length_depending_on_x': False,
-                      'output_length_depending_on_x_factor': 3
+                      'output_max_length_depending_on_x': False,
+                      'output_max_length_depending_on_x_factor': 3,
+                      'output_min_length_depending_on_x': False,
+                      'output_min_length_depending_on_x_factor': 2
                       }
 
     for k, v in params.iteritems():
@@ -282,7 +284,7 @@ class EvalPerformance(KerasCallback):
                                                      self.sampling_type,
                                                      verbose=self.verbose)
 
-                # Apply detokenization function if needed
+                    # Apply detokenization function if needed
                     if self.extra_vars.get('apply_detokenization', False):
                         predictions = map(self.extra_vars['detokenize_f'], predictions)
 
