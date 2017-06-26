@@ -813,7 +813,7 @@ class Dataset(object):
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
 
-        elif id in keys_Y_set and not overwrite_split or not add_additional:
+        elif id in keys_Y_set and (not overwrite_split or not add_additional):
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
