@@ -876,6 +876,8 @@ class Model_Wrapper(object):
                                  samples_per_epoch=state['samples_per_epoch'],
                                  nb_epoch=params['n_epochs'],
                                  max_q_size=params['n_parallel_loaders'],
+                                 nb_worker=params['n_parallel_loaders'],
+                                 pickle_safe = True,
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
                                  initial_epoch=params['epoch_offset'])
@@ -956,7 +958,10 @@ class Model_Wrapper(object):
 
         out = self.model.evaluate_generator(data_gen,
                                             val_samples=n_samples,
-                                            max_q_size=params['n_parallel_loaders'])
+                                            max_q_size=params['n_parallel_loaders'],
+                                            nb_worker=params['n_parallel_loaders'],
+                                            pickle_safe=True,
+                                            )
 
         # Display metrics results
         for name, o in zip(self.model.metrics_names, out):
@@ -2206,7 +2211,9 @@ class Model_Wrapper(object):
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,
                                                    val_samples=n_samples,
-                                                   max_q_size=params['n_parallel_loaders'])
+                                                   max_q_size=params['n_parallel_loaders'],
+                                                   nb_worker=params['n_parallel_loaders'],
+                                                   pickle_safe=True)
                 predictions[s] = out
             else:
                 processed_samples = 0

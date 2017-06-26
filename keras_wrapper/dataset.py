@@ -650,6 +650,7 @@ class Dataset(object):
 
     def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
                  overwrite_split=False, normalization_types=None, data_augmentation_types=None,
+                 add_additional=False,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,
                  # 'raw-image' / 'video'   (height, width, depth)
                  max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0,  # 'text'
@@ -672,6 +673,7 @@ class Dataset(object):
             :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
             :param normalization_types: type of normalization applied to the current input if we activate the data normalization while loading
             :param data_augmentation_types: type of data augmentation applied to the current input if we activate the data augmentation while loading
+            :param add_additional: adds additional data to an already existent input ID
 
             
             # 'raw-image'-related parameters
@@ -708,7 +710,7 @@ class Dataset(object):
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
-        elif id in keys_X_set and not overwrite_split:
+        elif id in keys_X_set and not overwrite_split and not add_additional:
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
         if not required and id not in self.optional_inputs:
@@ -749,14 +751,17 @@ class Dataset(object):
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
 
-        self.__setInput(data, set_name, type, id, overwrite_split)
+        self.__setInput(data, set_name, type, id, overwrite_split, add_additional)
 
-    def __setInput(self, set, set_name, type, id, overwrite_split):
-        exec ('self.X_' + set_name + '[id] = set')
+    def __setInput(self, set, set_name, type, id, overwrite_split, add_additional):
+        if add_additional:
+            exec ('self.X_' + set_name + '[id] += set')
+        else:
+            exec ('self.X_' + set_name + '[id] = set')
         exec ('self.loaded_' + set_name + '[0] = True')
         if id not in self.optional_inputs:
-            exec ('self.len_' + set_name + ' = len(set)')
-            if not overwrite_split:
+            exec ('self.len_' + set_name + ' = len(self.X_' + set_name + '[id])')
+            if not overwrite_split and not add_additional:
                 self.__checkLengthSet(set_name)
 
         if not self.silence:
@@ -784,7 +789,7 @@ class Dataset(object):
         logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
         self.setOutput(labels_list, set_name, type=type, id=id)
 
-    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
+    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False, add_additional=False):
         """
             Loads a list which can contain all samples from either the 'train', 'val', or
             'test' set splits (specified by set_name).
@@ -802,13 +807,13 @@ class Dataset(object):
 
         # Insert type and id of input data
         keys_Y_set = eval('self.Y_raw_' + set_name + '.keys()')
-        if id not in self.ids_inputs or overwrite_split:
+        if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
 
-        elif id in keys_Y_set and not overwrite_split:
+        elif id in keys_Y_set and not overwrite_split or not add_additional:
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
@@ -822,7 +827,7 @@ class Dataset(object):
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
-    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
+    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False, add_additional=False,
                   sample_weights=False,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
@@ -840,6 +845,7 @@ class Dataset(object):
             :param id: identifier of the input data loaded.
             :param repeat_set: repeats the outputs given (useful when we have more inputs than outputs). Int or array of ints.
             :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
+            :param add_additional: adds additional data to an already existent output ID
             :param sample_weights: switch on/off sample weights usage for the current output
             
             # 'text'-related parameters
@@ -871,7 +877,7 @@ class Dataset(object):
         if id not in self.ids_outputs:
             self.ids_outputs.append(id)
             self.types_outputs.append(type)
-        elif id in keys_Y_set and not overwrite_split:
+        elif id in keys_Y_set and not overwrite_split and not add_additional:
             raise Exception('An output with id "' + id + '" is already loaded into the Database.')
 
         if type not in self.__accepted_types_outputs:
@@ -905,13 +911,16 @@ class Dataset(object):
         if self.sample_weights.get(id) is None:
             self.sample_weights[id] = dict()
         self.sample_weights[id][set_name] = sample_weights
-        self.__setOutput(data, set_name, type, id, overwrite_split)
+        self.__setOutput(data, set_name, type, id, overwrite_split, add_additional)
 
-    def __setOutput(self, labels, set_name, type, id, overwrite_split):
-        exec ('self.Y_' + set_name + '[id] = labels')
+    def __setOutput(self, labels, set_name, type, id, overwrite_split, add_additional):
+        if add_additional:
+            exec('self.Y_' + set_name + '[id] += labels')
+        else:
+            exec('self.Y_' + set_name + '[id] = labels')
         exec ('self.loaded_' + set_name + '[1] = True')
-        exec ('self.len_' + set_name + ' = len(labels)')
-        if not overwrite_split:
+        exec ('self.len_' + set_name + ' = len(self.Y_' + set_name + '[id])')
+        if not overwrite_split and not add_additional:
             self.__checkLengthSet(set_name)
 
         if not self.silence:
