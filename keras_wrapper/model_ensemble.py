@@ -68,7 +68,7 @@ class BeamSearchEnsemble:
         else:
             return probs
 
-    def beam_search(self, X, params, null_sym=2):
+    def beam_search(self, X, params, eos_sym=0, null_sym=2):
         """
         Beam search method for Cond models.
         (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
@@ -111,8 +111,11 @@ class BeamSearchEnsemble:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
 
-        maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_length_depending_on_x_factor']) if \
-            params['output_length_depending_on_x'] else params['maxlen']
+        maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_max_length_depending_on_x_factor']) if \
+            params['output_max_length_depending_on_x'] else params['maxlen']
+
+        minlen = int(len(X[params['dataset_inputs'][0]][0]) / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
+            params['output_min_length_depending_on_x'] else 0
 
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
@@ -131,6 +134,10 @@ class BeamSearchEnsemble:
                                                                prev_outs=prev_outs)
             else:
                 probs = self.predict_cond(self.models, X, state_below, params, ii)
+
+            if minlen > 0 and ii < minlen:
+                probs[:, eos_sym] = -np.inf
+
             # total score for every sample is sum of -log of word prb
             cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
             cand_flat = cand_scores.flatten()
@@ -172,7 +179,7 @@ class BeamSearchEnsemble:
             hyp_alphas = []
             indices_alive = []
             for idx in xrange(len(new_hyp_samples)):
-                if new_hyp_samples[idx][-1] == 0:  # finished sample
+                if new_hyp_samples[idx][-1] == eos_sym:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
                     if self.return_alphas:
@@ -279,8 +286,10 @@ class BeamSearchEnsemble:
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
                           'coverage_norm_factor': 0.0,
-                          'output_length_depending_on_x': False,
-                          'output_length_depending_on_x_factor': 3
+                          'output_max_length_depending_on_x': False,
+                          'output_max_length_depending_on_x_factor': 3,
+                          'output_min_length_depending_on_x': False,
+                          'output_min_length_depending_on_x_factor': 2
                           }
         params = self.checkParameters(self.params, default_params)
         predictions = dict()
@@ -470,8 +479,10 @@ class BeamSearchEnsemble:
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
                           'coverage_norm_factor': 0.0,
-                          'output_length_depending_on_x': False,
-                          'output_length_depending_on_x_factor': 3
+                          'output_max_length_depending_on_x': False,
+                          'output_max_length_depending_on_x_factor': 3,
+                          'output_min_length_depending_on_x': False,
+                          'output_min_length_depending_on_x_factor': 2
                           }
         params = self.checkParameters(self.params, default_params)
         params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
@@ -673,8 +684,10 @@ class BeamSearchEnsemble:
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
                           'coverage_norm_factor': 0.0,
-                          'output_length_depending_on_x': False,
-                          'output_length_depending_on_x_factor': 3
+                          'output_max_length_depending_on_x': False,
+                          'output_max_length_depending_on_x_factor': 3,
+                          'output_min_length_depending_on_x': False,
+                          'output_min_length_depending_on_x_factor': 2
                           }
         params = self.checkParameters(self.params, default_params)
 
@@ -826,8 +839,10 @@ class BeamSearchEnsemble:
                           'length_penalty': False,
                           'length_norm_factor': 0.0,
                           'coverage_norm_factor': 0.0,
-                          'output_length_depending_on_x': False,
-                          'output_length_depending_on_x_factor': 3
+                          'output_max_length_depending_on_x': False,
+                          'output_max_length_depending_on_x_factor': 3,
+                          'output_min_length_depending_on_x': False,
+                          'output_min_length_depending_on_x_factor': 2
                           }
         params = self.checkParameters(self.params, default_params)
 
