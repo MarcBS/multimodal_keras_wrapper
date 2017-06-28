@@ -203,7 +203,6 @@ class EvalPerformance(KerasCallback):
         self.evaluate(self.cum_update, counter_name='iteration', logs=logs)
 
     def evaluate(self, epoch, counter_name='epoch', logs={}):
-
         # Evaluate on each set separately
         all_metrics = []
         for s in self.set_name:
