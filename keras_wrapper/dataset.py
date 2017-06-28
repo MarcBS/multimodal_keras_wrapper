@@ -483,6 +483,7 @@ class Dataset(object):
         # the point defined by the timestep dimension
         # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
         self.mapping = dict()  # Source -- Target predefined word mapping
+        self.BPE = None  # Byte Pair Encoding instance
         #################################################
 
         ############################ Parameters used for inputs of type 'video' or 'video-features'
@@ -671,6 +672,7 @@ class Dataset(object):
                  # 'raw-image' / 'video'   (height, width, depth)
                  max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
+                 bpe_codes=None, separator='@@', # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
                  max_video_len=26  # 'video'
                  ):
@@ -709,6 +711,8 @@ class Dataset(object):
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
             :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
+            :param bpe_codes: Codes used for applying BPE encoding.
+            :param separator: BPE encoding separator.
 
             # 'image-features' and 'video-features'- related parameters
             
@@ -746,7 +750,8 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
+                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
+                                       bpe_codes=bpe_codes, separator=separator)
         elif type == 'image-features':
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif type == 'video-features':
@@ -829,7 +834,7 @@ class Dataset(object):
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
 
-        elif id in keys_Y_set and not overwrite_split or not add_additional:
+        elif id in keys_Y_set and (not overwrite_split or not add_additional):
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
         if type not in self.__accepted_types_inputs:
@@ -847,6 +852,7 @@ class Dataset(object):
                   sample_weights=False,
                   tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
+                  bpe_codes=None, separator='@@', # 'text'
                   associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
                   sparse=False, # 'binary'
                   ):
@@ -875,7 +881,9 @@ class Dataset(object):
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
             :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
-            
+            :param bpe_codes: Codes used for applying BPE encoding.
+            :param separator: BPE encoding separator.
+
             # '3DLabel' or '3DSemanticLabel'-related parameters
             
             :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
@@ -910,7 +918,8 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
+                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
+                                       bpe_codes=bpe_codes, separator=separator)
         elif type == 'binary':
             data = self.preprocessBinary(path_list, id, sparse)
         elif type == 'real':
@@ -1193,7 +1202,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocessText(self, annotations_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far):
+                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None, separator='@@'):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
@@ -1210,6 +1219,8 @@ class Dataset(object):
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Should be ignored.
+        :param bpe_codes: Codes used for applying BPE encoding.
+        :param separator: BPE encoding separator.
 
         :return: Preprocessed sentences.
         """
@@ -1227,7 +1238,12 @@ class Dataset(object):
 
         # Check if tokenization method exists
         if hasattr(self, tokenization):
+            if 'bpe' in tokenization.lower():
+                assert bpe_codes is not None, 'bpe_codes must be specified when applying a BPE tokenization.'
+                self.build_bpe(bpe_codes, separator)
             tokfun = eval('self.' + tokenization)
+            if not self.silence:
+                logging.info('\tApplying tokenization function: "' + tokenization + '.')
         else:
             raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
@@ -1416,6 +1432,21 @@ class Dataset(object):
 
         if not self.silence:
             logging.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
+
+    def build_bpe(self, codes, separator='@@', vocabulary=None, glossaries=None):
+        """
+        Constructs a BPE encoder instance. Currently, vocabulary and glossaries options are not implemented.
+        :param codes: File with BPE codes (created by learn_bpe.py)
+        :param separator: Separator between non-final subword units (default: '@@'))
+        :param vocabulary: Vocabulary file. If provided, this script reverts any merge operations that produce an OOV.
+        :param glossaries: The strings provided in glossaries will not be affected
+                           by the BPE (i.e. they will neither be broken into subwords,
+                           nor concatenated with other subwords.
+        :return: None
+        """
+        from keras_wrapper.extra.external import BPE
+        with open(codes, 'r') as cods:
+            self.BPE = BPE(cods, separator, vocabulary, glossaries)
 
     def load3DLabels(self, bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         '''
@@ -2012,6 +2043,25 @@ class Dataset(object):
         resAns = processDigitArticle(resAns)
 
         return resAns
+
+    def tokenize_bpe(self, caption):
+        """
+        Applies BPE segmentation (https://github.com/rsennrich/subword-nmt)
+        :param caption: Caption to detokenize.
+        :return: Encoded version of caption.
+        """
+        tokenized = re.sub('[\n\t]+', '', caption.strip())
+        tokenized = self.BPE.segment(tokenized).strip()
+        return tokenized
+
+    def detokenize_none(self, caption):
+        """
+        Dummy function: Keeps the caption as it is.
+        :param caption: String to de-tokenize.
+        :return: Same caption.
+        """
+        return caption
+
 
     def detokenize_bpe(self, caption, separator='@@'):
         """
