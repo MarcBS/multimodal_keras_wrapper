@@ -654,7 +654,7 @@ class Dataset(object):
                  add_additional=False,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,
                  # 'raw-image' / 'video'   (height, width, depth)
-                 max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0,  # 'text'
+                 max_text_len=35, tokenization='tokenize_none', offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
                  bpe_codes=None, separator='@@', # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
@@ -834,7 +834,7 @@ class Dataset(object):
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False, add_additional=False,
                   sample_weights=False,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
+                  tokenization='tokenize_none', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
                   bpe_codes=None, separator='@@', # 'text'
                   associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
@@ -1227,7 +1227,7 @@ class Dataset(object):
                 self.build_bpe(bpe_codes, separator)
             tokfun = eval('self.' + tokenization)
             if not self.silence:
-                logging.info('\tApplying tokenization function: "' + tokenization + '.')
+                logging.info('\tApplying tokenization function: "' + tokenization + '".')
         else:
             raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
