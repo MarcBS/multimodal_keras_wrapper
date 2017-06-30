@@ -759,10 +759,21 @@ def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
 
 
 # Data structures-related utils
-def flat_list(list_of_lists):
+def flatten_list_of_lists(list_of_lists):
     """
     Flattens a list of lists
     :param list_of_lists: List of lists
     :return: Flatten list of lists
     """
     return [item for sublist in list_of_lists for item in sublist]
+
+
+def flatten(l):
+    """
+    Flatten a list (more general than flatten_list_of_lists, but also more inefficient
+    :param l:
+    :return:
+    """
+    if not l:
+        return l
+    return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if type(l) is list else [l]
