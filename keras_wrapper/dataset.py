@@ -2054,7 +2054,7 @@ class Dataset(object):
         :param caption: Caption to detokenize.
         :return: Encoded version of caption.
         """
-        if self.BPE_built:
+        if not self.BPE_built:
             raise Exception, 'Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"'
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         tokenized = self.BPE.segment(tokenized).strip()
