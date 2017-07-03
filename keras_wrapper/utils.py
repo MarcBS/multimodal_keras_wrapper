@@ -578,7 +578,7 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     PAD = '<pad>'
 
     for a_no in answer_pred_matrix:
-        if len(a_no.shape) > 1: # only process word by word if our prediction has more than one output
+        if len(a_no.shape) > 1:  # only process word by word if our prediction has more than one output
             init_token_pos = 0
             end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
@@ -739,7 +739,7 @@ def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
     :param scores: array of size #samples x #classes;
     every entry determines a score for sample i having class j
     :param sampling_type:
-    :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
+    :param temperature: Predictions temperature. The higher, the flatter probabilities. Hence more random outputs.
     :return: set of indices chosen as output, a vector of size #samples
     """
     if isinstance(scores, dict):
@@ -756,3 +756,24 @@ def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
         return np.argmax(scores, axis=-1)
     else:
         raise NotImplementedError()
+
+
+# Data structures-related utils
+def flatten_list_of_lists(list_of_lists):
+    """
+    Flattens a list of lists
+    :param list_of_lists: List of lists
+    :return: Flatten list of lists
+    """
+    return [item for sublist in list_of_lists for item in sublist]
+
+
+def flatten(l):
+    """
+    Flatten a list (more general than flatten_list_of_lists, but also more inefficient
+    :param l:
+    :return:
+    """
+    if not l:
+        return l
+    return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if type(l) is list else [l]
