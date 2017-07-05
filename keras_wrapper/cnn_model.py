@@ -2,7 +2,7 @@ import matplotlib as mpl
 
 from keras import backend as K
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, Concat
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, Concatenate
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -3596,7 +3596,7 @@ class Model_Wrapper(object):
         self.model.add_node(Convolution2D(kernels_pool_projection, 1, 1), name=id + '/pool_proj', input=id + '/pool')
         self.model.add_node(Activation('relu'), name=id + '/relu_pool_proj', input=id + '/pool_proj')
 
-        # Concat
+        # Concatenate
         inputs_list = [id + '/relu_1x1', id + '/relu_3x3', id + '/relu_5x5', id + '/relu_pool_proj']
         out_name = id + '/concat'
         self.model.add_node(Activation('linear'), name=out_name, inputs=inputs_list, concat_axis=1)
@@ -3635,7 +3635,7 @@ class Model_Wrapper(object):
         x_b4 = MaxPooling2D((3, 3), strides=(1, 1), name=id + '/pool')(x_b4)
         x_b4 = Convolution2D(kernels_pool_projection, 1, 1, name=id + '/pool_proj', activation='relu')(x_b4)
 
-        # Concat
+        # Concatenate
         out_name = id + '/concat'
         out_node = merge([x_b1, x_b2, x_b3, x_b4], mode='concat', concat_axis=1, name=out_name)
 
@@ -3821,7 +3821,7 @@ class Model_Wrapper(object):
         x_dense = self.add_dense_block(x, nb_layers, growth, drop,
                                        init_weights)  # (growth*nb_layers) feature maps added
 
-        ## Concatenation and skip connection recovery for upsampling path
+        ## Concatenateenation and skip connection recovery for upsampling path
         skip = merge([x, x_dense], mode='concat', concat_axis=axis)
 
         # Transition Down
@@ -3865,7 +3865,7 @@ class Model_Wrapper(object):
                             init=init_weights, border_mode='valid')(x)
 
         # Skip connection concatenation
-        x = Concat(cropping=[None, None, 'center', 'center'])([skip_conn, x])
+        x = Concatenate(cropping=[None, None, 'center', 'center'])([skip_conn, x])
 
         # Dense Block
         x = self.add_dense_block(x, nb_layers, growth, drop, init_weights,

@@ -28,7 +28,8 @@ def Regularize(layer, params, shared_layers=False, name=''):
             l2_beta_reg = None
 
         bn_mode = params.get('BATCH_NORMALIZATION_MODE', 0)
-        shared_layers_list.append(BatchNormalization(mode=bn_mode,
+        #TODO: Check BN
+        shared_layers_list.append(BatchNormalization(axis=bn_mode,
                                                      gamma_regularizer=l2_gamma_reg,
                                                      beta_regularizer=l2_beta_reg,
                                                      name=name + '_batch_normalization'))
