@@ -576,6 +576,9 @@ class Model_Wrapper(object):
             if key not in params:
                 params[key] = default_val
 
+        if 'n_parallel_loaders' in params and params['n_parallel_loaders'] > 1:
+            logging.info('WARNING: parallel loaders are not implemented')
+
         return params
 
     # ------------------------------------------------------- #
@@ -879,7 +882,7 @@ class Model_Wrapper(object):
                                  samples_per_epoch=state['samples_per_epoch'],
                                  nb_epoch=params['n_epochs'],
                                  max_q_size=params['n_parallel_loaders'],
-                                 nb_worker=params['n_parallel_loaders'],
+                                 nb_worker=1,# params['n_parallel_loaders'],
                                  pickle_safe=False,
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
@@ -962,7 +965,7 @@ class Model_Wrapper(object):
         out = self.model.evaluate_generator(data_gen,
                                             val_samples=n_samples,
                                             max_q_size=params['n_parallel_loaders'],
-                                            nb_worker=params['n_parallel_loaders'],
+                                            nb_worker=1,# params['n_parallel_loaders'],
                                             pickle_safe=False,
                                             )
 
@@ -2234,7 +2237,7 @@ class Model_Wrapper(object):
                 out = self.model.predict_generator(data_gen,
                                                    val_samples=n_samples,
                                                    max_q_size=params['n_parallel_loaders'],
-                                                   nb_worker=params['n_parallel_loaders'],
+                                                   nb_worker=1,# params['n_parallel_loaders'],
                                                    pickle_safe=False)
                 predictions[s] = out
             else:

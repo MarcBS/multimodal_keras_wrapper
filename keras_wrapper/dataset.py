@@ -114,6 +114,7 @@ class Data_Batch_Generator(threading.Thread):
         self.first_idx = -1
         self.init_sample = init_sample
         self.final_sample = final_sample
+        self.n_samples_split = eval("self.dataset.len_" + self.set_split)
 
         # Progress display attributes
         self.show_progress = show_progress
@@ -134,6 +135,13 @@ class Data_Batch_Generator(threading.Thread):
                        'random_samples': random_samples,
                        'shuffle': shuffle}
 
+        # Shuffle dataset at the beginning
+        if self.set_split == 'train' and not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+            silence = self.dataset.silence
+            self.dataset.silence = True
+            self.dataset.shuffleTraining()
+            self.dataset.silence = silence
+
         threading.Thread.__init__(self)
 
     def __iter__(self):
@@ -150,17 +158,48 @@ class Data_Batch_Generator(threading.Thread):
         else:
             data_augmentation = False
 
-        # with Data_Batch_Generator.lock:
+        # retrieve current epoch
         with self.lock:
-            it = self.it
             num_epoch = self.num_epoch
-            if it == 0:
-                # Data_Batch_Generator.start_time = time.time()
+
+        # wait for the previous epoch to finish
+        if num_epoch > 0:
+            check_passed = False
+            while not check_passed:
+                time.sleep(0.1)
+                with self.lock:
+                    check_passed = self.already_processed[num_epoch-1] == self.n_samples_split
+
+        # if it == 0 restart counters
+        with self.lock:
+
+            # Checks if we are starting the epoch
+            if self.it == 0:
                 self.start_time = time.time()
                 self.already_processed[num_epoch] = 0
-            # Data_Batch_Generator.it += 1
+                if self.params['random_samples'] == -1:
+                    self.dataset.resetCounters(set_name=self.set_split)
+                """
+                if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
+                        not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+                    silence = self.dataset.silence
+                    self.dataset.silence = True
+                    self.dataset.shuffleTraining()
+                    self.dataset.silence = silence
+                """
             self.it += 1
+            it = self.it
 
+            init_sample = (it - 1) * self.params['batch_size']
+            final_sample = it * self.params['batch_size']
+            batch_size = self.params['batch_size']
+
+            # Checks if we are finishing processing the epoch
+            if final_sample >= self.n_samples_split:
+                self.num_epoch += 1
+                self.it = 0
+
+        """
         if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
                 not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
             silence = self.dataset.silence
@@ -169,30 +208,23 @@ class Data_Batch_Generator(threading.Thread):
             self.dataset.silence = silence
         if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
             self.dataset.resetCounters(set_name=self.set_split)
-        it += 1
+        """
 
-        # Checks if we are finishing processing the data split
-        init_sample = (it - 1) * self.params['batch_size']
-        final_sample = it * self.params['batch_size']
-        batch_size = self.params['batch_size']
-        n_samples_split = eval("self.dataset.len_" + self.set_split)
-        if final_sample >= n_samples_split:
-            final_sample = n_samples_split
-            batch_size = n_samples_split - init_sample
-            while self.already_processed[num_epoch] != n_samples_split-batch_size:
-                time.sleep(1)
-
-            # with Data_Batch_Generator.lock:
-            #     Data_Batch_Generator.it = 0
-            self.num_epoch += 1
-            self.it = 0
+        # Checks if we are finishing processing the epoch
+        if final_sample >= self.n_samples_split:
+            final_sample = self.n_samples_split
+            batch_size = self.n_samples_split - init_sample
+            check_passed = False
+            while not check_passed:
+                time.sleep(0.1)
+                with self.lock:
+                    check_passed = self.already_processed[num_epoch] == self.n_samples_split - batch_size
 
         # Plot progress
         if self.show_progress:
-            # with Data_Batch_Generator.lock:
             with self.lock:
-                eta = (n_samples_split - final_sample) * (time.time() - self.start_time) / final_sample
-                percentage = final_sample / float(n_samples_split) * 100
+                eta = (self.n_samples_split - final_sample) * (time.time() - self.start_time) / final_sample
+                percentage = final_sample / float(self.n_samples_split) * 100
 
                 if it > self.parallel_loaders+1 or int(percentage) == 100: # only display when we have already completed the previous epoch
                     sys.stdout.write('\r')
@@ -205,14 +237,17 @@ class Data_Batch_Generator(threading.Thread):
         if self.params['random_samples'] > 0:
             num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
             if self.temporally_linked:
-                if self.first_idx == -1:
-                    self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
-                    self.next_idx = self.first_idx
-                indices = range(self.next_idx, self.next_idx + num_retrieve)
-                self.next_idx += num_retrieve
+                with self.lock:
+                    if self.first_idx == -1:
+                        self.first_idx = np.random.randint(0, self.n_samples_split - self.params['random_samples'], 1)[0]
+                        self.next_idx = self.first_idx
+                    indices = range(self.next_idx, self.next_idx + num_retrieve)
+                    self.next_idx += num_retrieve
             else:
-                indices = np.random.randint(0, n_samples_split, num_retrieve)
-            self.params['random_samples'] -= num_retrieve
+                indices = np.random.randint(0, self.n_samples_split, num_retrieve)
+
+            with self.lock:
+                self.params['random_samples'] -= num_retrieve
 
             # At sampling from train/val, we always have Y
             if self.predict:
@@ -270,9 +305,9 @@ class Data_Batch_Generator(threading.Thread):
 
         with self.lock:
             self.already_processed[num_epoch] += batch_size
+            return (data)
 
-        return (data)
-        # yield (data)
+            # yield (data)
 
 
 class Homogeneous_Data_Batch_Generator(object):
