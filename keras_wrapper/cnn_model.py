@@ -860,7 +860,8 @@ class Model_Wrapper(object):
                                            normalization=params['normalize'],
                                            data_augmentation=False,
                                            mean_substraction=params['mean_substraction'],
-                                           show_progress=True)#.generator()
+                                           show_progress=True,
+                                           parallel_loaders=params['n_parallel_loaders'])#.generator()
         else:
             val_gen = None
             n_valid_samples = None
@@ -1701,6 +1702,7 @@ class Model_Wrapper(object):
         references = []
         sources_sampling = []
         for s in params['predict_on_sets']:
+            print
             logging.info("<<< Predicting outputs of " + s + " set >>>")
 
             # TODO: enable 'train' sampling on temporally-linked models
@@ -1964,7 +1966,8 @@ class Model_Wrapper(object):
         references = []
         sources_sampling = []
         for s in params['predict_on_sets']:
-            logging.info("\n<<< Predicting outputs of " + s + " set >>>")
+            print
+            logging.info("<<< Predicting outputs of " + s + " set >>>")
 
             # TODO: enable 'train' sampling on temporally-linked models
             if params['temporally_linked'] and s == 'train':
@@ -2184,6 +2187,7 @@ class Model_Wrapper(object):
         for s in params['predict_on_sets']:
             predictions[s] = []
             if params['verbose'] > 0:
+                print
                 logging.info("<<< Predicting outputs of " + s + " set >>>")
             # Calculate how many interations are we going to perform
             if params['n_samples'] is None:
@@ -2206,7 +2210,8 @@ class Model_Wrapper(object):
                                                 init_sample=params['init_sample'],
                                                 final_sample=params['final_sample'],
                                                 predict=True,
-                                                show_progress=True)#.generator()
+                                                show_progress=True,
+                                                parallel_loaders=params['n_parallel_loaders'])#.generator()
 
             else:
                 n_samples = params['n_samples']
@@ -2222,7 +2227,8 @@ class Model_Wrapper(object):
                                                 mean_substraction=params['mean_substraction'],
                                                 predict=True,
                                                 random_samples=n_samples,
-                                                show_progress=True)#.generator()
+                                                show_progress=True,
+                                                parallel_loaders=params['n_parallel_loaders'])#.generator()
             # Predict on model
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,

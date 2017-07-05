@@ -73,8 +73,8 @@ class Data_Batch_Generator(threading.Thread):
     Batch generator class. Retrieves batches of data.
     """
 
-    it = 0
-    lock = threading.Lock()
+    # it = 0
+    # lock = threading.Lock()
 
     def __init__(self, set_split, net, dataset, num_iterations,
                  batch_size=50,
@@ -87,7 +87,8 @@ class Data_Batch_Generator(threading.Thread):
                  temporally_linked=False,
                  init_sample=-1,
                  final_sample=-1,
-                 show_progress=False):
+                 show_progress=False,
+                 parallel_loaders=1):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -103,6 +104,7 @@ class Data_Batch_Generator(threading.Thread):
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
         :param show_progress: Indicates whether we want to show the progress of data loading
+        :param parallel_loaders: Number of parallel loaders running at the same time
         """
         self.set_split = set_split
         self.dataset = dataset
@@ -112,7 +114,16 @@ class Data_Batch_Generator(threading.Thread):
         self.first_idx = -1
         self.init_sample = init_sample
         self.final_sample = final_sample
+
+        # Progress display attributes
         self.show_progress = show_progress
+        self.parallel_loaders = parallel_loaders
+
+        # Threads synchronization attributes
+        self.it = 0
+        self.lock = threading.Lock()
+        self.already_processed = dict()
+        self.num_epoch = 0
 
         # Several parameters
         self.params = {'batch_size': batch_size,
@@ -139,13 +150,16 @@ class Data_Batch_Generator(threading.Thread):
         else:
             data_augmentation = False
 
-        # it = 0
-        #while 1:
-        with Data_Batch_Generator.lock:
+        # with Data_Batch_Generator.lock:
+        with self.lock:
             it = self.it
+            num_epoch = self.num_epoch
             if it == 0:
-                Data_Batch_Generator.start_time = time.time()
-            Data_Batch_Generator.it += 1
+                # Data_Batch_Generator.start_time = time.time()
+                self.start_time = time.time()
+                self.already_processed[num_epoch] = 0
+            # Data_Batch_Generator.it += 1
+            self.it += 1
 
         if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
                 not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
@@ -164,18 +178,28 @@ class Data_Batch_Generator(threading.Thread):
         n_samples_split = eval("self.dataset.len_" + self.set_split)
         if final_sample >= n_samples_split:
             final_sample = n_samples_split
-            batch_size = final_sample - init_sample
+            batch_size = n_samples_split - init_sample
+            while self.already_processed[num_epoch] != n_samples_split-batch_size:
+                time.sleep(1)
 
-            with Data_Batch_Generator.lock:
-                Data_Batch_Generator.it = 0
+            # with Data_Batch_Generator.lock:
+            #     Data_Batch_Generator.it = 0
+            self.num_epoch += 1
+            self.it = 0
 
         # Plot progress
         if self.show_progress:
-            with Data_Batch_Generator.lock:
-                eta = (n_samples_split - final_sample) * (time.time() - Data_Batch_Generator.start_time) / final_sample
-                sys.stdout.write('\r')
-                sys.stdout.write("Progress %s: %0.2f%s  -  ETA: %ds " % (self.set_split, final_sample/float(n_samples_split)*100, '%', int(eta)))
-                sys.stdout.flush()
+            # with Data_Batch_Generator.lock:
+            with self.lock:
+                eta = (n_samples_split - final_sample) * (time.time() - self.start_time) / final_sample
+                percentage = final_sample / float(n_samples_split) * 100
+
+                if it > self.parallel_loaders+1 or int(percentage) == 100: # only display when we have already completed the previous epoch
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Progress %s: %0.2f%s  -  ETA: %ds " % (self.set_split, percentage, '%', int(eta)))
+                    sys.stdout.flush()
+                    if int(percentage) == 100:
+                        print
 
         # Recovers a batch of data
         if self.params['random_samples'] > 0:
@@ -228,7 +252,6 @@ class Data_Batch_Generator(threading.Thread):
 
         else:
             if self.predict:
-
                 X_batch = self.dataset.getX(self.set_split,
                                             init_sample,
                                             final_sample,
@@ -244,6 +267,9 @@ class Data_Batch_Generator(threading.Thread):
                                                       meanSubstraction=self.params['mean_substraction'],
                                                       dataAugmentation=data_augmentation)
                 data = self.net.prepareData(X_batch, Y_batch)
+
+        with self.lock:
+            self.already_processed[num_epoch] += batch_size
 
         return (data)
         # yield (data)
