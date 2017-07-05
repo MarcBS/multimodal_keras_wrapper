@@ -2608,7 +2608,6 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocessImages(self, path_list, id, set_name, img_size, img_size_crop, use_RGB):
-
         if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of images' paths
             data = []
             with open(path_list, 'r') as list_:
@@ -3089,8 +3088,8 @@ class Dataset(object):
             if not debug:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    load_sample_weights = self.sample_weights[id_out][set_name]
-                    y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
+                    #load_sample_weights = self.sample_weights[id_out][set_name]
+                    y = self.loadCategorical(y, nClasses)
                 elif type_out == 'binary':
                     y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
