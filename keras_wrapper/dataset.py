@@ -510,6 +510,8 @@ class Dataset(object):
         # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
         self.mapping = dict()  # Source -- Target predefined word mapping
         self.BPE = None  # Byte Pair Encoding instance
+        self.BPE_separator = None
+        self.BPE_built = False
         #################################################
 
         ############################ Parameters used for inputs of type 'video' or 'video-features'
@@ -601,7 +603,7 @@ class Dataset(object):
             if s in most_frequent:
                 kept.append(i)
 
-        # Remove non-top samples    
+        # Remove non-top samples
         # Inputs
         ids = None
         exec ('ids = self.X_' + set_name + '.keys()')
@@ -696,7 +698,7 @@ class Dataset(object):
                  add_additional=False,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,
                  # 'raw-image' / 'video'   (height, width, depth)
-                 max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0,  # 'text'
+                 max_text_len=35, tokenization='tokenize_none', offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
                  bpe_codes=None, separator='@@', # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
@@ -705,9 +707,9 @@ class Dataset(object):
         """
             Loads a list which can contain all samples from either the 'train', 'val', or
             'test' set splits (specified by set_name).
-            
+
             # General parameters
-            
+
             :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
@@ -719,15 +721,15 @@ class Dataset(object):
             :param data_augmentation_types: type of data augmentation applied to the current input if we activate the data augmentation while loading
             :param add_additional: adds additional data to an already existent input ID
 
-            
+
             # 'raw-image'-related parameters
-            
+
             :param img_size: size of the input images (any input image will be resized to this)
             :param img_size_crop: size of the cropped zone (when dataAugmentation=False the central crop will be used)
-            
-            
+
+
             # 'text'-related parameters
-            
+
             :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text'). A previously calculated vocabulary will be used if build_vocabulary is an 'id' from a previously loaded input/output
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
@@ -741,12 +743,12 @@ class Dataset(object):
             :param separator: BPE encoding separator.
 
             # 'image-features' and 'video-features'- related parameters
-            
+
             :param feat_len: size of the feature vectors for each dimension. We must provide a list if the features are not vectors.
-            
-            
+
+
             # 'video'-related parameters
-            
+
             :param max_video_len: maximum video length, the rest of the data will be padded with 0s (only applicable if the input data is of type 'video' or video-features').
         """
         self.__checkSetName(set_name)
@@ -876,7 +878,7 @@ class Dataset(object):
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False, add_additional=False,
                   sample_weights=False,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
+                  tokenization='tokenize_none', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
                   bpe_codes=None, separator='@@', # 'text'
                   associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
@@ -884,9 +886,9 @@ class Dataset(object):
                   ):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
-            
+
             # General parameters
-            
+
             :param path_list: can either be a path to a text file containing the labels or a python list of labels.
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test').
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).
@@ -895,9 +897,9 @@ class Dataset(object):
             :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
             :param add_additional: adds additional data to an already existent output ID
             :param sample_weights: switch on/off sample weights usage for the current output
-            
+
             # 'text'-related parameters
-            
+
             :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text') Set to 0 if the whole sentence will be used as an output class.
@@ -911,7 +913,7 @@ class Dataset(object):
             :param separator: BPE encoding separator.
 
             # '3DLabel' or '3DSemanticLabel'-related parameters
-            
+
             :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
             :param num_poolings: number of pooling layers used in the model (used for calculating output dimensions)
 
@@ -1269,7 +1271,7 @@ class Dataset(object):
                 self.build_bpe(bpe_codes, separator)
             tokfun = eval('self.' + tokenization)
             if not self.silence:
-                logging.info('\tApplying tokenization function: "' + tokenization + '.')
+                logging.info('\tApplying tokenization function: "' + tokenization + '".')
         else:
             raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
@@ -1473,6 +1475,8 @@ class Dataset(object):
         from keras_wrapper.extra.external import BPE
         with open(codes, 'r') as cods:
             self.BPE = BPE(cods, separator, vocabulary, glossaries)
+        self.BPE_separator = separator
+        self.BPE_built = True
 
     def load3DLabels(self, bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         '''
@@ -2076,6 +2080,8 @@ class Dataset(object):
         :param caption: Caption to detokenize.
         :return: Encoded version of caption.
         """
+        if not self.BPE_built:
+            raise Exception, 'Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"'
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         tokenized = self.BPE.segment(tokenized).strip()
         return tokenized
