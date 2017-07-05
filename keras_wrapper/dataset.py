@@ -12,6 +12,7 @@ import sys
 import threading
 from collections import Counter
 from operator import add
+import time
 
 import numpy as np
 from PIL import Image as pilimage
@@ -67,11 +68,13 @@ def loadDataset(dataset_path):
 #       DATA BATCH GENERATOR CLASS
 # ------------------------------------------------------- #
 
-
-class Data_Batch_Generator(object):
+class Data_Batch_Generator(threading.Thread):
     """
     Batch generator class. Retrieves batches of data.
     """
+
+    # it = 0
+    # lock = threading.Lock()
 
     def __init__(self, set_split, net, dataset, num_iterations,
                  batch_size=50,
@@ -83,7 +86,9 @@ class Data_Batch_Generator(object):
                  shuffle=True,
                  temporally_linked=False,
                  init_sample=-1,
-                 final_sample=-1):
+                 final_sample=-1,
+                 show_progress=False,
+                 parallel_loaders=1):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -98,6 +103,8 @@ class Data_Batch_Generator(object):
         :param random_samples: Retrieves this number of training samples
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
+        :param show_progress: Indicates whether we want to show the progress of data loading
+        :param parallel_loaders: Number of parallel loaders running at the same time
         """
         self.set_split = set_split
         self.dataset = dataset
@@ -108,6 +115,16 @@ class Data_Batch_Generator(object):
         self.init_sample = init_sample
         self.final_sample = final_sample
 
+        # Progress display attributes
+        self.show_progress = show_progress
+        self.parallel_loaders = parallel_loaders
+
+        # Threads synchronization attributes
+        self.it = 0
+        self.lock = threading.Lock()
+        self.already_processed = dict()
+        self.num_epoch = 0
+
         # Several parameters
         self.params = {'batch_size': batch_size,
                        'data_augmentation': data_augmentation,
@@ -117,7 +134,12 @@ class Data_Batch_Generator(object):
                        'random_samples': random_samples,
                        'shuffle': shuffle}
 
-    def generator(self):
+        threading.Thread.__init__(self)
+
+    def __iter__(self):
+        return self.next()
+
+    def next(self):
         """
         Gets and processes the data
         :return: generator with the data
@@ -128,109 +150,129 @@ class Data_Batch_Generator(object):
         else:
             data_augmentation = False
 
-        it = 0
-        while 1:
-            if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
-                    not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
-                silence = self.dataset.silence
-                self.dataset.silence = True
-                self.dataset.shuffleTraining()
-                self.dataset.silence = silence
-            if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
-                self.dataset.resetCounters(set_name=self.set_split)
-            it += 1
+        # with Data_Batch_Generator.lock:
+        with self.lock:
+            it = self.it
+            num_epoch = self.num_epoch
+            if it == 0:
+                # Data_Batch_Generator.start_time = time.time()
+                self.start_time = time.time()
+                self.already_processed[num_epoch] = 0
+            # Data_Batch_Generator.it += 1
+            self.it += 1
 
-            # Checks if we are finishing processing the data split
-            init_sample = (it - 1) * self.params['batch_size']
-            final_sample = it * self.params['batch_size']
-            batch_size = self.params['batch_size']
-            n_samples_split = eval("self.dataset.len_" + self.set_split)
-            if final_sample >= n_samples_split:
-                final_sample = n_samples_split
-                batch_size = final_sample - init_sample
-                it = 0
+        if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
+                not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+            silence = self.dataset.silence
+            self.dataset.silence = True
+            self.dataset.shuffleTraining()
+            self.dataset.silence = silence
+        if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
+            self.dataset.resetCounters(set_name=self.set_split)
+        it += 1
 
-            # Recovers a batch of data
-            if self.params['random_samples'] > 0:
-                num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
-                if self.temporally_linked:
-                    if self.first_idx == -1:
-                        self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
-                        self.next_idx = self.first_idx
-                    indices = range(self.next_idx, self.next_idx + num_retrieve)
-                    self.next_idx += num_retrieve
-                else:
-                    indices = np.random.randint(0, n_samples_split, num_retrieve)
-                self.params['random_samples'] -= num_retrieve
+        # Checks if we are finishing processing the data split
+        init_sample = (it - 1) * self.params['batch_size']
+        final_sample = it * self.params['batch_size']
+        batch_size = self.params['batch_size']
+        n_samples_split = eval("self.dataset.len_" + self.set_split)
+        if final_sample >= n_samples_split:
+            final_sample = n_samples_split
+            batch_size = n_samples_split - init_sample
+            while self.already_processed[num_epoch] != n_samples_split-batch_size:
+                time.sleep(1)
 
-                # At sampling from train/val, we always have Y
-                if self.predict:
-                    X_batch = self.dataset.getX_FromIndices(self.set_split,
-                                                            indices,
-                                                            normalization=self.params['normalization'],
-                                                            meanSubstraction=self.params['mean_substraction'],
-                                                            dataAugmentation=data_augmentation)
-                    data = self.net.prepareData(X_batch, None)[0]
+            # with Data_Batch_Generator.lock:
+            #     Data_Batch_Generator.it = 0
+            self.num_epoch += 1
+            self.it = 0
 
-                else:
-                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
-                                                                      indices,
-                                                                      normalization=self.params['normalization'],
-                                                                      meanSubstraction=self.params['mean_substraction'],
-                                                                      dataAugmentation=data_augmentation)
-                    data = self.net.prepareData(X_batch, Y_batch)
+        # Plot progress
+        if self.show_progress:
+            # with Data_Batch_Generator.lock:
+            with self.lock:
+                eta = (n_samples_split - final_sample) * (time.time() - self.start_time) / final_sample
+                percentage = final_sample / float(n_samples_split) * 100
 
-            elif self.init_sample > -1 and self.final_sample > -1:
-                indices = range(self.init_sample, self.final_sample)
-                if self.predict:
-                    X_batch = self.dataset.getX_FromIndices(self.set_split,
-                                                            indices,
-                                                            normalization=self.params['normalization'],
-                                                            meanSubstraction=self.params['mean_substraction'],
-                                                            dataAugmentation=data_augmentation)
-                    data = self.net.prepareData(X_batch, None)[0]
+                if it > self.parallel_loaders+1 or int(percentage) == 100: # only display when we have already completed the previous epoch
+                    sys.stdout.write('\r')
+                    sys.stdout.write("Progress %s: %0.2f%s  -  ETA: %ds " % (self.set_split, percentage, '%', int(eta)))
+                    sys.stdout.flush()
+                    if int(percentage) == 100:
+                        print
 
-                else:
-                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
-                                                                      indices,
-                                                                      normalization=self.params['normalization'],
-                                                                      meanSubstraction=self.params['mean_substraction'],
-                                                                      dataAugmentation=data_augmentation)
-                    data = self.net.prepareData(X_batch, Y_batch)
+        # Recovers a batch of data
+        if self.params['random_samples'] > 0:
+            num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
+            if self.temporally_linked:
+                if self.first_idx == -1:
+                    self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
+                    self.next_idx = self.first_idx
+                indices = range(self.next_idx, self.next_idx + num_retrieve)
+                self.next_idx += num_retrieve
+            else:
+                indices = np.random.randint(0, n_samples_split, num_retrieve)
+            self.params['random_samples'] -= num_retrieve
 
+            # At sampling from train/val, we always have Y
+            if self.predict:
+                X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                        indices,
+                                                        normalization=self.params['normalization'],
+                                                        meanSubstraction=self.params['mean_substraction'],
+                                                        dataAugmentation=data_augmentation)
+                data = self.net.prepareData(X_batch, None)[0]
 
             else:
-                if self.predict:
+                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                  indices,
+                                                                  normalization=self.params['normalization'],
+                                                                  meanSubstraction=self.params['mean_substraction'],
+                                                                  dataAugmentation=data_augmentation)
+                data = self.net.prepareData(X_batch, Y_batch)
 
-                    X_batch = self.dataset.getX(self.set_split,
-                                                init_sample,
-                                                final_sample,
-                                                normalization=self.params['normalization'],
-                                                meanSubstraction=self.params['mean_substraction'],
-                                                dataAugmentation=False)
-                    """
-                    if init_sample < 10:
+        elif self.init_sample > -1 and self.final_sample > -1:
+            indices = range(self.init_sample, self.final_sample)
+            if self.predict:
+                X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                        indices,
+                                                        normalization=self.params['normalization'],
+                                                        meanSubstraction=self.params['mean_substraction'],
+                                                        dataAugmentation=data_augmentation)
+                data = self.net.prepareData(X_batch, None)[0]
 
-                        Y_batch = self.dataset.getY(self.set_split,
-                                                    init_sample,
-                                                    final_sample,
-                                                    normalization=self.params['normalization'],
-                                                    meanSubstraction=self.params['mean_substraction'],
-                                                    dataAugmentation=False)
+            else:
+                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                  indices,
+                                                                  normalization=self.params['normalization'],
+                                                                  meanSubstraction=self.params['mean_substraction'],
+                                                                  dataAugmentation=data_augmentation)
+                data = self.net.prepareData(X_batch, Y_batch)
 
-                        for e,i in enumerate(range(init_sample, final_sample)):
-                            np.save(self.set_split + '_im_in_%d.npy' % (i), X_batch[0][e])
-                            np.save(self.set_split + '_lab_in_%d.npy' % (i), Y_batch[0][e])
-                    """
-                    data = self.net.prepareData(X_batch, None)[0]
-                else:
-                    X_batch, Y_batch = self.dataset.getXY(self.set_split,
-                                                          batch_size,
-                                                          normalization=self.params['normalization'],
-                                                          meanSubstraction=self.params['mean_substraction'],
-                                                          dataAugmentation=data_augmentation)
-                    data = self.net.prepareData(X_batch, Y_batch)
-            yield (data)
+
+        else:
+            if self.predict:
+                X_batch = self.dataset.getX(self.set_split,
+                                            init_sample,
+                                            final_sample,
+                                            normalization=self.params['normalization'],
+                                            meanSubstraction=self.params['mean_substraction'],
+                                            dataAugmentation=False)
+
+                data = self.net.prepareData(X_batch, None)[0]
+            else:
+                X_batch, Y_batch = self.dataset.getXY(self.set_split,
+                                                      batch_size,
+                                                      normalization=self.params['normalization'],
+                                                      meanSubstraction=self.params['mean_substraction'],
+                                                      dataAugmentation=data_augmentation)
+                data = self.net.prepareData(X_batch, Y_batch)
+
+        with self.lock:
+            self.already_processed[num_epoch] += batch_size
+
+        return (data)
+        # yield (data)
 
 
 class Homogeneous_Data_Batch_Generator(object):
@@ -467,6 +509,9 @@ class Dataset(object):
         # the point defined by the timestep dimension
         # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
         self.mapping = dict()  # Source -- Target predefined word mapping
+        self.BPE = None  # Byte Pair Encoding instance
+        self.BPE_separator = None
+        self.BPE_built = False
         #################################################
 
         ############################ Parameters used for inputs of type 'video' or 'video-features'
@@ -558,7 +603,7 @@ class Dataset(object):
             if s in most_frequent:
                 kept.append(i)
 
-        # Remove non-top samples    
+        # Remove non-top samples
         # Inputs
         ids = None
         exec ('ids = self.X_' + set_name + '.keys()')
@@ -653,17 +698,18 @@ class Dataset(object):
                  add_additional=False,
                  img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,
                  # 'raw-image' / 'video'   (height, width, depth)
-                 max_text_len=35, tokenization='tokenize_basic', offset=0, fill='end', min_occ=0,  # 'text'
+                 max_text_len=35, tokenization='tokenize_none', offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
+                 bpe_codes=None, separator='@@', # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
                  max_video_len=26  # 'video'
                  ):
         """
             Loads a list which can contain all samples from either the 'train', 'val', or
             'test' set splits (specified by set_name).
-            
+
             # General parameters
-            
+
             :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
@@ -675,15 +721,15 @@ class Dataset(object):
             :param data_augmentation_types: type of data augmentation applied to the current input if we activate the data augmentation while loading
             :param add_additional: adds additional data to an already existent input ID
 
-            
+
             # 'raw-image'-related parameters
-            
+
             :param img_size: size of the input images (any input image will be resized to this)
             :param img_size_crop: size of the cropped zone (when dataAugmentation=False the central crop will be used)
-            
-            
+
+
             # 'text'-related parameters
-            
+
             :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text'). A previously calculated vocabulary will be used if build_vocabulary is an 'id' from a previously loaded input/output
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
@@ -693,14 +739,16 @@ class Dataset(object):
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
             :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
+            :param bpe_codes: Codes used for applying BPE encoding.
+            :param separator: BPE encoding separator.
 
             # 'image-features' and 'video-features'- related parameters
-            
+
             :param feat_len: size of the feature vectors for each dimension. We must provide a list if the features are not vectors.
-            
-            
+
+
             # 'video'-related parameters
-            
+
             :param max_video_len: maximum video length, the rest of the data will be padded with 0s (only applicable if the input data is of type 'video' or video-features').
         """
         self.__checkSetName(set_name)
@@ -730,7 +778,8 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
+                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
+                                       bpe_codes=bpe_codes, separator=separator)
         elif type == 'image-features':
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif type == 'video-features':
@@ -829,16 +878,17 @@ class Dataset(object):
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False, add_additional=False,
                   sample_weights=False,
-                  tokenization='tokenize_basic', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
+                  tokenization='tokenize_none', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
+                  bpe_codes=None, separator='@@', # 'text'
                   associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
                   sparse=False, # 'binary'
                   ):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
-            
+
             # General parameters
-            
+
             :param path_list: can either be a path to a text file containing the labels or a python list of labels.
             :param set_name: identifier of the set split loaded ('train', 'val' or 'test').
             :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).
@@ -847,9 +897,9 @@ class Dataset(object):
             :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
             :param add_additional: adds additional data to an already existent output ID
             :param sample_weights: switch on/off sample weights usage for the current output
-            
+
             # 'text'-related parameters
-            
+
             :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
             :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
             :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text') Set to 0 if the whole sentence will be used as an output class.
@@ -859,9 +909,11 @@ class Dataset(object):
             :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
             :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
             :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
-            
+            :param bpe_codes: Codes used for applying BPE encoding.
+            :param separator: BPE encoding separator.
+
             # '3DLabel' or '3DSemanticLabel'-related parameters
-            
+
             :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
             :param num_poolings: number of pooling layers used in the model (used for calculating output dimensions)
 
@@ -894,7 +946,8 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far)
+                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
+                                       bpe_codes=bpe_codes, separator=separator)
         elif type == 'binary':
             data = self.preprocessBinary(path_list, id, sparse)
         elif type == 'real':
@@ -1177,7 +1230,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocessText(self, annotations_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far):
+                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None, separator='@@'):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
@@ -1194,6 +1247,8 @@ class Dataset(object):
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
         :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Should be ignored.
+        :param bpe_codes: Codes used for applying BPE encoding.
+        :param separator: BPE encoding separator.
 
         :return: Preprocessed sentences.
         """
@@ -1211,7 +1266,12 @@ class Dataset(object):
 
         # Check if tokenization method exists
         if hasattr(self, tokenization):
+            if 'bpe' in tokenization.lower():
+                assert bpe_codes is not None, 'bpe_codes must be specified when applying a BPE tokenization.'
+                self.build_bpe(bpe_codes, separator)
             tokfun = eval('self.' + tokenization)
+            if not self.silence:
+                logging.info('\tApplying tokenization function: "' + tokenization + '".')
         else:
             raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
@@ -1400,6 +1460,23 @@ class Dataset(object):
 
         if not self.silence:
             logging.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
+
+    def build_bpe(self, codes, separator='@@', vocabulary=None, glossaries=None):
+        """
+        Constructs a BPE encoder instance. Currently, vocabulary and glossaries options are not implemented.
+        :param codes: File with BPE codes (created by learn_bpe.py)
+        :param separator: Separator between non-final subword units (default: '@@'))
+        :param vocabulary: Vocabulary file. If provided, this script reverts any merge operations that produce an OOV.
+        :param glossaries: The strings provided in glossaries will not be affected
+                           by the BPE (i.e. they will neither be broken into subwords,
+                           nor concatenated with other subwords.
+        :return: None
+        """
+        from keras_wrapper.extra.external import BPE
+        with open(codes, 'r') as cods:
+            self.BPE = BPE(cods, separator, vocabulary, glossaries)
+        self.BPE_separator = separator
+        self.BPE_built = True
 
     def load3DLabels(self, bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         '''
@@ -1996,6 +2073,27 @@ class Dataset(object):
         resAns = processDigitArticle(resAns)
 
         return resAns
+
+    def tokenize_bpe(self, caption):
+        """
+        Applies BPE segmentation (https://github.com/rsennrich/subword-nmt)
+        :param caption: Caption to detokenize.
+        :return: Encoded version of caption.
+        """
+        if not self.BPE_built:
+            raise Exception, 'Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"'
+        tokenized = re.sub('[\n\t]+', '', caption.strip())
+        tokenized = self.BPE.segment(tokenized).strip()
+        return tokenized
+
+    def detokenize_none(self, caption):
+        """
+        Dummy function: Keeps the caption as it is.
+        :param caption: String to de-tokenize.
+        :return: Same caption.
+        """
+        return caption
+
 
     def detokenize_bpe(self, caption, separator='@@'):
         """

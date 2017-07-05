@@ -314,7 +314,7 @@ class BeamSearchEnsemble:
                                                 normalization=params['normalize'],
                                                 data_augmentation=False,
                                                 mean_substraction=params['mean_substraction'],
-                                                predict=True).generator()
+                                                predict=True)#.generator()
             else:
                 n_samples = params['n_samples']
                 num_iterations = int(math.ceil(float(n_samples))) # / params['batch_size']))
@@ -329,7 +329,7 @@ class BeamSearchEnsemble:
                                                 data_augmentation=False,
                                                 mean_substraction=params['mean_substraction'],
                                                 predict=False,
-                                                random_samples=n_samples).generator()
+                                                random_samples=n_samples)#.generator()
             if params['n_samples'] > 0:
                 references = []
                 sources_sampling = []
@@ -714,7 +714,7 @@ class BeamSearchEnsemble:
                                             normalization=params['normalize'],
                                             data_augmentation=False,
                                             mean_substraction=params['mean_substraction'],
-                                            predict=False).generator()
+                                            predict=False)#.generator()
             sources_sampling = []
             scores = []
             total_cost = 0
@@ -1059,7 +1059,7 @@ class PredictEnsemble:
                                                 mean_substraction=params['mean_substraction'],
                                                 init_sample=params['init_sample'],
                                                 final_sample=params['final_sample'],
-                                                predict=True).generator()
+                                                predict=True)#.generator()
             else:
                 n_samples = params['n_samples']
                 num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
@@ -1074,7 +1074,7 @@ class PredictEnsemble:
                                                 data_augmentation=False,
                                                 mean_substraction=params['mean_substraction'],
                                                 predict=True,
-                                                random_samples=n_samples).generator()
+                                                random_samples=n_samples)#.generator()
             # Predict on model
             """
             if self.postprocess_fun is None:
