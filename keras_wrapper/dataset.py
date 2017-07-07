@@ -68,13 +68,11 @@ def loadDataset(dataset_path):
 #       DATA BATCH GENERATOR CLASS
 # ------------------------------------------------------- #
 
-class Data_Batch_Generator(threading.Thread):
+
+class Data_Batch_Generator(object):
     """
     Batch generator class. Retrieves batches of data.
     """
-
-    # it = 0
-    # lock = threading.Lock()
 
     def __init__(self, set_split, net, dataset, num_iterations,
                  batch_size=50,
@@ -86,9 +84,7 @@ class Data_Batch_Generator(threading.Thread):
                  shuffle=True,
                  temporally_linked=False,
                  init_sample=-1,
-                 final_sample=-1,
-                 show_progress=False,
-                 parallel_loaders=1):
+                 final_sample=-1):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -103,8 +99,6 @@ class Data_Batch_Generator(threading.Thread):
         :param random_samples: Retrieves this number of training samples
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
-        :param show_progress: Indicates whether we want to show the progress of data loading
-        :param parallel_loaders: Number of parallel loaders running at the same time
         """
         self.set_split = set_split
         self.dataset = dataset
@@ -114,17 +108,6 @@ class Data_Batch_Generator(threading.Thread):
         self.first_idx = -1
         self.init_sample = init_sample
         self.final_sample = final_sample
-        self.n_samples_split = eval("self.dataset.len_" + self.set_split)
-
-        # Progress display attributes
-        self.show_progress = show_progress
-        self.parallel_loaders = parallel_loaders
-
-        # Threads synchronization attributes
-        self.it = 0
-        self.lock = threading.Lock()
-        self.already_processed = dict()
-        self.num_epoch = 0
 
         # Several parameters
         self.params = {'batch_size': batch_size,
@@ -135,19 +118,7 @@ class Data_Batch_Generator(threading.Thread):
                        'random_samples': random_samples,
                        'shuffle': shuffle}
 
-        # Shuffle dataset at the beginning
-        if self.set_split == 'train' and not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
-            silence = self.dataset.silence
-            self.dataset.silence = True
-            self.dataset.shuffleTraining()
-            self.dataset.silence = silence
-
-        threading.Thread.__init__(self)
-
-    def __iter__(self):
-        return self.next()
-
-    def next(self):
+    def generator(self):
         """
         Gets and processes the data
         :return: generator with the data
@@ -158,156 +129,109 @@ class Data_Batch_Generator(threading.Thread):
         else:
             data_augmentation = False
 
-        # retrieve current epoch
-        with self.lock:
-            num_epoch = self.num_epoch
+        it = 0
+        while 1:
+            if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
+                    not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+                silence = self.dataset.silence
+                self.dataset.silence = True
+                self.dataset.shuffleTraining()
+                self.dataset.silence = silence
+            if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
+                self.dataset.resetCounters(set_name=self.set_split)
+            it += 1
 
-        # wait for the previous epoch to finish
-        if num_epoch > 0:
-            check_passed = False
-            while not check_passed:
-                time.sleep(0.1)
-                with self.lock:
-                    check_passed = self.already_processed[num_epoch-1] == self.n_samples_split
-
-        # if it == 0 restart counters
-        with self.lock:
-
-            # Checks if we are starting the epoch
-            if self.it == 0:
-                self.start_time = time.time()
-                self.already_processed[num_epoch] = 0
-                if self.params['random_samples'] == -1:
-                    self.dataset.resetCounters(set_name=self.set_split)
-                """
-                if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
-                        not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
-                    silence = self.dataset.silence
-                    self.dataset.silence = True
-                    self.dataset.shuffleTraining()
-                    self.dataset.silence = silence
-                """
-            self.it += 1
-            it = self.it
-
+            # Checks if we are finishing processing the data split
             init_sample = (it - 1) * self.params['batch_size']
             final_sample = it * self.params['batch_size']
             batch_size = self.params['batch_size']
+            n_samples_split = eval("self.dataset.len_" + self.set_split)
+            if final_sample >= n_samples_split:
+                final_sample = n_samples_split
+                batch_size = final_sample - init_sample
+                it = 0
 
-            # Checks if we are finishing processing the epoch
-            if final_sample >= self.n_samples_split:
-                self.num_epoch += 1
-                self.it = 0
-
-        """
-        if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
-                not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
-            silence = self.dataset.silence
-            self.dataset.silence = True
-            self.dataset.shuffleTraining()
-            self.dataset.silence = silence
-        if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
-            self.dataset.resetCounters(set_name=self.set_split)
-        """
-
-        # Checks if we are finishing processing the epoch
-        if final_sample >= self.n_samples_split:
-            final_sample = self.n_samples_split
-            batch_size = self.n_samples_split - init_sample
-            check_passed = False
-            while not check_passed:
-                time.sleep(0.1)
-                with self.lock:
-                    check_passed = self.already_processed[num_epoch] == self.n_samples_split - batch_size
-
-        # Plot progress
-        if self.show_progress:
-            with self.lock:
-                eta = (self.n_samples_split - final_sample) * (time.time() - self.start_time) / final_sample
-                percentage = final_sample / float(self.n_samples_split) * 100
-
-                if it > self.parallel_loaders+1 or int(percentage) == 100: # only display when we have already completed the previous epoch
-                    sys.stdout.write('\r')
-                    sys.stdout.write("Progress %s: %0.2f%s  -  ETA: %ds " % (self.set_split, percentage, '%', int(eta)))
-                    sys.stdout.flush()
-                    if int(percentage) == 100:
-                        print
-
-        # Recovers a batch of data
-        if self.params['random_samples'] > 0:
-            num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
-            if self.temporally_linked:
-                with self.lock:
+            # Recovers a batch of data
+            if self.params['random_samples'] > 0:
+                num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
+                if self.temporally_linked:
                     if self.first_idx == -1:
-                        self.first_idx = np.random.randint(0, self.n_samples_split - self.params['random_samples'], 1)[0]
+                        self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
                         self.next_idx = self.first_idx
                     indices = range(self.next_idx, self.next_idx + num_retrieve)
                     self.next_idx += num_retrieve
-            else:
-                indices = np.random.randint(0, self.n_samples_split, num_retrieve)
-
-            with self.lock:
+                else:
+                    indices = np.random.randint(0, n_samples_split, num_retrieve)
                 self.params['random_samples'] -= num_retrieve
 
-            # At sampling from train/val, we always have Y
-            if self.predict:
-                X_batch = self.dataset.getX_FromIndices(self.set_split,
-                                                        indices,
-                                                        normalization=self.params['normalization'],
-                                                        meanSubstraction=self.params['mean_substraction'],
-                                                        dataAugmentation=data_augmentation)
-                data = self.net.prepareData(X_batch, None)[0]
+                # At sampling from train/val, we always have Y
+                if self.predict:
+                    X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                            indices,
+                                                            normalization=self.params['normalization'],
+                                                            meanSubstraction=self.params['mean_substraction'],
+                                                            dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, None)[0]
+
+                else:
+                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                      indices,
+                                                                      normalization=self.params['normalization'],
+                                                                      meanSubstraction=self.params['mean_substraction'],
+                                                                      dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
+
+            elif self.init_sample > -1 and self.final_sample > -1:
+                indices = range(self.init_sample, self.final_sample)
+                if self.predict:
+                    X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                            indices,
+                                                            normalization=self.params['normalization'],
+                                                            meanSubstraction=self.params['mean_substraction'],
+                                                            dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, None)[0]
+
+                else:
+                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                      indices,
+                                                                      normalization=self.params['normalization'],
+                                                                      meanSubstraction=self.params['mean_substraction'],
+                                                                      dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
+
 
             else:
-                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
-                                                                  indices,
-                                                                  normalization=self.params['normalization'],
-                                                                  meanSubstraction=self.params['mean_substraction'],
-                                                                  dataAugmentation=data_augmentation)
-                data = self.net.prepareData(X_batch, Y_batch)
+                if self.predict:
 
-        elif self.init_sample > -1 and self.final_sample > -1:
-            indices = range(self.init_sample, self.final_sample)
-            if self.predict:
-                X_batch = self.dataset.getX_FromIndices(self.set_split,
-                                                        indices,
-                                                        normalization=self.params['normalization'],
-                                                        meanSubstraction=self.params['mean_substraction'],
-                                                        dataAugmentation=data_augmentation)
-                data = self.net.prepareData(X_batch, None)[0]
+                    X_batch = self.dataset.getX(self.set_split,
+                                                init_sample,
+                                                final_sample,
+                                                normalization=self.params['normalization'],
+                                                meanSubstraction=self.params['mean_substraction'],
+                                                dataAugmentation=False)
+                    """
+                    if init_sample < 10:
 
-            else:
-                X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
-                                                                  indices,
-                                                                  normalization=self.params['normalization'],
-                                                                  meanSubstraction=self.params['mean_substraction'],
-                                                                  dataAugmentation=data_augmentation)
-                data = self.net.prepareData(X_batch, Y_batch)
+                        Y_batch = self.dataset.getY(self.set_split,
+                                                    init_sample,
+                                                    final_sample,
+                                                    normalization=self.params['normalization'],
+                                                    meanSubstraction=self.params['mean_substraction'],
+                                                    dataAugmentation=False)
 
-
-        else:
-            if self.predict:
-                X_batch = self.dataset.getX(self.set_split,
-                                            init_sample,
-                                            final_sample,
-                                            normalization=self.params['normalization'],
-                                            meanSubstraction=self.params['mean_substraction'],
-                                            dataAugmentation=False)
-
-                data = self.net.prepareData(X_batch, None)[0]
-            else:
-                X_batch, Y_batch = self.dataset.getXY(self.set_split,
-                                                      batch_size,
-                                                      normalization=self.params['normalization'],
-                                                      meanSubstraction=self.params['mean_substraction'],
-                                                      dataAugmentation=data_augmentation)
-                data = self.net.prepareData(X_batch, Y_batch)
-
-        with self.lock:
-            self.already_processed[num_epoch] += batch_size
-            return (data)
-
-            # yield (data)
+                        for e,i in enumerate(range(init_sample, final_sample)):
+                            np.save(self.set_split + '_im_in_%d.npy' % (i), X_batch[0][e])
+                            np.save(self.set_split + '_lab_in_%d.npy' % (i), Y_batch[0][e])
+                    """
+                    data = self.net.prepareData(X_batch, None)[0]
+                else:
+                    X_batch, Y_batch = self.dataset.getXY(self.set_split,
+                                                          batch_size,
+                                                          normalization=self.params['normalization'],
+                                                          meanSubstraction=self.params['mean_substraction'],
+                                                          dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
+            yield (data)
 
 
 class Homogeneous_Data_Batch_Generator(object):

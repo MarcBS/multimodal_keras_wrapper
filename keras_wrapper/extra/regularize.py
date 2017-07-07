@@ -5,7 +5,14 @@ from keras.regularizers import l2
 from keras.layers.core import Dropout, Lambda
 
 
-def Regularize(layer, params, shared_layers=False, name=''):
+def Regularize(layer, params,
+               shared_layers=False,
+               name='',
+               apply_noise=True,
+               apply_batch_normalization=True,
+               apply_prelu=True,
+               apply_dropout=True,
+               apply_l2=True):
     """
     Apply the regularization specified in parameters to the layer
     :param layer: Layer to regularize
@@ -16,10 +23,10 @@ def Regularize(layer, params, shared_layers=False, name=''):
     """
     shared_layers_list = []
 
-    if params.get('USE_NOISE', False):
+    if apply_noise and params.get('USE_NOISE', False):
         shared_layers_list.append(GaussianNoise(params.get('NOISE_AMOUNT', 0.01), name=name + '_gaussian_noise'))
 
-    if params.get('USE_BATCH_NORMALIZATION', False):
+    if apply_batch_normalization and params.get('USE_BATCH_NORMALIZATION', False):
         if params.get('WEIGHT_DECAY'):
             l2_gamma_reg = l2(params['WEIGHT_DECAY'])
             l2_beta_reg = l2(params['WEIGHT_DECAY'])
@@ -28,19 +35,19 @@ def Regularize(layer, params, shared_layers=False, name=''):
             l2_beta_reg = None
 
         bn_mode = params.get('BATCH_NORMALIZATION_MODE', 0)
-        #TODO: Check BN
-        shared_layers_list.append(BatchNormalization(axis=bn_mode,
+
+        shared_layers_list.append(BatchNormalization(mode=bn_mode,
                                                      gamma_regularizer=l2_gamma_reg,
                                                      beta_regularizer=l2_beta_reg,
                                                      name=name + '_batch_normalization'))
 
-    if params.get('USE_PRELU', False):
+    if apply_prelu and params.get('USE_PRELU', False):
         shared_layers_list.append(PReLU(name=name + '_PReLU'))
 
-    if params.get('USE_DROPOUT', False) :
+    if apply_dropout and params.get('DROPOUT_P', 0) > 0:
         shared_layers_list.append(Dropout(params.get('DROPOUT_P', 0.5), name=name + '_dropout'))
 
-    if params.get('USE_L2', False):
+    if apply_l2 and params.get('USE_L2', False):
         shared_layers_list.append(Lambda(L2_norm, name=name + '_L2_norm'))
 
     # Apply all the previously built shared layers

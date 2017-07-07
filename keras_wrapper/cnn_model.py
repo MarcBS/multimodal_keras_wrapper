@@ -840,14 +840,17 @@ class Model_Wrapper(object):
                                                          joint_batches=params['joint_batches'],
                                                          normalization=params['normalize'],
                                                          data_augmentation=params['data_augmentation'],
-                                                         mean_substraction=params['mean_substraction'])#.generator()
+                                                         mean_substraction=params['mean_substraction']).generator()
         else:
-            train_gen = Data_Batch_Generator('train', self, ds, state['n_iterations_per_epoch'],
+            train_gen = Data_Batch_Generator('train',
+                                             self,
+                                             ds,
+                                             state['n_iterations_per_epoch'],
                                              batch_size=params['batch_size'],
                                              normalization=params['normalize'],
                                              data_augmentation=params['data_augmentation'],
                                              mean_substraction=params['mean_substraction'],
-                                             shuffle=params['shuffle'])#.generator()
+                                             shuffle=params['shuffle']).generator()
 
         # Are we going to validate on 'val' data?
         if 'val' in params['eval_on_sets']:
@@ -862,9 +865,7 @@ class Model_Wrapper(object):
                                            batch_size=params['batch_size'],
                                            normalization=params['normalize'],
                                            data_augmentation=False,
-                                           mean_substraction=params['mean_substraction'],
-                                           show_progress=True,
-                                           parallel_loaders=params['n_parallel_loaders'])#.generator()
+                                           mean_substraction=params['mean_substraction']).generator()
         else:
             val_gen = None
             n_valid_samples = None
@@ -873,19 +874,17 @@ class Model_Wrapper(object):
         class_weight = {}
         if params['class_weights'] is not None:
             class_weight = ds.extra_variables['class_weights_' + params['class_weights']]
-
         # Train model
         self.model.fit_generator(train_gen,
-                                 validation_data=val_gen,
-                                 nb_val_samples=n_valid_samples,
-                                 class_weight=class_weight,
-                                 samples_per_epoch=state['samples_per_epoch'],
-                                 nb_epoch=params['n_epochs'],
-                                 max_q_size=params['n_parallel_loaders'],
-                                 nb_worker=1,# params['n_parallel_loaders'],
-                                 pickle_safe=False,
+                                 steps_per_epoch=state['n_iterations_per_epoch'],
+                                 epochs=params['n_epochs'],
                                  verbose=params['verbose'],
                                  callbacks=callbacks,
+                                 validation_data=val_gen,
+                                 validation_steps=n_valid_samples,
+                                 class_weight=class_weight,
+                                 max_queue_size=params['n_parallel_loaders'],
+                                 workers=1,# params['n_parallel_loaders'],
                                  initial_epoch=params['epoch_offset'])
 
     def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None, state=dict()):
@@ -960,7 +959,7 @@ class Model_Wrapper(object):
                                         batch_size=params['batch_size'],
                                         normalization=params['normalize'],
                                         data_augmentation=False,
-                                        mean_substraction=params['mean_substraction'])#.generator()
+                                        mean_substraction=params['mean_substraction']).generator()
 
         out = self.model.evaluate_generator(data_gen,
                                             val_samples=n_samples,
@@ -1743,7 +1742,7 @@ class Model_Wrapper(object):
                                                     data_augmentation=False,
                                                     mean_substraction=params['mean_substraction'],
                                                     predict=True)
-                    data_gen = data_gen_instance#.generator()
+                    data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
                     num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
@@ -1757,7 +1756,7 @@ class Model_Wrapper(object):
                                                     predict=False,
                                                     random_samples=n_samples,
                                                     temporally_linked=params['temporally_linked'])
-                    data_gen = data_gen_instance#.generator()
+                    data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
                     references = []
@@ -2006,7 +2005,7 @@ class Model_Wrapper(object):
                                                              data_augmentation=False,
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=True)
-                    data_gen = data_gen_instance#.generator()
+                    data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
                     num_iterations = int(math.ceil(float(n_samples))) #/ params['batch_size']))
@@ -2020,7 +2019,7 @@ class Model_Wrapper(object):
                                                              predict=False,
                                                              random_samples=n_samples,
                                                              temporally_linked=params['temporally_linked'])
-                    data_gen = data_gen_instance#.generator()
+                    data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
                     references = []
@@ -2214,7 +2213,7 @@ class Model_Wrapper(object):
                                                 final_sample=params['final_sample'],
                                                 predict=True,
                                                 show_progress=True,
-                                                parallel_loaders=params['n_parallel_loaders'])#.generator()
+                                                parallel_loaders=params['n_parallel_loaders']).generator()
 
             else:
                 n_samples = params['n_samples']
@@ -2231,7 +2230,7 @@ class Model_Wrapper(object):
                                                 predict=True,
                                                 random_samples=n_samples,
                                                 show_progress=True,
-                                                parallel_loaders=params['n_parallel_loaders'])#.generator()
+                                                parallel_loaders=params['n_parallel_loaders']).generator()
             # Predict on model
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,
@@ -2416,7 +2415,7 @@ class Model_Wrapper(object):
                                             normalization=params['normalize'],
                                             data_augmentation=False,
                                             mean_substraction=params['mean_substraction'],
-                                            predict=False)#.generator()
+                                            predict=False).generator()
             sources_sampling = []
             scores = []
             total_cost = 0
