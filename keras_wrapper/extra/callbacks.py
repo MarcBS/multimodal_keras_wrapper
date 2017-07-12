@@ -362,6 +362,9 @@ class EvalPerformance(KerasCallback):
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
 
+        # Store losses
+        self.model_to_eval.log('train', 'train_loss', logs['loss'])
+        self.model_to_eval.log('val', 'val_loss', logs['valid_loss'])
 
         # Plot results so far
         self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
