@@ -34,8 +34,10 @@ def checkDefaultParamsBeamSearch(params):
                       'length_penalty': False,
                       'length_norm_factor': 0.0,
                       'coverage_norm_factor': 0.0,
-                      'output_length_depending_on_x': False,
-                      'output_length_depending_on_x_factor': 3
+                      'output_max_length_depending_on_x': False,
+                      'output_max_length_depending_on_x_factor': 3,
+                      'output_min_length_depending_on_x': False,
+                      'output_min_length_depending_on_x_factor': 2
                       }
 
     for k, v in params.iteritems():
@@ -198,10 +200,9 @@ class EvalPerformance(KerasCallback):
             return
         if self.epoch < self.start_eval_on_epoch:
             return
-        self.evaluate(self.cum_update, counter_name='iteration')
+        self.evaluate(self.cum_update, counter_name='iteration', logs=logs)
 
-    def evaluate(self, epoch, counter_name='epoch'):
-
+    def evaluate(self, epoch, counter_name='epoch', logs={}):
         # Evaluate on each set separately
         all_metrics = []
         for s in self.set_name:
@@ -238,7 +239,7 @@ class EvalPerformance(KerasCallback):
                 predictions_all = [predictions_all]
                 gt_positions = [0]
             else:
-                gt_positions = self.gt_post
+                gt_positions = self.gt_pos
             for gt_pos in gt_positions:
                 predictions = predictions_all[gt_pos]
                 if self.is_text:
@@ -282,18 +283,18 @@ class EvalPerformance(KerasCallback):
                                                      self.sampling_type,
                                                      verbose=self.verbose)
 
-                # Apply detokenization function if needed
-                if self.extra_vars.get('apply_detokenization', False):
-                    predictions = map(self.extra_vars['detokenize_f'], predictions)
+                    # Apply detokenization function if needed
+                    if self.extra_vars.get('apply_detokenization', False):
+                        predictions = map(self.extra_vars['detokenize_f'], predictions)
 
 
-            elif self.is_multilabel:
-                if self.multilabel_idx is not None:
-                    predictions = predictions[self.multilabel_idx]
-                predictions = decode_multilabel(predictions,
-                                                self.index2word_y,
-                                                min_val=self.min_pred_multilabel,
-                                                verbose=self.verbose)
+                elif self.is_multilabel:
+                    if self.multilabel_idx is not None:
+                        predictions = predictions[self.multilabel_idx]
+                    predictions = decode_multilabel(predictions,
+                                                    self.index2word_y,
+                                                    min_val=self.min_pred_multilabel,
+                                                    verbose=self.verbose)
 
             # Store predictions
             if self.write_samples:
@@ -363,11 +364,14 @@ class EvalPerformance(KerasCallback):
                     logging.info('Done evaluating on metric ' + metric)
 
         # Store losses
-        self.model_to_eval.log('train', 'train_loss', logs['loss'])
-        self.model_to_eval.log('val', 'val_loss', logs['valid_loss'])
+        if logs.get('loss') is not None:
+            self.model_to_eval.log('train', 'train_loss', logs['loss'])
+        if logs.get('valid_loss') is not None:
+            self.model_to_eval.log('val', 'val_loss', logs['valid_loss'])
 
         # Plot results so far
-        self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
+        if self.metric_name:
+            self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
 
         # Save the model
         if self.save_each_evaluation:
