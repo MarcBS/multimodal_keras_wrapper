@@ -1,5 +1,15 @@
 import matplotlib as mpl
-
+import matplotlib.pyplot as plt
+import numpy as np
+import cPickle as pk
+import cloud.serialization.cloudpickle as cloudpk
+import sys
+import time
+import os
+import math
+import copy
+import shutil
+import logging
 from keras import backend as K
 from keras.engine.training import Model
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, Concatenate
@@ -14,28 +24,13 @@ from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
     decode_predictions_beam_search, replace_unknown_words, sample, sampling
-
-mpl.use('Agg')  # run matplotlib without X server (GUI)
-import matplotlib.pyplot as plt
-
-import numpy as np
-import cPickle as pk
-import cloud.serialization.cloudpickle as cloudpk
-
-import sys
-import time
-import os
-import math
-import copy
-import shutil
-
-import logging
-
-logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-logger = logging.getLogger(__name__)
-
 from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
 from keras.applications.vgg19 import VGG19
+
+# General setup of libraries
+mpl.use('Agg')  # run matplotlib without X server (GUI)
+logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 
 
 # ------------------------------------------------------- #
@@ -58,18 +53,18 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     if not path:
         path = model_wrapper.model_path
 
-    iter = str(update_num)
+    iteration = str(update_num)
 
     if full_path:
         if store_iter:
-            model_name = path + '_' + iter
+            model_name = path + '_' + iteration
         else:
             model_name = path
     else:
         if store_iter:
-            model_name = path + '/update_' + iter
+            model_name = path + '/update_' + iteration
         else:
-            model_name = path + '/epoch_' + iter
+            model_name = path + '/epoch_' + iteration
 
     if not model_wrapper.silence:
         logging.info("<<< Saving model to " + model_name + " ... >>>")
@@ -107,25 +102,30 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, reload_epoch=True, custom_objects=dict(), full_path=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False):
     """
     Loads a previously saved Model_Wrapper object.
 
     :param model_path: path to the Model_Wrapper object to load
     :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :param reload_epoch: Whether we should load epochs or updates
     :param custom_objects: dictionary of custom layers (i.e. input to model_from_json)
+    :param full_path: Whether we should load the path from model_name or from model_path directly.
     :return: loaded Model_Wrapper
     """
+    if not custom_objects:
+        custom_objects = dict()
+
     t = time.time()
-    iter = str(update_num)
+    iteration = str(update_num)
 
     if full_path:
         model_name = model_path
     else:
         if reload_epoch:
-            model_name = model_path + "/epoch_" + iter
+            model_name = model_path + "/epoch_" + iteration
         else:
-            model_name = model_path + "/update_" + iter
+            model_name = model_path + "/update_" + iteration
 
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
 
@@ -188,17 +188,19 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
     :param model: Model_Wrapper object to update
     :param model_path: path to the weights to load
     :param update_num: identifier of the number of iterations/updates/epochs elapsed
+    :param reload_epoch: Whether we should load epochs or updates
+    :param full_path: Whether we should load the path from model_name or from model_path directly.
     :return: updated Model_Wrapper
     """
     t = time.time()
     model_name = model.name
-    iter = str(update_num)
+    iteration = str(update_num)
 
     if not full_path:
         if reload_epoch:
-            model_path = model_path + "/epoch_" + iter
+            model_path = model_path + "/epoch_" + iteration
         else:
-            model_path = model_path + "/update_" + iter
+            model_path = model_path + "/update_" + iteration
 
     logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
@@ -290,7 +292,8 @@ def read_layer_names(model, starting_name=None):
         Reads the existent layers' names from a model starting after a layer specified by its name
 
         :param model: model whose layers' names will be read
-        :param starting_name: name of the layer after which the layers' names will be read (if None, then all the layers' names will be read)
+        :param starting_name: name of the layer after which the layers' names will be read
+                              (if None, then all the layers' names will be read)
         :return: list of layers' names
         """
 
@@ -329,16 +332,23 @@ class Model_Wrapper(object):
             Model_Wrapper object constructor.
 
             :param nOutput: number of outputs of the network. Only valid if 'structure_path' == None.
-            :param type: network name type (corresponds to any method defined in the section 'MODELS' of this class). Only valid if 'structure_path' == None.
+            :param type: network name type (corresponds to any method defined in the section 'MODELS' of this class).
+                         Only valid if 'structure_path' == None.
             :param silence: set to True if you don't want the model to output informative messages
-            :param input_shape: array with 3 integers which define the images' input shape [height, width, channels]. Only valid if 'structure_path' == None.
-            :param structure_path: path to a Keras' model json file. If we speficy this parameter then 'type' will be only an informative parameter.
+            :param input_shape: array with 3 integers which define the images' input shape [height, width, channels].
+                                Only valid if 'structure_path' == None.
+            :param structure_path: path to a Keras' model json file.
+                                   If we speficy this parameter then 'type' will be only an informative parameter.
             :param weights_path: path to the pre-trained weights file (if None, then it will be randomly initialized)
-            :param seq_to_functional: indicates if we are loading a set of weights trained on a Sequential model to a Functional one
-            :param model_name: optional name given to the network (if None, then it will be assigned to current time as its name)
+            :param seq_to_functional: indicates if we are loading a set of weights trained
+                                      on a Sequential model to a Functional one
+            :param model_name: optional name given to the network
+                               (if None, then it will be assigned to current time as its name)
             :param plots_path: path to the folder where the plots will be stored during training
             :param models_path: path to the folder where the temporal model packups will be stored
-            :param inheritance: indicates if we are building an instance from a child class (in this case the model will not be built from this __init__, it should be built from the child class).
+            :param inheritance: indicates if we are building an instance from a child class
+                                (in this case the model will not be built from this __init__,
+                                it should be built from the child class).
         """
         self.__toprint = ['net_type', 'name', 'plot_path', 'models_path', 'lr', 'momentum',
                           'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
@@ -430,7 +440,10 @@ class Model_Wrapper(object):
         """
             Sets the mapping of the inputs from the format given by the dataset to the format received by the model.
 
-            :param inputsMapping: dictionary with the model inputs' identifiers as keys and the dataset inputs identifiers' position as values. If the current model is Sequential then keys must be ints with the desired input order (starting from 0). If it is Model then keys must be str.
+            :param inputsMapping: dictionary with the model inputs' identifiers as keys and the dataset inputs
+                                  identifiers' position as values.
+                                  If the current model is Sequential then keys must be ints with the desired input order
+                                  (starting from 0). If it is Model then keys must be str.
         """
         self.inputsMapping = inputsMapping
 
@@ -438,8 +451,13 @@ class Model_Wrapper(object):
         """
             Sets the mapping of the outputs from the format given by the dataset to the format received by the model.
 
-            :param outputsMapping: dictionary with the model outputs' identifiers as keys and the dataset outputs identifiers' position as values. If the current model is Sequential then keys must be ints with the desired output order (in this case only one value can be provided). If it is Model then keys must be str.
-            :param acc_output: name of the model's output that will be used for calculating the accuracy of the model (only needed for Graph models)
+            :param outputsMapping: dictionary with the model outputs'
+                                   identifiers as keys and the dataset outputs identifiers' position as values.
+                                   If the current model is Sequential then keys must be ints with
+                                   the desired output order (in this case only one value can be provided).
+                                   If it is Model then keys must be str.
+            :param acc_output: name of the model's output that will be used for calculating
+                              the accuracy of the model (only needed for Graph models)
         """
         if isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1:
             raise Exception("When using Sequential models only one output can be provided in outputsMapping")
@@ -450,11 +468,10 @@ class Model_Wrapper(object):
                      nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
-
             :param lr: learning rate of the network
             :param momentum: momentum of the network (if None, then momentum = 1-lr)
             :param loss: loss function applied for optimization
-	        :param loss_weights: weights given to multi-loss models
+            :param loss_weights: weights given to multi-loss models
             :param metrics: list of Keras' metrics used for evaluating the model. To specify different metrics for different outputs of a multi-output model, you could also pass a dictionary, such as `metrics={'output_a': 'accuracy'}`.
             :param epsilon: fuzz factor
             :param decay: lr decay
@@ -631,36 +648,39 @@ class Model_Wrapper(object):
         else:
             return False
 
-    def trainNet(self, ds, parameters={}, out_name=None):
+    def trainNet(self, ds, parameters=None, out_name=None):
         """
-            Trains the network on the given dataset 'ds'.
-
-            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.
+            Trains the network on the given dataset.
+            :param ds: Dataset with the training data
+            :param parameters: dict() which may contain the following (optional) training parameters
+            :param out_name: name of the output node that will be used to evaluate the network accuracy.
+                            Only applicable to Graph models.
 
             The input 'parameters' is a dict() which may contain the following (optional) training parameters:
-
             ####    Visualization parameters
-
-            :param report_iter: number of iterations between each loss report
-            :param iter_for_val: number of interations between each validation test
-            :param num_iterations_val: number of iterations applied on the validation dataset for computing the average performance (if None then all the validation data will be tested)
-
+             * report_iter: number of iterations between each loss report
+             * iter_for_val: number of interations between each validation test
+             * num_iterations_val: number of iterations applied on the validation dataset for computing the
+                                   average performance (if None then all the validation data will be tested)
             ####    Learning parameters
-
-            :param n_epochs: number of epochs that will be applied during training
-            :param batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
-            :param lr_decay: number of iterations passed for decreasing the learning rate
-            :param lr_gamma: proportion of learning rate kept at each decrease. It can also be a set of rules defined by a list, e.g. lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration 3000, ..., 0.8 until the end.
-            :param patience: number of epochs waiting for a possible performance increase before stopping training
-            :param metric_check: name of the metric checked for early stoppping and LR decrease
+             * n_epochs: number of epochs that will be applied during training
+             * batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
+             * lr_decay: number of iterations passed for decreasing the learning rate
+             * lr_gamma: proportion of learning rate kept at each decrease.
+                         It can also be a set of rules defined by a list, e.g.
+                         lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration
+                         3000, ..., 0.8 until the end.
+             * patience: number of epochs waiting for a possible performance increase before stopping training
+             * metric_check: name of the metric checked for early stoppping and LR decrease
 
             ####    Data processing parameters
 
-            :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
-            :param normalize: boolean indicating if we want to 0-1 normalize the image pixel values
-            :param mean_substraction: boolean indicating if we want to substract the training mean
-            :param data_augmentation: boolean indicating if we want to perform data augmentation (always False on validation)
-            :param shuffle: apply shuffling on training data at the beginning of each epoch.
+             * n_parallel_loaders: number of parallel data loaders allowed to work at the same time
+             * normalize: boolean indicating if we want to 0-1 normalize the image pixel values
+             * mean_substraction: boolean indicating if we want to substract the training mean
+             * data_augmentation: boolean indicating if we want to perform data augmentation
+                                  (always False on validation)
+             * shuffle: apply shuffling on training data at the beginning of each epoch.
 
             ####    Other parameters
 
@@ -668,7 +688,8 @@ class Model_Wrapper(object):
         """
 
         # Check input parameters and recover default values if needed
-
+        if parameters is None:
+            parameters = dict()
         default_params = {'n_epochs': 1,
                           'batch_size': 50,
                           'maxlen': 100,  # sequence learning parameters (BeamSearch)
@@ -1849,7 +1870,7 @@ class Model_Wrapper(object):
                             best_alphas.append(np.asarray(alphas[best_score]))
                         total_cost += scores[best_score]
                         eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) / (
-                        sampled + i_sample + 1)
+                            sampled + i_sample + 1)
                         if params['n_samples'] > 0:
                             for output_id in params['model_outputs']:
                                 references.append(Y[output_id][i_sample])
@@ -3832,7 +3853,7 @@ class Model_Wrapper(object):
         x_dense = self.add_dense_block(x, nb_layers, growth, drop,
                                        init_weights)  # (growth*nb_layers) feature maps added
 
-        ## Concatenateenation and skip connection recovery for upsampling path
+        ## Concatenate and skip connection recovery for upsampling path
         skip = merge([x, x_dense], mode='concat', concat_axis=axis)
 
         # Transition Down
