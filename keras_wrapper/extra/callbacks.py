@@ -362,6 +362,8 @@ class EvalPerformance(KerasCallback):
 
                 if self.verbose > 0:
                     logging.info('Done evaluating on metric ' + metric)
+
+        # Store losses
         if logs.get('loss') is not None:
             self.model_to_eval.log('train', 'train_loss', logs['loss'])
         if logs.get('valid_loss') is not None:
