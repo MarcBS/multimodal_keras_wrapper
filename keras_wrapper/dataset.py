@@ -74,7 +74,11 @@ class Data_Batch_Generator(object):
     Batch generator class. Retrieves batches of data.
     """
 
-    def __init__(self, set_split, net, dataset, num_iterations,
+    def __init__(self,
+                 set_split,
+                 net,
+                 dataset,
+                 num_iterations,
                  batch_size=50,
                  normalization=False,
                  data_augmentation=True,
@@ -199,30 +203,14 @@ class Data_Batch_Generator(object):
                                                                       dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, Y_batch)
 
-
             else:
                 if self.predict:
-
                     X_batch = self.dataset.getX(self.set_split,
                                                 init_sample,
                                                 final_sample,
                                                 normalization=self.params['normalization'],
                                                 meanSubstraction=self.params['mean_substraction'],
                                                 dataAugmentation=False)
-                    """
-                    if init_sample < 10:
-
-                        Y_batch = self.dataset.getY(self.set_split,
-                                                    init_sample,
-                                                    final_sample,
-                                                    normalization=self.params['normalization'],
-                                                    meanSubstraction=self.params['mean_substraction'],
-                                                    dataAugmentation=False)
-
-                        for e,i in enumerate(range(init_sample, final_sample)):
-                            np.save(self.set_split + '_im_in_%d.npy' % (i), X_batch[0][e])
-                            np.save(self.set_split + '_lab_in_%d.npy' % (i), Y_batch[0][e])
-                    """
                     data = self.net.prepareData(X_batch, None)[0]
                 else:
                     X_batch, Y_batch = self.dataset.getXY(self.set_split,
@@ -1636,10 +1624,7 @@ class Dataset(object):
             X_out = np.zeros(n_batch).astype('int32')
             for i in range(n_batch):
                 w = X[i]
-                if w in vocab:
-                    X_out[i] = vocab[w]
-                else:
-                    X_out[i] = vocab['<unk>']
+                X_out[i] = vocab.get(w, vocab['<unk>'])
             if loading_X:
                 X_out = (X_out, None)  # This None simulates a mask
         else:  # process text as a sequence of words
@@ -1678,10 +1663,7 @@ class Dataset(object):
 
                 if words_so_far:
                     for j, w in zip(range(len_j), x[:len_j]):
-                        if w in vocab:
-                            next_w = vocab[w]
-                        else:
-                            next_w = vocab['<unk>']
+                        next_w = vocab.get(w, next_w = vocab['<unk>'])
                         for k in range(j, len_j):
                             X_out[i, k + offset_j, j + offset_j] = next_w
                             X_mask[i, k + offset_j, j + offset_j] = 1  # fill mask
@@ -1689,11 +1671,7 @@ class Dataset(object):
 
                 else:
                     for j, w in zip(range(len_j), x[:len_j]):
-                        if w in vocab:
-                            X_out[i, j + offset_j] = vocab[w]
-                        else:
-                            # print w, "not in vocab!"
-                            X_out[i, j + offset_j] = vocab['<unk>']
+                        X_out[i, j + offset_j] = vocab.get(w, vocab['<unk>'])
                         X_mask[i, j + offset_j] = 1  # fill mask
                     X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
 
