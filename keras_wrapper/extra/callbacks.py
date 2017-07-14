@@ -1,15 +1,11 @@
 from __future__ import print_function
 
-"""
-Extra set of callbacks.
-"""
-
 import warnings
+
+import evaluation
 from keras.callbacks import Callback as KerasCallback
 from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
     decode_multilabel
-
-import evaluation
 from read_write import *
 
 
@@ -63,10 +59,10 @@ class EvalPerformance(KerasCallback):
                  metric_name,
                  set_name,
                  batch_size,
-                 gt_pos=[],
+                 gt_pos=None,
                  each_n_epochs=1,
                  max_eval_samples=None,
-                 extra_vars=dict(),
+                 extra_vars=None,
                  normalize=False,
                  is_text=False,
                  is_multilabel=False,
@@ -103,9 +99,11 @@ class EvalPerformance(KerasCallback):
         :param gt_pos: position of the GT output to evaluate in model's outputs
         :param each_n_epochs: sampling each this number of epochs or updates
         :param max_eval_samples: maximum number of samples evaluated
-        :param extra_vars: dictionary of extra variables. See evaluation metrics in keras_wrapper/extra/evaluation.py for assigning the needed extra variables.
+        :param extra_vars: dictionary of extra variables. See evaluation metrics in keras_wrapper/extra/evaluation.py
+                           for assigning the needed extra variables.
         :param normalize: switch on/off data normalization
-        :param is_text: defines if the predicted info is of type text (in that case the data will be converted from values into a textual representation)
+        :param is_text: defines if the predicted info is of type text (in that case the data will be
+                        converted from values into a textual representation)
         :param is_multilabel: are we applying multi-label prediction?
         :param multilabel_idx: output index where to apply the evaluation (set to None if the model has a single output)
         :param min_pred_multilabel: minimum prediction value considered for positive prediction
@@ -125,10 +123,16 @@ class EvalPerformance(KerasCallback):
         :param is_3DLabel: defines if the predicted info is of type 3DLabels
         :param sampling_type: type of sampling used (multinomial or max_likelihood)
         :param save_each_evaluation: save the model each time we evaluate (epochs or updates)
-        :param out_pred_idx: index of the output prediction used for evaluation (only applicable if model has more than one output, else set to None)
+        :param out_pred_idx: index of the output prediction used for evaluation
+                             (only applicable if model has more than one output, else set to None)
         :param max_plot: maximum value shown on the performance plots generated
         :param verbose: verbosity level; by default 1
         """
+        if gt_pos is None:
+            gt_pos = []
+        if extra_vars is None:
+            extra_vars = dict()
+
         self.model_to_eval = model
         self.ds = dataset
         self.gt_id = gt_id
@@ -269,24 +273,23 @@ class EvalPerformance(KerasCallback):
                     # Convert predictions into sentences
                     if self.beam_search:
                         predictions = decode_predictions_beam_search(samples,
-                                                                 self.index2word_y,
-                                                                 alphas=alphas,
-                                                                 x_text=sources,
-                                                                 heuristic=heuristic,
-                                                                 mapping=self.extra_vars.get('mapping', None),
-                                                                 verbose=self.verbose)
+                                                                     self.index2word_y,
+                                                                     alphas=alphas,
+                                                                     x_text=sources,
+                                                                     heuristic=heuristic,
+                                                                     mapping=self.extra_vars.get('mapping', None),
+                                                                     verbose=self.verbose)
                     else:
                         probs = predictions
                         predictions = decode_predictions(predictions,
-                                                     1,  # always set temperature to 1
-                                                     self.index2word_y,
-                                                     self.sampling_type,
-                                                     verbose=self.verbose)
+                                                         1,  # always set temperature to 1
+                                                         self.index2word_y,
+                                                         self.sampling_type,
+                                                         verbose=self.verbose)
 
                     # Apply detokenization function if needed
                     if self.extra_vars.get('apply_detokenization', False):
                         predictions = map(self.extra_vars['detokenize_f'], predictions)
-
 
                 elif self.is_multilabel:
                     if self.multilabel_idx is not None:
@@ -304,9 +307,9 @@ class EvalPerformance(KerasCallback):
                     list2file(filepath, predictions)
                 elif self.write_type == 'vqa':
                     try:
-                        exec('refs = self.ds.Y_'+s+'[self.gt_id]')
+                        exec ('refs = self.ds.Y_' + s + '[self.gt_id]')
                     except:
-                        refs = ['N/A' for i in range(probs.shape[0])]
+                        refs = ['N/A' for _ in range(probs.shape[0])]
                     extra_data_plot = {'reference': refs,
                                        'probs': probs,
                                        'vocab': self.index2word_y}
@@ -316,11 +319,10 @@ class EvalPerformance(KerasCallback):
                 elif self.write_type == 'numpy':
                     numpy2file(filepath, predictions)
                 elif self.write_type == '3DLabels':
-                    # TODO:
-                    print("WRITE SAMPLES FUNCTION NOT IMPLEMENTED")
+                    raise NotImplementedError('Write 3DLabels function is not implemented')
                 elif self.write_type == '3DSemanticLabel':
                     folder_path = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch)  # results folder
-                    numpy2imgs(folder_path, predictions, eval('self.ds.X_'+ s +'["'+self.input_id+'"]'), self.ds)
+                    numpy2imgs(folder_path, predictions, eval('self.ds.X_' + s + '["' + self.input_id + '"]'), self.ds)
                 else:
                     raise NotImplementedError(
                         'The store type "' + self.write_type + '" is not implemented.')
@@ -393,7 +395,7 @@ class StoreModel(KerasCallback):
             fun - function for saving the model
             epochs_for_save - number of epochs before the last save
         """
-        super(KerasCallback, self).__init__()
+        super(StoreModel, self).__init__()
         self.model_to_save = model
         self.store_function = fun
         self.epochs_for_save = epochs_for_save
@@ -652,8 +654,8 @@ class EarlyStopping(KerasCallback):
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         # Get last metric value from logs
         if current_score is None:
-            warnings.warn('The chosen metric ' + str(self.metric_check) + ' does not exist;'
-                                                                          ' this reducer works only with a valid metric.')
+            warnings.warn('The chosen metric ' + str(self.metric_check) +
+                          ' does not exist; this reducer works only with a valid metric.')
             return
         if self.want_to_minimize:
             current_score = -current_score
@@ -681,7 +683,6 @@ class EarlyStopping(KerasCallback):
 
 
 class LearningRateReducer(KerasCallback):
-
     def __init__(self, reduce_rate=0.99, reduce_each_epochs=True, reduce_frequency=1, start_reduction_on_epoch=0,
                  exp_base=0.5, half_life=50000, reduction_function='linear', epsilon=1e-11, verbose=1):
         """
@@ -717,7 +718,7 @@ class LearningRateReducer(KerasCallback):
         self.current_update_nb = 0
         self.epsilon = epsilon
         self.epoch = 0
-        assert self.reduction_function in ['linear', 'exponential'], 'Reduction function "%s" unimplemented!' %\
+        assert self.reduction_function in ['linear', 'exponential'], 'Reduction function "%s" unimplemented!' % \
                                                                      str(self.reduction_function)
 
     def on_epoch_end(self, epoch, logs={}):
@@ -745,7 +746,7 @@ class LearningRateReducer(KerasCallback):
         self.reduce_lr(self.current_update_nb)
 
     def reduce_lr(self, current_nb):
-        new_rate = self.reduce_rate if self.reduction_function == 'linear' else\
+        new_rate = self.reduce_rate if self.reduction_function == 'linear' else \
             np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
         lr = self.model.optimizer.lr.get_value()
         self.new_lr = np.float32(lr * new_rate)
