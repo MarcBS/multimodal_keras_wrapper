@@ -2804,7 +2804,7 @@ class Model_Wrapper(object):
 
         # Build default colours_shapes_dict if not provided
         if not colours_shapes_dict:
-            default_colours = ['b', 'g', 'y', 'k']
+            default_colours = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
             default_shapes = ['-', 'o', '.']
             m = 0
             for met in metrics:
@@ -2816,7 +2816,7 @@ class Model_Wrapper(object):
                 m += 1
                 m = m % len(default_colours)
 
-        plt.figure(1)
+        plt.figure(1).add_axes([0.1, 0.1, 0.6, 0.75])
 
         all_iterations = []
         for sp in splits:
@@ -2837,7 +2837,7 @@ class Model_Wrapper(object):
                 measure = self.__logger[sp][met]
                 # plt.subplot(211)
                 # plt.plot(iterations, loss, colours['train_loss']+'o')
-                plt.plot(iterations, measure, colours_shapes_dict[met + '_' + sp])
+                plt.plot(iterations, measure, colours_shapes_dict[met + '_' + sp], label=str(met))
 
         max_iter = np.max(all_iterations + [0])
 
@@ -2851,7 +2851,7 @@ class Model_Wrapper(object):
         plt.xlabel(time_measure)
         # plt.subplot(211)
         plt.title('Training progress')
-
+        plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
         # Create plots dir
         if not os.path.isdir(self.model_path):
             os.makedirs(self.model_path)
