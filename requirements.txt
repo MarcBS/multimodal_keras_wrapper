@@ -6,6 +6,7 @@ matplotlib
 scipy
 #cpickle
 cython
+sklearn
 
 --allow-external keras
 --allow-unverified keras

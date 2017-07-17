@@ -9,11 +9,13 @@ Modified by: Marc Bola\~nos
 """
 
 import json
-import numpy as np
-import os
 import logging
+import os
+
+import numpy as np
 import tables
 from PIL import Image as pilimage
+
 
 ###
 # Helpers
@@ -33,6 +35,7 @@ def create_dir_if_not_exists(directory):
         logging.info("<<< creating directory " + directory + " ... >>>")
         os.makedirs(directory)
 
+
 def clean_dir(directory):
     """
     Creates (or empties) a directory
@@ -47,6 +50,7 @@ def clean_dir(directory):
         os.makedirs(directory)
     else:
         os.makedirs(directory)
+
 
 ###
 # Main functions
@@ -70,10 +74,12 @@ def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
         f.root.data.append(mylist)
         f.close()
 
+
 def numpy2file(filepath, mylist, permission='w'):
     mylist = np.asarray(mylist)
     with open(filepath, permission) as f:
         np.save(f, mylist)
+
 
 def numpy2imgs(folder_path, mylist, imgs_names, dataset):
     create_dir_if_not_exists(folder_path)
@@ -83,9 +89,9 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
 
     for img, name in zip(mylist, imgs_names):
         name = '_'.join(name.split('/'))
-        file_path = folder_path + "/" + name   # image file
+        file_path = folder_path + "/" + name  # image file
 
-        #dataset.getImageFromPrediction_3DSemanticLabel()
+        # dataset.getImageFromPrediction_3DSemanticLabel()
 
         # prepare prediction image
         pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
@@ -118,12 +124,14 @@ def list2file(filepath, mylist, permission='w'):
     with open(filepath, permission) as f:
         f.writelines(mylist)
 
+
 def list2stdout(mylist):
     mylist = [str(l) for l in mylist]
     mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
         mylist = mylist.encode('utf-8')
     print mylist
+
 
 def nbest2file(filepath, mylist, separator='|||', permission='w'):
     newlist = []
@@ -142,18 +150,21 @@ def nbest2file(filepath, mylist, separator='|||', permission='w'):
     with open(filepath, permission) as f:
         f.writelines(mylist)
 
+
 def list2vqa(filepath, mylist, qids, permission='w', extra=None):
     res = []
     for i, (ans, qst) in enumerate(zip(mylist, qids)):
         line = {'answer': ans, 'question_id': int(qst)}
         if extra is not None:
             line['reference'] = extra['reference'][i]
-            #line['probs'] = str(extra['probs'][i]) # vector of probabilities for all outputs
-            line['top5'] = str([[extra['vocab'][p], extra['probs'][i][p]] for p in np.argsort(extra['probs'][i])[::-1][:5]])
+            # line['probs'] = str(extra['probs'][i]) # vector of probabilities for all outputs
+            line['top5'] = str(
+                [[extra['vocab'][p], extra['probs'][i][p]] for p in np.argsort(extra['probs'][i])[::-1][:5]])
             line['max_prob'] = str(max(extra['probs'][i]))
         res.append(line)
     with open(filepath, permission) as f:
         json.dump(res, f)
+
 
 def dump_hdf5_simple(filepath, dataset_name, data):
     import h5py
