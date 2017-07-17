@@ -3350,7 +3350,7 @@ class Model_Wrapper(object):
                           dim_ordering=dim_ordering)(x)
 
         if padding:
-            for i in range(padding):
+            for _ in range(padding):
                 x = ZeroPadding2D(padding=(1, 1), dim_ordering=dim_ordering)(x)
 
         return x
@@ -3367,8 +3367,6 @@ class Model_Wrapper(object):
         CONCAT_AXIS = 1
         NB_CLASS = nOutput  # number of classes (default 1000)
         DROPOUT = 0.4
-        WEIGHT_DECAY = 0.0005  # L2 regularization factor
-        USE_BN = True  # whether to use batch normalization
         # Theano - 'th' (channels, width, height)
         # Tensorflow - 'tf' (width, height, channels)
         DIM_ORDERING = 'th'

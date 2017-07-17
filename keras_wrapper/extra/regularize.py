@@ -19,6 +19,11 @@ def Regularize(layer, params,
     :param params: Params specifying the regularizations to apply
     :param shared_layers: Boolean indicating if we want to get the used layers for applying to a shared-layers model.
     :param name: Name prepended to regularizer layer
+    :param apply_noise: If False, noise won't be applied, independently of params
+    :param apply_dropout: If False, dropout won't be applied, independently of params
+    :param apply_prelu: If False, prelu won't be applied, independently of params
+    :param apply_batch_normalization: If False, batch normalization won't be applied, independently of params
+    :param apply_l2: If False, l2 normalization won't be applied, independently of params
     :return: Regularized layer
     """
     shared_layers_list = []
