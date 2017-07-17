@@ -901,17 +901,31 @@ class Model_Wrapper(object):
         if params['class_weights'] is not None:
             class_weight = ds.extra_variables['class_weights_' + params['class_weights']]
         # Train model
-        self.model.fit_generator(train_gen,
-                                 steps_per_epoch=state['n_iterations_per_epoch'],
-                                 epochs=params['n_epochs'],
-                                 verbose=params['verbose'],
-                                 callbacks=callbacks,
-                                 validation_data=val_gen,
-                                 validation_steps=n_valid_samples,
-                                 class_weight=class_weight,
-                                 max_queue_size=params['n_parallel_loaders'],
-                                 workers=1,  # params['n_parallel_loaders'],
-                                 initial_epoch=params['epoch_offset'])
+        if int(keras.__version__.split('.')[0]) == 1:
+            # Keras 1.x version
+            self.model.fit_generator(train_gen,
+                                     validation_data=val_gen,
+                                     nb_val_samples=n_valid_samples,
+                                     class_weight=class_weight,
+                                     samples_per_epoch=state['samples_per_epoch'],
+                                     nb_epoch=params['n_epochs'],
+                                     max_q_size=params['n_parallel_loaders'],
+                                     verbose=params['verbose'],
+                                     callbacks=callbacks,
+                                     initial_epoch=params['epoch_offset'])
+        else:
+            # Keras 2.x version
+            self.model.fit_generator(train_gen,
+                                     steps_per_epoch=state['n_iterations_per_epoch'],
+                                     epochs=params['n_epochs'],
+                                     verbose=params['verbose'],
+                                     callbacks=callbacks,
+                                     validation_data=val_gen,
+                                     validation_steps=n_valid_samples,
+                                     class_weight=class_weight,
+                                     max_queue_size=params['n_parallel_loaders'],
+                                     workers=1,  # params['n_parallel_loaders'],
+                                     initial_epoch=params['epoch_offset'])
 
     def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None, state=dict()):
 
