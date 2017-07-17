@@ -10,9 +10,10 @@ import math
 import copy
 import shutil
 import logging
+import keras
 from keras import backend as K
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D, Concatenate
+from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
@@ -26,6 +27,12 @@ from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_pr
     decode_predictions_beam_search, replace_unknown_words, sample, sampling
 from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
 from keras.applications.vgg19 import VGG19
+
+if int(keras.__version__.split('.')[0]) == 1:
+    from keras.layers import Concat as Concatenate
+else:
+    from keras.layers import Concatenate
+
 
 # General setup of libraries
 mpl.use('Agg')  # run matplotlib without X server (GUI)
