@@ -1,4 +1,5 @@
 import matplotlib as mpl
+mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 import numpy as np
 import cPickle as pk
@@ -35,7 +36,6 @@ else:
 
 
 # General setup of libraries
-mpl.use('Agg')  # run matplotlib without X server (GUI)
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
 
@@ -1407,7 +1407,7 @@ class Model_Wrapper(object):
                     live_k[pos_sample] = new_live_k
 
                     if new_live_k > 0 and dead_k[pos_sample] < k:
-                        # convert chosen samples 
+                        # convert chosen samples
                         state_below.append(np.asarray(hyp_samples[pos_sample], dtype='int64'))
 
                     # keep every remaining one
@@ -1683,7 +1683,7 @@ class Model_Wrapper(object):
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
         :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
         The following attributes must be inserted to the model when building an optimized search model:
-        
+
             * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
             * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
             * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
@@ -1940,7 +1940,7 @@ class Model_Wrapper(object):
         :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
         :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
         The following attributes must be inserted to the model when building an optimized search model:
-        
+
             * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
             * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
             * ids_inputs_next: list of input variables to model_next (previous word must be the first input)

@@ -353,8 +353,8 @@ class Homogeneous_Data_Batch_Generator(object):
 # ------------------------------------------------------- #
 class Dataset(object):
     """
-    Class for defining instances of databases adapted for Keras. It includes several utility functions for easily managing
-    data splits, image loading, mean calculation, etc.
+    Class for defining instances of databases adapted for Keras. It includes several utility functions for
+    easily managing data splits, image loading, mean calculation, etc.
     """
 
     def __init__(self, name, path, silence=False):
@@ -375,7 +375,7 @@ class Dataset(object):
         # Variable for storing external extra variables
         self.extra_variables = dict()
 
-        ############################ Data loading parameters
+        # Data loading parameters
         # Lock for threads synchronization
         self.__lock_read = threading.Lock()
 
@@ -410,7 +410,7 @@ class Dataset(object):
 
         #################################################
 
-        ############################ Parameters for managing all the inputs and outputs
+        # Parameters for managing all the inputs and outputs
         # List of identifiers for the inputs and outputs and their respective types 
         # (which will define the preprocessing applied)
         self.ids_inputs = []
@@ -443,7 +443,7 @@ class Dataset(object):
         self.__available_augm_vid_feat = ['random_selection', 'noise']  # 'video-features' only
         #################################################
 
-        ############################ Parameters used for inputs/outputs of type 'text'
+        # Parameters used for inputs/outputs of type 'text'
         self.extra_words = {'<pad>': 0, '<unk>': 1, '<null>': 2}  # extra words introduced in all vocabularies
         self.vocabulary = dict()  # vocabularies (words2idx and idx2words)
         self.max_text_len = dict()  # number of words accepted in a 'text' sample
@@ -461,17 +461,17 @@ class Dataset(object):
         self.BPE_built = False
         #################################################
 
-        ############################ Parameters used for inputs of type 'video' or 'video-features'
+        # Parameters used for inputs of type 'video' or 'video-features'
         self.counts_frames = dict()
         self.paths_frames = dict()
         self.max_video_len = dict()
         #################################################
 
-        ############################ Parameters used for inputs of type 'image-features' or 'video-features'
+        # Parameters used for inputs of type 'image-features' or 'video-features'
         self.features_lengths = dict()
         #################################################
 
-        ############################ Parameters used for inputs of type 'raw-image'
+        # Parameters used for inputs of type 'raw-image'
         # Image resize dimensions used for all the returned images
         self.img_size = dict()
         # Image crop dimensions for the returned images
@@ -482,21 +482,21 @@ class Dataset(object):
         self.use_RGB = dict()
         #################################################
 
-        ############################ Parameters used for outputs of type 'categorical', '3DLabels' or '3DSemanticLabel'
+        # Parameters used for outputs of type 'categorical', '3DLabels' or '3DSemanticLabel'
         self.classes = dict()
         self.dic_classes = dict()
         #################################################
 
-        ############################ Parameters used for outputs of type '3DLabels' or '3DSemanticLabel'
+        # Parameters used for outputs of type '3DLabels' or '3DSemanticLabel'
         self.id_in_3DLabel = dict()
         self.num_poolings_model = dict()
         #################################################
 
-        ############################ Parameters used for outputs of type '3DSemanticLabel'
+        # Parameters used for outputs of type '3DSemanticLabel'
         self.semantic_classes = dict()
         #################################################
 
-        ############################ Parameters used for outputs of type 'sparse'
+        # Parameters used for outputs of type 'sparse'
         self.sparse_binary = dict()
         #################################################
 
@@ -530,10 +530,6 @@ class Dataset(object):
         if id_out not in self.ids_outputs:
             raise Exception("The parameter 'id_out' must specify a valid id for an output of the dataset.\n"
                             "Error produced because parameter %s was not in %s" % (id_out, self.ids_outputs))
-
-        # type_out = self.types_outputs(self.ids_outputs.index(id_out))
-        # if type_out != 'text':
-        #    raise Exception("This method is only applicable to outputs of type 'text'.")
 
         logging.info('Keeping top ' + str(n_top) + ' outputs from the ' + set_name + ' set and removing the rest.')
 
