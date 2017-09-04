@@ -2265,9 +2265,7 @@ class Model_Wrapper(object):
                                                 mean_substraction=params['mean_substraction'],
                                                 init_sample=params['init_sample'],
                                                 final_sample=params['final_sample'],
-                                                predict=True,
-                                                show_progress=True,
-                                                parallel_loaders=params['n_parallel_loaders']).generator()
+                                                predict=True).generator()
 
             else:
                 n_samples = params['n_samples']
@@ -2282,9 +2280,7 @@ class Model_Wrapper(object):
                                                 data_augmentation=False,
                                                 mean_substraction=params['mean_substraction'],
                                                 predict=True,
-                                                random_samples=n_samples,
-                                                show_progress=True,
-                                                parallel_loaders=params['n_parallel_loaders']).generator()
+                                                random_samples=n_samples).generator()
             # Predict on model
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,
