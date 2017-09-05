@@ -2283,11 +2283,20 @@ class Model_Wrapper(object):
                                                 random_samples=n_samples).generator()
             # Predict on model
             if postprocess_fun is None:
-                out = self.model.predict_generator(data_gen,
-                                                   num_iterations,
-                                                   max_queue_size=params['n_parallel_loaders'],
-                                                   workers=1,  # params['n_parallel_loaders'],
-                                                   verbose=params['verbose'])
+                if int(keras.__version__.split('.')[0]) == 1:
+                    # Keras version 1.x
+                    out = self.model.predict_generator(data_gen,
+                                                       val_samples=n_samples,
+                                                       max_q_size=params['n_parallel_loaders'],
+                                                       nb_worker=1,  # params['n_parallel_loaders'],
+                                                       pickle_safe=False)
+                else:
+                    # Keras version 2.x
+                    out = self.model.predict_generator(data_gen,
+                                                       num_iterations,
+                                                       max_queue_size=params['n_parallel_loaders'],
+                                                       workers=1,  # params['n_parallel_loaders'],
+                                                       verbose=params['verbose'])
                 predictions[s] = out
             else:
                 processed_samples = 0
