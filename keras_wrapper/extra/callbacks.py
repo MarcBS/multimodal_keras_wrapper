@@ -215,7 +215,8 @@ class EvalPerformance(KerasCallback):
                 params_prediction = {'max_batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
-                                     'beam_batch_size': self.beam_batch_size if self.beam_batch_size is not None else self.batch_size,
+                                     'beam_batch_size': self.beam_batch_size if
+                                     self.beam_batch_size is not None else self.batch_size,
                                      'pos_unk': False,
                                      'normalize': self.normalize,
                                      'max_eval_samples': self.max_eval_samples
@@ -398,10 +399,10 @@ class StoreModel(KerasCallback):
         super(StoreModel, self).__init__()
         self.model_to_save = model
         self.store_function = fun
-        self.epochs_for_save = epochs_for_save
+        self.epochs_for_save = epochs_for_save if epochs_for_save > 0 else np.inf
         self.verbose = verbose
 
-    def on_epoch_end(self, epoch, logs={}):
+    def on_epoch_end(self, epoch, logs=None):
         epoch += 1
         if epoch % self.epochs_for_save == 0:
             print('')
@@ -718,6 +719,7 @@ class LearningRateReducer(KerasCallback):
         self.current_update_nb = 0
         self.epsilon = epsilon
         self.epoch = 0
+        self.new_lr = None
         assert self.reduction_function in ['linear', 'exponential'], 'Reduction function "%s" unimplemented!' % \
                                                                      str(self.reduction_function)
 
