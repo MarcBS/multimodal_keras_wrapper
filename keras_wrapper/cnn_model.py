@@ -2284,10 +2284,10 @@ class Model_Wrapper(object):
             # Predict on model
             if postprocess_fun is None:
                 out = self.model.predict_generator(data_gen,
-                                                   val_samples=n_samples,
-                                                   max_q_size=params['n_parallel_loaders'],
-                                                   nb_worker=1,  # params['n_parallel_loaders'],
-                                                   pickle_safe=False)
+                                                   num_iterations,
+                                                   max_queue_size=params['n_parallel_loaders'],
+                                                   workers=1,  # params['n_parallel_loaders'],
+                                                   verbose=params['verbose'])
                 predictions[s] = out
             else:
                 processed_samples = 0
