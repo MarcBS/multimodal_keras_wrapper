@@ -1029,7 +1029,7 @@ class Dataset(object):
         if sparse:
             labels = labels_list
         else: # convert to sparse representation
-            labels = [[str(i) for i, x in enumerate(y) if x == 1] for y in labels_list]
+            labels = [[i for i, x in enumerate(y) if x == 1] for y in labels_list]
         self.sparse_binary[id] = True
 
         unique_label_set = []
