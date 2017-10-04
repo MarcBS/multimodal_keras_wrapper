@@ -1650,6 +1650,7 @@ class Dataset(object):
                     offset_j = max_len_batch - len_j - 1
                 elif fill == 'center':
                     offset_j = (max_len_batch - len_j) / 2
+                    len_j = len_j + offset_j
                 else:
                     offset_j = 0
                     len_j = min(len_j, max_len_batch)
