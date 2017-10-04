@@ -1029,7 +1029,7 @@ class Dataset(object):
         if sparse:
             labels = labels_list
         else: # convert to sparse representation
-            labels = [[i for i, x in enumerate(y) if x == 1] for y in labels_list]
+            labels = [[str(i) for i, x in enumerate(y) if x == 1] for y in labels_list]
         self.sparse_binary[id] = True
 
         unique_label_set = []
@@ -1650,10 +1650,10 @@ class Dataset(object):
                     offset_j = max_len_batch - len_j - 1
                 elif fill == 'center':
                     offset_j = (max_len_batch - len_j) / 2
-                    len_j = min(len_j, max_len_batch)
+                    len_j = len_j + offset_j
                 else:
                     offset_j = 0
-                    len_j = min(len_j, max_len_batch)
+                    len_j = min(len_j, max_len_batchz)
                 if offset_j < 0:
                     len_j = len_j + offset_j
                     offset_j = 0
