@@ -1653,7 +1653,7 @@ class Dataset(object):
                     len_j = len_j + offset_j
                 else:
                     offset_j = 0
-                    len_j = min(len_j, max_len_batchz)
+                    len_j = min(len_j, max_len_batch)
                 if offset_j < 0:
                     len_j = len_j + offset_j
                     offset_j = 0
