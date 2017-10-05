@@ -87,6 +87,7 @@ class EvalPerformance(KerasCallback):
                  save_each_evaluation=True,
                  out_pred_idx=None,
                  max_plot=1.0,
+                 do_plot=True,
                  verbose=1):
         """
         Evaluates a model each N epochs or updates
@@ -127,6 +128,7 @@ class EvalPerformance(KerasCallback):
                              (only applicable if model has more than one output, else set to None)
         :param max_plot: maximum value shown on the performance plots generated
         :param verbose: verbosity level; by default 1
+        :param do_plot: plot results so far
 
 
         Deprecated outputs
@@ -191,7 +193,27 @@ class EvalPerformance(KerasCallback):
         self.max_plot = max_plot
         self.save_each_evaluation = save_each_evaluation
         self.written_header = False
+        self.do_plot = do_plot
         create_dir_if_not_exists(self.save_path)
+
+        # Single-output model
+        if not self.gt_pos or self.gt_pos == 0:
+            self.metric_name = [self.metric_name]
+            self.write_type = [self.write_type]
+            self.index2word_y = [self.index2word_y]
+            self.index2word_x = [self.index2word_x]
+            if 0 not in self.extra_vars.keys():
+                self.extra_vars[0] = self.extra_vars
+
+            if self.output_types is None:
+                if self.is_multilabel:
+                    self.output_types = ['binary']
+                elif self.is_text:
+                    self.output_types = ['text']
+            else:
+                self.output_types = [self.output_types]
+
+
         super(EvalPerformance, self).__init__()
 
     def on_epoch_end(self, epoch, logs={}):
@@ -228,6 +250,7 @@ class EvalPerformance(KerasCallback):
     def evaluate(self, epoch, counter_name='epoch', logs={}):
         # Evaluate on each set separately
         all_metrics = []
+
         for s in self.set_name:
             # Apply model predictions
             if self.beam_search:
@@ -260,23 +283,9 @@ class EvalPerformance(KerasCallback):
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 
             # Single-output model
-            if not self.gt_pos:
+            if not self.gt_pos or self.gt_pos == 0:
                 predictions_all = [predictions_all]
                 gt_positions = [0]
-                self.metric_name = [self.metric_name]
-                self.write_type = [self.write_type]
-                self.index2word_y = [self.index2word_y]
-                self.index2word_x = [self.index2word_x]
-                if 0 not in self.extra_vars.keys():
-                    self.extra_vars[0] = self.extra_vars
-
-                if self.output_types is None:
-                    if self.is_multilabel:
-                        self.output_types = ['binary']
-                    elif self.is_text:
-                        self.output_types = ['text']
-                else:
-                    self.output_types = [self.output_types]
 
             # Multi-output model
             else:
@@ -348,6 +357,14 @@ class EvalPerformance(KerasCallback):
                                                     min_val=self.min_pred_multilabel,
                                                     verbose=self.verbose)
 
+                    # Prepare references
+                    exec("y_raw = self.ds.Y_" + s + "[gt_id]")
+                    self.extra_vars[gt_pos][s]['references'] = self.ds.loadBinary(y_raw, gt_id)
+
+                # Other output data types
+                else:
+                    exec("self.extra_vars[gt_pos][s]['references'] = self.ds.Y_" + s)
+
                 # Store predictions
                 if self.write_samples:
                     # Store result
@@ -356,7 +373,7 @@ class EvalPerformance(KerasCallback):
                         list2file(filepath, predictions)
                     elif write_type == 'vqa':
                         try:
-                            exec ('refs = self.ds.Y_' + s + '[self.gt_id]')
+                            exec ('refs = self.ds.Y_' + s + '[gt_id]')
                         except:
                             refs = ['N/A' for _ in range(probs.shape[0])]
                         extra_data_plot = {'reference': refs,
@@ -424,8 +441,9 @@ class EvalPerformance(KerasCallback):
             self.model_to_eval.log('val', 'val_loss', logs['valid_loss'])
 
         # Plot results so far
-        if self.metric_name:
-            self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
+        if self.do_plot:
+            if self.metric_name:
+                self.model_to_eval.plot(counter_name, set(all_metrics), self.set_name, upperbound=self.max_plot)
 
         # Save the model
         if self.save_each_evaluation:
