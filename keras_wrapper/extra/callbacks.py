@@ -363,7 +363,7 @@ class EvalPerformance(KerasCallback):
 
                 # Other output data types
                 else:
-                    exec("self.extra_vars[gt_pos][s]['references'] = self.ds.Y_" + s)
+                    exec("self.extra_vars[gt_pos][s]['references'] = self.ds.Y_" + s + "[gt_id]")
 
                 # Store predictions
                 if self.write_samples:
