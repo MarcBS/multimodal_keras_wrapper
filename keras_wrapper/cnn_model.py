@@ -932,7 +932,6 @@ class Model_Wrapper(object):
         if params['verbose'] > 0:
             logging.info("Training parameters: " + str(params))
         callbacks = []
-        ## Callbacks order:
 
         # Extra callbacks (e.g. evaluation)
         callbacks += params['extra_callbacks']
@@ -969,7 +968,7 @@ class Model_Wrapper(object):
         self.model.fit(x,
                        y,
                        batch_size=min(params['batch_size'], len(x)),
-                       nb_epoch=params['n_epochs'],
+                       epochs=params['n_epochs'],
                        verbose=params['verbose'],
                        callbacks=callbacks,
                        validation_data=None,
