@@ -418,9 +418,9 @@ class EvalPerformance(KerasCallback):
                         self.model_to_eval.log(s, counter_name, epoch)
                         for metric_ in sorted(metrics):
                             value = metrics[metric_]
-
-                            metric_ += '_output_'+str(gt_pos)
-
+                            # Multiple-output model
+                            if self.gt_pos and self.gt_pos != 0:
+                                metric_ += '_output_' + str(gt_pos)
                             all_metrics.append(metric_)
                             header += metric_ + ','
                             line += str(value) + ','
@@ -725,7 +725,7 @@ class EarlyStopping(KerasCallback):
         # Get last metric value from logs
         if current_score is None:
             warnings.warn('The chosen metric ' + str(self.metric_check) +
-                          ' does not exist; this reducer works only with a valid metric.')
+                          ' does not exist; the EarlyStopping callback works only with a valid metric.')
             return
         if self.want_to_minimize:
             current_score = -current_score
