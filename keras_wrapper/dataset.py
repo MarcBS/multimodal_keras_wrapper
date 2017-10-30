@@ -1038,7 +1038,7 @@ class Dataset(object):
                 unique_label_set.append(sample)
         y_vocab = ['::'.join(sample) for sample in unique_label_set]
 
-        self.build_vocabulary(y_vocab, id, split_symbol='::', use_extra_words=False)
+        self.build_vocabulary(y_vocab, id, split_symbol='::', use_extra_words=False, is_val=True)
 
         return labels
 
@@ -1257,7 +1257,7 @@ class Dataset(object):
 
         return sentences
 
-    def build_vocabulary(self, captions, id, tokfun=None, do_split=True, min_occ=0, n_words=0, split_symbol=' ', use_extra_words=True):
+    def build_vocabulary(self, captions, id, tokfun=None, do_split=True, min_occ=0, n_words=0, split_symbol=' ', use_extra_words=True, is_val=False):
         """
         Vocabulary builder for data of type 'text'
 
@@ -1268,6 +1268,7 @@ class Dataset(object):
         :param split_symbol: symbol used for separating the elements in each sentence
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
         :param n_words: Maximum number of words to include in the dictionary.
+        :param is_val: Set to True if the input 'captions' are values and we want to keep them sorted
         :return: None.
         """
         if not self.silence:
@@ -1328,7 +1329,10 @@ class Dataset(object):
 
         dictionary = {}
         for i, (word, count) in enumerate(vocab_count):
-            dictionary[word] = i
+            if is_val:
+                dictionary[word] = int(word)
+            else:
+                dictionary[word] = i
             if use_extra_words:
                 dictionary[word] += len(self.extra_words)
 

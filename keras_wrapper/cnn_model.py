@@ -728,6 +728,9 @@ class Model_Wrapper(object):
                           'lr_reducer_exp_base': 0.5,
                           'lr_half_life': 50000}
         params = self.checkParameters(parameters, default_params)
+        # Set params['start_reduction_on_epoch'] = params['lr_decay'] by default
+        if params['lr_decay'] is not None and 'start_reduction_on_epoch' not in parameters.keys():
+            params['start_reduction_on_epoch'] = params['lr_decay']
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
         self.training_parameters.append(save_params)
