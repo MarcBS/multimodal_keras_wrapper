@@ -55,10 +55,11 @@ def clean_dir(directory):
 ###
 # Main functions
 ###
-def file2list(filepath):
+def file2list(filepath, stripfile=True):
     with open(filepath, 'r') as f:
-        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0]
-    return lines
+        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in
+                                                                                                 f.readlines()]
+        return lines
 
 
 def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
@@ -189,7 +190,7 @@ def pickle_model(
         index2word_x,
         index2word_y):
     import sys
-    import cPickle as pickle
+    import cPickle
     modifier = 10
     tmp = sys.getrecursionlimit()
     sys.setrecursionlimit(tmp * modifier)
@@ -199,22 +200,22 @@ def pickle_model(
                   'word2index_y': word2index_y,
                   'index2word_x': index2word_x,
                   'index2word_y': index2word_y}
-        pickle.dump(p_dict, f, protocol=2)
+        cPickle.dump(p_dict, f, protocol=cPickle.HIGHEST_PROTOCOL)
     sys.setrecursionlimit(tmp)
 
 
 def unpickle_model(path):
-    import cPickle as pickle
+    import cPickle
     with open(path, 'rb') as f:
-        model = pickle.load(f)['model']
+        model = cPickle.load(f)['model']
     return model
 
 
 def unpickle_vocabulary(path):
-    import cPickle as pickle
+    import cPickle
     p_dict = {}
     with open(path, 'rb') as f:
-        pickle_load = pickle.load(f)
+        pickle_load = cPickle.load(f)
         p_dict['word2index_x'] = pickle_load['word2index_x']
         p_dict['word2index_y'] = pickle_load['word2index_y']
         p_dict['index2word_x'] = pickle_load['index2word_x']
@@ -223,9 +224,9 @@ def unpickle_vocabulary(path):
 
 
 def unpickle_data_provider(path):
-    import cPickle as pickle
+    import cPickle
     with open(path, 'rb') as f:
-        dp = pickle.load(f)['data_provider']
+        dp = cPickle.load(f)['data_provider']
     return dp
 
 
