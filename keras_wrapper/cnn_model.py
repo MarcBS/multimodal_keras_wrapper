@@ -338,12 +338,12 @@ class Model_Wrapper(object):
         """
             Model_Wrapper object constructor.
 
-            :param nOutput: number of outputs of the network. Only valid if 'structure_path' == None.
+            :param nOutput: number of outputs of the network. Only valid if 'structure_path' is None.
             :param type: network name type (corresponds to any method defined in the section 'MODELS' of this class).
-                         Only valid if 'structure_path' == None.
+                         Only valid if 'structure_path' is None.
             :param silence: set to True if you don't want the model to output informative messages
             :param input_shape: array with 3 integers which define the images' input shape [height, width, channels].
-                                Only valid if 'structure_path' == None.
+                                Only valid if 'structure_path' is None.
             :param structure_path: path to a Keras' model json file.
                                    If we speficy this parameter then 'type' will be only an informative parameter.
             :param weights_path: path to the pre-trained weights file (if None, then it will be randomly initialized)
@@ -886,7 +886,7 @@ class Model_Wrapper(object):
         if 'val' in params['eval_on_sets']:
             # Calculate how many validation interations are we going to perform per test
             n_valid_samples = ds.len_val
-            if params['num_iterations_val'] == None:
+            if params['num_iterations_val'] is None:
                 params['num_iterations_val'] = int(math.ceil(float(n_valid_samples) / params['batch_size']))
 
             # prepare data generator
@@ -1350,7 +1350,7 @@ class Model_Wrapper(object):
             # SCORE
             state_below = []
             if params['optimized_search']:
-                prev_out_new = [[] for v in prev_out]
+                prev_out_new = [[] for _ in prev_out]
             for pos_sample, sample_identifier in enumerate(
                     sample_identifier_prediction):  # process one sample at a time
 
@@ -1918,7 +1918,8 @@ class Model_Wrapper(object):
 
                 if params['pos_unk']:
                     if eval('ds.loaded_raw_' + s + '[0]'):
-                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'))
+                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
+                                            stripfile=False)
                     predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
                 else:
                     predictions[s] = np.asarray(best_samples)
@@ -2120,8 +2121,8 @@ class Model_Wrapper(object):
                         for input_id in params['model_inputs']:
                             if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
                                 link = int(X[params['link_index_id']][i])
-                                if link not in previous_outputs[
-                                    input_id].keys():  # input to current sample was not processed yet
+                                if link not in previous_outputs[input_id].keys():
+                                    # input to current sample was not processed yet
                                     link = -1
                                 prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
                                           previous_outputs[input_id][link]]
@@ -2199,7 +2200,8 @@ class Model_Wrapper(object):
 
                 if params['pos_unk']:
                     if eval('ds.loaded_raw_' + s + '[0]'):
-                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'))
+                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
+                                            stripfile=False)
                     predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
                 else:
                     predictions[s] = np.asarray(best_samples)
