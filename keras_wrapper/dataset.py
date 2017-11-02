@@ -3,7 +3,6 @@ import cPickle as pk
 import copy
 import fnmatch
 import logging
-import math
 import ntpath
 import os
 import random
@@ -12,7 +11,6 @@ import sys
 import threading
 from collections import Counter
 from operator import add
-import time
 
 import numpy as np
 from PIL import Image as pilimage
@@ -643,7 +641,7 @@ class Dataset(object):
                  # 'raw-image' / 'video'   (height, width, depth)
                  max_text_len=35, tokenization='tokenize_none', offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
-                 bpe_codes=None, separator='@@', # 'text'
+                 bpe_codes=None, separator='@@',  # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
                  max_video_len=26  # 'video'
                  ):
@@ -781,7 +779,8 @@ class Dataset(object):
         logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
         self.setOutput(labels_list, set_name, type=type, id=id)
 
-    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False, add_additional=False):
+    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False,
+                     add_additional=False):
         """
             Loads a list which can contain all samples from either the 'train', 'val', or
             'test' set splits (specified by set_name).
@@ -819,13 +818,14 @@ class Dataset(object):
         if not self.silence:
             logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
-    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False, add_additional=False,
+    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
+                  add_additional=False,
                   sample_weights=False,
                   tokenization='tokenize_none', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
-                  bpe_codes=None, separator='@@', # 'text'
+                  bpe_codes=None, separator='@@',  # 'text'
                   associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
-                  sparse=False, # 'binary'
+                  sparse=False,  # 'binary'
                   ):
         """
             Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
@@ -911,9 +911,9 @@ class Dataset(object):
 
     def __setOutput(self, labels, set_name, type, id, overwrite_split, add_additional):
         if add_additional:
-            exec('self.Y_' + set_name + '[id] += labels')
+            exec ('self.Y_' + set_name + '[id] += labels')
         else:
-            exec('self.Y_' + set_name + '[id] = labels')
+            exec ('self.Y_' + set_name + '[id] = labels')
         exec ('self.loaded_' + set_name + '[1] = True')
         exec ('self.len_' + set_name + ' = len(self.Y_' + set_name + '[id])')
         if not overwrite_split and not add_additional:
@@ -1028,7 +1028,7 @@ class Dataset(object):
 
         if sparse:
             labels = labels_list
-        else: # convert to sparse representation
+        else:  # convert to sparse representation
             labels = [[str(i) for i, x in enumerate(y) if x == 1] for y in labels_list]
         self.sparse_binary[id] = True
 
@@ -1046,17 +1046,17 @@ class Dataset(object):
 
         try:
             sparse = self.sparse_binary[id]
-        except: # allows retrocompatibility
+        except:  # allows retrocompatibility
             sparse = False
 
-        if sparse: # convert sparse into numpy array
+        if sparse:  # convert sparse into numpy array
             n_samples = len(y_raw)
             voc = self.vocabulary[id]['words2idx']
             num_words = len(voc.keys())
             y = np.zeros((n_samples, num_words), dtype=np.uint8)
             for i, y_ in enumerate(y_raw):
                 for elem in y_:
-                    y[i,voc[elem]] = 1
+                    y[i, voc[elem]] = 1
         else:
             y = np.array(y_raw).astype(np.uint8)
 
@@ -1086,7 +1086,6 @@ class Dataset(object):
                             'It must be a path to a text file with real values or an instance of the class list.\n'
                             'It currently is: %s' % str(labels_list))
 
-
         return labels
 
     # ------------------------------------------------------- #
@@ -1115,7 +1114,8 @@ class Dataset(object):
         elif isinstance(path_list, list):
             data = path_list
         else:
-            raise Exception('Wrong type for "path_list". It must be a path to a text file. Each line must contain a path'
+            raise Exception(
+                'Wrong type for "path_list". It must be a path to a text file. Each line must contain a path'
                 ' to a .npy file storing a feature vector. Alternatively "path_list"'
                 ' can be an instance of the class list.\n'
                 'Currently it is: %s .' % str(path_list))
@@ -1245,8 +1245,8 @@ class Dataset(object):
         if not id in self.vocabulary:
             raise Exception('The dataset must include a vocabulary with'
                             ' id "' + id + '" in order to process the type "text" data. '
-                            'Set "build_vocabulary" to True if you want '
-                            'to use the current data for building the vocabulary.')
+                                           'Set "build_vocabulary" to True if you want '
+                                           'to use the current data for building the vocabulary.')
 
         # Store max text len
         self.max_text_len[id][set_name] = max_text_len
@@ -1257,7 +1257,8 @@ class Dataset(object):
 
         return sentences
 
-    def build_vocabulary(self, captions, id, tokfun=None, do_split=True, min_occ=0, n_words=0, split_symbol=' ', use_extra_words=True, is_val=False):
+    def build_vocabulary(self, captions, id, tokfun=None, do_split=True, min_occ=0, n_words=0, split_symbol=' ',
+                         use_extra_words=True, is_val=False):
         """
         Vocabulary builder for data of type 'text'
 
@@ -1339,7 +1340,6 @@ class Dataset(object):
         if use_extra_words:
             for w, k in self.extra_words.iteritems():
                 dictionary[w] = k
-
 
         # Store dictionary and append to previously existent if needed.
         if id not in self.vocabulary:
@@ -1664,7 +1664,7 @@ class Dataset(object):
 
                 if words_so_far:
                     for j, w in zip(range(len_j), x[:len_j]):
-                        next_w = vocab.get(w, next_w = vocab['<unk>'])
+                        next_w = vocab.get(w, next_w=vocab['<unk>'])
                         for k in range(j, len_j):
                             X_out[i, k + offset_j, j + offset_j] = next_w
                             X_mask[i, k + offset_j, j + offset_j] = 1  # fill mask
@@ -1735,10 +1735,11 @@ class Dataset(object):
             logging.info("Source -- target mapping loaded with a total of %d words." % len(self.mapping.keys()))
 
     # ------------------------------------------------------- #
-    #       Tokenization functions
+    #       Tokenizing functions
     # ------------------------------------------------------- #
 
-    def tokenize_basic(self, caption, lowercase=True):
+    @staticmethod
+    def tokenize_basic(caption, lowercase=True):
         """
         Basic tokenizer for the input/output data of type 'text':
            * Splits punctuation
@@ -1765,7 +1766,8 @@ class Dataset(object):
         resAns = resAns.replace('  ', ' ')
         return resAns
 
-    def tokenize_aggressive(self, caption, lowercase=True):
+    @staticmethod
+    def tokenize_aggressive(caption, lowercase=True):
         """
         Aggressive tokenizer for the input/output data of type 'text':
         * Removes punctuation
@@ -1791,7 +1793,8 @@ class Dataset(object):
         resAns = resAns.strip()
         return resAns
 
-    def tokenize_icann(self, caption):
+    @staticmethod
+    def tokenize_icann(caption):
         """
         Tokenization used for the icann paper:
         * Removes some punctuation (. , ")
@@ -1806,7 +1809,8 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
-    def tokenize_montreal(self, caption):
+    @staticmethod
+    def tokenize_montreal(caption):
         """
         Similar to tokenize_icann
             * Removes some punctuation
@@ -1822,7 +1826,8 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
-    def tokenize_soft(self, caption, lowercase=True):
+    @staticmethod
+    def tokenize_soft(caption, lowercase=True):
         """
         Tokenization used for the icann paper:
             * Removes very little punctuation
@@ -1849,7 +1854,8 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
-    def tokenize_none(self, caption):
+    @staticmethod
+    def tokenize_none(caption):
         """
         Does not tokenizes the sentences. Only performs a stripping
 
@@ -1859,7 +1865,8 @@ class Dataset(object):
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         return tokenized
 
-    def tokenize_none_char(self, caption):
+    @staticmethod
+    def tokenize_none_char(caption):
         """
         Character-level tokenization. Respects all symbols. Separates chars. Inserts <space> sybmol for spaces.
         If found an escaped char, "&apos;" symbol, it is converted to the original one
@@ -1896,7 +1903,8 @@ class Dataset(object):
         tokenized = " ".join(tokenized)
         return tokenized
 
-    def tokenize_CNN_sentence(self, caption):
+    @staticmethod
+    def tokenize_CNN_sentence(caption):
         """
         Tokenization employed in the CNN_sentence package
         (https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97).
@@ -1918,7 +1926,8 @@ class Dataset(object):
         tokenized = re.sub(r"\s{2,}", " ", tokenized)
         return tokenized.strip().lower()
 
-    def tokenize_questions(self, caption):
+    @staticmethod
+    def tokenize_questions(caption):
         """
         Basic tokenizer for VQA questions:
             * Lowercasing
@@ -2024,7 +2033,8 @@ class Dataset(object):
         tokenized = self.BPE.segment(tokenized).strip()
         return tokenized
 
-    def detokenize_none(self, caption):
+    @staticmethod
+    def detokenize_none(caption):
         """
         Dummy function: Keeps the caption as it is.
         :param caption: String to de-tokenize.
@@ -2032,8 +2042,8 @@ class Dataset(object):
         """
         return caption
 
-
-    def detokenize_bpe(self, caption, separator='@@'):
+    @staticmethod
+    def detokenize_bpe(caption, separator='@@'):
         """
         Reverts BPE segmentation (https://github.com/rsennrich/subword-nmt)
         :param caption: Caption to detokenize.
@@ -2044,7 +2054,8 @@ class Dataset(object):
         detokenized = bpe_detokenization.sub("", str(caption).strip())
         return detokenized
 
-    def detokenize_none_char(self, caption):
+    @staticmethod
+    def detokenize_none_char(caption):
         """
         Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by
         the <space> token. If found an special character is converted to the escaped char.
@@ -2349,7 +2360,6 @@ class Dataset(object):
                             ' or an instance of the class list with an id in each position.'
                             'It currently is: %s' % str(path_list))
 
-
         return data
 
     # ------------------------------------------------------- #
@@ -2423,7 +2433,7 @@ class Dataset(object):
 
         for i in range(n_samples):
             pre_labels = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
-            #labels = np.zeros((h_crop, w_crop), dtype=np.uint8)
+            # labels = np.zeros((h_crop, w_crop), dtype=np.uint8)
             line = gt[i]
 
             ### Load labeled GT image
@@ -2653,7 +2663,7 @@ class Dataset(object):
             data = path_list
         else:
             raise Exception('Wrong type for "path_list". It must be a path to a text file with an image '
-                'path in each line or an instance of the class list with an image path in each position.'
+                            'path in each line or an instance of the class list with an image path in each position.'
                             'It currently is: %s' % str(path_list))
 
         self.img_size[id] = img_size
@@ -3124,7 +3134,7 @@ class Dataset(object):
             if not debug:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    #load_sample_weights = self.sample_weights[id_out][set_name]
+                    # load_sample_weights = self.sample_weights[id_out][set_name]
                     y = self.loadCategorical(y, nClasses)
                 elif type_out == 'binary':
                     y = self.loadBinary(y, id_out)
@@ -3552,7 +3562,7 @@ class Dataset(object):
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
                                                                             '\t Inputs:' + str(plot_ids_in) + ''
-                                                                            '\t Outputs:' + str(
+                                                                                                              '\t Outputs:' + str(
                     self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
