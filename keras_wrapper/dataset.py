@@ -265,7 +265,7 @@ class Homogeneous_Data_Batch_Generator(object):
         self.params = {'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
-                       'num_iterations': num_iterations,
+                       'num_iterations': num_iterations / joint_batches,
                        'random_samples': random_samples,
                        'shuffle': shuffle,
                        'joint_batches': joint_batches}
@@ -289,18 +289,18 @@ class Homogeneous_Data_Batch_Generator(object):
         self.it += 1
 
         # Checks if we are finishing processing the data split
-        init_sample = (self.it - 1) * self.batch_size
-        final_sample = self.it * self.batch_size
-        batch_size = self.batch_size
         joint_batches = self.params['joint_batches']
+        batch_size = self.batch_size * joint_batches
+        init_sample = (self.it - 1) * batch_size
+        final_sample = self.it * batch_size
         n_samples_split = eval("self.dataset.len_" + self.set_split)
         if final_sample >= n_samples_split:
             final_sample = n_samples_split
             batch_size = final_sample - init_sample
             self.it = 0
-
+        # Recovers a batch of data
         X_batch, Y_batch = self.dataset.getXY(self.set_split,
-                                              batch_size * joint_batches,
+                                              batch_size, # This batch_size value is self.batch_size * joint_batches
                                               normalization=self.params['normalization'],
                                               meanSubstraction=self.params['mean_substraction'],
                                               dataAugmentation=data_augmentation)
@@ -335,6 +335,16 @@ class Homogeneous_Data_Batch_Generator(object):
         self.curr_idx = next_idx
         if self.curr_idx >= len(self.tidx):
             self.reset()
+        """
+        Y_batch = data[1]
+        print 'source words:', [map(lambda x: self.dataset.vocabulary['source_text']['idx2words'][x], seq) for seq
+                                in data[0]['source_text']]
+        print 'state_below words:', [map(lambda x: self.dataset.vocabulary['state_below']['idx2words'][x], seq) for seq
+                                in data[0]['state_below']]
+
+        print 'target words:', [map(lambda x: self.dataset.vocabulary['target_text']['idx2words'][x], seq) for seq
+                                in [np.nonzero(sample)[1] for sample in Y_batch['target_text']]]
+        """
         return data
 
     def generator(self):
