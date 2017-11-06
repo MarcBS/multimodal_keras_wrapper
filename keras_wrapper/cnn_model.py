@@ -622,7 +622,7 @@ class Model_Wrapper(object):
         # If it is a Sequential model
         if isinstance(self.model, Sequential):
             # Remove old layers
-            for i in range(num_remove):
+            for _ in range(num_remove):
                 removed_layers.append(self.model.layers.pop())
                 removed_params.append(self.model.params.pop())
 
@@ -1808,7 +1808,7 @@ class Model_Wrapper(object):
                 sampled = 0
                 start_time = time.time()
                 eta = -1
-                for j in range(num_iterations):
+                for _ in range(num_iterations):
                     data = data_gen.next()
                     X = dict()
                     if params['n_samples'] > 0:
@@ -2633,7 +2633,7 @@ class Model_Wrapper(object):
         if len(self.inputsMapping.keys()) == 1:  # single input
             X = X[self.inputsMapping[0]]
         else:
-            X_new = [0 for i in range(len(self.inputsMapping.keys()))]  # multiple inputs
+            X_new = [0 for _ in range(len(self.inputsMapping.keys()))]  # multiple inputs
             for in_model, in_ds in self.inputsMapping.iteritems():
                 X_new[in_model] = X[in_ds]
             X = X_new

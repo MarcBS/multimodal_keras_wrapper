@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import copy
-import os
 import numpy as np
 from scipy import misc
 from skimage.transform import resize

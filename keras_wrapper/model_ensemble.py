@@ -346,7 +346,7 @@ class BeamSearchEnsemble:
             eta = -1
             if self.n_best:
                 n_best_list = []
-            for j in range(num_iterations):
+            for _ in range(num_iterations):
                 data = data_gen.next()
                 X = dict()
                 if params['n_samples'] > 0:

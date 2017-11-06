@@ -56,7 +56,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
 
     final_scores = {}
     for scorer, method in scorers:
-        score, scores = scorer.compute_score(refs, hypo)
+        score, _ = scorer.compute_score(refs, hypo)
         if type(score) == list:
             for m, s in zip(method, score):
                 final_scores[m] = s
