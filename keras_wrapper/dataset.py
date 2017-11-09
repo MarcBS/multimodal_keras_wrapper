@@ -1207,26 +1207,30 @@ class Dataset(object):
                 'Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences. '
                 'It currently is: %s' % (str(annotations_list)))
 
-        # Check if tokenization method exists
-        if hasattr(self, tokenization):
-            if 'bpe' in tokenization.lower():
-                assert bpe_codes is not None, 'bpe_codes must be specified when applying a BPE tokenization.'
-                self.build_bpe(bpe_codes, separator)
-            tokfun = eval('self.' + tokenization)
-            if not self.silence:
-                logging.info('\tApplying tokenization function: "' + tokenization + '".')
-        else:
-            raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
-
         # Tokenize sentences
         if max_text_len != 0:  # will only tokenize if we are not using the whole sentence as a class
+
+            # Check if tokenization method exists
+	    if hasattr(self, tokenization):
+	        if 'bpe' in tokenization.lower():
+	    	    assert bpe_codes is not None, 'bpe_codes must be specified when applying a BPE tokenization.'
+		    self.build_bpe(bpe_codes, separator)
+		tokfun = eval('self.' + tokenization)
+		if not self.silence:
+		    logging.info('\tApplying tokenization function: "' + tokenization + '".')
+	    else:
+	        raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
+
             for i in range(len(sentences)):
                 sentences[i] = tokfun(sentences[i])
+        else:
+            tokfun = None
+
 
         # Build vocabulary
         error_vocab = False
         if build_vocabulary == True:
-            self.build_vocabulary(sentences, id, max_text_len != 0, min_occ=min_occ, n_words=max_words)
+            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words, use_extra_words=(max_text_len != 0))
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
@@ -1624,7 +1628,10 @@ class Dataset(object):
             X_out = np.zeros(n_batch).astype('int32')
             for i in range(n_batch):
                 w = X[i]
-                X_out[i] = vocab.get(w, vocab['<unk>'])
+                if '<unk>' in vocab:
+                    X_out[i] = vocab.get(w, vocab['<unk>'])
+                else:
+                    X_out[i] = vocab[w]
             if loading_X:
                 X_out = (X_out, None)  # This None simulates a mask
         else:  # process text as a sequence of words
@@ -3275,8 +3282,7 @@ class Dataset(object):
             if not debug:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    load_sample_weights = self.sample_weights[id_out][set_name]
-                    y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
+                    y = self.loadCategorical(y, nClasses)
                 elif type_out == 'binary':
                     y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
@@ -3438,8 +3444,7 @@ class Dataset(object):
             if not debug:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    load_sample_weights = self.sample_weights[id_out][set_name]
-                    y = self.loadCategorical(y, nClasses, id_out, load_sample_weights)
+                    y = self.loadCategorical(y, nClasses)
                 elif type_out == 'binary':
                     y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
