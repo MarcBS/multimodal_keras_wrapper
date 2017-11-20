@@ -622,7 +622,7 @@ class Model_Wrapper(object):
         # If it is a Sequential model
         if isinstance(self.model, Sequential):
             # Remove old layers
-            for i in range(num_remove):
+            for _ in range(num_remove):
                 removed_layers.append(self.model.layers.pop())
                 removed_params.append(self.model.params.pop())
 
@@ -1167,7 +1167,7 @@ class Model_Wrapper(object):
         if ii > 1:  # timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, 1)
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1)
                 if idx > 0:  # first output must be the output probs.
                     if next_out_name in self.matchings_next_to_next.keys():
                         next_in_name = self.matchings_next_to_next[next_out_name]
@@ -1180,11 +1180,11 @@ class Model_Wrapper(object):
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
                 else:
                     in_data[model_input] = copy.copy(X[model_input])
-            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, 1)
+            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1)
         elif ii == 1:  # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, 1)
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1)
                 if idx > 0:  # first output must be the output probs.
                     if init_out_name in self.matchings_init_to_next.keys():
                         next_in_name = self.matchings_init_to_next[init_out_name]
@@ -1551,8 +1551,7 @@ class Model_Wrapper(object):
             state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray(
                 [np.zeros((maxlen, maxlen))] * live_k)
         else:
-            state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray(
-                [np.zeros(maxlen)] * live_k)
+            state_below = np.asarray([null_sym] * live_k)
 
         prev_out = None
 
@@ -1631,22 +1630,11 @@ class Model_Wrapper(object):
                 break
             state_below = np.asarray(hyp_samples, dtype='int64')
 
-            # we must include an additional dimension if the input for each timestep are all the generated words so far
-            if pad_on_batch:
-                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
-                if params['words_so_far']:
-                    state_below = np.expand_dims(state_below, axis=0)
-            else:
-                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
-                                         np.zeros((state_below.shape[0],
-                                                   max(maxlen - state_below.shape[1] - 1, 0)),
-                                                  dtype='int64')))
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
 
-                if params['words_so_far']:
-                    state_below = np.expand_dims(state_below, axis=0)
-                    state_below = np.hstack((state_below,
-                                             np.zeros((state_below.shape[0], maxlen - state_below.shape[1],
-                                                       state_below.shape[2]))))
+            # we must include an additional dimension if the input for each timestep are all the generated words so far
+            if params['words_so_far']:
+                state_below = np.expand_dims(state_below, axis=0)
 
             if params['optimized_search'] and ii > 0:
                 # filter next search inputs w.r.t. remaining samples
@@ -1820,7 +1808,7 @@ class Model_Wrapper(object):
                 sampled = 0
                 start_time = time.time()
                 eta = -1
-                for j in range(num_iterations):
+                for _ in range(num_iterations):
                     data = data_gen.next()
                     X = dict()
                     if params['n_samples'] > 0:
@@ -2645,7 +2633,7 @@ class Model_Wrapper(object):
         if len(self.inputsMapping.keys()) == 1:  # single input
             X = X[self.inputsMapping[0]]
         else:
-            X_new = [0 for i in range(len(self.inputsMapping.keys()))]  # multiple inputs
+            X_new = [0 for _ in range(len(self.inputsMapping.keys()))]  # multiple inputs
             for in_model, in_ds in self.inputsMapping.iteritems():
                 X_new[in_model] = X[in_ds]
             X = X_new
