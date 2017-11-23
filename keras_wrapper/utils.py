@@ -262,7 +262,7 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
         ecoc_table[c[1], i, 1] = 1
 
         # Create each one_vs_one classifier of the intermediate stage
-        if functional_api == False:
+        if not functional_api:
             if ecoc_version == 1:
                 output_name = net.add_One_vs_One_Inception(input, input_shape, i, nOutput=2, activation=activations[0])
             elif ecoc_version == 2:
@@ -520,25 +520,27 @@ def prepareGoogleNet_Stage2(stage1, stage2):
     # Add new input
     stage2.model.add_input(name='input_data', input_shape=(832, 7, 7))
     stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs['input_data']
+    """
+    # Insert layers into stage
+     stage2.model = Graph()
+    # Input
+     stage2.model.add_input(name='input_data', input_shape=(832,7,7))
+     for l_name,l,p in zip(layers_to_delete, layers, params):
+        stage2.model.namespace.add(l_name)
+        stage2.model.nodes[l_name] = l
+        stage2.model.node_config.append(p)
+    #input = stage2.model.input # keep input
+    # Connect first layer with input
+     stage2.model.node_config[0]['input'] = 'input_data'
+     stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs['input_data']
+     stage2.model.input_config[0]['input_shape'] = [832,7,7]
 
-    ## Insert layers into stage
-    # stage2.model = Graph()
-    ## Input
-    # stage2.model.add_input(name='input_data', input_shape=(832,7,7))
-    # for l_name,l,p in zip(layers_to_delete, layers, params):
-    #    stage2.model.namespace.add(l_name)
-    #    stage2.model.nodes[l_name] = l
-    #    stage2.model.node_config.append(p)
-    ##input = stage2.model.input # keep input
-    ## Connect first layer with input
-    # stage2.model.node_config[0]['input'] = 'input_data'
-    # stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs['input_data']
-    # stage2.model.input_config[0]['input_shape'] = [832,7,7]
-    #    
-    ## Output
-    # stage2.model.add_output(name='loss3/loss3', input=layers_to_delete[-1])
-    ##stage2.model.add_output(name='loss3/loss3_', input=layers_to_delete[-1])
-    ##stage2.model.input = input # recover input
+    # Output
+     stage2.model.add_output(name='loss3/loss3', input=layers_to_delete[-1])
+    #stage2.model.add_output(name='loss3/loss3_', input=layers_to_delete[-1])
+    #stage2.model.input = input # recover input
+    """
+
 
 def simplifyDataset(ds, id_classes, n_classes=50):
     """
