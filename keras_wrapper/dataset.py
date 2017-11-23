@@ -110,6 +110,7 @@ class Data_Batch_Generator(object):
         self.first_idx = -1
         self.init_sample = init_sample
         self.final_sample = final_sample
+        self.next_idx = None
 
         # Several parameters
         self.params = {'batch_size': batch_size,
@@ -261,6 +262,12 @@ class Homogeneous_Data_Batch_Generator(object):
         self.batch_size = batch_size
         self.it = 0
 
+        self.X_batch = None
+        self.Y_batch = None
+        self.tidx = None
+        self.curr_idx = None
+        self.batch_idx = None
+        self.batch_tidx = None
         # Several parameters
         self.params = {'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
@@ -300,7 +307,7 @@ class Homogeneous_Data_Batch_Generator(object):
             self.it = 0
         # Recovers a batch of data
         X_batch, Y_batch = self.dataset.getXY(self.set_split,
-                                              batch_size, # This batch_size value is self.batch_size * joint_batches
+                                              batch_size,  # This batch_size value is self.batch_size * joint_batches
                                               normalization=self.params['normalization'],
                                               meanSubstraction=self.params['mean_substraction'],
                                               dataAugmentation=data_augmentation)
@@ -507,8 +514,10 @@ class Dataset(object):
         # Parameters used for outputs of type 'sparse'
         self.sparse_binary = dict()
         #################################################
-
-        # Reset counters to start loading data in batches
+        # Set and reset counters to start loading data in batches
+        self.last_train = 0
+        self.last_val = 0
+        self.last_test = 0
         self.resetCounters()
 
     def shuffleTraining(self):
@@ -559,11 +568,11 @@ class Dataset(object):
         ids = None
         exec ('ids = self.X_' + set_name + '.keys()')
         for id in ids:
-            exec ('self.X_' + set_name + '[id] = [self.X_' + set_name + '[id][k] for k in kept]')
+            exec ('self.X_' + set_name + '[' + id + '] = [self.X_' + set_name + '[id][k] for k in kept]')
         # Outputs
         exec ('ids = self.Y_' + set_name + '.keys()')
         for id in ids:
-            exec ('self.Y_' + set_name + '[id] = [self.Y_' + set_name + '[id][k] for k in kept]')
+            exec ('self.Y_' + set_name + '[' + id + '] = [self.Y_' + set_name + '[id][k] for k in kept]')
         new_len = len(samples[id_out])
         exec ('self.len_' + set_name + ' = new_len')
 
@@ -594,33 +603,34 @@ class Dataset(object):
         """
         self.silence = silence
 
-    def setListGeneral(self, path_list, split=[0.8, 0.1, 0.1], shuffle=True, type='raw-image', id='image'):
+    def setListGeneral(self, path_list, split=None, shuffle=True, type='raw-image', id='image'):
         """
-            Deprecated
+        Deprecated
         """
+        if split is None:
+            split = [0.8, 0.1, 0.1]
         logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
         self.setInput(path_list, split, type=type, id=id)
 
     def setList(self, path_list, set_name, type='raw-image', id='image'):
         """
-            DEPRECATED
+        DEPRECATED
         """
         logging.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
         self.setInput(path_list, set_name, type, id)
 
     def setRawInput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
         """
-            Loads a list which can contain all samples from either the 'train', 'val', or
-            'test' set splits (specified by set_name).
+        Loads a list which can contain all samples from either the 'train', 'val', or
+        'test' set splits (specified by set_name).
 
-            # General parameters
-
-            :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
-            :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
-            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
-            :param id: identifier of the input data loaded
-            :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
-            :param required: flag for optional inputs
+        # General parameters
+        :param overwrite_split:
+        :param path_list: Path to a text file containing the paths to the images or a python list of paths
+        :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
+        :param type: identifier of the type of input we are loading
+                     (see self.__accepted_types_inputs for accepted types)
+        :param id: identifier of the input data loaded
         """
         self.__checkSetName(set_name)
 
@@ -647,7 +657,7 @@ class Dataset(object):
     def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
                  overwrite_split=False, normalization_types=None, data_augmentation_types=None,
                  add_additional=False,
-                 img_size=[256, 256, 3], img_size_crop=[227, 227, 3], use_RGB=True,
+                 img_size=None, img_size_crop=None, use_RGB=True,
                  # 'raw-image' / 'video'   (height, width, depth)
                  max_text_len=35, tokenization='tokenize_none', offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
@@ -656,54 +666,74 @@ class Dataset(object):
                  max_video_len=26  # 'video'
                  ):
         """
-            Loads a list which can contain all samples from either the 'train', 'val', or
-            'test' set splits (specified by set_name).
+        Loads a list which can contain all samples from either the 'train', 'val', or
+        'test' set splits (specified by set_name).
 
-            # General parameters
+        # General parameters
 
-            :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
-            :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
-            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
-            :param id: identifier of the input data loaded
-            :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
-            :param required: flag for optional inputs
-            :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
-            :param normalization_types: type of normalization applied to the current input if we activate the data normalization while loading
-            :param data_augmentation_types: type of data augmentation applied to the current input if we activate the data augmentation while loading
-            :param add_additional: adds additional data to an already existent input ID
-
-
-            # 'raw-image'-related parameters
-
-            :param img_size: size of the input images (any input image will be resized to this)
-            :param img_size_crop: size of the cropped zone (when dataAugmentation=False the central crop will be used)
-
-
-            # 'text'-related parameters
-
-            :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
-            :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text'). A previously calculated vocabulary will be used if build_vocabulary is an 'id' from a previously loaded input/output
-            :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text').
-            :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
-            :param offset: number of timesteps that the text is shifted to the right (for sequential conditional models, which take as input the previous output)
-            :param fill: select whether padding before or after the sequence
-            :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
-            :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
-            :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
-            :param bpe_codes: Codes used for applying BPE encoding.
-            :param separator: BPE encoding separator.
-
-            # 'image-features' and 'video-features'- related parameters
-
-            :param feat_len: size of the feature vectors for each dimension. We must provide a list if the features are not vectors.
+        :param use_RGB:
+        :param path_list: can either be a path to a text file containing the
+                          paths to the images or a python list of paths
+        :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
+        :param type: identifier of the type of input we are loading
+                     (accepted types can be seen in self.__accepted_types_inputs)
+        :param id: identifier of the input data loaded
+        :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs).
+                           Int or array of ints.
+        :param required: flag for optional inputs
+        :param overwrite_split: indicates that we want to overwrite the data with
+                                id that was already declared in the dataset
+        :param normalization_types: type of normalization applied to the current input
+                                    if we activate the data normalization while loading
+        :param data_augmentation_types: type of data augmentation applied to the current
+                                        input if we activate the data augmentation while loading
+        :param add_additional: adds additional data to an already existent input ID
 
 
-            # 'video'-related parameters
+        # 'raw-image'-related parameters
 
-            :param max_video_len: maximum video length, the rest of the data will be padded with 0s (only applicable if the input data is of type 'video' or video-features').
+        :param img_size: size of the input images (any input image will be resized to this)
+        :param img_size_crop: size of the cropped zone (when dataAugmentation=False the central crop will be used)
+
+
+        # 'text'-related parameters
+
+        :param tokenization: type of tokenization applied (must be declared as a method of this class)
+                             (only applicable when type=='text').
+        :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not
+                                 (only applicable when type=='text'). A previously calculated vocabulary will be used
+                                 if build_vocabulary is an 'id' from a previously loaded input/output
+        :param max_text_len: maximum text length, the rest of the data will be padded with 0s
+                            (only applicable if the output data is of type 'text').
+        :param max_words: a maximum of 'max_words' words from the whole vocabulary will
+                          be chosen by number or occurrences
+        :param offset: number of timesteps that the text is shifted to the right
+                      (for sequential conditional models, which take as input the previous output)
+        :param fill: select whether padding before or after the sequence
+        :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
+        :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if
+                            True, max_len will be used as the fixed length otherwise
+        :param words_so_far: if True, each sample will be represented as the complete set of words until the point
+                            defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
+        :param bpe_codes: Codes used for applying BPE encoding.
+        :param separator: BPE encoding separator.
+
+        # 'image-features' and 'video-features'- related parameters
+
+        :param feat_len: size of the feature vectors for each dimension.
+                         We must provide a list if the features are not vectors.
+
+
+        # 'video'-related parameters
+        :param max_video_len: maximum video length, the rest of the data will be padded with 0s
+                              (only applicable if the input data is of type 'video' or video-features').
         """
         self.__checkSetName(set_name)
+        if img_size is None:
+            img_size = [256, 256, 3]
 
+        if img_size_crop is None:
+            img_size_crop = [227, 227, 3]
         # Insert type and id of input data
         keys_X_set = eval('self.X_' + set_name + '.keys()')
         if id not in self.ids_inputs:
@@ -720,7 +750,7 @@ class Dataset(object):
                 'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
                     self.__accepted_types_inputs))
 
-        # Proprocess the input data depending on its type
+        # Preprocess the input data depending on its type
         if type == 'raw-image':
             data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop, use_RGB)
         elif type == 'video':
@@ -739,7 +769,8 @@ class Dataset(object):
                 for da in data_augmentation_types:
                     if da not in self.__available_augm_vid_feat:
                         raise NotImplementedError(
-                            'The chosen data augmentation type ' + da + ' is not implemented for the type "video-features".')
+                            'The chosen data augmentation type ' + da +
+                            ' is not implemented for the type "video-features".')
             self.inputs_data_augmentation_types[id] = data_augmentation_types
             data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop,
                                                 feat_len)
@@ -792,17 +823,18 @@ class Dataset(object):
     def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False,
                      add_additional=False):
         """
-            Loads a list which can contain all samples from either the 'train', 'val', or
-            'test' set splits (specified by set_name).
+        Loads a list which can contain all samples from either the 'train', 'val', or
+        'test' set splits (specified by set_name).
 
-            # General parameters
-
-            :param path_list: can either be a path to a text file containing the paths to the images or a python list of paths
-            :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
-            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_inputs)
-            :param id: identifier of the input data loaded
-            :param repeat_set: repeats the inputs given (useful when we have more outputs than inputs). Int or array of ints.
-            :param required: flag for optional inputs
+        # General parameters
+        :param overwrite_split:
+        :param add_additional:
+        :param path_list: can either be a path to a text file containing the paths to
+                              the images or a python list of paths
+        :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
+        :param type: identifier of the type of input we are loading
+                         (accepted types can be seen in self.__accepted_types_inputs)
+        :param id: identifier of the input data loaded
         """
         self.__checkSetName(set_name)
 
@@ -838,41 +870,53 @@ class Dataset(object):
                   sparse=False,  # 'binary'
                   ):
         """
-            Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
+        Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
 
-            # General parameters
+        # General parameters
 
-            :param path_list: can either be a path to a text file containing the labels or a python list of labels.
-            :param set_name: identifier of the set split loaded ('train', 'val' or 'test').
-            :param type: identifier of the type of input we are loading (accepted types can be seen in self.__accepted_types_outputs).
-            :param id: identifier of the input data loaded.
-            :param repeat_set: repeats the outputs given (useful when we have more inputs than outputs). Int or array of ints.
-            :param overwrite_split: indicates that we want to overwrite the data with id that was already declared in the dataset
-            :param add_additional: adds additional data to an already existent output ID
-            :param sample_weights: switch on/off sample weights usage for the current output
+        :param path_list: can either be a path to a text file containing the labels or a python list of labels.
+        :param set_name: identifier of the set split loaded ('train', 'val' or 'test').
+        :param type: identifier of the type of input we are loading
+                     (accepted types can be seen in self.__accepted_types_outputs).
+        :param id: identifier of the input data loaded.
+        :param repeat_set: repeats the outputs given
+                           (useful when we have more inputs than outputs). Int or array of ints.
+        :param overwrite_split: indicates that we want to overwrite
+                                the data with id that was already declared in the dataset
+        :param add_additional: adds additional data to an already existent output ID
+        :param sample_weights: switch on/off sample weights usage for the current output
 
             # 'text'-related parameters
 
-            :param tokenization: type of tokenization applied (must be declared as a method of this class) (only applicable when type=='text').
-            :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not (only applicable when type=='text').
-            :param max_text_len: maximum text length, the rest of the data will be padded with 0s (only applicable if the output data is of type 'text') Set to 0 if the whole sentence will be used as an output class.
-            :param max_words: a maximum of 'max_words' words from the whole vocabulary will be chosen by number or occurrences
-            :param offset: number of timesteps that the text is shifted to the right (for sequential conditional models, which take as input the previous output)
-            :param fill: select whether padding before or after the sequence
-            :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
-            :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1 if True, max_len will be used as the fixed length otherwise
-            :param words_so_far: if True, each sample will be represented as the complete set of words until the point defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
-            :param bpe_codes: Codes used for applying BPE encoding.
-            :param separator: BPE encoding separator.
+        :param tokenization: type of tokenization applied (must be declared as a method of this class)
+                             (only applicable when type=='text').
+        :param build_vocabulary: whether a new vocabulary will be built from the loaded data or not
+                                (only applicable when type=='text').
+        :param max_text_len: maximum text length, the rest of the data will be padded with 0s
+                            (only applicable if the output data is of type 'text').
+                             Set to 0 if the whole sentence will be used as an output class.
+        :param max_words: a maximum of 'max_words' words from the whole vocabulary will
+                          be chosen by number or occurrences
+        :param offset: number of timesteps that the text is shifted to the right
+                       (for sequential conditional models, which take as input the previous output)
+        :param fill: select whether padding before or after the sequence
+        :param min_occ: minimum number of occurrences allowed for the words in the vocabulary. (default = 0)
+        :param pad_on_batch: the batch timesteps size will be set to the length of the largest sample +1
+                             if True, max_len will be used as the fixed length otherwise
+        :param words_so_far: if True, each sample will be represented as the complete set of words until the point
+                             defined by the timestep dimension (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
+        :param bpe_codes: Codes used for applying BPE encoding.
+        :param separator: BPE encoding separator.
 
             # '3DLabel' or '3DSemanticLabel'-related parameters
 
-            :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
-            :param num_poolings: number of pooling layers used in the model (used for calculating output dimensions)
+        :param associated_id_in: id of the input 'raw-image' associated to the inputted 3DLabels or 3DSemanticLabel
+        :param num_poolings: number of pooling layers used in the model (used for calculating output dimensions)
 
             # 'binary'-related parameters
 
-            :param sparse: indicates if the data is stored as a list of lists with class indices, e.g. [[4, 234],[87, 222, 4568],[3],...]
+        :param sparse: indicates if the data is stored as a list of lists with class indices,
+                       e.g. [[4, 234],[87, 222, 4568],[3],...]
 
         """
         self.__checkSetName(set_name)
@@ -906,10 +950,10 @@ class Dataset(object):
         elif type == 'real':
             data = self.preprocessReal(path_list)
         elif type == 'id':
-            data = self.preprocessIDs(path_list, id)
-        elif (type == '3DLabel'):
+            data = self.preprocessIDs(path_list, id, set_name)
+        elif type == '3DLabel':
             data = self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
-        elif (type == '3DSemanticLabel'):
+        elif type == '3DSemanticLabel':
             data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in, num_poolings)
 
         if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
@@ -986,6 +1030,8 @@ class Dataset(object):
         """
         Preprocesses categorical data.
 
+        :param id:
+        :param sample_weights:
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
 
         :return: Preprocessed labels.
@@ -1016,7 +1062,8 @@ class Dataset(object):
 
         return labels
 
-    def loadCategorical(self, y_raw, nClasses):
+    @staticmethod
+    def loadCategorical(y_raw, nClasses):
         y = np_utils.to_categorical(y_raw, nClasses).astype(np.uint8)
         return y
 
@@ -1028,8 +1075,10 @@ class Dataset(object):
         """
         Preprocesses binary classes.
 
+        :param id:
         :param labels_list: Binary label list given as an instance of the class list.
-        :param sparse: indicates if the data is stored as a list of lists with class indices, e.g. [[4, 234],[87, 222, 4568],[3],...]
+        :param sparse: indicates if the data is stored as a list of lists with class indices,
+                        e.g. [[4, 234],[87, 222, 4568],[3],...]
 
         :return: Preprocessed labels.
         """
@@ -1056,7 +1105,7 @@ class Dataset(object):
 
         try:
             sparse = self.sparse_binary[id]
-        except:  # allows retrocompatibility
+        except:  # allows backwards compatibility
             sparse = False
 
         if sparse:  # convert sparse into numpy array
@@ -1076,7 +1125,8 @@ class Dataset(object):
     #       TYPE 'real' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocessReal(self, labels_list):
+    @staticmethod
+    def preprocessReal(labels_list):
         """
         Preprocesses real classes.
 
@@ -1104,10 +1154,11 @@ class Dataset(object):
 
     def preprocessFeatures(self, path_list, id, set_name, feat_len):
         """
-        Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file storing a feature vector.
-        Alternatively "path_list" can be an instance of the class list.
+        Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file
+        storing a feature vector. Alternatively "path_list" can be an instance of the class list.
 
-        :param path_list: Path to a text file where each line must contain a path to a .npy file storing a feature vector. Alternatively, instance of the class list.
+        :param path_list: Path to a text file where each line must contain a path to a .npy file
+                          storing a feature vector. Alternatively, instance of the class list.
         :param id: Dataset id
         :param set_name: Used?
         :param feat_len: Length of features. If all features have the same length, given as a number. Otherwise, list.
@@ -1153,7 +1204,8 @@ class Dataset(object):
         """
         if normalization and normalization_type not in self.__available_norm_feat:
             raise NotImplementedError(
-                'The chosen normalization type ' + normalization_type + ' is not implemented for the type "image-features" and "video-features".')
+                'The chosen normalization type ' + normalization_type +
+                ' is not implemented for the type "image-features" and "video-features".')
 
         n_batch = len(X)
         features = np.zeros(tuple([n_batch] + feat_len))
@@ -1172,7 +1224,7 @@ class Dataset(object):
 
             if normalization:
                 if normalization_type == 'L2':
-                    feat = feat / np.linalg.norm(feat, ord=2)
+                    feat /= np.linalg.norm(feat, ord=2)
 
             features[i] = feat
 
@@ -1198,7 +1250,8 @@ class Dataset(object):
         :param offset: Text shifting.
         :param fill: Whether we path with zeros at the beginning or at the end of the sentences.
         :param min_occ: Minimum occurrences of each word to be included in the dictionary.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the
+                             minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Should be ignored.
         :param bpe_codes: Codes used for applying BPE encoding.
         :param separator: BPE encoding separator.
@@ -1214,33 +1267,33 @@ class Dataset(object):
             sentences = annotations_list
         else:
             raise Exception(
-                'Wrong type for "annotations_list". It must be a path to a text file with the sentences or a list of sentences. '
+                'Wrong type for "annotations_list". '
+                'It must be a path to a text file with the sentences or a list of sentences. '
                 'It currently is: %s' % (str(annotations_list)))
 
         # Tokenize sentences
         if max_text_len != 0:  # will only tokenize if we are not using the whole sentence as a class
-
             # Check if tokenization method exists
-	    if hasattr(self, tokenization):
-	        if 'bpe' in tokenization.lower():
-	    	    assert bpe_codes is not None, 'bpe_codes must be specified when applying a BPE tokenization.'
-		    self.build_bpe(bpe_codes, separator)
-		tokfun = eval('self.' + tokenization)
-		if not self.silence:
-		    logging.info('\tApplying tokenization function: "' + tokenization + '".')
-	    else:
-	        raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
+            if hasattr(self, tokenization):
+                if 'bpe' in tokenization.lower():
+                    assert bpe_codes is not None, 'bpe_codes must be specified when applying a BPE tokenization.'
+                    self.build_bpe(bpe_codes, separator)
+                tokfun = eval('self.' + tokenization)
+                if not self.silence:
+                    logging.info('\tApplying tokenization function: "' + tokenization + '".')
+            else:
+                raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
             for i in range(len(sentences)):
                 sentences[i] = tokfun(sentences[i])
         else:
             tokfun = None
 
-
         # Build vocabulary
         error_vocab = False
-        if build_vocabulary == True:
-            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words, use_extra_words=(max_text_len != 0))
+        if build_vocabulary:
+            self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words,
+                                  use_extra_words=(max_text_len != 0))
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
@@ -1256,7 +1309,7 @@ class Dataset(object):
             if not self.silence:
                 logging.info('\tReusing vocabulary from dictionary for data with id "' + id + '".')
 
-        if not id in self.vocabulary:
+        if id not in self.vocabulary:
             raise Exception('The dataset must include a vocabulary with'
                             ' id "' + id + '" in order to process the type "text" data. '
                                            'Set "build_vocabulary" to True if you want '
@@ -1276,6 +1329,7 @@ class Dataset(object):
         """
         Vocabulary builder for data of type 'text'
 
+        :param use_extra_words:
         :param captions: Corpus sentences
         :param id: Dataset id of the text
         :param tokfun: Tokenization function. (used?)
@@ -1384,12 +1438,12 @@ class Dataset(object):
                 logging.info('\tThe new total is ' + str(self.vocabulary_len[id]) + '.')
 
     def merge_vocabularies(self, ids):
-        '''
+        """
         Merges the vocabularies from a set of text inputs/outputs into a single one.
 
         :param ids: identifiers of the inputs/outputs whose vocabularies will be merged
         :return: None
-        '''
+        """
         assert isinstance(ids, list), 'ids must be a list of inputs/outputs identifiers of type text'
         if not self.silence:
             logging.info('Merging vocabularies of the following ids: ' + str(ids))
@@ -1439,8 +1493,9 @@ class Dataset(object):
         self.BPE_separator = separator
         self.BPE_built = True
 
-    def load3DLabels(self, bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
-        '''
+    @staticmethod
+    def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
+        """
         Loads a set of outputs of the type 3DLabel (used for detection)
 
         :param bbox_list: list of bboxes, labels and original sizes
@@ -1451,7 +1506,7 @@ class Dataset(object):
         :param size_crop: crop size applied to input images
         :param image_list: list of input images used as identifiers to 'daRandomParams'
         :return: 3DLabels with shape (batch_size, width*height, classes)
-        '''
+        """
 
         n_samples = len(bbox_list)
         h, w, d = img_size
@@ -1476,12 +1531,13 @@ class Dataset(object):
                 bndbox_ones = np.ones((bndbox[2] - bndbox[0] + 1, bndbox[3] - bndbox[1] + 1))
                 label3D[idxclass, bndbox[0] - 1:bndbox[2], bndbox[1] - 1:bndbox[3]] = bndbox_ones
 
-            if not dataAugmentation or daRandomParams == None:
+            if not dataAugmentation or daRandomParams is None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
                     label2D = misc.imresize(label3D[j], (h_crop, w_crop))
                     maxval = np.max(label2D)
-                    if maxval > 0: label2D /= maxval
+                    if maxval > 0:
+                        label2D /= maxval
                     labels[i, j] = label2D
             else:
                 label3D_rs = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
@@ -1489,7 +1545,8 @@ class Dataset(object):
                 for j in range(nClasses):
                     label2D = misc.imresize(label3D[j], (h, w))
                     maxval = np.max(label2D)
-                    if maxval > 0: label2D /= maxval
+                    if maxval > 0:
+                        label2D /= maxval
                     randomParams = daRandomParams[image_list[i]]
                     # Take random crop
                     left = randomParams["left"]
@@ -1519,7 +1576,7 @@ class Dataset(object):
 
     def load3DSemanticLabels(self, labeled_images_list, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
                              img_size, size_crop, image_list):
-        '''
+        """
         Loads a set of outputs of the type 3DSemanticLabel (used for semantic segmentation TRAINING)
 
         :param labeled_images_list: list of labeled images
@@ -1531,7 +1588,7 @@ class Dataset(object):
         :param size_crop: crop size applied to input images
         :param image_list: list of input images used as identifiers to 'daRandomParams'
         :return: 3DSemanticLabels with shape (batch_size, width*height, classes)
-        '''
+        """
 
         n_samples = len(labeled_images_list)
         h, w, d = img_size
@@ -1541,7 +1598,7 @@ class Dataset(object):
         for i in range(n_samples):
             line = labeled_images_list[i].rstrip('\n')
 
-            ### Load labeled GT image
+            # Load labeled GT image
             labeled_im = self.path + '/' + line
             # Check if the filename includes the extension
             [path, filename] = ntpath.split(labeled_im)
@@ -1577,12 +1634,13 @@ class Dataset(object):
                         x, y = indices[0][idx_pos], indices[1][idx_pos]
                         label3D[class_id, x, y] = 1.
 
-            if not dataAugmentation or daRandomParams == None:
+            if not dataAugmentation or daRandomParams is None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
                     label2D = misc.imresize(label3D[j], (h_crop, w_crop))
                     maxval = np.max(label2D)
-                    if maxval > 0: label2D /= maxval
+                    if maxval > 0:
+                        label2D /= maxval
                     labels[i, j] = label2D
             else:
                 label3D_rs = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
@@ -1590,7 +1648,8 @@ class Dataset(object):
                 for j in range(nClasses):
                     label2D = misc.imresize(label3D[j], (h, w))
                     maxval = np.max(label2D)
-                    if maxval > 0: label2D /= maxval
+                    if maxval > 0:
+                        label2D /= maxval
                     randomParams = daRandomParams[image_list[i]]
                     # Take random crop
                     left = randomParams["left"]
@@ -1626,8 +1685,11 @@ class Dataset(object):
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end, 'center': the vector will be surrounded by 0s, both at beginning and end
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning.
+                     'end': it will be filled with 0s at the end.
+                     'center': the vector will be surrounded by 0s, both at beginning and end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
+                             sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
         :return: Text as sequence of number. Mask for each sentence.
@@ -1671,12 +1733,12 @@ class Dataset(object):
                     offset_j = max_len_batch - len_j - 1
                 elif fill == 'center':
                     offset_j = (max_len_batch - len_j) / 2
-                    len_j = len_j + offset_j
+                    len_j += offset_j
                 else:
                     offset_j = 0
                     len_j = min(len_j, max_len_batch)
                 if offset_j < 0:
-                    len_j = len_j + offset_j
+                    len_j += offset_j
                     offset_j = 0
 
                 if words_so_far:
@@ -1713,12 +1775,17 @@ class Dataset(object):
         """
         Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
 
+        :param vocabulary_len:
+        :param sample_weights:
         :param X: Text to encode.
         :param vocabularies: Mapping word -> index
         :param max_len: Maximum length of the text.
         :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning, 'end': it will be filled with 0s at the end, 'center': the vector will be surrounded by 0s, both at beginning and end
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or sentences with a fixed (max_text_length) length.
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning.
+                     'end': it will be filled with 0s at the end.
+                     'center': the vector will be surrounded by 0s, both at beginning and end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of
+                             the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
         :return: Text as sequence of number. Mask for each sentence.
@@ -2007,7 +2074,7 @@ class Dataset(object):
         def processPunctuation(inText):
             outText = inText
             for p in punct:
-                if (p + ' ' in inText or ' ' + p in inText) or (re.search(commaStrip, inText) != None):
+                if (p + ' ' in inText or ' ' + p in inText) or (re.search(commaStrip, inText) is not None):
                     outText = outText.replace(p, '')
                 else:
                     outText = outText.replace(p, ' ')
@@ -2045,7 +2112,7 @@ class Dataset(object):
         :return: Encoded version of caption.
         """
         if not self.BPE_built:
-            raise Exception, 'Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"'
+            raise Exception('Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"')
         tokenized = re.sub('[\n\t]+', '', caption.strip())
         tokenized = self.BPE.segment(tokenized).strip()
         return tokenized
@@ -2085,7 +2152,7 @@ class Dataset(object):
             " ->  &quot;
             [ ->  &#91;
             ] ->  &#93;
-            :param caption: String to de-tokenize.
+        :param caption: String to de-tokenize.
             :return: Detokenized version of caption.
         """
 
@@ -2165,9 +2232,10 @@ class Dataset(object):
             elif isinstance(path_list[1], list):
                 counts_frames = path_list[1]
             else:
-                raise Exception('Wrong type for "counts_frames".'
-                                ' It must be a path to a file containing a list of counts or directly a list of counts.\n'
-                                'It currently is: %s' % str(path_list[1]))
+                raise Exception(
+                    'Wrong type for "counts_frames".'
+                    ' It must be a path to a file containing a list of counts or directly a list of counts.\n'
+                    'It currently is: %s' % str(path_list[1]))
 
             # video indices
             video_indices = range(len(counts_frames))
@@ -2285,7 +2353,7 @@ class Dataset(object):
 
                 if normalization:
                     if normalization_type == 'L2':
-                        feat = feat / np.linalg.norm(feat, ord=2)
+                        feat /= np.linalg.norm(feat, ord=2)
 
                 features[i, j] = feat
 
@@ -2361,7 +2429,8 @@ class Dataset(object):
     #       TYPE 'id' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocessIDs(self, path_list, id, set_name):
+    @staticmethod
+    def preprocessIDs(path_list, id, set_name):
 
         logging.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
         if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of IDs
@@ -2392,7 +2461,8 @@ class Dataset(object):
     def setSemanticClasses(self, path_classes, id):
         """
         Loads the list of semantic classes of the dataset together with their corresponding colours in the GT image.
-        Each line must contain a unique identifier of the class and its associated RGB colour representation separated by commas.
+        Each line must contain a unique identifier of the class and its associated RGB colour representation
+         separated by commas.
 
         :param path_classes: Path to a text file with the classes and their colours.
         :param id: input/output id
@@ -2423,13 +2493,13 @@ class Dataset(object):
             logging.info('Loaded semantic classes list for data with id: ' + id)
 
     def load_GT_3DSemanticLabels(self, gt, id):
-        '''
+        """
         Loads a GT list of 3DSemanticLabels in a 2D matrix and reshapes them to an Nx1 array (EVALUATION)
 
         :param gt: list of Dataset output of type 3DSemanticLabels
         :param id: id of the input/output we are processing
         :return: out_list: containing a list of label images reshaped as an Nx1 array
-        '''
+        """
         out_list = []
 
         assoc_id_in = self.id_in_3DLabel[id]
@@ -2453,7 +2523,7 @@ class Dataset(object):
             # labels = np.zeros((h_crop, w_crop), dtype=np.uint8)
             line = gt[i]
 
-            ### Load labeled GT image
+            # Load labeled GT image
             labeled_im = self.path + '/' + line
             # Check if the filename includes the extension
             [path, filename] = ntpath.split(labeled_im)
@@ -2493,7 +2563,8 @@ class Dataset(object):
             for j in range(nClasses):
                 label2D = misc.imresize(label3D[j], (h_crop, w_crop))
                 maxval = np.max(label2D)
-                if maxval > 0: label2D /= maxval
+                if maxval > 0:
+                    label2D /= maxval
                 pre_labels[j] = label2D
 
             # Convert to single matrix with class IDs
@@ -2533,7 +2604,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocess3DLabel(self, path_list, id, associated_id_in, num_poolings):
-        if (isinstance(path_list, str) and os.path.isfile(path_list)):
+        if isinstance(path_list, str) and os.path.isfile(path_list):
             path_list_3DLabel = []
             with open(path_list, 'r') as list_:
                 for line in list_:
@@ -2553,7 +2624,10 @@ class Dataset(object):
         """
         Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.
 
-        :param predictions: 3DLabels predicted by Model_Wrapper. If type is list it will be assumed that position 0 corresponds to 3DLabels
+        :param idx_3DLabel:
+        :param size_restriction:
+        :param predictions: 3DLabels predicted by Model_Wrapper.
+                            If type is list it will be assumed that position 0 corresponds to 3DLabels
         :param original_sizes: original sizes of the predicted images width and height
         :param threshold: minimum overlapping threshold for considering a prediction valid
         :return: predicted_bboxes, predicted_Y, predicted_scores for each image
@@ -2592,10 +2666,10 @@ class Dataset(object):
                 labeled, nr_objects = ndimage.label(binary_heat)  # get connected components
                 [objects, counts] = np.unique(labeled, return_counts=True)  # count occurrences
                 # biggest_components = np.argsort(counts[1:])[::-1]
-                # selected_components = [1 if counts[i+1] >= min_size else 0 for i in biggest_components] # check minimum size restriction
+                # selected_components = [1 if counts[i+1] >= min_size else 0
+                # for i in biggest_components] # check minimum size restriction
                 # selected_components = [1 for i in range(len(objects))]
                 # biggest_components = biggest_components[:min([np.sum(selected_components), 9999])] # get all bboxes
-
 
                 for obj in objects[1:]:
                     current_obj = np.where(labeled == obj, 255, 0)  # get the biggest
@@ -2631,13 +2705,15 @@ class Dataset(object):
 
         return out_list
 
-    def convert_GT_3DLabels_to_bboxes(self, gt):
-        '''
+    @staticmethod
+    def convert_GT_3DLabels_to_bboxes(gt):
+        """
         Converts a GT list of 3DLabels to a set of bboxes.
 
         :param gt: list of Dataset output of type 3DLabels
-        :return: [out_list, original_sizes], where out_list contains a list of samples with the following info [GT_bboxes, GT_Y], and original_sizes contains the original width and height for each image
-        '''
+        :return: [out_list, original_sizes], where out_list contains a list of samples with the following info
+                 [GT_bboxes, GT_Y], and original_sizes contains the original width and height for each image
+        """
         out_list = []
         original_sizes = []
         # extra_vars[split]['references'] - list of samples with the following info [GT_bboxes, GT_Y]
@@ -2705,7 +2781,9 @@ class Dataset(object):
             - list with a value per channel
             - string with the path to the stored image.
             
-            :param id: identifier of the type of input whose train mean is being introduced.
+        :param mean_image:
+        :param normalization:
+        :param id: identifier of the type of input whose train mean is being introduced.
         """
         if isinstance(mean_image, str):
             if not self.silence:
@@ -2716,7 +2794,7 @@ class Dataset(object):
         self.train_mean[id] = mean_image.astype(np.float32)
 
         if normalization:
-            self.train_mean[id] = self.train_mean[id] / 255.0
+            self.train_mean[id] /= 255.0
 
         if self.train_mean[id].shape != tuple(self.img_size_crop[id]):
             if len(self.train_mean[id].shape) == 1 and self.train_mean[id].shape[0] == self.img_size_crop[id][2]:
@@ -2728,14 +2806,16 @@ class Dataset(object):
                 self.train_mean[id] = mean_image
             else:
                 logging.warning(
-                    "The loaded training mean size does not match the desired images size.\nChange the images size with setImageSize(size) or recalculate the training mean with calculateTrainMean().")
+                    "The loaded training mean size does not match the desired images size.\n"
+                    "Change the images size with setImageSize(size) or "
+                    "recalculate the training mean with calculateTrainMean().")
 
     def calculateTrainMean(self, id):
         """
             Calculates the mean of the data belonging to the training set split in each channel.
         """
         calculate = False
-        if not id in self.train_mean or not isinstance(self.train_mean[id], np.ndarray):
+        if id not in self.train_mean or not isinstance(self.train_mean[id], np.ndarray):
             calculate = True
         elif self.train_mean[id].shape != tuple(self.img_size[id]):
             calculate = True
@@ -2793,22 +2873,25 @@ class Dataset(object):
                    dataAugmentation=True, daRandomParams=None,
                    external=False, loaded=False):
         """
-            Loads a set of images from disk.
+        Loads a set of images from disk.
             
-            :param images : list of image string names or list of matrices representing images (only if loaded==True)
-            :param id : identifier in the Dataset object of the data we are loading
-            :param normalization_type: type of normalization applied
-            :param normalization : whether we applying a 0-1 normalization to the images
-            :param meanSubstraction : whether we are removing the training mean
-            :param dataAugmentation : whether we are applying dataAugmentatino (random cropping and horizontal flip)
-            :param daRandomParams : dictionary with results of random data augmentation provided by self.getDataAugmentationRandomParams()
-            :param external : if True the images will be loaded from an external database, in this case the list of images must be absolute paths
-            :param loaded : set this option to True if images is a list of matricies instead of a list of strings
+        :param images : list of image string names or list of matrices representing images (only if loaded==True)
+        :param id : identifier in the Dataset object of the data we are loading
+        :param normalization_type: type of normalization applied
+        :param normalization : whether we applying a 0-1 normalization to the images
+        :param meanSubstraction : whether we are removing the training mean
+        :param dataAugmentation : whether we are applying dataAugmentatino (random cropping and horizontal flip)
+        :param daRandomParams : dictionary with results of random data augmentation provided by
+                                self.getDataAugmentationRandomParams()
+        :param external : if True the images will be loaded from an external database, in this case the list of
+                          images must be absolute paths
+        :param loaded : set this option to True if images is a list of matricies instead of a list of strings
         """
         # Check if the chosen normalization type exists
         if normalization and normalization_type not in self.__available_norm_im_vid:
             raise NotImplementedError(
-                'The chosen normalization type ' + normalization_type + ' is not implemented for the type "raw-image" and "video".')
+                'The chosen normalization type ' + normalization_type +
+                ' is not implemented for the type "raw-image" and "video".')
 
         # Prepare the training mean image
         if meanSubstraction:  # remove mean
@@ -2828,7 +2911,7 @@ class Dataset(object):
             # Also normalize training mean image if we are applying normalization to images
             if normalization:
                 if normalization_type == '0-1':
-                    train_mean = train_mean / 255.0
+                    train_mean /= 255.0
 
         nImages = len(images)
 
@@ -2921,7 +3004,7 @@ class Dataset(object):
             # Normalize
             if normalization:
                 if normalization_type == '0-1':
-                    im = im / 255.0
+                    im /= 255.0
 
             # Permute dimensions
             if len(self.img_size[id]) == 3:
@@ -2986,30 +3069,25 @@ class Dataset(object):
     def getX(self, set_name, init, final, normalization_type='0-1', normalization=False,
              meanSubstraction=True, dataAugmentation=True, debug=False):
         """
-            Gets all the data samples stored between the positions init to final
+        Gets all the data samples stored between the positions init to final
             
-            :param set_name: 'train', 'val' or 'test' set
-            :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than final.
-            :param final: final position in the corresponding set split.
-            :param debug: if True all data will be returned without preprocessing
-            
-            
-            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
-            
-            :param normalization: indicates if we want to normalize the data.
-            
-            
-            # 'image-features' and 'video-features'-related parameters
-            
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
-            
-            
-            # 'raw-image' and 'video'-related parameters
-            
-            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
-            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
-
-            :return: X, list of input data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
+        :param set_name: 'train', 'val' or 'test' set
+        :param init: initial position in the corresponding set split.
+                     Must be bigger or equal than 0 and smaller than final.
+        :param final: final position in the corresponding set split.
+        :param debug: if True all data will be returned without preprocessing
+        # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
+        :param normalization: indicates if we want to normalize the data.
+        # 'image-features' and 'video-features'-related parameters
+        :param normalization_type: indicates the type of normalization applied.
+                                   See available types in self.__available_norm_im_vid for 'raw-image' and 'video'
+                                   and self.__available_norm_feat for 'image-features' and 'video-features'.
+        # 'raw-image' and 'video'-related parameters
+        :param meanSubstraction: indicates if we want to substract the training mean from the returned images
+                                 (only applicable if normalization=True)
+        :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images
+                                (random flip and cropping)
+        :return: X, list of input data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
@@ -3063,31 +3141,24 @@ class Dataset(object):
     def getXY(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
               dataAugmentation=True, debug=False):
         """
-            Gets the [X,Y] pairs for the next 'k' samples in the desired set.
-            
-            :param set_name: 'train', 'val' or 'test' set
-            :param k: number of consecutive samples retrieved from the corresponding set.
-            :param sorted_batches: If True, it will pick data of the same size
-            :param debug: if True all data will be returned without preprocessing
-            
-            
-            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
-            
-            :param normalization: indicates if we want to normalize the data.
-            
-            
-            # 'image-features' and 'video-features'-related parameters
-            
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
-            
-            
-            # 'raw-image' and 'video'-related parameters
-            
-            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
-            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
-
-            :return: [X,Y], list of input and output data variables of the next 'k' consecutive samples belonging to the chosen 'set_name'
-            :return: [X, Y, [new_last, last, surpassed]] if debug==True
+        Gets the [X,Y] pairs for the next 'k' samples in the desired set.
+        :param set_name: 'train', 'val' or 'test' set
+        :param k: number of consecutive samples retrieved from the corresponding set.
+        :param debug: if True all data will be returned without preprocessing
+        # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
+        :param normalization: indicates if we want to normalize the data.
+        # 'image-features' and 'video-features'-related parameters
+        :param normalization_type: indicates the type of normalization applied. See available types in
+                                   self.__available_norm_im_vid for 'image' and 'video' and self.__available_norm_feat
+                                   for 'image-features' and 'video-features'.
+        # 'raw-image' and 'video'-related parameters
+        :param meanSubstraction: indicates if we want to substract the training mean from the returned images
+                                 (only applicable if normalization=True)
+        :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images
+                                (random flip and cropping)
+        :return: [X,Y], list of input and output data variables of the next 'k' consecutive samples belonging to
+                 the chosen 'set_name'
+        :return: [X, Y, [new_last, last, surpassed]] if debug==True
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
@@ -3157,7 +3228,7 @@ class Dataset(object):
                     y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
-                elif (type_out == '3DLabel'):
+                elif type_out == '3DLabel':
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     if surpassed:
@@ -3169,7 +3240,7 @@ class Dataset(object):
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
-                elif (type_out == '3DSemanticLabel'):
+                elif type_out == '3DSemanticLabel':
                     nClasses = len(self.classes[id_out])
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
@@ -3209,30 +3280,23 @@ class Dataset(object):
     def getXY_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
                           dataAugmentation=True, debug=False):
         """
-            Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
-
-            :param set_name: 'train', 'val' or 'test' set
-            :param k: positions of the desired samples
-            :param sorted_batches: If True, it will pick data of the same size
-            :param debug: if True all data will be returned without preprocessing
-
-
-            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
-
-            :param normalization: indicates if we want to normalize the data.
-
-
-            # 'image-features' and 'video-features'-related parameters
-
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
-
-
-            # 'raw-image' and 'video'-related parameters
-
-            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
-            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
-
-            :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k' samples belonging to the chosen 'set_name'
+        Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
+        :param set_name: 'train', 'val' or 'test' set
+        :param k: positions of the desired samples
+        :param debug: if True all data will be returned without preprocessing
+        # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
+        :param normalization: indicates if we want to normalize the data.
+        # 'image-features' and 'video-features'-related parameters
+        :param normalization_type: indicates the type of normalization applied. See available types in
+                                    self.__available_norm_im_vid for 'raw-image' and 'video' and
+                                    self.__available_norm_feat for 'image-features' and 'video-features'.
+        # 'raw-image' and 'video'-related parameters
+        :param meanSubstraction: indicates if we want to substract the training mean from the returned images
+                                 (only applicable if normalization=True)
+        :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images
+                                 (random flip and cropping)
+        :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k'
+                 samples belonging to the chosen 'set_name'
         """
 
         self.__checkSetName(set_name)
@@ -3297,14 +3361,14 @@ class Dataset(object):
                     y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
-                elif (type_out == '3DLabel'):
+                elif type_out == '3DLabel':
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
-                elif (type_out == '3DSemanticLabel'):
+                elif type_out == '3DSemanticLabel':
                     nClasses = len(self.classes[id_out])
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
@@ -3337,30 +3401,23 @@ class Dataset(object):
     def getX_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
                          dataAugmentation=True, debug=False):
         """
-            Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
-
-            :param set_name: 'train', 'val' or 'test' set
-            :param k: positions of the desired samples
-            :param sorted_batches: If True, it will pick data of the same size
-            :param debug: if True all data will be returned without preprocessing
-
-
-            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
-
-            :param normalization: indicates if we want to normalize the data.
-
-
-            # 'image-features' and 'video-features'-related parameters
-
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
-
-
-            # 'raw-image' and 'video'-related parameters
-
-            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
-            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
-
-            :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k' samples belonging to the chosen 'set_name'
+        Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
+        :param set_name: 'train', 'val' or 'test' set
+        :param k: positions of the desired samples
+        :param debug: if True all data will be returned without preprocessing
+        # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
+        :param normalization: indicates if we want to normalize the data.
+        # 'image-features' and 'video-features'-related parameters
+        :param normalization_type: indicates the type of normalization applied. See available types in
+                                   self.__available_norm_im_vid for 'raw-image' and 'video' and
+                                   self.__available_norm_feat for 'image-features' and 'video-features'.
+        # 'raw-image' and 'video'-related parameters
+        :param meanSubstraction: indicates if we want to substract the training mean from the returned images
+                                (only applicable if normalization=True)
+        :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images
+                                (random flip and cropping)
+        :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k'
+                 samples belonging to the chosen 'set_name'
         """
 
         self.__checkSetName(set_name)
@@ -3412,28 +3469,23 @@ class Dataset(object):
     def getY(self, set_name, init, final, normalization_type='0-1', normalization=False, meanSubstraction=True,
              dataAugmentation=True, debug=False):
         """
-            Gets the [Y] samples for the FULL dataset
-
-            :param set_name: 'train', 'val' or 'test' set
-            :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than final.
-            :param final: final position in the corresponding set split.
-            :param debug: if True all data will be returned without preprocessing
-
-
-            # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
-
-            :param normalization: indicates if we want to normalize the data.
-
-
-            :param normalization_type: indicates the type of normalization applied. See available types in self.__available_norm_im_vid for 'raw-image' and 'video' and self.__available_norm_feat for 'image-features' and 'video-features'.
-
-
-            # 'raw-image' and 'video'-related parameters
-
-            :param meanSubstraction: indicates if we want to substract the training mean from the returned images (only applicable if normalization=True)
-            :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images (random flip and cropping)
-
-            :return: Y, list of output data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
+        Gets the [Y] samples for the FULL dataset
+        :param set_name: 'train', 'val' or 'test' set
+        :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than
+                     final.
+        :param final: final position in the corresponding set split.
+        :param debug: if True all data will be returned without preprocessing
+        # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
+        :param normalization: indicates if we want to normalize the data.
+        :param normalization_type: indicates the type of normalization applied. See available types in
+                                   self.__available_norm_im_vid for 'raw-image' and 'video' and
+                                   self.__available_norm_feat for 'image-features' and 'video-features'.
+        # 'raw-image' and 'video'-related parameters
+        :param meanSubstraction: indicates if we want to substract the training mean from the returned images
+                                 (only applicable if normalization=True)
+        :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images
+                                 (random flip and cropping)
+        :return: Y, list of output data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 1)
@@ -3459,14 +3511,14 @@ class Dataset(object):
                     y = self.loadBinary(y, id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
-                elif (type_out == '3DLabel'):
+                elif type_out == '3DLabel':
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
                     y = self.load3DLabels(y, nClasses, dataAugmentation, None,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
-                elif (type_out == '3DSemanticLabel'):
+                elif type_out == '3DSemanticLabel':
                     nClasses = len(self.classes[id_out])
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
@@ -3501,7 +3553,6 @@ class Dataset(object):
     #       AUXILIARY FUNCTIONS
     #           
     # ------------------------------------------------------- #
-
 
     def __str__(self):
         """
@@ -3546,7 +3597,8 @@ class Dataset(object):
                 raise Exception('Set ' + set_name + ' labels are not loaded yet.')
         return
 
-    def __checkSetName(self, set_name):
+    @staticmethod
+    def __checkSetName(set_name):
         """
         Checks name of a split.
         Only "train", "val" or "test" are valid set names.
@@ -3577,8 +3629,7 @@ class Dataset(object):
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
                                                                             '\t Inputs:' + str(plot_ids_in) + ''
-                                                                                                              '\t Outputs:' + str(
-                    self.ids_outputs))
+                                                                            '\t Outputs:' + str(self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
         """
@@ -3602,7 +3653,7 @@ class Dataset(object):
 
     def __getstate__(self):
         """
-            Behavour applied when pickling a Dataset instance.
+            Behaviour applied when pickling a Dataset instance.
         """
         obj_dict = self.__dict__.copy()
         del obj_dict['_Dataset__lock_read']
@@ -3610,7 +3661,7 @@ class Dataset(object):
 
     def __setstate__(self, dict):
         """
-            Behavour applied when unpickling a Dataset instance.
+            Behaviour applied when unpickling a Dataset instance.
         """
         dict['_Dataset__lock_read'] = threading.Lock()
         self.__dict__ = dict

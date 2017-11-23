@@ -105,7 +105,8 @@ class EvalPerformance(KerasCallback):
         :param max_eval_samples: maximum number of samples evaluated
         :param extra_vars: dictionary of extra variables. See evaluation metrics in keras_wrapper/extra/evaluation.py
                            for assigning the needed extra variables.
-        :param output_types: list with type identifiers of the different outputs to evaluate (len must coincide with gt_post)
+        :param output_types: list with type identifiers of the different outputs to evaluate
+                             (len must coincide with gt_post)
         :param normalize: switch on/off data normalization
         :param min_pred_multilabel: minimum prediction value considered for positive prediction
         :param index2word_y: mapping from the indices to words (only needed if is_text==True)
@@ -213,7 +214,6 @@ class EvalPerformance(KerasCallback):
             else:
                 self.output_types = [self.output_types]
 
-
         super(EvalPerformance, self).__init__()
 
     def on_epoch_end(self, epoch, logs={}):
@@ -291,18 +291,20 @@ class EvalPerformance(KerasCallback):
             else:
                 gt_positions = self.gt_pos
 
-
             # Select each output to evaluate separately
             for gt_pos, type, these_metrics, gt_id, write_type, index2word_y, index2word_x in zip(gt_positions,
-                                                    self.output_types,
-                                                    self.metric_name, self.gt_id, self.write_type,
-                                                    self.index2word_y, self.index2word_x):
+                                                                                                  self.output_types,
+                                                                                                  self.metric_name,
+                                                                                                  self.gt_id,
+                                                                                                  self.write_type,
+                                                                                                  self.index2word_y,
+                                                                                                  self.index2word_x):
 
                 predictions = predictions_all[gt_pos]
 
                 if self.verbose > 0:
                     print('')
-                    logging.info('Prediction output ' + str(gt_pos) + ': ' + gt_id + ' ('+type+')')
+                    logging.info('Prediction output ' + str(gt_pos) + ': ' + gt_id + ' (' + type + ')')
 
                 # Preprocess outputs of type text
                 if type == 'text':
@@ -358,17 +360,18 @@ class EvalPerformance(KerasCallback):
                                                     verbose=self.verbose)
 
                     # Prepare references
-                    exec("y_raw = self.ds.Y_" + s + "[gt_id]")
+                    exec ("y_raw = self.ds.Y_" + s + "[gt_id]")
                     self.extra_vars[gt_pos][s]['references'] = self.ds.loadBinary(y_raw, gt_id)
 
                 # Other output data types
                 else:
-                    exec("self.extra_vars[gt_pos][s]['references'] = self.ds.Y_" + s + "[gt_id]")
+                    exec ("self.extra_vars[gt_pos][s]['references'] = self.ds.Y_" + s + "[gt_id]")
 
                 # Store predictions
                 if self.write_samples:
                     # Store result
-                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '_output_' + str(gt_pos) + '.pred'  # results file
+                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '_output_' + str(
+                        gt_pos) + '.pred'  # results file
                     if write_type == 'list':
                         list2file(filepath, predictions)
                     elif write_type == 'vqa':
@@ -379,7 +382,8 @@ class EvalPerformance(KerasCallback):
                         extra_data_plot = {'reference': refs,
                                            'probs': probs,
                                            'vocab': index2word_y}
-                        list2vqa(filepath, predictions, self.extra_vars[gt_pos][s]['question_ids'], extra=extra_data_plot)
+                        list2vqa(filepath, predictions, self.extra_vars[gt_pos][s]['question_ids'],
+                                 extra=extra_data_plot)
                     elif write_type == 'listoflists':
                         listoflists2file(filepath, predictions)
                     elif write_type == 'numpy':
@@ -388,7 +392,8 @@ class EvalPerformance(KerasCallback):
                         raise NotImplementedError('Write 3DLabels function is not implemented')
                     elif write_type == '3DSemanticLabel':
                         folder_path = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch)  # results folder
-                        numpy2imgs(folder_path, predictions, eval('self.ds.X_' + s + '["' + self.input_id + '"]'), self.ds)
+                        numpy2imgs(folder_path, predictions, eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
+                                   self.ds)
                     else:
                         raise NotImplementedError(
                             'The store type "' + self.write_type + '" is not implemented.')
@@ -764,7 +769,7 @@ class LearningRateReducer(KerasCallback):
                 lr = exp_base^{current_step / half_life) * reduce_rate * lr
 
         :param reduce_rate: Reduction rate.
-        :param reduce_each_epochs: Wether we reduce each epochs or each updates.
+        :param reduce_each_epochs: Whether we reduce each epochs or each updates.
         :param reduce_frequency: Reduce each this number of epochs/updates
         :param start_reduction_on_epoch: Start reduction at this epoch
         :param exp_base: Base for exponential reduction.

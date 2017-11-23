@@ -758,7 +758,6 @@ class BeamSearchEnsemble:
                             length_penalty = 1.0
 
                         if params['coverage_penalty']:
-                            coverage_penalties = []
                             # We assume that source sentences are at the first position of x
                             x_sentence = x[params['model_inputs'][0]][0]
                             alpha = np.asarray(alphas)
@@ -880,7 +879,6 @@ class BeamSearchEnsemble:
                     length_penalty = 1.0
 
                 if params['coverage_penalty']:
-                    coverage_penalties = []
                     # We assume that source sentences are at the first position of x
                     x_sentence = x[params['model_inputs'][0]][0]
                     alpha = np.asarray(alphas)
@@ -946,7 +944,8 @@ class PredictEnsemble:
 
     # PREDICTION FUNCTIONS: Functions for making prediction on input samples
 
-    def predict_generator(self, models, data_gen, val_samples=1, max_q_size=1):
+    @staticmethod
+    def predict_generator(models, data_gen, val_samples=1, max_q_size=1):
         """
         Call the prediction functions of all models, according to their inputs
         The generator should return the same kind of data as accepted by
@@ -973,7 +972,8 @@ class PredictEnsemble:
         outs = sum(outs_list[i] for i in xrange(len(models))) / float(len(models))
         return outs
 
-    def predict_on_batch(self, models, X, in_name=None, out_name=None, expand=False):
+    @staticmethod
+    def predict_on_batch(models, X, in_name=None, out_name=None, expand=False):
         """
         Applies a forward pass and returns the predicted values of all models.
 
@@ -999,22 +999,27 @@ class PredictEnsemble:
         return outs
 
     def predictNet(self):
-        '''
+        """
             Returns the predictions of the net on the dataset splits chosen. The input 'parameters' is a dict()
             which may contain the following parameters:
 
             :param batch_size: size of the batch
             :param n_parallel_loaders: number of parallel data batch loaders
-            :param normalize: apply data normalization on images/features or not (only if using images/features as input)
+            :param normalize: apply data normalization on images/features or not
+                              (only if using images/features as input)
             :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
-            :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
+            :param predict_on_sets: list of set splits for which we want to extract
+                                    the predictions ['train', 'val', 'test']
 
             Additional parameters:
 
-            :param postprocess_fun : post-processing function applied to all predictions before returning the result. The output of the function must be a list of results, one per sample. If postprocess_fun is a list, the second element will be used as an extra input to the function.
+            :param postprocess_fun : post-processing function applied to all predictions before returning the result.
+                                     The output of the function must be a list of results, one per sample.
+                                     If postprocess_fun is a list, the second element will be used as an extra
+                                     input to the function.
 
             :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
-        '''
+        """
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50,

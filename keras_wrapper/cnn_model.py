@@ -1,5 +1,4 @@
 import matplotlib as mpl
-mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 import numpy as np
 import cPickle as pk
@@ -28,11 +27,11 @@ from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_pr
     decode_predictions_beam_search, replace_unknown_words, sample, sampling
 from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
 from keras.applications.vgg19 import VGG19
-
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
 else:
     from keras.layers import Concatenate
+mpl.use('Agg')  # run matplotlib without X server (GUI)
 
 
 # General setup of libraries
@@ -86,7 +85,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     # Save model weights
     model_wrapper.model.save_weights(model_name + '_weights.h5', overwrite=True)
 
-    # Save auxiliar models for optimized search
+    # Save auxiliary models for optimized search
     if model_wrapper.model_init is not None:
         logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
         # Save model structure
@@ -142,7 +141,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     # Load model weights
     model.load_weights(model_name + '_weights.h5')
 
-    # Load auxiliar models for optimized search
+    # Load auxiliary models for optimized search
     if os.path.exists(model_name + '_structure_init.json') and \
             os.path.exists(model_name + '_weights_init.h5') and \
             os.path.exists(model_name + '_structure_next.json') and \
@@ -214,7 +213,7 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
     # Load model weights
     model.model.load_weights(model_path + '_weights.h5')
 
-    # Load auxiliar models for optimized search
+    # Load auxiliary models for optimized search
     if os.path.exists(model_path + '_weights_init.h5') and os.path.exists(model_path + '_weights_next.h5'):
         loaded_optimized = True
     else:
@@ -239,9 +238,9 @@ def transferWeights(old_model, new_model, layers_mapping):
     Transfers all existent layers' weights from an old model to a new model.
 
     :param old_model: old version of the model, where the weights will be picked
-    :param new_model: new version of the model, where the weights will be transfered to
+    :param new_model: new version of the model, where the weights will be transferred to
     :param layers_mapping: mapping from old to new model layers
-    :return: new model with weights transfered
+    :return: new model with weights transferred
     """
 
     logging.info("<<< Transferring weights from models. >>>")
@@ -332,7 +331,7 @@ class Model_Wrapper(object):
             - Easy to use training and test methods.
     """
 
-    def __init__(self, nOutput=1000, type='basic_model', silence=False, input_shape=[256, 256, 3],
+    def __init__(self, nOutput=1000, type='basic_model', silence=False, input_shape=None,
                  structure_path=None, weights_path=None, seq_to_functional=False,
                  model_name=None, plots_path=None, models_path=None, inheritance=False):
         """
@@ -357,6 +356,9 @@ class Model_Wrapper(object):
                                 (in this case the model will not be built from this __init__,
                                 it should be built from the child class).
         """
+        if input_shape is None:
+            input_shape = [256, 256, 3]
+
         self.__toprint = ['net_type', 'name', 'plot_path', 'models_path', 'lr', 'momentum',
                           'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
 
@@ -396,6 +398,15 @@ class Model_Wrapper(object):
 
         # Matchings between temporally linked samples
         self.matchings_sample_to_next_sample = None
+
+        # Placeholders for model attributes
+        self.inputsMapping = dict()
+        self.outputsMapping = dict()
+        self.acc_output = None
+        self.name = None
+        self.model_path = None
+        self.plot_path = None
+        self.params = None
 
         # Prepare logger
         self.updateLogger()
@@ -475,11 +486,15 @@ class Model_Wrapper(object):
                      nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
         """
             Sets a new optimizer for the CNN model.
+            :param nesterov:
+            :param clipvalue:
             :param lr: learning rate of the network
             :param momentum: momentum of the network (if None, then momentum = 1-lr)
             :param loss: loss function applied for optimization
             :param loss_weights: weights given to multi-loss models
-            :param metrics: list of Keras' metrics used for evaluating the model. To specify different metrics for different outputs of a multi-output model, you could also pass a dictionary, such as `metrics={'output_a': 'accuracy'}`.
+            :param metrics: list of Keras' metrics used for evaluating the model.
+                            To specify different metrics for different outputs of a multi-output model,
+                            you could also pass a dictionary, such as `metrics={'output_a': 'accuracy'}`.
             :param epsilon: fuzz factor
             :param decay: lr decay
             :param clipnorm: gradients' clip norm
@@ -533,6 +548,9 @@ class Model_Wrapper(object):
         if not self.silence:
             logging.info("Optimizer updated, learning rate set to " + str(lr))
 
+    def compile(self, **kwargs):
+        self.model.compile(kwargs)
+
     def setName(self, model_name, plots_path=None, models_path=None, create_plots=False, clear_dirs=True):
         """
                     Changes the name (identifier) of the Model_Wrapper instance.
@@ -580,7 +598,8 @@ class Model_Wrapper(object):
     def setParams(self, params):
         self.params = params
 
-    def checkParameters(self, input_params, default_params):
+    @staticmethod
+    def checkParameters(input_params, default_params):
         """
             Validates a set of input parameters and uses the default ones if not specified.
         """
@@ -650,7 +669,7 @@ class Model_Wrapper(object):
         else:
             callback_model = self
 
-        if hasattr(callback_model, 'stop_training') and callback_model.stop_training == True:
+        if hasattr(callback_model, 'stop_training') and callback_model.stop_training:
             return True
         else:
             return False
@@ -666,19 +685,19 @@ class Model_Wrapper(object):
             The input 'parameters' is a dict() which may contain the following (optional) training parameters:
             ####    Visualization parameters
              * report_iter: number of iterations between each loss report
-             * iter_for_val: number of interations between each validation test
+             * iter_for_val: number of iterations between each validation test
              * num_iterations_val: number of iterations applied on the validation dataset for computing the
                                    average performance (if None then all the validation data will be tested)
             ####    Learning parameters
              * n_epochs: number of epochs that will be applied during training
-             * batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
+             * batch_size: size of the batch (number of images) applied on each iteration by the SGD optimization
              * lr_decay: number of iterations passed for decreasing the learning rate
              * lr_gamma: proportion of learning rate kept at each decrease.
                          It can also be a set of rules defined by a list, e.g.
                          lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration
                          3000, ..., 0.8 until the end.
              * patience: number of epochs waiting for a possible performance increase before stopping training
-             * metric_check: name of the metric checked for early stoppping and LR decrease
+             * metric_check: name of the metric checked for early stopping and LR decrease
 
             ####    Data processing parameters
 
@@ -691,7 +710,6 @@ class Model_Wrapper(object):
 
             ####    Other parameters
 
-            :param save_model: number of iterations between each model backup
         """
 
         # Check input parameters and recover default values if needed
@@ -741,44 +759,29 @@ class Model_Wrapper(object):
 
         logging.info("<<< Finished training model >>>")
 
-    def trainNetFromSamples(self, x, y, parameters={}, class_weight=None, sample_weight=None, out_name=None):
+    def trainNetFromSamples(self, x, y, parameters=None, class_weight=None, sample_weight=None, out_name=None):
         """
             Trains the network on the given samples x, y.
 
-            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Graph models.
+            :param x:
+            :param y:
+            :param parameters:
+            :param class_weight:
+            :param sample_weight:
+            :param out_name: name of the output node that will be used to evaluate the network accuracy.
+                             Only applicable to Graph models.
 
             The input 'parameters' is a dict() which may contain the following (optional) training parameters:
-
             ####    Visualization parameters
-
-            :param report_iter: number of iterations between each loss report
-            :param iter_for_val: number of interations between each validation test
-            :param num_iterations_val: number of iterations applied on the validation dataset for computing the average performance (if None then all the validation data will be tested)
-
             ####    Learning parameters
-
-            :param n_epochs: number of epochs that will be applied during training
-            :param batch_size: size of the batch (number of images) applied on each interation by the SGD optimization
-            :param lr_decay: number of iterations passed for decreasing the learning rate
-            :param lr_gamma: proportion of learning rate kept at each decrease. It can also be a set of rules defined by a list, e.g. lr_gamma = [[3000, 0.9], ..., [None, 0.8]] means 0.9 until iteration 3000, ..., 0.8 until the end.
-            :param patience: number of epochs waiting for a possible performance increase before stopping training
-            :param metric_check: name of the metric checked for early stoppping and LR decrease
-
             ####    Data processing parameters
-
-            :param n_parallel_loaders: number of parallel data loaders allowed to work at the same time
-            :param normalize: boolean indicating if we want to 0-1 normalize the image pixel values
-            :param mean_substraction: boolean indicating if we want to substract the training mean
-            :param data_augmentation: boolean indicating if we want to perform data augmentation (always False on validation)
-            :param shuffle: apply shuffling on training data at the beginning of each epoch.
-
             ####    Other parameters
 
-            :param save_model: number of iterations between each model backup
         """
 
         # Check input parameters and recover default values if needed
-
+        if parameters is None:
+            parameters = dict()
         default_params = {'n_epochs': 1,
                           'batch_size': 50,
                           'maxlen': 100,  # sequence learning parameters (BeamSearch)
@@ -816,8 +819,10 @@ class Model_Wrapper(object):
         if params['verbose'] > 0:
             logging.info("<<< Finished training model >>>")
 
-    def __train(self, ds, params, state=dict()):
+    def __train(self, ds, params, state=None):
 
+        if state is None:
+            state = dict()
         if params['verbose'] > 0:
             logging.info("Training parameters: " + str(params))
 
@@ -827,7 +832,6 @@ class Model_Wrapper(object):
 
         # Prepare callbacks
         callbacks = []
-        ## Callbacks order:
 
         # Extra callbacks (e.g. evaluation)
         callbacks += params['extra_callbacks']
@@ -884,7 +888,7 @@ class Model_Wrapper(object):
 
         # Are we going to validate on 'val' data?
         if 'val' in params['eval_on_sets']:
-            # Calculate how many validation interations are we going to perform per test
+            # Calculate how many validation iterations are we going to perform per test
             n_valid_samples = ds.len_val
             if params['num_iterations_val'] is None:
                 params['num_iterations_val'] = int(math.ceil(float(n_valid_samples) / params['batch_size']))
@@ -930,7 +934,7 @@ class Model_Wrapper(object):
                                      workers=1,  # params['n_parallel_loaders'],
                                      initial_epoch=params['epoch_offset'])
 
-    def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None, state=dict()):
+    def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None):
 
         if params['verbose'] > 0:
             logging.info("Training parameters: " + str(params))
@@ -985,13 +989,13 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize': False,
-                          'mean_substraction': True};
+                          'mean_substraction': True}
         params = self.checkParameters(parameters, default_params)
         self.testing_parameters.append(copy.copy(params))
 
         logging.info("<<< Testing model >>>")
 
-        # Calculate how many test interations are we going to perform
+        # Calculate how many test iterations are we going to perform
         n_samples = ds.len_test
         num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
@@ -1035,12 +1039,16 @@ class Model_Wrapper(object):
         """
             Applies a test on the samples provided and returns the resulting loss and accuracy (if True).
 
-            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable for Graph models.
+            :param X:
+            :param Y:
+            :param accuracy:
+            :param out_name: name of the output node that will be used to evaluate the network accuracy.
+                            Only applicable for Graph models.
         """
         n_samples = X.shape[1]
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
             [X, Y] = self._prepareSequentialData(X, Y)
-            loss = self.model.test_on_batch(X, Y, accuracy=False)
+            loss = self.model.test_on_batch(X, Y)
             loss = loss[0]
             if accuracy:
                 [score, top_score] = self._getSequentialAccuracy(Y, self.model.predict_on_batch(X)[0])
@@ -1070,7 +1078,8 @@ class Model_Wrapper(object):
     def predict_cond(self, X, states_below, params, ii):
         """
         Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
-        WARNING!: It's assumed that the current history (state_below) is the last input of the model! See Dataset class for more information
+        WARNING!: It's assumed that the current history (state_below) is the last input of the model!
+        See Dataset class for more information
         :param X: Input context
         :param states_below: Batch of partial hypotheses
         :param params: Decoding parameters
@@ -1095,7 +1104,6 @@ class Model_Wrapper(object):
         # Recover output identifiers
         ##########################################
         # in any case, the first output of the models must be the next words' probabilities
-        pick_idx = -1
         output_ids_list = params['model_outputs']
         pick_idx = ii
 
@@ -1142,6 +1150,7 @@ class Model_Wrapper(object):
         Returns predictions on batch given the (static) input X and the current history (states_below) at time-step ii.
         WARNING!: It's assumed that the current history (state_below) is the last input of the model!
         See Dataset class for more information
+        :param debug:
         :param X: Input context
         :param states_below: Batch of partial hypotheses
         :param params: Decoding parameters
@@ -1211,7 +1220,9 @@ class Model_Wrapper(object):
         ##########################################
         if params['max_batch_size'] >= n_samples:  # The model inputs beam will fit into one batch in memory
             out_data = model.predict_on_batch(in_data)
-        else:  # It is possible that the model inputs don't fit into one single batch: Make beam_batch_size-sample-sized batches
+        else:
+            # It is possible that the model inputs don't fit into one single batch:
+            #  Make beam_batch_size-sample-sized batches
             if debug:
                 print 'n_samples', n_samples
                 print 'beam_batch_size', params['beam_batch_size']
@@ -1283,6 +1294,7 @@ class Model_Wrapper(object):
 
         4. return final_samples, final_scores
 
+        :param debug:
         :param X: Model inputs
         :param params: Search parameters
         :param null_sym: <null> symbol
@@ -1292,17 +1304,17 @@ class Model_Wrapper(object):
         sample_identifier_prediction = [[i] for i in range(n_samples_batch)]
 
         k = params['beam_size']
-        samples = [[] for i in range(n_samples_batch)]
-        sample_scores = [[] for i in range(n_samples_batch)]
+        samples = [[] for _ in range(n_samples_batch)]
+        sample_scores = [[] for _ in range(n_samples_batch)]
         pad_on_batch = params['pad_on_batch']
         dead_k = [0] * n_samples_batch  # samples that reached eos
         live_k = [1] * n_samples_batch  # samples that did not yet reach eos
         all_live_k = sum(live_k)
-        hyp_samples = [[[]] for i in range(n_samples_batch)]
-        hyp_scores = [np.zeros(1).astype('float32') for i in range(n_samples_batch)]
+        hyp_samples = [[[]] for _ in range(n_samples_batch)]
+        hyp_scores = [np.zeros(1).astype('float32') for _ in range(n_samples_batch)]
         if params['pos_unk']:
-            sample_alphas = [[] for i in range(n_samples_batch)]
-            hyp_alphas = [[[]] for i in range(n_samples_batch)]
+            sample_alphas = [[] for _ in range(n_samples_batch)]
+            hyp_alphas = [[[]] for _ in range(n_samples_batch)]
 
         # Create 'X_next' for initial step
         X_next = dict()
@@ -1517,6 +1529,7 @@ class Model_Wrapper(object):
 
         4. return final_samples, final_scores
 
+        :param return_alphas:
         :param X: Model inputs
         :param params: Search parameters
         :param eos_sym: <eos> symbol
@@ -1662,34 +1675,31 @@ class Model_Wrapper(object):
 
         #    def predictBeamSearchNet(self, ds, parameters={}):
 
-    def predictBeamSearchNet_NEW(self, ds, parameters={}):
+    def predictBeamSearchNet_NEW(self, ds, parameters=None):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
-        :param batch_size: size of the batch
-        :param n_parallel_loaders: number of parallel data batch loaders
-        :param normalization: apply data normalization on images/features or not (only if using images/features as input)
-        :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
-        :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
-        :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
         The following attributes must be inserted to the model when building an optimized search model:
 
             * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
             * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
             * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
-            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and the number of out variables must match the number of in variables)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                                the number of out variables must match the number of in variables)
             * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
             * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
 
-        :param temporally_linked: boolean indicating if the outputs from a sample are the inputs of the following one
         The following attributes must be inserted to the model when building a temporally_linked model:
 
             * matchings_sample_to_next_sample:
             * ids_temporally_linked_inputs:
 
+        :param ds:
+        :param parameters:
         :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         """
-
+        if parameters is None:
+            parameters = dict()
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
                           'beam_size': 5, 'beam_batch_size': 50,
@@ -1747,7 +1757,7 @@ class Model_Wrapper(object):
 
             # TODO: enable 'train' sampling on temporally-linked models
             if params['temporally_linked'] and s == 'train':
-                logging.info('Sampling is currenly not implemented on the "train" set for temporally-linked models.')
+                logging.info('Sampling is currently not implemented on the "train" set for temporally-linked models.')
                 data_gen = -1
                 data_gen_instance = -1
             else:
@@ -1842,8 +1852,8 @@ class Model_Wrapper(object):
                         if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
                             for i in range(n_samples_batch):
                                 link = int(X[params['link_index_id']][i])
-                                if link not in previous_outputs[
-                                    input_id].keys():  # input to current sample was not processed yet
+                                if link not in previous_outputs[input_id].keys():
+                                    # input to current sample was not processed yet
                                     link = -1
                                 prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
                                           previous_outputs[input_id][link]]
@@ -1920,34 +1930,31 @@ class Model_Wrapper(object):
 
             #    def predictBeamSearchNet_DEPRECATED(self, ds, parameters={}):
 
-    def predictBeamSearchNet(self, ds, parameters={}):
+    def predictBeamSearchNet(self, ds, parameters=None):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
 
-        :param max_batch_size: Maximum batch size loaded into memory
-        :param n_parallel_loaders: number of parallel data batch loaders
-        :param normalization: apply data normalization on images/features or not (only if using images/features as input)
-        :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
-        :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
-        :param optimized_search: boolean indicating if the used model has the optimized Beam Search implemented (separate self.model_init and self.model_next models for reusing the information from previous timesteps).
         The following attributes must be inserted to the model when building an optimized search model:
 
             * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
             * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
             * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
-            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and the number of out variables must match the number of in variables)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                                the number of out variables must match the number of in variables)
             * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
             * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
 
-        :param temporally_linked: boolean indicating if the outputs from a sample are the inputs of the following one
         The following attributes must be inserted to the model when building a temporally_linked model:
 
             * matchings_sample_to_next_sample:
             * ids_temporally_linked_inputs:
 
+        :param ds:
+        :param parameters:
         :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         """
-
+        if parameters is None:
+            parameters = dict()
         # Check input parameters and recover default values if needed
         default_params = {'max_batch_size': 50,
                           'n_parallel_loaders': 8,
@@ -2017,7 +2024,7 @@ class Model_Wrapper(object):
 
             # TODO: enable 'train' sampling on temporally-linked models
             if params['temporally_linked'] and s == 'train':
-                logging.info('Sampling is currenly not implemented on the "train" set for temporally-linked models.')
+                logging.info('Sampling is currently not implemented on the "train" set for temporally-linked models.')
                 data_gen = -1
                 data_gen_instance = -1
             else:
@@ -2200,24 +2207,22 @@ class Model_Wrapper(object):
         else:
             return predictions, references, sources_sampling
 
-    def predictNet(self, ds, parameters=dict(), postprocess_fun=None):
-        '''
+    def predictNet(self, ds, parameters=None, postprocess_fun=None):
+        """
             Returns the predictions of the net on the dataset splits chosen. The input 'parameters' is a dict()
             which may contain the following parameters:
 
-            :param batch_size: size of the batch
-            :param n_parallel_loaders: number of parallel data batch loaders
-            :param normalize: apply data normalization on images/features or not (only if using images/features as input)
-            :param mean_substraction: apply mean data normalization on images or not (only if using images as input)
-            :param predict_on_sets: list of set splits for which we want to extract the predictions ['train', 'val', 'test']
-
             Additional parameters:
-
-            :param postprocess_fun : post-processing function applied to all predictions before returning the result. The output of the function must be a list of results, one per sample. If postprocess_fun is a list, the second element will be used as an extra input to the function.
-
+            :param ds:
+            :param parameters:
+            :param postprocess_fun : post-processing function applied to all predictions before returning the result.
+                                    The output of the function must be a list of results, one per sample.
+                                    If postprocess_fun is a list, the second element will be used as an extra
+                                     input to the function.
             :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
-        '''
-
+        """
+        if parameters is None:
+            parameters = dict()
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50,
                           'n_parallel_loaders': 8,
@@ -2237,7 +2242,7 @@ class Model_Wrapper(object):
             if params['verbose'] > 0:
                 print
                 logging.info("<<< Predicting outputs of " + s + " set >>>")
-            # Calculate how many interations are we going to perform
+            # Calculate how many iterations are we going to perform
             if params['n_samples'] is None:
                 if params['init_sample'] > -1 and params['final_sample'] > -1:
                     n_samples = params['final_sample'] - params['init_sample']
@@ -2370,7 +2375,7 @@ class Model_Wrapper(object):
         for ii in xrange(len(Y)):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
-                [probs, prev_out, alphas] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
+                [probs, prev_out, _] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
@@ -2403,7 +2408,7 @@ class Model_Wrapper(object):
     def scoreNet(self):
         """
         Approximates by beam search the best predictions of the net on the dataset splits chosen.
-        Params from config that affect the sarch process:
+        Params from config that affect the search process:
             * batch_size: size of the batch
             * n_parallel_loaders: number of parallel data batch loaders
             * normalization: apply data normalization on images/features or not (only if using images/features as input)
@@ -2451,7 +2456,7 @@ class Model_Wrapper(object):
             if not params['optimized_search']:  # use optimized search model if available
                 assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
-            # Calculate how many interations are we going to perform
+            # Calculate how many iterations are we going to perform
             n_samples = eval("self.dataset.len_" + s)
             num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
@@ -2492,7 +2497,6 @@ class Model_Wrapper(object):
                     sys.stdout.write("Scored %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
                     sys.stdout.flush()
                     x = dict()
-                    y = dict()
 
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
@@ -2520,7 +2524,8 @@ class Model_Wrapper(object):
     #           Functions for decoding predictions
     # ------------------------------------------------------- #
 
-    def sample(self, a, temperature=1.0):
+    @staticmethod
+    def sample(a, temperature=1.0):
         """
         Helper function to sample an index from a probability array
         :param a: Probability array
@@ -2531,20 +2536,23 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use utils.sample() instead"
         return sample(a, temperature=temperature)
 
-    def sampling(self, scores, sampling_type='max_likelihood', temperature=1.0):
+    @staticmethod
+    def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
         """
         Sampling words (each sample is drawn from a categorical distribution).
         Or picks up words that maximize the likelihood.
         :param scores: array of size #samples x #classes;
         every entry determines a score for sample i having class j
         :param sampling_type:
-        :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
+        :param temperature: Temperature for the predictions. The higher, the flatter probabilities.
+                            Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples
         """
         print "WARNING!: deprecated function, use utils.sampling() instead"
         return sampling(scores, sampling_type=sampling_type, temperature=temperature)
 
-    def decode_predictions(self, preds, temperature, index2word, sampling_type, verbose=0):
+    @staticmethod
+    def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0):
         """
         Decodes predictions
         :param preds: Predictions codified as the output of a softmax activation function.
@@ -2557,7 +2565,8 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use utils.decode_predictions() instead"
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
-    def replace_unknown_words(self, src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
+    @staticmethod
+    def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                               heuristic=0, mapping=None, verbose=0):
         """
         Replaces unknown words from the target sentence according to some heuristic.
@@ -2575,11 +2584,17 @@ class Model_Wrapper(object):
         return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                                      heuristic=heuristic, mapping=mapping, verbose=verbose)
 
-    def decode_predictions_beam_search(self, preds, index2word, alphas=None, heuristic=0,
+    @staticmethod
+    def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                        x_text=None, unk_symbol='<unk>', pad_sequences=False,
                                        mapping=None, verbose=0):
         """
         Decodes predictions from the BeamSearch method.
+        :param alphas:
+        :param heuristic:
+        :param x_text:
+        :param unk_symbol:
+        :param mapping:
         :param preds: Predictions codified as word indices.
         :param index2word: Mapping from word indices into word characters.
         :param pad_sequences: Whether we should make a zero-pad on the input sequence.
@@ -2589,19 +2604,22 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
         return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
                                               x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
-                                              mapping=mapping, verbose=0)
+                                              mapping=mapping, verbose=verbose)
 
-    def one_hot_2_indices(self, preds, pad_sequences=True, verbose=0):
+    @staticmethod
+    def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
         """
         Converts a one-hot codification into a index-based one
+        :param pad_sequences:
         :param preds: Predictions codified as one-hot vectors.
         :param verbose: Verbosity level, by default 0.
-        :return: List of convertedpredictions
+        :return: List of converted predictions
         """
         print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
         return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
 
-    def decode_predictions_one_hot(self, preds, index2word, verbose=0):
+    @staticmethod
+    def decode_predictions_one_hot(preds, index2word, verbose=0):
         """
         Decodes predictions following a one-hot codification.
         :param preds: Predictions codified as one-hot vectors.
@@ -2648,8 +2666,8 @@ class Model_Wrapper(object):
                 else:
                     Y = Y[self.outputsMapping[0]]
             else:
-                Y_new = [0 for i in range(len(self.outputsMapping.keys()))]  # multiple outputs
-                Y_sample_weights = [None for i in range(len(self.outputsMapping.keys()))]
+                Y_new = [0 for _ in range(len(self.outputsMapping.keys()))]  # multiple outputs
+                Y_sample_weights = [None for _ in range(len(self.outputsMapping.keys()))]
                 for out_model, out_ds in self.outputsMapping.iteritems():
                     if isinstance(Y[out_ds], tuple):
                         Y_new[out_model] = Y[out_ds][0]
@@ -2680,7 +2698,8 @@ class Model_Wrapper(object):
 
         return [X_new, Y_new] if Y_sample_weights == dict() else [X_new, Y_new, Y_sample_weights]
 
-    def _getGraphAccuracy(self, data, prediction, topN=5):
+    @staticmethod
+    def _getGraphAccuracy(data, prediction, topN=5):
         """
             Calculates the accuracy obtained from a set of samples on a Graph model.
         """
@@ -2702,7 +2721,8 @@ class Model_Wrapper(object):
 
         return [accuracies, top_accuracies]
 
-    def _getSequentialAccuracy(self, GT, pred, topN=5):
+    @staticmethod
+    def _getSequentialAccuracy(GT, pred, topN=5):
         """
             Calculates the topN accuracy obtained from a set of samples on a Sequential model.
         """
@@ -2804,7 +2824,7 @@ class Model_Wrapper(object):
         else:
             return self.__logger[mode][data_type]
 
-    def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict={}):
+    def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict=None):
         """
         Plots the training progress information
 
@@ -2819,8 +2839,10 @@ class Model_Wrapper(object):
         :param colours_shapes_dict: dictionary of '<metric>_<split>' and the colour and/or shape
                 that we want them to have in the plot
         """
-
         # Build default colours_shapes_dict if not provided
+        if colours_shapes_dict is None:
+            colours_shapes_dict = dict()
+            
         if not colours_shapes_dict:
             default_colours = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
             default_shapes = ['-', 'o', '.']
@@ -2830,9 +2852,9 @@ class Model_Wrapper(object):
                 for sp in splits:
                     colours_shapes_dict[met + '_' + sp] = default_colours[m] + default_shapes[s]
                     s += 1
-                    s = s % len(default_shapes)
+                    s %= len(default_shapes)
                 m += 1
-                m = m % len(default_colours)
+                m %= len(default_colours)
 
         plt.figure(1).add_axes([0.1, 0.1, 0.6, 0.75])
 
@@ -2842,7 +2864,8 @@ class Model_Wrapper(object):
                 raise Exception("There is no performance data from split '" + sp + "' in the model log.")
             if time_measure not in self.__logger[sp]:
                 raise Exception(
-                    "There is no performance data on each '" + time_measure + "' in the model log for split '" + sp + "'.")
+                    "There is no performance data on each '" + time_measure +
+                    "' in the model log for split '" + sp + "'.")
 
             iterations = self.__logger[sp][time_measure]
             all_iterations = all_iterations + iterations
@@ -2850,7 +2873,8 @@ class Model_Wrapper(object):
             for met in metrics:
                 if met not in self.__logger[sp]:
                     raise Exception(
-                        "There is no performance data for metric '" + met + "' in the model log for split '" + sp + "'.")
+                        "There is no performance data for metric '" + met +
+                        "' in the model log for split '" + sp + "'.")
 
                 measure = self.__logger[sp][met]
                 # plt.subplot(211)
@@ -3254,7 +3278,8 @@ class Model_Wrapper(object):
     # GoogLeNet implementation from http://dandxy89.github.io/ImageModels/googlenet/
     ########################################
 
-    def inception_module(self, x, params, dim_ordering, concat_axis,
+    @staticmethod
+    def inception_module(x, params, dim_ordering, concat_axis,
                          subsample=(1, 1), activation='relu',
                          border_mode='same', weight_decay=None):
 
@@ -3326,7 +3351,8 @@ class Model_Wrapper(object):
         return merge([pathway1, pathway2, pathway3, pathway4],
                      mode='concat', concat_axis=concat_axis)
 
-    def conv_layer(self, x, nb_filter, nb_row, nb_col, dim_ordering,
+    @staticmethod
+    def conv_layer(x, nb_filter, nb_row, nb_col, dim_ordering,
                    subsample=(1, 1), activation='relu',
                    border_mode='same', weight_decay=None, padding=None):
 
@@ -3435,7 +3461,7 @@ class Model_Wrapper(object):
 
     def Union_Layer(self, nOutput, input):
         """
-            Network with just a dropout and a softmax layers which is intended to serve as the final layer for an ECOC model
+        Network with just a dropout and a softmax layers which is intended to serve as the final layer for an ECOC model
         """
         if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
@@ -3447,10 +3473,12 @@ class Model_Wrapper(object):
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax'))
 
-    def One_vs_One_Inception(self, nOutput=2, input=[224, 224, 3]):
+    def One_vs_One_Inception(self, nOutput=2, input=None):
         """
-            Builds a simple One_vs_One_Inception network with 2 inception layers (useful for ECOC models).
+        Builds a simple One_vs_One_Inception network with 2 inception layers (useful for ECOC models).
         """
+        if input is None:
+            input = [224, 224, 3]
         if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
@@ -3475,7 +3503,8 @@ class Model_Wrapper(object):
 
     def add_One_vs_One_Inception(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
-            Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
+        Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model
+        (useful for ECOC_loss models).
         """
 
         # Inception Ea
@@ -3499,7 +3528,8 @@ class Model_Wrapper(object):
 
     def add_One_vs_One_Inception_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
-            Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
+        Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model
+         (useful for ECOC_loss models).
         """
 
         in_node = self.model.get_layer(input).output
@@ -3521,7 +3551,8 @@ class Model_Wrapper(object):
 
         return out_node
 
-    def add_One_vs_One_3x3_Functional(self, input, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
+    @staticmethod
+    def add_One_vs_One_3x3_Functional(input, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
         out_3x3 = Convolution2D(nkernels, 3, 3, name='3x3/ecoc_' + str(id_branch), activation='relu')(input)
@@ -3537,7 +3568,8 @@ class Model_Wrapper(object):
 
         return out_node
 
-    def add_One_vs_One_3x3_double_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
+    @staticmethod
+    def add_One_vs_One_3x3_double_Functional(input, input_shape, id_branch, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
         out_3x3 = Convolution2D(64, 3, 3, name='3x3_1/ecoc_' + str(id_branch), activation='relu')(input)
@@ -3556,10 +3588,12 @@ class Model_Wrapper(object):
 
         return out_node
 
-    def One_vs_One_Inception_v2(self, nOutput=2, input=[224, 224, 3]):
+    def One_vs_One_Inception_v2(self, nOutput=2, input=None):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers (useful for ECOC models).
         """
+        if input is None:
+            input = [224, 224, 3]
         if len(input) == 3:
             input_shape = tuple([input[2]] + input[0:2])
         else:
@@ -3584,7 +3618,8 @@ class Model_Wrapper(object):
 
     def add_One_vs_One_Inception_v2(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
-            Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model (useful for ECOC_loss models).
+            Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model
+            (useful for ECOC_loss models).
         """
 
         # Inception Ea
@@ -3651,7 +3686,8 @@ class Model_Wrapper(object):
 
         return out_name
 
-    def __addInception_Functional(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3,
+    @staticmethod
+    def __addInception_Functional(id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3,
                                   kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
@@ -3692,7 +3728,7 @@ class Model_Wrapper(object):
     def add_One_vs_One_Merge(self, inputs_list, nOutput, activation='softmax'):
 
         self.model.add_node(Flatten(), name='ecoc_loss', inputs=inputs_list,
-                            merge_mode='concat')  # join outputs from OneVsOne classifers
+                            merge_mode='concat')  # join outputs from OneVsOne classifiers
         self.model.add_node(Dropout(0.5), name='final_loss/drop', input='ecoc_loss')
         self.model.add_node(Dense(nOutput, activation=activation), name='final_loss',
                             input='final_loss/drop')  # apply final joint prediction
@@ -3705,7 +3741,7 @@ class Model_Wrapper(object):
 
     def add_One_vs_One_Merge_Functional(self, inputs_list, nOutput, activation='softmax'):
 
-        # join outputs from OneVsOne classifers
+        # join outputs from OneVsOne classifiers
         ecoc_loss_name = 'ecoc_loss'
         final_loss_name = 'final_loss/out'
         ecoc_loss = merge(inputs_list, name=ecoc_loss_name, mode='concat', concat_axis=1)
@@ -3766,8 +3802,10 @@ class Model_Wrapper(object):
             The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation.
             arXiv preprint arXiv:1611.09326. 2016 Nov 28.
 
+        :param name:
         :param in_layer: input layer to the dense block.
-        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer() for information about the internal layers).
+        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer()
+                          for information about the internal layers).
         :param k: growth rate. Number of additional feature maps learned at each layer.
         :param drop: dropout rate.
         :param init_weights: weights initialization function
@@ -3798,7 +3836,8 @@ class Model_Wrapper(object):
 
         return merge(list_outputs, mode='concat', concat_axis=axis, name=name_merge)
 
-    def add_dense_layer(self, in_layer, k, drop, init_weights, name=None):
+    @staticmethod
+    def add_dense_layer(in_layer, k, drop, init_weights, name=None):
         """
         Adds a Dense Layer inside a Dense Block, which is composed of BN, ReLU, Conv and Dropout
 
@@ -3807,6 +3846,7 @@ class Model_Wrapper(object):
             The One Hundred Layers Tiramisu: Fully Convolutional DenseNets for Semantic Segmentation.
             arXiv preprint arXiv:1611.09326. 2016 Nov 28.
 
+        :param name:
         :param in_layer: input layer to the dense block.
         :param k: growth rate. Number of additional feature maps learned at each layer.
         :param drop: dropout rate.
@@ -3852,7 +3892,8 @@ class Model_Wrapper(object):
         :param init_weights: weights initialization function
 
         # Dense Block parameters
-        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer() for information about the internal layers).
+        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer()
+                          for information about the internal layers).
         :param growth: growth rate. Number of additional feature maps learned at each layer.
         :param drop: dropout rate.
 
@@ -3869,7 +3910,7 @@ class Model_Wrapper(object):
         x_dense = self.add_dense_block(x, nb_layers, growth, drop,
                                        init_weights)  # (growth*nb_layers) feature maps added
 
-        ## Concatenate and skip connection recovery for upsampling path
+        # Concatenate and skip connection recovery for upsampling path
         skip = merge([x, x_dense], mode='concat', concat_axis=axis)
 
         # Transition Down
@@ -3894,6 +3935,7 @@ class Model_Wrapper(object):
             arXiv preprint arXiv:1611.09326. 2016 Nov 28.
 
         # Input layers parameters
+        :param name:
         :param x: input layer.
         :param skip_conn: list of layers to be used as skip connections.
 
@@ -3902,7 +3944,8 @@ class Model_Wrapper(object):
         :param init_weights: weights initialization function
 
         # Dense Block parameters
-        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer() for information about the internal layers).
+        :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer()
+                          for information about the internal layers).
         :param growth: growth rate. Number of additional feature maps learned at each layer.
         :param drop: dropout rate.
 
@@ -3920,7 +3963,8 @@ class Model_Wrapper(object):
                                  name=name)  # (growth*nb_layers) feature maps added
         return x
 
-    def Empty(self, nOutput, input):
+    @staticmethod
+    def Empty(nOutput, input):
         """
             Creates an empty Model_Wrapper (can be externally defined)
         """
