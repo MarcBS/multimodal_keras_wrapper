@@ -11,7 +11,7 @@ Modified by: Marc Bola\~nos
 import json
 import logging
 import os
-
+import codecs
 import numpy as np
 import tables
 from PIL import Image as pilimage
@@ -56,7 +56,7 @@ def clean_dir(directory):
 # Main functions
 ###
 def file2list(filepath, stripfile=True):
-    with open(filepath, 'r') as f:
+    with codecs.open(filepath, 'r', encoding='utf-8') as f:
         lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in
                                                                                                  f.readlines()]
         return lines
