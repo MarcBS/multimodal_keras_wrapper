@@ -734,21 +734,21 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
         if trans_words[j] == unk_symbol:
             UNK_src = src_word_seq[hard_alignment[j]]
             if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
-                new_trans_words.append(UNK_src)
+                new_trans_words.append(UNK_src.decode('utf-8'))
             elif heuristic == 1:
                 # Use the most likely translation (with t-table). If not found, copy the source word.
                 # Ok for small vocabulary (~30k) models
                 if mapping.get(UNK_src) is not None:
-                    new_trans_words.append(mapping[UNK_src])
+                    new_trans_words.append(mapping[UNK_src].decode('utf-8'))
                 else:
-                    new_trans_words.append(UNK_src)
+                    new_trans_words.append(UNK_src.decode('utf-8'))
             elif heuristic == 2:
                 # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                 # Sometimes works better than other heuristics
                 if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
                     new_trans_words.append(mapping[UNK_src])
                 else:
-                    new_trans_words.append(UNK_src)
+                    new_trans_words.append(UNK_src.decode('utf-8'))
         else:
             new_trans_words.append(trans_words[j])
 
@@ -782,7 +782,7 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
             logging.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-    flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
+    flattened_answer_pred = [map(lambda x: index2word[x].decode('utf-8'), pred) for pred in preds]
     answer_pred = []
 
     if alphas is not None:
@@ -807,11 +807,11 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                              verbose=verbose)
                 if verbose > 1:
                     print "After unk_replace:", a_no
-            tmp = ' '.join(a_no[:-1])
+            tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     else:
         for a_no in flattened_answer_pred:
-            tmp = ' '.join(a_no[:-1])
+            tmp = ' '.join(a_no[:-1]).decode('utf-8')
             answer_pred.append(tmp)
     return answer_pred
 

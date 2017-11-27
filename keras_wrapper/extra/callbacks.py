@@ -636,14 +636,14 @@ class Sample(KerasCallback):
                 if self.print_sources:
                     # Write samples
                     for i, (source, sample, truth) in enumerate(zip(sources, predictions, truths)):
-                        print("Source     (%d): %s" % (i, source))
-                        print("Hypothesis (%d): %s" % (i, sample))
-                        print("Reference  (%d): %s" % (i, truth))
+                        print("Source     (%d): %s" % (i, str(source.encode('utf-8'))))
+                        print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
+                        print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
                         print("")
                 else:
                     for i, (sample, truth) in enumerate(zip(predictions, truths)):
-                        print("Hypothesis (%d): %s" % (i, sample))
-                        print("Reference  (%d): %s" % (i, truth))
+                        print("Hypothesis (%d): %s" % (i, source.encode('utf-8')))
+                        print("Reference  (%d): %s" % (i, sample.encode('utf-8')))
                         print("")
 
 
