@@ -1,5 +1,4 @@
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 import numpy as np
 import cPickle as pk
 import cloud.serialization.cloudpickle as cloudpk
@@ -32,6 +31,7 @@ if int(keras.__version__.split('.')[0]) == 1:
 else:
     from keras.layers import Concatenate
 mpl.use('Agg')  # run matplotlib without X server (GUI)
+import matplotlib.pyplot as plt
 
 
 # General setup of libraries

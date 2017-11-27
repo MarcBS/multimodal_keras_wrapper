@@ -342,16 +342,6 @@ class Homogeneous_Data_Batch_Generator(object):
         self.curr_idx = next_idx
         if self.curr_idx >= len(self.tidx):
             self.reset()
-        """
-        Y_batch = data[1]
-        print 'source words:', [map(lambda x: self.dataset.vocabulary['source_text']['idx2words'][x], seq) for seq
-                                in data[0]['source_text']]
-        print 'state_below words:', [map(lambda x: self.dataset.vocabulary['state_below']['idx2words'][x], seq) for seq
-                                in data[0]['state_below']]
-
-        print 'target words:', [map(lambda x: self.dataset.vocabulary['target_text']['idx2words'][x], seq) for seq
-                                in [np.nonzero(sample)[1] for sample in Y_batch['target_text']]]
-        """
         return data
 
     def generator(self):

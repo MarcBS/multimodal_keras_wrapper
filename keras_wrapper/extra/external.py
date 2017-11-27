@@ -11,9 +11,19 @@ Rico Sennrich, Barry Haddow and Alexandra Birch (2015). Neural Machine Translati
 Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (ACL 2016). Berlin, Germany.
 """
 
-from __future__ import unicode_literals, division
+from __future__ import division, unicode_literals
 
+import sys
+import codecs
+import io
+import argparse
+import json
 import re
+from collections import defaultdict
+
+# hack for python2/3 compatibility
+from io import open
+argparse.open = open
 
 
 class BPE(object):
