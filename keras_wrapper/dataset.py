@@ -2103,7 +2103,7 @@ class Dataset(object):
         """
         if not self.BPE_built:
             raise Exception('Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"')
-        tokenized = re.sub('[\n\t]+', '', caption.strip())
+        tokenized = re.sub('[\n\t]+', u'', caption)
         tokenized = self.BPE.segment(tokenized).strip()
         return tokenized
 
@@ -2117,7 +2117,7 @@ class Dataset(object):
         return caption
 
     @staticmethod
-    def detokenize_bpe(caption, separator='@@'):
+    def detokenize_bpe(caption, separator=u'@@'):
         """
         Reverts BPE segmentation (https://github.com/rsennrich/subword-nmt)
         :param caption: Caption to detokenize.
@@ -2125,7 +2125,7 @@ class Dataset(object):
         :return: Detokenized version of caption.
         """
         bpe_detokenization = re.compile('(' + separator + ' )|(' + separator + ' ?$)')
-        detokenized = bpe_detokenization.sub("", str(caption).strip())
+        detokenized = bpe_detokenization.sub(u"", caption).strip()
         return detokenized
 
     @staticmethod
