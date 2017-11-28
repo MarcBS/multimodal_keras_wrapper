@@ -2114,6 +2114,8 @@ class Dataset(object):
         :param caption: String to de-tokenize.
         :return: Same caption.
         """
+        if type(caption) == str:
+            caption = caption.decode('utf-8')
         return caption
 
     @staticmethod
@@ -2124,8 +2126,10 @@ class Dataset(object):
         :param separator: BPE separator.
         :return: Detokenized version of caption.
         """
-        bpe_detokenization = re.compile('(' + separator + ' )|(' + separator + ' ?$)')
-        detokenized = bpe_detokenization.sub(u"", caption).strip()
+        if type(caption) == str:
+            caption = caption.decode('utf-8')
+        bpe_detokenization = re.compile(u'(' + separator + u' )|(' + separator + u' ?$)')
+        detokenized = bpe_detokenization.sub(u'', caption).strip()
         return detokenized
 
     @staticmethod

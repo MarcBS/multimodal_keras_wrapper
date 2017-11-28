@@ -639,7 +639,7 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
     for a_no in answer_pred_matrix:
         end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
         end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        tmp = ' '.join(a_no[:end_token_pos])
+        tmp = ' '.join(a_no[:end_token_pos]).decode('utf-8')
         answer_pred.append(tmp)
     return answer_pred
 
