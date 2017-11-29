@@ -642,8 +642,8 @@ class Sample(KerasCallback):
                         print("")
                 else:
                     for i, (sample, truth) in enumerate(zip(predictions, truths)):
-                        print("Hypothesis (%d): %s" % (i, source.encode('utf-8')))
-                        print("Reference  (%d): %s" % (i, sample.encode('utf-8')))
+                        print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
+                        print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
                         print("")
 
 
