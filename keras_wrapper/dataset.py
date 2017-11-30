@@ -78,9 +78,9 @@ class Data_Batch_Generator(object):
                  dataset,
                  num_iterations,
                  batch_size=50,
-                 normalization=False,
+                 normalization=True,
                  data_augmentation=True,
-                 mean_substraction=True,
+                 mean_substraction=False,
                  predict=False,
                  random_samples=-1,
                  shuffle=True,
@@ -2862,8 +2862,8 @@ class Dataset(object):
         # Return the mean
         return self.train_mean[id]
 
-    def loadImages(self, images, id, normalization_type='0-1',
-                   normalization=False, meanSubstraction=True,
+    def loadImages(self, images, id, normalization_type='(-1)-1',
+                   normalization=True, meanSubstraction=False,
                    dataAugmentation=True, daRandomParams=None,
                    external=False, loaded=False):
         """
@@ -2872,7 +2872,7 @@ class Dataset(object):
         :param images : list of image string names or list of matrices representing images (only if loaded==True)
         :param id : identifier in the Dataset object of the data we are loading
         :param normalization_type: type of normalization applied
-        :param normalization : whether we applying a 0-1 normalization to the images
+        :param normalization : whether we applying a '0-1' or '(-1)-1' normalization to the images
         :param meanSubstraction : whether we are removing the training mean
         :param dataAugmentation : whether we are applying dataAugmentatino (random cropping and horizontal flip)
         :param daRandomParams : dictionary with results of random data augmentation provided by
@@ -2906,6 +2906,9 @@ class Dataset(object):
             if normalization:
                 if normalization_type == '0-1':
                     train_mean /= 255.0
+                elif normalization_type == '(-1)-1':
+                    train_mean /= 127.5
+                    train_mean -= 1.
 
         nImages = len(images)
 
@@ -2997,6 +3000,9 @@ class Dataset(object):
             if normalization:
                 if normalization_type == '0-1':
                     im /= 255.0
+                elif normalization_type == '(-1)-1':
+                    im /= 127.5
+                    im -= 1.
 
             # Permute dimensions
             if len(self.img_size[id]) == 3:
@@ -3058,8 +3064,9 @@ class Dataset(object):
     #           [X,Y] pairs or X only
     # ------------------------------------------------------- #
 
-    def getX(self, set_name, init, final, normalization_type='0-1', normalization=False,
-             meanSubstraction=True, dataAugmentation=True, debug=False):
+    def getX(self, set_name, init, final, normalization_type='(-1)-1',
+             normalization=True, meanSubstraction=False, 
+             dataAugmentation=True, debug=False):
         """
         Gets all the data samples stored between the positions init to final
             
@@ -3130,7 +3137,8 @@ class Dataset(object):
 
         return X
 
-    def getXY(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
+    def getXY(self, set_name, k, normalization_type='(-1)-1',
+              normalization=True, meanSubstraction=False,
               dataAugmentation=True, debug=False):
         """
         Gets the [X,Y] pairs for the next 'k' samples in the desired set.
@@ -3269,7 +3277,8 @@ class Dataset(object):
 
         return [X, Y]
 
-    def getXY_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
+    def getXY_FromIndices(self, set_name, k, normalization_type='(-1)-1',
+                          normalization=True, meanSubstraction=False,
                           dataAugmentation=True, debug=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -3390,7 +3399,8 @@ class Dataset(object):
 
         return [X, Y]
 
-    def getX_FromIndices(self, set_name, k, normalization_type='0-1', normalization=False, meanSubstraction=True,
+    def getX_FromIndices(self, set_name, k, normalization_type='(-1)-1',
+                         normalization=True, meanSubstraction=False,
                          dataAugmentation=True, debug=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
