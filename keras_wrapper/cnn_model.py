@@ -723,8 +723,8 @@ class Model_Wrapper(object):
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
                           'n_parallel_loaders': 8,
-                          'normalize': False,
-                          'mean_substraction': True,
+                          'normalize': True,
+                          'mean_substraction': False,
                           'data_augmentation': True,
                           'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0,
@@ -790,8 +790,8 @@ class Model_Wrapper(object):
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
                           'n_parallel_loaders': 8,
-                          'normalize': False,
-                          'mean_substraction': True,
+                          'normalize': True,
+                          'mean_substraction': False,
                           'data_augmentation': True,
                           'verbose': 1,
                           'eval_on_sets': ['val'],
@@ -988,8 +988,8 @@ class Model_Wrapper(object):
     def testNet(self, ds, parameters, out_name=None):
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize': False,
-                          'mean_substraction': True}
+        default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'normalize': True,
+                          'mean_substraction': False}
         params = self.checkParameters(parameters, default_params)
         self.testing_parameters.append(copy.copy(params))
 
@@ -1703,7 +1703,7 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8,
                           'beam_size': 5, 'beam_batch_size': 50,
-                          'normalize': False, 'mean_substraction': True,
+                          'normalize': True, 'mean_substraction': False,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],
@@ -1959,8 +1959,8 @@ class Model_Wrapper(object):
         default_params = {'max_batch_size': 50,
                           'n_parallel_loaders': 8,
                           'beam_size': 5, 'beam_batch_size': 50,
-                          'normalize': False,
-                          'mean_substraction': True,
+                          'normalize': True,
+                          'mean_substraction': False,
                           'predict_on_sets': ['val'],
                           'maxlen': 20,
                           'n_samples': -1,
@@ -2226,8 +2226,8 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50,
                           'n_parallel_loaders': 8,
-                          'normalize': False,
-                          'mean_substraction': True,
+                          'normalize': True,
+                          'mean_substraction': False,
                           'n_samples': None,
                           'init_sample': -1,
                           'final_sample': -1,
@@ -2432,7 +2432,7 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50, 'n_parallel_loaders': 8, 'beam_size': 5,
-                          'normalize': False, 'mean_substraction': True,
+                          'normalize': True, 'mean_substraction': False,
                           'predict_on_sets': ['val'], 'maxlen': 20, 'n_samples': -1,
                           'model_inputs': ['source_text', 'state_below'],
                           'model_outputs': ['description'],

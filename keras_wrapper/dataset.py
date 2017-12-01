@@ -235,7 +235,7 @@ class Homogeneous_Data_Batch_Generator(object):
                  joint_batches=20,
                  normalization=False,
                  data_augmentation=True,
-                 mean_substraction=True,
+                 mean_substraction=False,
                  predict=False,
                  random_samples=-1,
                  shuffle=True):
@@ -441,7 +441,7 @@ class Dataset(object):
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
 
         # List of implemented input normalization functions
-        self.__available_norm_im_vid = ['0-1']  # 'image' and 'video' only
+        self.__available_norm_im_vid = ['0-1', '(-1)-1']  # 'image' and 'video' only
         self.__available_norm_feat = ['L2']  # 'image-features' and 'video-features' only
 
         # List of implemented input data augmentation functions
