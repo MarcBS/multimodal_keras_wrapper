@@ -15,7 +15,7 @@ from operator import add
 import numpy as np
 from PIL import Image as pilimage
 from scipy import ndimage
-from skimage import io, transform
+from skimage import transform
 
 from extra.read_write import create_dir_if_not_exists
 from keras.utils import np_utils
