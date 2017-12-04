@@ -76,10 +76,15 @@ def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
         f.close()
 
 
-def numpy2file(filepath, mylist, permission='w'):
+def numpy2file(filepath, mylist, permission='w', split=False):
     mylist = np.asarray(mylist)
-    with open(filepath, permission) as f:
-        np.save(f, mylist)
+    if split:
+        for i, filepath_ in enumerate(filepath):
+            with open(filepath_, permission) as f:
+                np.save(f, mylist[i])
+    else:
+        with open(filepath, permission) as f:
+            np.save(f, mylist)
 
 
 def numpy2imgs(folder_path, mylist, imgs_names, dataset):
