@@ -79,6 +79,7 @@ class Data_Batch_Generator(object):
                  num_iterations,
                  batch_size=50,
                  normalization=True,
+                 normalization_type=None,
                  data_augmentation=True,
                  mean_substraction=False,
                  predict=False,
@@ -117,6 +118,7 @@ class Data_Batch_Generator(object):
                        'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
+                       'normalization_type': normalization_type,
                        'num_iterations': num_iterations,
                        'random_samples': random_samples,
                        'shuffle': shuffle}
@@ -172,6 +174,7 @@ class Data_Batch_Generator(object):
                     X_batch = self.dataset.getX_FromIndices(self.set_split,
                                                             indices,
                                                             normalization=self.params['normalization'],
+                                                            normalization_type=self.params['normalization_type'],
                                                             meanSubstraction=self.params['mean_substraction'],
                                                             dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, None)[0]
@@ -180,6 +183,7 @@ class Data_Batch_Generator(object):
                     X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
                                                                       indices,
                                                                       normalization=self.params['normalization'],
+                                                                      normalization_type=self.params['normalization_type'],
                                                                       meanSubstraction=self.params['mean_substraction'],
                                                                       dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, Y_batch)
@@ -190,6 +194,7 @@ class Data_Batch_Generator(object):
                     X_batch = self.dataset.getX_FromIndices(self.set_split,
                                                             indices,
                                                             normalization=self.params['normalization'],
+                                                            normalization_type=self.params['normalization_type'],
                                                             meanSubstraction=self.params['mean_substraction'],
                                                             dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, None)[0]
@@ -198,6 +203,7 @@ class Data_Batch_Generator(object):
                     X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
                                                                       indices,
                                                                       normalization=self.params['normalization'],
+                                                                      normalization_type=self.params['normalization_type'],
                                                                       meanSubstraction=self.params['mean_substraction'],
                                                                       dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, Y_batch)
@@ -208,6 +214,7 @@ class Data_Batch_Generator(object):
                                                 init_sample,
                                                 final_sample,
                                                 normalization=self.params['normalization'],
+                                                normalization_type=self.params['normalization_type'],
                                                 meanSubstraction=self.params['mean_substraction'],
                                                 dataAugmentation=False)
                     data = self.net.prepareData(X_batch, None)[0]
@@ -215,6 +222,7 @@ class Data_Batch_Generator(object):
                     X_batch, Y_batch = self.dataset.getXY(self.set_split,
                                                           batch_size,
                                                           normalization=self.params['normalization'],
+                                                          normalization_type=self.params['normalization_type'],
                                                           meanSubstraction=self.params['mean_substraction'],
                                                           dataAugmentation=data_augmentation)
                     data = self.net.prepareData(X_batch, Y_batch)
@@ -234,6 +242,7 @@ class Homogeneous_Data_Batch_Generator(object):
                  batch_size=50,
                  joint_batches=20,
                  normalization=False,
+                 normalization_type=None,
                  data_augmentation=True,
                  mean_substraction=False,
                  predict=False,
@@ -272,6 +281,7 @@ class Homogeneous_Data_Batch_Generator(object):
         self.params = {'data_augmentation': data_augmentation,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
+                       'normalization_type': normalization_type,
                        'num_iterations': num_iterations / joint_batches,
                        'random_samples': random_samples,
                        'shuffle': shuffle,
@@ -308,6 +318,7 @@ class Homogeneous_Data_Batch_Generator(object):
         # Recovers a batch of data
         X_batch, Y_batch = self.dataset.getXY(self.set_split,
                                               batch_size,  # This batch_size value is self.batch_size * joint_batches
+                                              normalization_type=self.params['normalization_type'],
                                               normalization=self.params['normalization'],
                                               meanSubstraction=self.params['mean_substraction'],
                                               dataAugmentation=data_augmentation)
