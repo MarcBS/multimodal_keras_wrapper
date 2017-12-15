@@ -2893,6 +2893,8 @@ class Dataset(object):
         :param loaded : set this option to True if images is a list of matricies instead of a list of strings
         """
         # Check if the chosen normalization type exists
+        if normalization_type is None:
+            normalization_type = '(-1)-1'
         if normalization and normalization_type not in self.__available_norm_im_vid:
             raise NotImplementedError(
                 'The chosen normalization type ' + normalization_type +
@@ -2972,13 +2974,13 @@ class Dataset(object):
             if not dataAugmentation:
                 # Use whole image
                 im = np.asarray(im, dtype=type_imgs)
-                im = transform.resize(im, (self.img_size_crop[id][1], self.img_size_crop[id][0]))
+                im = transform.resize(im, (self.img_size_crop[id][0], self.img_size_crop[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
                 im = np.asarray(im, dtype=type_imgs)
-                im = transform.resize(im, (self.img_size[id][1], self.img_size[id][0]))
+                im = transform.resize(im, (self.img_size[id][0], self.img_size[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
 
                 # Take random crop
