@@ -21,6 +21,7 @@ def checkDefaultParamsBeamSearch(params):
                       'temporally_linked': False,
                       'link_index_id': 'link_index',
                       'state_below_index': -1,
+                      'state_below_maxlen': -1,
                       'pos_unk': False,
                       'max_eval_samples': None,
                       'search_pruning': False,

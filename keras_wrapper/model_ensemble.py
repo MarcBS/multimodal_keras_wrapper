@@ -111,13 +111,22 @@ class BeamSearchEnsemble:
         if self.return_alphas:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
+        if pad_on_batch:
+            maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_max_length_depending_on_x_factor']) if \
+                params['output_max_length_depending_on_x'] else params['maxlen']
 
-        maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_max_length_depending_on_x_factor']) if \
-            params['output_max_length_depending_on_x'] else params['maxlen']
+            minlen = int(len(X[params['dataset_inputs'][0]][0]) /
+                         params['output_min_length_depending_on_x_factor'] + 1e-7) \
+                if params['output_min_length_depending_on_x'] else 0
+        else:
+            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym)
+                         / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
+                params['output_min_length_depending_on_x'] else 0
 
-        minlen = int(len(X[params['dataset_inputs'][0]][0]) /
-                     params['output_min_length_depending_on_x_factor'] + 1e-7) \
-            if params['output_min_length_depending_on_x'] else 0
+            maxlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) * params[
+                'output_max_length_depending_on_x_factor']) if \
+                params['output_max_length_depending_on_x'] else params['maxlen']
+            maxlen = min(params['state_below_maxlen'] - 1, maxlen)
 
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
@@ -126,8 +135,8 @@ class BeamSearchEnsemble:
             state_below = np.asarray([[null_sym]] * live_k) \
                 if pad_on_batch else np.asarray([np.zeros((maxlen, maxlen))] * live_k)
         else:
-            state_below = np.asarray([null_sym] * live_k) \
-                if pad_on_batch else np.asarray([np.zeros(maxlen)] * live_k)
+            state_below = np.asarray([null_sym] * live_k) if pad_on_batch else \
+                np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
         prev_outs = [None] * len(self.models)
         for ii in xrange(maxlen):
             # for every possible live sample calc prob for every possible label
@@ -136,17 +145,16 @@ class BeamSearchEnsemble:
                                                                prev_outs=prev_outs)
             else:
                 probs = self.predict_cond(self.models, X, state_below, params, ii)
-
+            log_probs = np.log(probs)
             if minlen > 0 and ii < minlen:
-                probs[:, eos_sym] = -np.inf
-
+                log_probs[:, eos_sym] = -np.inf
             # total score for every sample is sum of -log of word prb
-            cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
+            cand_scores = np.array(hyp_scores)[:, None] - log_probs
             cand_flat = cand_scores.flatten()
             # Find the best options by calling argsort of flatten array
             ranks_flat = cand_flat.argsort()[:(k - dead_k)]
             # Decypher flatten indices
-            voc_size = probs.shape[1]
+            voc_size = log_probs.shape[1]
             trans_indices = ranks_flat / voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
@@ -173,7 +181,6 @@ class BeamSearchEnsemble:
                     new_hyp_scores[idx] = copy.copy(costs[idx])
                     if self.return_alphas:
                         new_hyp_alphas.append(hyp_alphas[ti] + [alphas[ti]])
-
             # check the finished samples
             new_live_k = 0
             hyp_samples = []
@@ -209,10 +216,10 @@ class BeamSearchEnsemble:
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
             else:
-                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
-                                         np.zeros((state_below.shape[0],
-                                                   max(maxlen - state_below.shape[1] - 1, 0)),
-                                                  dtype='int64')))
+                np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym,
+                           state_below,
+                           np.zeros((state_below.shape[0],
+                                     max(params['state_below_maxlen'] - state_below.shape[1] - 1, 0)), dtype='int64')))
 
                 if params['words_so_far']:
                     state_below = np.expand_dims(state_below, axis=0)
@@ -282,6 +289,7 @@ class BeamSearchEnsemble:
                           'optimized_search': False,
                           'pos_unk': False,
                           'state_below_index': -1,
+                          'state_below_maxlen': -1,
                           'search_pruning': False,
                           'normalize_probs': False,
                           'alpha_factor': 0.0,
@@ -476,6 +484,7 @@ class BeamSearchEnsemble:
                           'words_so_far': False,
                           'optimized_search': False,
                           'state_below_index': -1,
+                          'state_below_maxlen': -1,
                           'output_text_index': 0,
                           'search_pruning': False,
                           'pos_unk': False,
@@ -598,7 +607,8 @@ class BeamSearchEnsemble:
                 if pad_on_batch else np.asarray([np.zeros((params['maxlen'], params['maxlen']))])
         else:
             state_below = np.asarray([null_sym]) \
-                if pad_on_batch else np.asarray([np.zeros(params['maxlen'])])
+                if pad_on_batch else np.asarray([np.zeros(params['state_below_maxlen']) + null_sym])
+
 
         prev_outs = [None] * len(self.models)
         for ii in xrange(len(Y)):
@@ -681,6 +691,7 @@ class BeamSearchEnsemble:
                           'words_so_far': False,
                           'optimized_search': False,
                           'state_below_index': -1,
+                          'state_below_maxlen': -1,
                           'output_text_index': 0,
                           'pos_unk': False,
                           'normalize_probs': False,
