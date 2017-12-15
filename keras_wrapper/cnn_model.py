@@ -1098,7 +1098,6 @@ class Model_Wrapper(object):
         """
         in_data = {}
         n_samples = states_below.shape[0]
-
         ##########################################
         # Choose model to use for sampling
         ##########################################
@@ -1109,14 +1108,12 @@ class Model_Wrapper(object):
             else:
                 in_data[model_input] = copy.copy(X[model_input])
         in_data[params['model_inputs'][params['state_below_index']]] = states_below
-
         ##########################################
         # Recover output identifiers
         ##########################################
         # in any case, the first output of the models must be the next words' probabilities
         output_ids_list = params['model_outputs']
         pick_idx = ii
-
         ##########################################
         # Apply prediction on current timestep
         ##########################################
@@ -1182,11 +1179,10 @@ class Model_Wrapper(object):
         ##########################################
         # Get inputs
         ##########################################
-
         if ii > 1:  # timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1)
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params['pad_on_batch'] else states_below
                 if idx > 0:  # first output must be the output probs.
                     if next_out_name in self.matchings_next_to_next.keys():
                         next_in_name = self.matchings_next_to_next[next_out_name]
@@ -1199,11 +1195,11 @@ class Model_Wrapper(object):
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
                 else:
                     in_data[model_input] = copy.copy(X[model_input])
-            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1)
+            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1) if params['pad_on_batch'] else states_below
         elif ii == 1:  # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1)
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params['pad_on_batch'] else states_below
                 if idx > 0:  # first output must be the output probs.
                     if init_out_name in self.matchings_init_to_next.keys():
                         next_in_name = self.matchings_init_to_next[init_out_name]
@@ -1558,13 +1554,20 @@ class Model_Wrapper(object):
         if ret_alphas:
             sample_alphas = []
             hyp_alphas = [[]] * live_k
-
-        maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_max_length_depending_on_x_factor']) if \
-            params['output_max_length_depending_on_x'] else params['maxlen']
-
-        minlen = int(
-            len(X[params['dataset_inputs'][0]][0]) / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
+        if pad_on_batch:
+            maxlen = int(len(X[params['dataset_inputs'][0]][0]) * params['output_max_length_depending_on_x_factor']) if \
+                params['output_max_length_depending_on_x'] else params['maxlen']
+            minlen = int(
+                len(X[params['dataset_inputs'][0]][0]) / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
+                params['output_min_length_depending_on_x'] else 0
+        else:
+            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0]==eos_sym)
+                     / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
             params['output_min_length_depending_on_x'] else 0
+
+            maxlen = int(np.argmax(X[params['dataset_inputs'][0]][0]==eos_sym) * params['output_max_length_depending_on_x_factor']) if \
+                params['output_max_length_depending_on_x'] else params['maxlen']
+            maxlen = min(params['state_below_maxlen'] - 1, maxlen)
 
         # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
         if params['words_so_far']:
@@ -1574,8 +1577,8 @@ class Model_Wrapper(object):
             state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray(
                 [np.zeros((maxlen, maxlen))] * live_k)
         else:
-            state_below = np.asarray([null_sym] * live_k)
-
+            state_below = np.asarray([null_sym] * live_k) if pad_on_batch else \
+                np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
         prev_out = None
 
         for ii in xrange(maxlen):
@@ -1587,17 +1590,16 @@ class Model_Wrapper(object):
                     prev_out = prev_out[:-1]
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
-
+            log_probs = np.log(probs)
             if minlen > 0 and ii < minlen:
-                probs[:, eos_sym] = -np.inf
-
+                log_probs[:, eos_sym] = -np.inf
             # total score for every sample is sum of -log of word prb
-            cand_scores = np.array(hyp_scores)[:, None] - np.log(probs)
+            cand_scores = np.array(hyp_scores)[:, None] - log_probs
             cand_flat = cand_scores.flatten()
             # Find the best options by calling argsort of flatten array
             ranks_flat = cand_flat.argsort()[:(k - dead_k)]
             # Decypher flatten indices
-            voc_size = probs.shape[1]
+            voc_size = log_probs.shape[1]
             trans_indices = ranks_flat / voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
@@ -1653,7 +1655,13 @@ class Model_Wrapper(object):
                 break
             state_below = np.asarray(hyp_samples, dtype='int64')
 
-            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))\
+                if pad_on_batch else  \
+                np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym,
+                           state_below,
+                           np.zeros((state_below.shape[0],
+                                     max(params['state_below_maxlen'] - state_below.shape[1] - 1, 0)), dtype='int64')))
+
 
             # we must include an additional dimension if the input for each timestep are all the generated words so far
             if params['words_so_far']:
@@ -1683,7 +1691,6 @@ class Model_Wrapper(object):
         print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
         return self.predictBeamSearchNet(ds, parameters)
 
-        #    def predictBeamSearchNet(self, ds, parameters={}):
 
     def predictBeamSearchNet_NEW(self, ds, parameters=None):
         """
@@ -1783,7 +1790,6 @@ class Model_Wrapper(object):
                     assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
 
                 params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
-
                 if params['temporally_linked']:
                     previous_outputs = {}  # variable for storing previous outputs if using a temporally-linked model
                     for input_id in self.ids_temporally_linked_inputs:
@@ -1996,6 +2002,7 @@ class Model_Wrapper(object):
                           'temporally_linked': False,
                           'link_index_id': 'link_index',
                           'state_below_index': -1,
+                          'state_below_maxlen': -1,
                           'max_eval_samples': None,
                           'normalize_probs': False,
                           'alpha_factor': 0.0,
