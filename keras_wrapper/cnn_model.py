@@ -834,6 +834,8 @@ class Model_Wrapper(object):
                                                  'embeddings_freq': 0,
                                                  'embeddings_layer_names': None,
                                                  'embeddings_metadata': None,
+                                                 'label_word_embeddings_with_vocab': False,
+                                                 'word_embeddings_labels': None
                                                  }
 
                           }
@@ -892,6 +894,31 @@ class Model_Wrapper(object):
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
+            embeddings_metadata = params['tensorboard_params']['embeddings_metadata']
+            create_dir_if_not_exists(self.model_path + '/' + params['tensorboard_params']['log_dir'])
+            if params['tensorboard_params']['label_word_embeddings_with_vocab'] \
+                    and params['tensorboard_params']['word_embeddings_labels'] is not None:
+                embeddings_metadata = {}
+                assert len(params['tensorboard_params']['embeddings_layer_names']) \
+                       == len(params['tensorboard_params'][
+                                  'word_embeddings_labels']), 'The number of "embeddings_layer_names" and ' \
+                                                              '"word_embeddings_labels" do not match. Currently, ' \
+                                                              'we have %d "embeddings_layer_names" and %d' \
+                                                              ' "word_embeddings_labels"' % (
+                                                                  len(params['tensorboard_params'][
+                                                                          'embeddings_layer_names']),
+                                                                  len(params['tensorboard_params'][
+                                                                          'word_embeddings_labels']))
+                # Prepare word embeddings mapping
+                for i, layer_name in enumerate(params['tensorboard_params']['embeddings_layer_names']):
+                    layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
+                    mapping_name = layer_label + '.tsv'
+                    dict2file(ds.vocabulary[layer_label]['words2idx'],
+                              self.model_path + '/' + params['tensorboard_params']['log_dir'] + '/' + mapping_name,
+                              title='Word\tIndex',
+                              separator='\t')
+                    embeddings_metadata[layer_name] = mapping_name
+
             callback_tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
                 histogram_freq=params['tensorboard_params']['histogram_freq'],
@@ -901,7 +928,7 @@ class Model_Wrapper(object):
                 write_images=params['tensorboard_params']['write_images'],
                 embeddings_freq=params['tensorboard_params']['embeddings_freq'],
                 embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'])
+                embeddings_metadata=embeddings_metadata)
             callbacks.append(callback_tensorboard)
 
         # Prepare data generators
@@ -1249,7 +1276,7 @@ class Model_Wrapper(object):
                 else:
                     in_data[model_input] = copy.copy(X[model_input])
             in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1) if \
-            params['pad_on_batch'] else states_below
+                params['pad_on_batch'] else states_below
         elif ii == 1:  # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
@@ -2935,7 +2962,7 @@ class Model_Wrapper(object):
         # Build default colours_shapes_dict if not provided
         if colours_shapes_dict is None:
             colours_shapes_dict = dict()
-            
+
         if not colours_shapes_dict:
             default_colours = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
             default_shapes = ['-', 'o', '.']

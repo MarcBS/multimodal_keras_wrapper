@@ -300,7 +300,7 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
     return score
 
 
-def dict2file(mydict, path, title=None):
+def dict2file(mydict, path, title=None, separator=':'):
     """
     In:
         mydict - dictionary to save in a file
@@ -309,7 +309,7 @@ def dict2file(mydict, path, title=None):
             useful if we write many dictionaries
             into the same file
     """
-    tmp = [str(x[0]) + ':' + str(x[1]) for x in mydict.items()]
+    tmp = [str(x[0]) + separator + str(x[1]) for x in mydict.items()]
     if title is not None:
         output_list = [title]
         output_list.extend(tmp)
