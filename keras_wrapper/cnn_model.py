@@ -1,21 +1,22 @@
-import matplotlib as mpl
-import numpy as np
 import cPickle as pk
-import cloud.serialization.cloudpickle as cloudpk
+import copy
+import math
+import shutil
 import sys
 import time
-import os
-import math
-import copy
-import shutil
-import logging
+
+import cloud.serialization.cloudpickle as cloudpk
+import matplotlib as mpl
+
 import keras
 from keras import backend as K
+from keras.applications.vgg19 import VGG19
 from keras.engine.training import Model
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json
+from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
 from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
@@ -24,15 +25,13 @@ from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
     decode_predictions_beam_search, replace_unknown_words, sample, sampling
-from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
-from keras.applications.vgg19 import VGG19
+
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
 else:
     from keras.layers import Concatenate
 mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
-
 
 # General setup of libraries
 logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
@@ -745,7 +744,19 @@ class Model_Wrapper(object):
                           'lr_gamma': 0.1,
                           'lr_reducer_type': 'linear',
                           'lr_reducer_exp_base': 0.5,
-                          'lr_half_life': 50000}
+                          'lr_half_life': 50000,
+                          'tensorboard': False,
+                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
+                                                 'histogram_freq': 0,
+                                                 'batch_size': 50,
+                                                 'write_graph': True,
+                                                 'write_grads': False,
+                                                 'write_images': False,
+                                                 'embeddings_freq': 0,
+                                                 'embeddings_layer_names': None,
+                                                 'embeddings_metadata': None,
+                                                 }
+                          }
         params = self.checkParameters(parameters, default_params)
         # Set params['start_reduction_on_epoch'] = params['lr_decay'] by default
         if params['lr_decay'] is not None and 'start_reduction_on_epoch' not in parameters.keys():
@@ -812,7 +823,22 @@ class Model_Wrapper(object):
                           'lr_gamma': 0.1,
                           'lr_reducer_type': 'linear',
                           'lr_reducer_exp_base': 0.5,
-                          'lr_half_life': 50000}
+                          'lr_half_life': 50000,
+                          'tensorboard': False,
+                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
+                                                 'histogram_freq': 0,
+                                                 'batch_size': 50,
+                                                 'write_graph': True,
+                                                 'write_grads': False,
+                                                 'write_images': False,
+                                                 'embeddings_freq': 0,
+                                                 'embeddings_layer_names': None,
+                                                 'embeddings_metadata': None,
+                                                 'label_word_embeddings_with_vocab': False,
+                                                 'word_embeddings_labels': None
+                                                 }
+
+                          }
         params = self.checkParameters(parameters, default_params)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
@@ -865,6 +891,45 @@ class Model_Wrapper(object):
         if params['epochs_for_save'] >= 0:
             callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
             callbacks.append(callback_store_model)
+
+        # Tensorboard callback
+        if params['tensorboard'] and K.backend() == 'tensorflow':
+            embeddings_metadata = params['tensorboard_params']['embeddings_metadata']
+            create_dir_if_not_exists(self.model_path + '/' + params['tensorboard_params']['log_dir'])
+            if params['tensorboard_params']['label_word_embeddings_with_vocab'] \
+                    and params['tensorboard_params']['word_embeddings_labels'] is not None:
+                embeddings_metadata = {}
+                assert len(params['tensorboard_params']['embeddings_layer_names']) \
+                       == len(params['tensorboard_params'][
+                                  'word_embeddings_labels']), 'The number of "embeddings_layer_names" and ' \
+                                                              '"word_embeddings_labels" do not match. Currently, ' \
+                                                              'we have %d "embeddings_layer_names" and %d' \
+                                                              ' "word_embeddings_labels"' % (
+                                                                  len(params['tensorboard_params'][
+                                                                          'embeddings_layer_names']),
+                                                                  len(params['tensorboard_params'][
+                                                                          'word_embeddings_labels']))
+                # Prepare word embeddings mapping
+                for i, layer_name in enumerate(params['tensorboard_params']['embeddings_layer_names']):
+                    layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
+                    mapping_name = layer_label + '.tsv'
+                    dict2file(ds.vocabulary[layer_label]['words2idx'],
+                              self.model_path + '/' + params['tensorboard_params']['log_dir'] + '/' + mapping_name,
+                              title='Word\tIndex',
+                              separator='\t')
+                    embeddings_metadata[layer_name] = mapping_name
+
+            callback_tensorboard = keras.callbacks.TensorBoard(
+                log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
+                histogram_freq=params['tensorboard_params']['histogram_freq'],
+                batch_size=params['tensorboard_params']['batch_size'],
+                write_graph=params['tensorboard_params']['write_graph'],
+                write_grads=params['tensorboard_params']['write_grads'],
+                write_images=params['tensorboard_params']['write_images'],
+                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                embeddings_metadata=embeddings_metadata)
+            callbacks.append(callback_tensorboard)
 
         # Prepare data generators
         if params['homogeneous_batches']:
@@ -976,6 +1041,20 @@ class Model_Wrapper(object):
         if params['epochs_for_save'] >= 0:
             callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
             callbacks.append(callback_store_model)
+
+        # Tensorboard callback
+        if params['tensorboard'] and K.backend() == 'tensorflow':
+            callback_tensorboard = keras.callbacks.TensorBoard(
+                log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
+                histogram_freq=params['tensorboard_params']['histogram_freq'],
+                batch_size=params['tensorboard_params']['batch_size'],
+                write_graph=params['tensorboard_params']['write_graph'],
+                write_grads=params['tensorboard_params']['write_grads'],
+                write_images=params['tensorboard_params']['write_images'],
+                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'])
+            callbacks.append(callback_tensorboard)
 
         # Train model
         self.model.fit(x,
@@ -1182,7 +1261,8 @@ class Model_Wrapper(object):
         if ii > 1:  # timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params['pad_on_batch'] else states_below
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params[
+                        'pad_on_batch'] else states_below
                 if idx > 0:  # first output must be the output probs.
                     if next_out_name in self.matchings_next_to_next.keys():
                         next_in_name = self.matchings_next_to_next[next_out_name]
@@ -1195,11 +1275,13 @@ class Model_Wrapper(object):
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
                 else:
                     in_data[model_input] = copy.copy(X[model_input])
-            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1) if params['pad_on_batch'] else states_below
+            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1) if \
+                params['pad_on_batch'] else states_below
         elif ii == 1:  # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params['pad_on_batch'] else states_below
+                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params[
+                        'pad_on_batch'] else states_below
                 if idx > 0:  # first output must be the output probs.
                     if init_out_name in self.matchings_init_to_next.keys():
                         next_in_name = self.matchings_init_to_next[init_out_name]
@@ -1561,11 +1643,12 @@ class Model_Wrapper(object):
                 len(X[params['dataset_inputs'][0]][0]) / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
                 params['output_min_length_depending_on_x'] else 0
         else:
-            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0]==eos_sym)
-                     / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
-            params['output_min_length_depending_on_x'] else 0
+            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym)
+                         / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
+                params['output_min_length_depending_on_x'] else 0
 
-            maxlen = int(np.argmax(X[params['dataset_inputs'][0]][0]==eos_sym) * params['output_max_length_depending_on_x_factor']) if \
+            maxlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) * params[
+                'output_max_length_depending_on_x_factor']) if \
                 params['output_max_length_depending_on_x'] else params['maxlen']
             maxlen = min(params['state_below_maxlen'] - 1, maxlen)
 
@@ -1655,13 +1738,12 @@ class Model_Wrapper(object):
                 break
             state_below = np.asarray(hyp_samples, dtype='int64')
 
-            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))\
-                if pad_on_batch else  \
+            state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below)) \
+                if pad_on_batch else \
                 np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym,
                            state_below,
                            np.zeros((state_below.shape[0],
                                      max(params['state_below_maxlen'] - state_below.shape[1] - 1, 0)), dtype='int64')))
-
 
             # we must include an additional dimension if the input for each timestep are all the generated words so far
             if params['words_so_far']:
@@ -1690,7 +1772,6 @@ class Model_Wrapper(object):
         """
         print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
         return self.predictBeamSearchNet(ds, parameters)
-
 
     def predictBeamSearchNet_NEW(self, ds, parameters=None):
         """
@@ -2881,7 +2962,7 @@ class Model_Wrapper(object):
         # Build default colours_shapes_dict if not provided
         if colours_shapes_dict is None:
             colours_shapes_dict = dict()
-            
+
         if not colours_shapes_dict:
             default_colours = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
             default_shapes = ['-', 'o', '.']
