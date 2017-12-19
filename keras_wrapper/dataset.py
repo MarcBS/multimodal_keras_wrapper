@@ -2115,7 +2115,9 @@ class Dataset(object):
         """
         if not self.BPE_built:
             raise Exception('Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"')
-        tokenized = re.sub('[\n\t]+', u'', caption)
+        if type(caption) == str:
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
         tokenized = self.BPE.segment(tokenized).strip()
         return tokenized
 
