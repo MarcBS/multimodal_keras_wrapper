@@ -14,7 +14,7 @@ from operator import add
 
 import numpy as np
 from PIL import Image as pilimage
-from scipy import ndimage
+from scipy import ndimage, misc
 from skimage import transform
 
 from extra.read_write import create_dir_if_not_exists
@@ -1535,7 +1535,7 @@ class Dataset(object):
             if not dataAugmentation or daRandomParams is None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
-                    label2D = transform.resize(label3D[j], (h_crop, w_crop))
+                    label2D = misc.imresize(label3D[j], (h_crop, w_crop))
                     maxval = np.max(label2D)
                     if maxval > 0:
                         label2D /= maxval
@@ -1544,7 +1544,7 @@ class Dataset(object):
                 label3D_rs = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
                 # Crop the labels (random crop)
                 for j in range(nClasses):
-                    label2D = transform.resize(label3D[j], (h, w))
+                    label2D = misc.imresize(label3D[j], (h, w))
                     maxval = np.max(label2D)
                     if maxval > 0:
                         label2D /= maxval
@@ -1617,8 +1617,9 @@ class Dataset(object):
                 labeled_im = pilimage.open(labeled_im)
                 labeled_im = np.asarray(labeled_im)
                 logging.disable(logging.NOTSET)
-                labeled_im = transform.resize(labeled_im, (h, w))
+                labeled_im = misc.imresize(labeled_im, (h, w))
             except:
+                logging.info(labeled_im)
                 logging.warning("WARNING!")
                 logging.warning("Can't load image " + labeled_im)
                 labeled_im = np.zeros((h, w))
@@ -1638,7 +1639,7 @@ class Dataset(object):
             if not dataAugmentation or daRandomParams is None:
                 # Resize 3DLabel to crop size.
                 for j in range(nClasses):
-                    label2D = transform.resize(label3D[j], (h_crop, w_crop))
+                    label2D = misc.imresize(label3D[j], (h_crop, w_crop))
                     maxval = np.max(label2D)
                     if maxval > 0:
                         label2D /= maxval
@@ -1647,7 +1648,7 @@ class Dataset(object):
                 label3D_rs = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
                 # Crop the labels (random crop)
                 for j in range(nClasses):
-                    label2D = transform.resize(label3D[j], (h, w))
+                    label2D = misc.imresize(label3D[j], (h, w))
                     maxval = np.max(label2D)
                     if maxval > 0:
                         label2D /= maxval
@@ -2569,7 +2570,7 @@ class Dataset(object):
                 labeled_im = pilimage.open(labeled_im)
                 labeled_im = np.asarray(labeled_im)
                 logging.disable(logging.NOTSET)
-                labeled_im = transform.resize(labeled_im, (h, w))
+                labeled_im = misc.imresize(labeled_im, (h, w))
             except:
                 logging.warning("WARNING!")
                 logging.warning("Can't load image " + labeled_im)
@@ -2589,7 +2590,7 @@ class Dataset(object):
 
             # Resize 3DLabel to crop size.
             for j in range(nClasses):
-                label2D = transform.resize(label3D[j], (h_crop, w_crop))
+                label2D = misc.imresize(label3D[j], (h_crop, w_crop))
                 maxval = np.max(label2D)
                 if maxval > 0:
                     label2D /= maxval
@@ -2618,7 +2619,7 @@ class Dataset(object):
 
             new_pred = np.zeros(tuple([n_classes] + out_size[0:2]))
             for pos, p in enumerate(pred):
-                new_pred[pos] = transform.resize(p, tuple(out_size[0:2]))
+                new_pred[pos] = misc.imresize(p, tuple(out_size[0:2]))
 
             new_pred = np.reshape(new_pred, (-1, out_size[0] * out_size[1]))
             new_pred = np.transpose(new_pred, [1, 0])
@@ -2929,7 +2930,7 @@ class Dataset(object):
             if id not in self.train_mean:
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "' + id + '".')
             train_mean = copy.copy(self.train_mean[id])
-            train_mean = transform.resize(train_mean, self.img_size_crop[id][0:2])
+            train_mean = misc.imresize(train_mean, self.img_size_crop[id][0:2])
             
             # Transpose dimensions
             if len(self.img_size[id]) == 3:  # if it is a 3D image
@@ -2997,13 +2998,13 @@ class Dataset(object):
             if not dataAugmentation:
                 # Use whole image
                 im = np.asarray(im, dtype=type_imgs)
-                im = transform.resize(im, (self.img_size_crop[id][0], self.img_size_crop[id][1]))
+                im = misc.imresize(im, (self.img_size_crop[id][0], self.img_size_crop[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
                 im = np.asarray(im, dtype=type_imgs)
-                im = transform.resize(im, (self.img_size[id][0], self.img_size[id][1]))
+                im = misc.imresize(im, (self.img_size[id][0], self.img_size[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
 
                 # Take random crop
