@@ -2802,7 +2802,7 @@ class Dataset(object):
 
         return data
 
-    def setTrainMean(self, mean_image, id, normalization=False):
+    def setTrainMean(self, mean_image, id, use_RGB=True, normalization=False):
         """
             Loads a pre-calculated training mean image, 'mean_image' can either be:
             
@@ -2811,6 +2811,7 @@ class Dataset(object):
             - string with the path to the stored image.
             
         :param mean_image:
+        :param user_RGB: set to False for grayscale images
         :param normalization:
         :param id: identifier of the type of input whose train mean is being introduced.
         """
@@ -2826,6 +2827,16 @@ class Dataset(object):
             self.train_mean[id] /= 255.0
 
         if self.train_mean[id].shape != tuple(self.img_size_crop[id]):
+            """
+            if not use_RGB:
+                if len(self.train_mean[id].shape) == 1:
+                    if not self.silence:
+                        logging.info("Converting input train mean pixels into mean image.")
+                    mean_image = np.zeros(tuple(self.img_size_crop[id]), np.float64)
+                    mean_image[:, :] = self.train_mean[id]
+                    self.train_mean[id] = mean_image
+            else:
+            """
             if len(self.train_mean[id].shape) == 1 and self.train_mean[id].shape[0] == self.img_size_crop[id][2]:
                 if not self.silence:
                     logging.info("Converting input train mean pixels into mean image.")
@@ -2993,35 +3004,41 @@ class Dataset(object):
                     im = im.convert('RGB')
                 else:
                     im = im.convert('L')
+                im = np.asarray(im, dtype=type_imgs)
 
             # Data augmentation
             if not dataAugmentation:
                 # Use whole image
-                im = np.asarray(im, dtype=type_imgs)
+
                 im = misc.imresize(im, (self.img_size_crop[id][0], self.img_size_crop[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
+
+                if not self.use_RGB[id]:
+                    im = np.expand_dims(im, 2)
+
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
-                im = np.asarray(im, dtype=type_imgs)
+
                 im = misc.imresize(im, (self.img_size[id][0], self.img_size[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
+
+                if not self.use_RGB[id]:
+                    im = np.expand_dims(im, 2)
 
                 # Take random crop
                 left = randomParams["left"]
                 right = np.add(left, self.img_size_crop[id][0:2])
-                if self.use_RGB[id]:
-                    try:
-                        im = im[left[0]:right[0], left[1]:right[1], :]
-                    except:
-                        print '------- ERROR -------'
-                        print left
-                        print right
-                        print im.shape
-                        print imname
-                        raise Exception('Error with image ' + imname)
-                else:
-                    im = im[left[0]:right[0], left[1]:right[1]]
+
+                try:
+                    im = im[left[0]:right[0], left[1]:right[1], :]
+                except:
+                    print '------- ERROR -------'
+                    print left
+                    print right
+                    print im.shape
+                    print imname
+                    raise Exception('Error with image ' + imname)
 
                 # Randomly flip (with a certain probability)
                 flip = randomParams["hflip"]
