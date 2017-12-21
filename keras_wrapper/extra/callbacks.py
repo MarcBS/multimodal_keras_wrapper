@@ -7,6 +7,7 @@ from keras.callbacks import Callback as KerasCallback
 from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
     decode_multilabel
 from read_write import *
+import copy
 
 
 def checkDefaultParamsBeamSearch(params):
@@ -82,6 +83,7 @@ class EvalPerformance(KerasCallback):
                  save_path='logs/performance.',
                  reload_epoch=0,
                  eval_on_epochs=True,
+                 eval_orig_size=False,
                  start_eval_on_epoch=0,
                  is_3DLabel=False,
                  sampling_type='max_likelihood',
@@ -122,6 +124,7 @@ class EvalPerformance(KerasCallback):
         :param save_path: path to dumb the logs
         :param reload_epoch: reloading epoch
         :param eval_on_epochs: eval each epochs (True) or each updates (False)
+        :param eval_orig_size: eval on original image size (True) or not (False)
         :param start_eval_on_epoch: only starts evaluating model if a given epoch has been reached
         :param is_3DLabel: defines if the predicted info is of type 3DLabels
         :param sampling_type: type of sampling used (multinomial or max_likelihood)
@@ -181,6 +184,7 @@ class EvalPerformance(KerasCallback):
         self.normalize = normalize
         self.save_path = save_path
         self.eval_on_epochs = eval_on_epochs
+        self.eval_orig_size = eval_orig_size
         self.start_eval_on_epoch = start_eval_on_epoch
         self.write_type = write_type
         self.sampling_type = sampling_type
@@ -200,10 +204,15 @@ class EvalPerformance(KerasCallback):
 
         # Single-output model
         if not self.gt_pos or self.gt_pos == 0:
+            #if not type(self.metric_name) == list:
             self.metric_name = [self.metric_name]
+            #if not type(self.write_type) == list:
             self.write_type = [self.write_type]
+            #if not type(self.index2word_y) == list:
             self.index2word_y = [self.index2word_y]
+            #if not type(self.index2word_x) == list:
             self.index2word_x = [self.index2word_x]
+
             if 0 not in self.extra_vars.keys():
                 self.extra_vars[0] = self.extra_vars
 
@@ -212,6 +221,10 @@ class EvalPerformance(KerasCallback):
                     self.output_types = ['binary']
                 elif self.is_text:
                     self.output_types = ['text']
+                elif self.is_3DLabel:
+                    self.output_types = ['3DLabel']
+                else:
+                    self.output_types = ["NA"]
             else:
                 self.output_types = [self.output_types]
 
@@ -307,7 +320,7 @@ class EvalPerformance(KerasCallback):
                     print('')
                     logging.info('Prediction output ' + str(gt_pos) + ': ' + gt_id + ' (' + type + ')')
 
-                # Preprocess outputs of type text
+                # Postprocess outputs of type text
                 if type == 'text':
                     if params_prediction.get('pos_unk', False):
                         samples = predictions[0]
@@ -353,7 +366,7 @@ class EvalPerformance(KerasCallback):
                     if self.extra_vars.get('apply_detokenization', False):
                         predictions = map(self.extra_vars['detokenize_f'], predictions)
 
-                # Preprocess outputs of type binary
+                # Postprocess outputs of type binary
                 elif type == 'binary':
                     predictions = decode_multilabel(predictions,
                                                     index2word_y,
@@ -363,6 +376,28 @@ class EvalPerformance(KerasCallback):
                     # Prepare references
                     exec ("y_raw = self.ds.Y_" + s + "[gt_id]")
                     self.extra_vars[gt_pos][s]['references'] = self.ds.loadBinary(y_raw, gt_id)
+
+                # Postprocess outputs of type 3DLabel
+                elif type == '3DLabel':
+                    self.extra_vars[gt_pos][s] = dict()
+                    exec ('ref=self.ds.Y_' + s + '["'+gt_id+'"]')
+                    [ref, original_sizes] = self.ds.convert_GT_3DLabels_to_bboxes(ref)
+                    self.extra_vars[gt_pos][s]['references'] = ref
+                    self.extra_vars[gt_pos][s]['references_orig_sizes'] = original_sizes
+
+                # Postprocess outputs of type 3DSemanticLabel
+                elif type == '3DSemanticLabel':
+                    self.extra_vars[gt_pos]['eval_orig_size'] = self.eval_orig_size
+                    self.extra_vars[gt_pos][s] = dict()
+                    exec ('ref=self.ds.Y_' + s + '["' + gt_id + '"]')
+                    if self.eval_orig_size:
+                        old_crop = copy.deepcopy(self.ds.img_size_crop)
+                        self.ds.img_size_crop = copy.deepcopy(self.ds.img_size)
+                        self.extra_vars[gt_pos][s]['eval_orig_size_id'] = np.array([gt_id]*len(ref))
+                    ref = self.ds.load_GT_3DSemanticLabels(ref, gt_id)
+                    if self.eval_orig_size:
+                        self.ds.img_size_crop = copy.deepcopy(old_crop)
+                    self.extra_vars[gt_pos][s]['references'] = ref
 
                 # Other output data types
                 else:
