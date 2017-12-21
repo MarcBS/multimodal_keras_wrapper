@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import re
 
+# def tokenize_general(caption, lowercase=True):
 
 def tokenize_basic(caption, lowercase=True):
     """
