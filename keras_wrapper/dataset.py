@@ -476,6 +476,10 @@ class Dataset(object):
         self.BPE = None  # Byte Pair Encoding instance
         self.BPE_separator = None
         self.BPE_built = False
+        self.moses_tokenizer = None
+        self.moses_detokenizer = False
+        self.moses_tokenizer_built = None
+        self.moses_detokenizer_built = False
         #################################################
 
         # Parameters used for inputs of type 'video' or 'video-features'
@@ -1495,6 +1499,52 @@ class Dataset(object):
         self.BPE_separator = separator
         self.BPE_built = True
 
+    def build_moses_tokenizer(self, language='en'):
+        """
+        Constructs a Moses tokenizer instance.
+        :param language: Tokenizer language.
+        :return: None
+        """
+        import nltk
+        from nltk.tokenize.moses import MosesTokenizer
+        try:
+            nltk.data.find('misc/perluniprops')
+        except LookupError:
+            nltk.download('perluniprops')
+        try:
+            nltk.data.find('corpora/nonbreaking_prefixes')
+        except LookupError:
+            nltk.download('nonbreaking_prefixes')
+
+        self.moses_tokenizer = MosesTokenizer(lang=language)
+        self.moses_tokenizer_built = True
+
+    def build_moses_detokenizer(self, language='en'):
+        """
+        Constructs a BPE encoder instance. Currently, vocabulary and glossaries options are not implemented.
+        :param codes: File with BPE codes (created by learn_bpe.py)
+        :param separator: Separator between non-final subword units (default: '@@'))
+        :param vocabulary: Vocabulary file. If provided, this script reverts any merge operations that produce an OOV.
+        :param glossaries: The strings provided in glossaries will not be affected
+                           by the BPE (i.e. they will neither be broken into subwords,
+                           nor concatenated with other subwords.
+        :return: None
+        """
+        import nltk
+        from nltk.tokenize.moses import MosesDetokenizer
+        try:
+            nltk.data.find('misc/perluniprops')
+        except LookupError:
+            nltk.download('perluniprops')
+        try:
+            nltk.data.find('corpora/nonbreaking_prefixes')
+        except LookupError:
+            nltk.download('nonbreaking_prefixes')
+
+        self.moses_detokenizer = MosesDetokenizer(lang=language)
+        self.moses_detokenizer_built = True
+
+
     @staticmethod
     def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         """
@@ -1863,7 +1913,6 @@ class Dataset(object):
         """
         return tokenize_icann(caption)
 
-
     @staticmethod
     def tokenize_montreal(caption):
         """
@@ -1993,6 +2042,57 @@ class Dataset(object):
             :return: Detokenized version of caption.
         """
         return detokenize_none_char(caption)
+
+
+    def tokenize_moses(self, caption, language='en', lowercase=False, aggressive_dash_splits=False, return_str=True, escape=False):
+        """
+        Applies the Moses tokenization. Relying on NLTK implementation of the Moses tokenizer.
+
+        :param caption: Sentence to tokenize
+        :param language: Language (will build the tokenizer for this language)
+        :param lowercase: Whether to lowercase or not the sentence
+        :param agressive_dash_splits: Option to trigger dash split rules .
+        :param return_str: Return string or list
+        :param escape: Escape HTML special chars
+        :return:
+        """
+        # Compatibility with old Datasets instances:
+        if not hasattr(self, 'moses_tokenizer_built'):
+            self.moses_tokenizer_built = False
+        if not self.moses_tokenizer_built:
+            self.build_moses_tokenizer(language=language)
+        if type(caption) == str:
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
+        if lowercase:
+            tokenized = tokenized.lower()
+        return self.moses_tokenizer.tokenize(tokenized, agressive_dash_splits=aggressive_dash_splits,
+                                             return_str=return_str, escape=escape)
+
+
+    def detokenize_moses(self, caption, language='en', lowercase=False, return_str=True, unescape=True):
+        """
+        Applies the Moses detokenization. Relying on NLTK implementation of the Moses tokenizer.
+
+        :param caption: Sentence to tokenize
+        :param language: Language (will build the tokenizer for this language)
+        :param lowercase: Whether to lowercase or not the sentence
+        :param agressive_dash_splits: Option to trigger dash split rules .
+        :param return_str: Return string or list
+        :param escape: Escape HTML special chars
+        :return:
+        """
+        # Compatibility with old Datasets instances:
+        if not hasattr(self, 'moses_detokenizer_built'):
+            self.moses_detokenizer_built = False
+        if not self.moses_detokenizer_built:
+            self.build_moses_detokenizer(language=language)
+        if type(caption) == str:
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
+        if lowercase:
+            tokenized = tokenized.lower()
+        return self.moses_detokenizer.detokenize(tokenized.split(), return_str=return_str, unescape=unescape)
 
     # ------------------------------------------------------- #
     #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS

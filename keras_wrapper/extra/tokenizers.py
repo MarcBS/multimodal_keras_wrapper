@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import re
+import sys
+import subprocess
+from os import path
+import time
 
-# def tokenize_general(caption, lowercase=True):
 
 def tokenize_basic(caption, lowercase=True):
     """
