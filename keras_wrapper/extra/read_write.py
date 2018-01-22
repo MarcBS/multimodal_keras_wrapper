@@ -90,27 +90,16 @@ def numpy2file(filepath, mylist, permission='w', split=False):
 def numpy2imgs(folder_path, mylist, imgs_names, dataset):
     create_dir_if_not_exists(folder_path)
     n_samples, wh, n_classes = mylist.shape
-    h_crop, w_crop, d_crop = dataset.img_size_crop[dataset.id_in_3DLabel[dataset.ids_outputs[0]]]
-    output_id = ''.join(dataset.ids_outputs)
 
     for img, name in zip(mylist, imgs_names):
         name = '_'.join(name.split('/'))
         file_path = folder_path + "/" + name  # image file
 
-        # dataset.getImageFromPrediction_3DSemanticLabel()
+        out_img = dataset.getImageFromPrediction_3DSemanticLabel(img, n_classes)
 
-        # prepare prediction image
-        pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
-        pred_im = np.zeros((h_crop, w_crop, d_crop))
-
-        for ih in range(h_crop):
-            for iw in range(w_crop):
-                lab = np.argmax(pred_labels[ih, iw])
-                pred_im[ih, iw, :] = dataset.semantic_classes[output_id][lab]
-
-        # save prediction image
-        pred_im = pilimage.fromarray(np.uint8(pred_im))
-        pred_im.save(file_path)
+        # save the segmented image
+        out_img = pilimage.fromarray(np.uint8(out_img))
+        out_img.save(file_path)
 
 
 def listoflists2file(filepath, mylist, permission='w'):
@@ -311,7 +300,7 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
     return score
 
 
-def dict2file(mydict, path, title=None):
+def dict2file(mydict, path, title=None, separator=':'):
     """
     In:
         mydict - dictionary to save in a file
@@ -320,7 +309,7 @@ def dict2file(mydict, path, title=None):
             useful if we write many dictionaries
             into the same file
     """
-    tmp = [str(x[0]) + ':' + str(x[1]) for x in mydict.items()]
+    tmp = [str(x[0]) + separator + str(x[1]) for x in mydict.items()]
     if title is not None:
         output_list = [title]
         output_list.extend(tmp)
