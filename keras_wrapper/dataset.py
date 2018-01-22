@@ -2384,9 +2384,10 @@ class Dataset(object):
         h_crop, w_crop, d_crop = self.img_size_crop[self.id_in_3DLabel[self.ids_outputs[0]]]
         output_id = ''.join(self.ids_outputs)
 
-        #prepare the segmented image
+        # prepare the segmented image
         pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
-        out_img = np.zeros((h_crop, w_crop, d_crop))
+        #out_img = np.zeros((h_crop, w_crop, d_crop))
+        out_img = np.zeros((h_crop, w_crop, 3)) # predictions saved as RGB images (3 channels)
 
         for ih in range(h_crop):
             for iw in range(w_crop):
