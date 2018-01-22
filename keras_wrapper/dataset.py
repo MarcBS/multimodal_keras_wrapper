@@ -1292,7 +1292,7 @@ class Dataset(object):
 
         # Build vocabulary
         error_vocab = False
-        if build_vocabulary:
+        if build_vocabulary == True:
             self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words,
                                   use_extra_words=(max_text_len != 0))
         elif isinstance(build_vocabulary, str):
