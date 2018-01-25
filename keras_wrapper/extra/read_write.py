@@ -14,7 +14,6 @@ import os
 import codecs
 import numpy as np
 import tables
-from PIL import Image as pilimage
 
 
 ###
@@ -88,6 +87,7 @@ def numpy2file(filepath, mylist, permission='w', split=False):
 
 
 def numpy2imgs(folder_path, mylist, imgs_names, dataset):
+    from PIL import Image as pilimage
     create_dir_if_not_exists(folder_path)
     n_samples, wh, n_classes = mylist.shape
 
