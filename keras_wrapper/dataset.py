@@ -11,12 +11,7 @@ import sys
 import threading
 from collections import Counter
 from operator import add
-
 import numpy as np
-from PIL import Image as pilimage
-from scipy import ndimage, misc
-from skimage import transform
-
 from extra.read_write import create_dir_if_not_exists
 from extra.tokenizers import *
 from keras.utils import np_utils
@@ -1559,6 +1554,7 @@ class Dataset(object):
         :param image_list: list of input images used as identifiers to 'daRandomParams'
         :return: 3DLabels with shape (batch_size, width*height, classes)
         """
+        from scipy import misc
 
         n_samples = len(bbox_list)
         h, w, d = img_size
@@ -1641,6 +1637,8 @@ class Dataset(object):
         :param image_list: list of input images used as identifiers to 'daRandomParams'
         :return: 3DSemanticLabels with shape (batch_size, width*height, classes)
         """
+        from PIL import Image as pilimage
+        from scipy import misc
 
         n_samples = len(labeled_images_list)
         h, w, d = img_size
@@ -2441,6 +2439,9 @@ class Dataset(object):
         :param id: id of the input/output we are processing
         :return: out_list: containing a list of label images reshaped as an Nx1 array
         """
+        from PIL import Image as pilimage
+        from scipy import misc
+
         out_list = []
 
         assoc_id_in = self.id_in_3DLabel[id]
@@ -2517,6 +2518,8 @@ class Dataset(object):
         return out_list
 
     def resize_semantic_output(self, predictions, ids_out):
+        from scipy import misc
+
         out_pred = []
 
         for pred, id_out in zip(predictions, ids_out):
@@ -2573,6 +2576,7 @@ class Dataset(object):
         :param threshold: minimum overlapping threshold for considering a prediction valid
         :return: predicted_bboxes, predicted_Y, predicted_scores for each image
         """
+        from scipy import ndimage
         out_list = []
 
         # if type is list it will be assumed that position 0 corresponds to 3DLabels
@@ -2727,6 +2731,8 @@ class Dataset(object):
         :param normalization:
         :param id: identifier of the type of input whose train mean is being introduced.
         """
+        from scipy import misc
+
         if isinstance(mean_image, str):
             if not self.silence:
                 logging.info("Loading train mean image from file.")
@@ -2766,6 +2772,8 @@ class Dataset(object):
         """
             Calculates the mean of the data belonging to the training set split in each channel.
         """
+        from scipy import misc
+
         calculate = False
         if id not in self.train_mean or not isinstance(self.train_mean[id], np.ndarray):
             calculate = True
@@ -2840,6 +2848,9 @@ class Dataset(object):
         :param loaded : set this option to True if images is a list of matricies instead of a list of strings
         """
         # Check if the chosen normalization type exists
+        from PIL import Image as pilimage
+        from scipy import misc
+
         if normalization_type is None:
             normalization_type = '(-1)-1'
         if normalization and normalization_type not in self.__available_norm_im_vid:
