@@ -1303,6 +1303,7 @@ class Dataset(object):
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
+                self.vocabulary_len[id] = self.vocabulary_len[build_vocabulary]
                 if not self.silence:
                     logging.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with id "' + id + '".')
             else:
