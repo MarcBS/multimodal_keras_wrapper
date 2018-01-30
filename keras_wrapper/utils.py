@@ -789,9 +789,7 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
 
     if alphas is not None:
         x_text = map(lambda x: x.split(), x_text)
-        hard_alignments = map(
-            lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
-            alphas, x_text)
+        hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas, x_text)
         for i, a_no in enumerate(flattened_answer_pred):
             if unk_symbol in a_no:
                 if verbose > 1:
