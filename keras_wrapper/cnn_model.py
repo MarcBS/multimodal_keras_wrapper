@@ -701,7 +701,7 @@ class Model_Wrapper(object):
             ####    Data processing parameters
 
              * n_parallel_loaders: number of parallel data loaders allowed to work at the same time
-             * normalize: boolean indicating if we want to 0-1 normalize the image pixel values
+             * normalize: boolean indicating if we want to normalize the image pixel values
              * mean_substraction: boolean indicating if we want to substract the training mean
              * data_augmentation: boolean indicating if we want to perform data augmentation
                                   (always False on validation)
@@ -722,8 +722,8 @@ class Model_Wrapper(object):
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
                           'n_parallel_loaders': 8,
-                          'normalize': False,
-                          'normalization_type': None,
+                          'normalize': True,
+                          'normalization_type': '(-1)-1',
                           'mean_substraction': False,
                           'data_augmentation': True,
                           'verbose': 1, 'eval_on_sets': ['val'],

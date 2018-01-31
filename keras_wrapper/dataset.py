@@ -15,6 +15,7 @@ import numpy as np
 from extra.read_write import create_dir_if_not_exists
 from extra.tokenizers import *
 from keras.utils import np_utils
+import keras
 from .utils import bbox
 
 
@@ -2873,7 +2874,8 @@ class Dataset(object):
                 # Convert RGB to BGR
                 if self.img_size[id][2] == 3:  # if has 3 channels
                     train_mean = train_mean[:, :, ::-1]
-                train_mean = train_mean.transpose(2, 0, 1)
+                if keras.backend.image_data_format() == 'channels_first':
+                    train_mean = train_mean.transpose(2, 0, 1)
 
             # Also normalize training mean image if we are applying normalization to images
             if normalization:
@@ -2887,7 +2889,10 @@ class Dataset(object):
 
         type_imgs = np.float64
         if len(self.img_size[id]) == 3:
-            I = np.zeros([nImages] + [self.img_size_crop[id][2]] + self.img_size_crop[id][0:2], dtype=type_imgs)
+            if keras.backend.image_data_format() == 'channels_first':
+                I = np.zeros([nImages] + [self.img_size_crop[id][2]] + self.img_size_crop[id][0:2], dtype=type_imgs)
+            else:
+                I = np.zeros([nImages] + self.img_size_crop[id][0:2] + [self.img_size_crop[id][2]], dtype=type_imgs)
         else:
             I = np.zeros([nImages] + self.img_size_crop[id], dtype=type_imgs)
 
@@ -2988,7 +2993,8 @@ class Dataset(object):
                 # Convert RGB to BGR
                 if self.img_size[id][2] == 3:  # if has 3 channels
                     im = im[:, :, ::-1]
-                im = im.transpose(2, 0, 1)
+                if keras.backend.image_data_format() == 'channels_first':
+                    im = im.transpose(2, 0, 1)
             else:
                 pass
 
