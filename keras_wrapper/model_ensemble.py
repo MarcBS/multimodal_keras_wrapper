@@ -396,7 +396,7 @@ class BeamSearchEnsemble:
                                                 # this 5 is a magic number by Google...
                                                 for sample in samples]
                         else:
-                            length_penalties = [1.0 for _ in len(samples)]
+                            length_penalties = [1.0 for _ in samples]
 
                         if params['coverage_penalty']:
                             coverage_penalties = []
@@ -412,7 +412,7 @@ class BeamSearchEnsemble:
                                     cp_penalty += np.log(min(att_weight, 1.0))
                                 coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
                         else:
-                            coverage_penalties = [0.0 for _ in len(samples)]
+                            coverage_penalties = [0.0 for _ in samples]
                         scores = [co / lp + cp for co, lp, cp in zip(scores, length_penalties, coverage_penalties)]
 
                     elif params['normalize_probs']:
@@ -520,7 +520,7 @@ class BeamSearchEnsemble:
                                      / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
                                     for sample in samples]
             else:
-                length_penalties = [1.0 for _ in len(samples)]
+                length_penalties = [1.0 for _ in samples]
 
             if params['coverage_penalty']:
                 coverage_penalties = []
@@ -536,7 +536,7 @@ class BeamSearchEnsemble:
                         cp_penalty += np.log(min(att_weight, 1.0))
                     coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
             else:
-                coverage_penalties = [0.0 for _ in len(samples)]
+                coverage_penalties = [0.0 for _ in samples]
             scores = [co / lp + cp for co, lp, cp in zip(scores, length_penalties, coverage_penalties)]
 
         elif params['normalize_probs']:

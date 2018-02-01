@@ -2,9 +2,6 @@
 
 import copy
 import numpy as np
-from scipy import misc
-from skimage.transform import resize
-from scipy import ndimage
 
 
 ################################################################################
@@ -105,6 +102,7 @@ def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
         Additionally, it returns the best "n_top_convs" convolutional features for each of the classes. The ranking is 
         computed considering the weight Wi assigned to the i-th feature map.
     '''
+    from skimage.transform import resize
 
     # Apply forward pass in GAP model
     [X, predictions] = applyForwardPass(snet, X)
@@ -202,6 +200,9 @@ def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_r
         :return: [predicted_bboxes, predicted_scores], containing a list of bboxes coordinates on the first position
                 and a list of their corresponding scores on the second position
     '''
+    from skimage.transform import resize
+    from scipy import ndimage
+
     try:
         from nms.gpu_nms import gpu_nms
         from nms.cpu_nms import cpu_nms
@@ -303,6 +304,8 @@ def recognizeBBoxes(img_path, predicted_bboxes, recognition_net, ds, remove_non_
         :return: [final_bboxes, predicted_scores, predicted_Y], containing a list of bboxes coordinates on the first position,
                 a list of their corresponding scores on the second position and a list of class ids on the last position.
     '''
+    from scipy import misc
+
     predicted_Y = []
     predicted_scores = []
     final_bboxes = []
