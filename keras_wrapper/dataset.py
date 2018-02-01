@@ -11,13 +11,9 @@ import sys
 import threading
 from collections import Counter
 from operator import add
-
 import numpy as np
-from PIL import Image as pilimage
-from scipy import ndimage, misc
-from skimage import transform
-
 from extra.read_write import create_dir_if_not_exists
+from extra.tokenizers import *
 from keras.utils import np_utils
 from .utils import bbox
 
@@ -475,6 +471,10 @@ class Dataset(object):
         self.BPE = None  # Byte Pair Encoding instance
         self.BPE_separator = None
         self.BPE_built = False
+        self.moses_tokenizer = None
+        self.moses_detokenizer = False
+        self.moses_tokenizer_built = None
+        self.moses_detokenizer_built = False
         #################################################
 
         # Parameters used for inputs of type 'video' or 'video-features'
@@ -1292,12 +1292,13 @@ class Dataset(object):
 
         # Build vocabulary
         error_vocab = False
-        if build_vocabulary:
+        if build_vocabulary == True:
             self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words,
                                   use_extra_words=(max_text_len != 0))
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[id] = self.vocabulary[build_vocabulary]
+                self.vocabulary_len[id] = self.vocabulary_len[build_vocabulary]
                 if not self.silence:
                     logging.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with id "' + id + '".')
             else:
@@ -1494,6 +1495,52 @@ class Dataset(object):
         self.BPE_separator = separator
         self.BPE_built = True
 
+    def build_moses_tokenizer(self, language='en'):
+        """
+        Constructs a Moses tokenizer instance.
+        :param language: Tokenizer language.
+        :return: None
+        """
+        import nltk
+        try:
+            nltk.data.find('misc/perluniprops')
+        except LookupError:
+            nltk.download('perluniprops')
+        try:
+            nltk.data.find('corpora/nonbreaking_prefixes')
+        except LookupError:
+            nltk.download('nonbreaking_prefixes')
+        from nltk.tokenize.moses import MosesTokenizer
+
+        self.moses_tokenizer = MosesTokenizer(lang=language)
+        self.moses_tokenizer_built = True
+
+    def build_moses_detokenizer(self, language='en'):
+        """
+        Constructs a BPE encoder instance. Currently, vocabulary and glossaries options are not implemented.
+        :param codes: File with BPE codes (created by learn_bpe.py)
+        :param separator: Separator between non-final subword units (default: '@@'))
+        :param vocabulary: Vocabulary file. If provided, this script reverts any merge operations that produce an OOV.
+        :param glossaries: The strings provided in glossaries will not be affected
+                           by the BPE (i.e. they will neither be broken into subwords,
+                           nor concatenated with other subwords.
+        :return: None
+        """
+        import nltk
+        from nltk.tokenize.moses import MosesDetokenizer
+        try:
+            nltk.data.find('misc/perluniprops')
+        except LookupError:
+            nltk.download('perluniprops')
+        try:
+            nltk.data.find('corpora/nonbreaking_prefixes')
+        except LookupError:
+            nltk.download('nonbreaking_prefixes')
+
+        self.moses_detokenizer = MosesDetokenizer(lang=language)
+        self.moses_detokenizer_built = True
+
+
     @staticmethod
     def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         """
@@ -1508,6 +1555,7 @@ class Dataset(object):
         :param image_list: list of input images used as identifiers to 'daRandomParams'
         :return: 3DLabels with shape (batch_size, width*height, classes)
         """
+        from scipy import misc
 
         n_samples = len(bbox_list)
         h, w, d = img_size
@@ -1590,6 +1638,8 @@ class Dataset(object):
         :param image_list: list of input images used as identifiers to 'daRandomParams'
         :return: 3DSemanticLabels with shape (batch_size, width*height, classes)
         """
+        from PIL import Image as pilimage
+        from scipy import misc
 
         n_samples = len(labeled_images_list)
         h, w, d = img_size
@@ -1835,22 +1885,7 @@ class Dataset(object):
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption
         """
-
-        punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',',
-                 '?', '!']
-
-        def processPunctuation(inText):
-            outText = inText
-            for p in punct:
-                outText = outText.replace(p, ' ' + p + ' ')
-            return outText
-
-        resAns = caption.lower() if lowercase else caption
-        resAns = resAns.replace('\n', ' ')
-        resAns = resAns.replace('\t', ' ')
-        resAns = processPunctuation(resAns)
-        resAns = resAns.replace('  ', ' ')
-        return resAns
+        return tokenize_basic(caption, lowercase=lowercase)
 
     @staticmethod
     def tokenize_aggressive(caption, lowercase=True):
@@ -1863,21 +1898,7 @@ class Dataset(object):
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption
         """
-        punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')',
-                 '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!',
-                 '¿', '¡', '\n', '\t', '\r']
-
-        def processPunctuation(inText):
-            outText = inText
-            for p in punct:
-                outText = outText.replace(p, '')
-            return outText
-
-        resAns = caption.lower() if lowercase else caption
-        resAns = processPunctuation(resAns)
-        resAns = re.sub('[  ]+', ' ', resAns)
-        resAns = resAns.strip()
-        return resAns
+        return tokenize_aggressive(caption, lowercase=lowercase)
 
     @staticmethod
     def tokenize_icann(caption):
@@ -1889,11 +1910,7 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
-        tokenized = re.sub('[.,"\n\t]+', '', caption)
-        tokenized = re.sub('[  ]+', ' ', tokenized)
-        tokenized = map(lambda x: x.lower(), tokenized.split())
-        tokenized = " ".join(tokenized)
-        return tokenized
+        return tokenize_icann(caption)
 
     @staticmethod
     def tokenize_montreal(caption):
@@ -1905,12 +1922,7 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
-        tokenized = re.sub('[.,"\n\t]+', '', caption.strip())
-        tokenized = re.sub('[\']+', " '", tokenized)
-        tokenized = re.sub('[  ]+', ' ', tokenized)
-        tokenized = map(lambda x: x.lower(), tokenized.split())
-        tokenized = " ".join(tokenized)
-        return tokenized
+        return tokenize_montreal(caption)
 
     @staticmethod
     def tokenize_soft(caption, lowercase=True):
@@ -1922,23 +1934,7 @@ class Dataset(object):
         :param lowercase: Whether to lowercase the caption or not
         :return: Tokenized version of caption
         """
-        tokenized = re.sub('[\n\t]+', '', caption.strip())
-        tokenized = re.sub('[\.]+', ' . ', tokenized)
-        tokenized = re.sub('[,]+', ' , ', tokenized)
-        tokenized = re.sub('[!]+', ' ! ', tokenized)
-        tokenized = re.sub('[?]+', ' ? ', tokenized)
-        tokenized = re.sub('[\{]+', ' { ', tokenized)
-        tokenized = re.sub('[\}]+', ' } ', tokenized)
-        tokenized = re.sub('[\(]+', ' ( ', tokenized)
-        tokenized = re.sub('[\)]+', ' ) ', tokenized)
-        tokenized = re.sub('[\[]+', ' [ ', tokenized)
-        tokenized = re.sub('[\]]+', ' ] ', tokenized)
-        tokenized = re.sub('["]+', ' " ', tokenized)
-        tokenized = re.sub('[\']+', " ' ", tokenized)
-        tokenized = re.sub('[  ]+', ' ', tokenized)
-        tokenized = map(lambda x: x.lower(), tokenized.split())
-        tokenized = " ".join(tokenized)
-        return tokenized
+        return tokenize_soft(caption, lowercase=lowercase)
 
     @staticmethod
     def tokenize_none(caption):
@@ -1948,8 +1944,7 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
-        tokenized = re.sub('[\n\t]+', '', caption.strip())
-        return tokenized
+        return tokenize_none(caption)
 
     @staticmethod
     def tokenize_none_char(caption):
@@ -1968,26 +1963,7 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
-
-        def convert_chars(x):
-            if x == ' ':
-                return '<space>'
-            else:
-                return x.encode('utf-8')
-
-        tokenized = re.sub('[\n\t]+', '', caption.strip())
-        tokenized = re.sub('&amp;', ' & ', tokenized)
-        tokenized = re.sub('&#124;', ' | ', tokenized)
-        tokenized = re.sub('&gt;', ' > ', tokenized)
-        tokenized = re.sub('&lt;', ' < ', tokenized)
-        tokenized = re.sub('&apos;', " ' ", tokenized)
-        tokenized = re.sub('&quot;', ' " ', tokenized)
-        tokenized = re.sub('&#91;', ' [ ', tokenized)
-        tokenized = re.sub('&#93;', ' ] ', tokenized)
-        tokenized = re.sub('[  ]+', ' ', tokenized)
-        tokenized = [convert_chars(char) for char in tokenized.decode('utf-8')]
-        tokenized = " ".join(tokenized)
-        return tokenized
+        return tokenize_none_char(caption)
 
     @staticmethod
     def tokenize_CNN_sentence(caption):
@@ -1997,20 +1973,7 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
-        tokenized = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", caption)
-        tokenized = re.sub(r"\'s", " \'s", tokenized)
-        tokenized = re.sub(r"\'ve", " \'ve", tokenized)
-        tokenized = re.sub(r"n\'t", " n\'t", tokenized)
-        tokenized = re.sub(r"\'re", " \'re", tokenized)
-        tokenized = re.sub(r"\'d", " \'d", tokenized)
-        tokenized = re.sub(r"\'ll", " \'ll", tokenized)
-        tokenized = re.sub(r",", " , ", tokenized)
-        tokenized = re.sub(r"!", " ! ", tokenized)
-        tokenized = re.sub(r"\(", " \( ", tokenized)
-        tokenized = re.sub(r"\)", " \) ", tokenized)
-        tokenized = re.sub(r"\?", " \? ", tokenized)
-        tokenized = re.sub(r"\s{2,}", " ", tokenized)
-        return tokenized.strip().lower()
+        return tokenize_CNN_sentence(caption)
 
     @staticmethod
     def tokenize_questions(caption):
@@ -2024,88 +1987,7 @@ class Dataset(object):
         :param caption: String to tokenize
         :return: Tokenized version of caption
         """
-        contractions = {"aint": "ain't", "arent": "aren't", "cant": "can't", "couldve": "could've",
-                        "couldnt": "couldn't",
-                        "couldn'tve": "couldn’t’ve", "couldnt’ve": "couldn’t’ve", "didnt": "didn’t",
-                        "doesnt": "doesn’t",
-                        "dont": "don’t", "hadnt": "hadn’t", "hadnt’ve": "hadn’t’ve", "hadn'tve": "hadn’t’ve",
-                        "hasnt": "hasn’t", "havent": "haven’t", "hed": "he’d", "hed’ve": "he’d’ve", "he’dve": "he’d’ve",
-                        "hes": "he’s", "howd": "how’d", "howll": "how’ll", "hows": "how’s", "Id’ve": "I’d’ve",
-                        "I’dve": "I’d’ve", "Im": "I’m", "Ive": "I’ve", "isnt": "isn’t", "itd": "it’d",
-                        "itd’ve": "it’d’ve",
-                        "it’dve": "it’d’ve", "itll": "it’ll", "let’s": "let’s", "maam": "ma’am", "mightnt": "mightn’t",
-                        "mightnt’ve": "mightn’t’ve", "mightn’tve": "mightn’t’ve", "mightve": "might’ve",
-                        "mustnt": "mustn’t",
-                        "mustve": "must’ve", "neednt": "needn’t", "notve": "not’ve", "oclock": "o’clock",
-                        "oughtnt": "oughtn’t",
-                        "ow’s’at": "’ow’s’at", "’ows’at": "’ow’s’at", "’ow’sat": "’ow’s’at", "shant": "shan’t",
-                        "shed’ve": "she’d’ve", "she’dve": "she’d’ve", "she’s": "she’s", "shouldve": "should’ve",
-                        "shouldnt": "shouldn’t", "shouldnt’ve": "shouldn’t’ve", "shouldn’tve": "shouldn’t’ve",
-                        "somebody’d": "somebodyd", "somebodyd’ve": "somebody’d’ve", "somebody’dve": "somebody’d’ve",
-                        "somebodyll": "somebody’ll", "somebodys": "somebody’s", "someoned": "someone’d",
-                        "someoned’ve": "someone’d’ve", "someone’dve": "someone’d’ve", "someonell": "someone’ll",
-                        "someones": "someone’s", "somethingd": "something’d", "somethingd’ve": "something’d’ve",
-                        "something’dve": "something’d’ve", "somethingll": "something’ll", "thats": "that’s",
-                        "thered": "there’d", "thered’ve": "there’d’ve", "there’dve": "there’d’ve",
-                        "therere": "there’re",
-                        "theres": "there’s", "theyd": "they’d", "theyd’ve": "they’d’ve", "they’dve": "they’d’ve",
-                        "theyll": "they’ll", "theyre": "they’re", "theyve": "they’ve", "twas": "’twas",
-                        "wasnt": "wasn’t",
-                        "wed’ve": "we’d’ve", "we’dve": "we’d’ve", "weve": "we've", "werent": "weren’t",
-                        "whatll": "what’ll",
-                        "whatre": "what’re", "whats": "what’s", "whatve": "what’ve", "whens": "when’s", "whered":
-                            "where’d", "wheres": "where's", "whereve": "where’ve", "whod": "who’d",
-                        "whod’ve": "who’d’ve",
-                        "who’dve": "who’d’ve", "wholl": "who’ll", "whos": "who’s", "whove": "who've", "whyll": "why’ll",
-                        "whyre": "why’re", "whys": "why’s", "wont": "won’t", "wouldve": "would’ve",
-                        "wouldnt": "wouldn’t",
-                        "wouldnt’ve": "wouldn’t’ve", "wouldn’tve": "wouldn’t’ve", "yall": "y’all",
-                        "yall’ll": "y’all’ll",
-                        "y’allll": "y’all’ll", "yall’d’ve": "y’all’d’ve", "y’alld’ve": "y’all’d’ve",
-                        "y’all’dve": "y’all’d’ve",
-                        "youd": "you’d", "youd’ve": "you’d’ve", "you’dve": "you’d’ve", "youll": "you’ll",
-                        "youre": "you’re", "youve": "you’ve"}
-        punct = [';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\',
-                 '_', '-', '>', '<', '@', '`', ',', '?', '!']
-        commaStrip = re.compile("(\d)(\,)(\d)")
-        periodStrip = re.compile("(?!<=\d)(\.)(?!\d)")
-        manualMap = {'none': '0', 'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5',
-                     'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'ten': '10'}
-        articles = ['a', 'an', 'the']
-
-        def processPunctuation(inText):
-            outText = inText
-            for p in punct:
-                if (p + ' ' in inText or ' ' + p in inText) or (re.search(commaStrip, inText) is not None):
-                    outText = outText.replace(p, '')
-                else:
-                    outText = outText.replace(p, ' ')
-            outText = periodStrip.sub("", outText, re.UNICODE)
-            return outText
-
-        def processDigitArticle(inText):
-            outText = []
-            tempText = inText.lower().split()
-            for word in tempText:
-                word = manualMap.setdefault(word, word)
-                if word not in articles:
-                    outText.append(word)
-                else:
-                    pass
-            for wordId, word in enumerate(outText):
-                if word in contractions:
-                    outText[wordId] = contractions[word]
-            outText = ' '.join(outText)
-            return outText
-
-        resAns = caption.lower()
-        resAns = resAns.replace('\n', ' ')
-        resAns = resAns.replace('\t', ' ')
-        resAns = resAns.strip()
-        resAns = processPunctuation(resAns.decode("utf-8").encode("utf-8"))
-        resAns = processDigitArticle(resAns)
-
-        return resAns
+        return tokenize_questions(caption)
 
     def tokenize_bpe(self, caption):
         """
@@ -2128,9 +2010,7 @@ class Dataset(object):
         :param caption: String to de-tokenize.
         :return: Same caption.
         """
-        if type(caption) == str:
-            caption = caption.decode('utf-8')
-        return caption
+        return detokenize_none(caption)
 
     @staticmethod
     def detokenize_bpe(caption, separator=u'@@'):
@@ -2140,11 +2020,8 @@ class Dataset(object):
         :param separator: BPE separator.
         :return: Detokenized version of caption.
         """
-        if type(caption) == str:
-            caption = caption.decode('utf-8')
-        bpe_detokenization = re.compile(u'(' + separator + u' )|(' + separator + u' ?$)')
-        detokenized = bpe_detokenization.sub(u'', caption).strip()
-        return detokenized
+        return detokenize_bpe(caption, separator=separator)
+
 
     @staticmethod
     def detokenize_none_char(caption):
@@ -2163,24 +2040,58 @@ class Dataset(object):
         :param caption: String to de-tokenize.
             :return: Detokenized version of caption.
         """
+        return detokenize_none_char(caption)
 
-        def deconvert_chars(x):
-            if x == '<space>':
-                return ' '
-            else:
-                return x.encode('utf-8')
 
-        detokenized = re.sub(' & ', ' &amp; ', str(caption).strip())
-        detokenized = re.sub(' \| ', ' &#124; ', detokenized)
-        detokenized = re.sub(' > ', ' &gt; ', detokenized)
-        detokenized = re.sub(' < ', ' &lt; ', detokenized)
-        detokenized = re.sub("' ", ' &apos; ', detokenized)
-        detokenized = re.sub('" ', ' &quot; ', detokenized)
-        detokenized = re.sub('\[ ', ' &#91; ', detokenized)
-        detokenized = re.sub('\] ', ' &#93; ', detokenized)
-        detokenized = re.sub(' ', '', detokenized)
-        detokenized = re.sub('<space>', ' ', detokenized)
-        return detokenized
+    def tokenize_moses(self, caption, language='en', lowercase=False, aggressive_dash_splits=False, return_str=True, escape=False):
+        """
+        Applies the Moses tokenization. Relying on NLTK implementation of the Moses tokenizer.
+
+        :param caption: Sentence to tokenize
+        :param language: Language (will build the tokenizer for this language)
+        :param lowercase: Whether to lowercase or not the sentence
+        :param agressive_dash_splits: Option to trigger dash split rules .
+        :param return_str: Return string or list
+        :param escape: Escape HTML special chars
+        :return:
+        """
+        # Compatibility with old Datasets instances:
+        if not hasattr(self, 'moses_tokenizer_built'):
+            self.moses_tokenizer_built = False
+        if not self.moses_tokenizer_built:
+            self.build_moses_tokenizer(language=language)
+        if type(caption) == str:
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
+        if lowercase:
+            tokenized = tokenized.lower()
+        return self.moses_tokenizer.tokenize(tokenized, agressive_dash_splits=aggressive_dash_splits,
+                                             return_str=return_str, escape=escape)
+
+
+    def detokenize_moses(self, caption, language='en', lowercase=False, return_str=True, unescape=True):
+        """
+        Applies the Moses detokenization. Relying on NLTK implementation of the Moses tokenizer.
+
+        :param caption: Sentence to tokenize
+        :param language: Language (will build the tokenizer for this language)
+        :param lowercase: Whether to lowercase or not the sentence
+        :param agressive_dash_splits: Option to trigger dash split rules .
+        :param return_str: Return string or list
+        :param escape: Escape HTML special chars
+        :return:
+        """
+        # Compatibility with old Datasets instances:
+        if not hasattr(self, 'moses_detokenizer_built'):
+            self.moses_detokenizer_built = False
+        if not self.moses_detokenizer_built:
+            self.build_moses_detokenizer(language=language)
+        if type(caption) == str:
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
+        if lowercase:
+            tokenized = tokenized.lower()
+        return self.moses_detokenizer.detokenize(tokenized.split(), return_str=return_str, unescape=unescape)
 
     # ------------------------------------------------------- #
     #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS
@@ -2472,9 +2383,10 @@ class Dataset(object):
         h_crop, w_crop, d_crop = self.img_size_crop[self.id_in_3DLabel[self.ids_outputs[0]]]
         output_id = ''.join(self.ids_outputs)
 
-        #prepare the segmented image
+        # prepare the segmented image
         pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
-        out_img = np.zeros((h_crop, w_crop, d_crop))
+        #out_img = np.zeros((h_crop, w_crop, d_crop))
+        out_img = np.zeros((h_crop, w_crop, 3)) # predictions saved as RGB images (3 channels)
 
         for ih in range(h_crop):
             for iw in range(w_crop):
@@ -2529,6 +2441,9 @@ class Dataset(object):
         :param id: id of the input/output we are processing
         :return: out_list: containing a list of label images reshaped as an Nx1 array
         """
+        from PIL import Image as pilimage
+        from scipy import misc
+
         out_list = []
 
         assoc_id_in = self.id_in_3DLabel[id]
@@ -2605,6 +2520,8 @@ class Dataset(object):
         return out_list
 
     def resize_semantic_output(self, predictions, ids_out):
+        from scipy import misc
+
         out_pred = []
 
         for pred, id_out in zip(predictions, ids_out):
@@ -2661,6 +2578,7 @@ class Dataset(object):
         :param threshold: minimum overlapping threshold for considering a prediction valid
         :return: predicted_bboxes, predicted_Y, predicted_scores for each image
         """
+        from scipy import ndimage
         out_list = []
 
         # if type is list it will be assumed that position 0 corresponds to 3DLabels
@@ -2802,7 +2720,7 @@ class Dataset(object):
 
         return data
 
-    def setTrainMean(self, mean_image, id, normalization=False):
+    def setTrainMean(self, mean_image, id, use_RGB=True, normalization=False):
         """
             Loads a pre-calculated training mean image, 'mean_image' can either be:
             
@@ -2811,9 +2729,12 @@ class Dataset(object):
             - string with the path to the stored image.
             
         :param mean_image:
+        :param user_RGB: set to False for grayscale images
         :param normalization:
         :param id: identifier of the type of input whose train mean is being introduced.
         """
+        from scipy import misc
+
         if isinstance(mean_image, str):
             if not self.silence:
                 logging.info("Loading train mean image from file.")
@@ -2826,6 +2747,16 @@ class Dataset(object):
             self.train_mean[id] /= 255.0
 
         if self.train_mean[id].shape != tuple(self.img_size_crop[id]):
+            """
+            if not use_RGB:
+                if len(self.train_mean[id].shape) == 1:
+                    if not self.silence:
+                        logging.info("Converting input train mean pixels into mean image.")
+                    mean_image = np.zeros(tuple(self.img_size_crop[id]), np.float64)
+                    mean_image[:, :] = self.train_mean[id]
+                    self.train_mean[id] = mean_image
+            else:
+            """
             if len(self.train_mean[id].shape) == 1 and self.train_mean[id].shape[0] == self.img_size_crop[id][2]:
                 if not self.silence:
                     logging.info("Converting input train mean pixels into mean image.")
@@ -2843,6 +2774,8 @@ class Dataset(object):
         """
             Calculates the mean of the data belonging to the training set split in each channel.
         """
+        from scipy import misc
+
         calculate = False
         if id not in self.train_mean or not isinstance(self.train_mean[id], np.ndarray):
             calculate = True
@@ -2917,6 +2850,9 @@ class Dataset(object):
         :param loaded : set this option to True if images is a list of matricies instead of a list of strings
         """
         # Check if the chosen normalization type exists
+        from PIL import Image as pilimage
+        from scipy import misc
+
         if normalization_type is None:
             normalization_type = '(-1)-1'
         if normalization and normalization_type not in self.__available_norm_im_vid:
@@ -2993,35 +2929,41 @@ class Dataset(object):
                     im = im.convert('RGB')
                 else:
                     im = im.convert('L')
+                im = np.asarray(im, dtype=type_imgs)
 
             # Data augmentation
             if not dataAugmentation:
                 # Use whole image
-                im = np.asarray(im, dtype=type_imgs)
+
                 im = misc.imresize(im, (self.img_size_crop[id][0], self.img_size_crop[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
+
+                if not self.use_RGB[id]:
+                    im = np.expand_dims(im, 2)
+
             else:
                 randomParams = daRandomParams[images[i]]
                 # Resize
-                im = np.asarray(im, dtype=type_imgs)
+
                 im = misc.imresize(im, (self.img_size[id][0], self.img_size[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
+
+                if not self.use_RGB[id]:
+                    im = np.expand_dims(im, 2)
 
                 # Take random crop
                 left = randomParams["left"]
                 right = np.add(left, self.img_size_crop[id][0:2])
-                if self.use_RGB[id]:
-                    try:
-                        im = im[left[0]:right[0], left[1]:right[1], :]
-                    except:
-                        print '------- ERROR -------'
-                        print left
-                        print right
-                        print im.shape
-                        print imname
-                        raise Exception('Error with image ' + imname)
-                else:
-                    im = im[left[0]:right[0], left[1]:right[1]]
+
+                try:
+                    im = im[left[0]:right[0], left[1]:right[1], :]
+                except:
+                    print '------- ERROR -------'
+                    print left
+                    print right
+                    print im.shape
+                    print imname
+                    raise Exception('Error with image ' + imname)
 
                 # Randomly flip (with a certain probability)
                 flip = randomParams["hflip"]
