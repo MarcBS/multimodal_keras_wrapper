@@ -1503,7 +1503,6 @@ class Dataset(object):
         :return: None
         """
         import nltk
-        from nltk.tokenize.moses import MosesTokenizer
         try:
             nltk.data.find('misc/perluniprops')
         except LookupError:
@@ -1512,6 +1511,7 @@ class Dataset(object):
             nltk.data.find('corpora/nonbreaking_prefixes')
         except LookupError:
             nltk.download('nonbreaking_prefixes')
+        from nltk.tokenize.moses import MosesTokenizer
 
         self.moses_tokenizer = MosesTokenizer(lang=language)
         self.moses_tokenizer_built = True
@@ -1528,7 +1528,6 @@ class Dataset(object):
         :return: None
         """
         import nltk
-        from nltk.tokenize.moses import MosesDetokenizer
         try:
             nltk.data.find('misc/perluniprops')
         except LookupError:
@@ -1537,7 +1536,7 @@ class Dataset(object):
             nltk.data.find('corpora/nonbreaking_prefixes')
         except LookupError:
             nltk.download('nonbreaking_prefixes')
-
+        from nltk.tokenize.moses import MosesDetokenizer
         self.moses_detokenizer = MosesDetokenizer(lang=language)
         self.moses_detokenizer_built = True
 
