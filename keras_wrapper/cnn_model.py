@@ -190,7 +190,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     return model_wrapper
 
 
-def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False):
+def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile=False):
     """
     Loads a the weights from files to a Model_Wrapper object.
 
@@ -213,8 +213,14 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
 
     logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
-    # Load model weights
-    model.model.load_weights(model_path + '_weights.h5')
+    try:
+        logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
+        model.model = load_model(model_path + '.h5', compile=compile)
+    except:
+        # Load model structure
+        logging.info("<<< Failed -> Loading model from " + model_name + "_structure.json' ... >>>")
+        # Load model weights
+        model.model.load_weights(model_path + '_weights.h5')
 
     # Load auxiliary models for optimized search
     if os.path.exists(model_path + '_weights_init.h5') and os.path.exists(model_path + '_weights_next.h5'):
