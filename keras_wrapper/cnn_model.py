@@ -214,11 +214,12 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
     logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
     try:
-        logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
-        model.model = load_model(model_path + '.h5', compile=compile)
+        logging.info("<<< Loading model from " + model_path + ".h5 ... >>>")
+        model.model.set_weights(load_model(model_path + '.h5', compile=False).get_weights())
+
     except:
         # Load model structure
-        logging.info("<<< Failed -> Loading model from " + model_name + "_structure.json' ... >>>")
+        logging.info("<<< Failed -> Loading model from " + model_path + "_weights.h5' ... >>>")
         # Load model weights
         model.model.load_weights(model_path + '_weights.h5')
 
