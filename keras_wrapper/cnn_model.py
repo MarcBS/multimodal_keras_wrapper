@@ -2307,7 +2307,7 @@ class Model_Wrapper(object):
                     if eval('ds.loaded_raw_' + s + '[0]'):
                         sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
                                             stripfile=False)
-                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
+                    predictions[s] = (np.asarray(best_samples), best_alphas, sources)
                 else:
                     predictions[s] = np.asarray(best_samples)
         del data_gen
