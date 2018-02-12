@@ -15,7 +15,7 @@ from keras.engine.training import Model
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
-from keras.models import Sequential, model_from_json
+from keras.models import Sequential, model_from_json, load_model
 from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
 from keras.regularizers import l2
 from keras.utils import np_utils
@@ -78,23 +78,26 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     if not os.path.isdir(path):
         os.makedirs(os.path.dirname(path))
 
-    # Save model structure
-    json_string = model_wrapper.model.to_json()
-    open(model_name + '_structure.json', 'w').write(json_string)
-    # Save model weights
-    model_wrapper.model.save_weights(model_name + '_weights.h5', overwrite=True)
+    try:  # Try to save model at one time
+        model_wrapper.model.save(model_name + '.h5')
+    except:  # Split saving in model structure / weights
+        # Save model structure
+        json_string = model_wrapper.model.to_json()
+        open(model_name + '_structure.json', 'w').write(json_string)
+        # Save model weights
+        model_wrapper.model.save_weights(model_name + '_weights.h5', overwrite=True)
 
     # Save auxiliary models for optimized search
     if model_wrapper.model_init is not None:
-        logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
         # Save model structure
+        logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
         json_string = model_wrapper.model_init.to_json()
         open(model_name + '_structure_init.json', 'w').write(json_string)
         # Save model weights
         model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
     if model_wrapper.model_next is not None:
-        logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
         # Save model structure
+        logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
         json_string = model_wrapper.model_next.to_json()
         open(model_name + '_structure_next.json', 'w').write(json_string)
         # Save model weights
@@ -107,7 +110,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -133,18 +136,18 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
             model_name = model_path + "/update_" + iteration
 
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
-
-    # Load model structure
-    model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
-
-    # Load model weights
-    model.load_weights(model_name + '_weights.h5')
+    try:
+        logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
+        model = load_model(model_name + '.h5', compile=compile)
+    except:
+        # Load model structure
+        logging.info("<<< Failed -> Loading model from " + model_name + "_structure.json' ... >>>")
+        model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
+        # Load model weights
+        model.load_weights(model_name + '_weights.h5')
 
     # Load auxiliary models for optimized search
-    if os.path.exists(model_name + '_structure_init.json') and \
-            os.path.exists(model_name + '_weights_init.h5') and \
-            os.path.exists(model_name + '_structure_next.json') and \
-            os.path.exists(model_name + '_weights_next.h5'):
+    if os.path.exists(model_name + '_structure_init.json') and os.path.exists(model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and os.path.exists(model_name + '_weights_next.h5'):
         loaded_optimized = True
     else:
         loaded_optimized = False
@@ -153,7 +156,8 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         # Load model structure
         logging.info("<<< Loading optimized model... >>>")
         logging.info("\t <<< Loading model_init from " + model_name + "_structure_init.json ... >>>")
-        model_init = model_from_json(open(model_name + '_structure_init.json').read(), custom_objects=custom_objects)
+        model_init = model_from_json(open(model_name + '_structure_init.json').read(),
+                                     custom_objects=custom_objects)
         # Load model weights
         model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
@@ -186,7 +190,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     return model_wrapper
 
 
-def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False):
+def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile=False):
     """
     Loads a the weights from files to a Model_Wrapper object.
 
@@ -209,8 +213,15 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
 
     logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
-    # Load model weights
-    model.model.load_weights(model_path + '_weights.h5')
+    try:
+        logging.info("<<< Loading model from " + model_path + ".h5 ... >>>")
+        model.model.set_weights(load_model(model_path + '.h5', compile=False).get_weights())
+
+    except:
+        # Load model structure
+        logging.info("<<< Failed -> Loading model from " + model_path + "_weights.h5' ... >>>")
+        # Load model weights
+        model.model.load_weights(model_path + '_weights.h5')
 
     # Load auxiliary models for optimized search
     if os.path.exists(model_path + '_weights_init.h5') and os.path.exists(model_path + '_weights_next.h5'):
@@ -701,7 +712,7 @@ class Model_Wrapper(object):
             ####    Data processing parameters
 
              * n_parallel_loaders: number of parallel data loaders allowed to work at the same time
-             * normalize: boolean indicating if we want to 0-1 normalize the image pixel values
+             * normalize: boolean indicating if we want to normalize the image pixel values
              * mean_substraction: boolean indicating if we want to substract the training mean
              * data_augmentation: boolean indicating if we want to perform data augmentation
                                   (always False on validation)
@@ -722,8 +733,8 @@ class Model_Wrapper(object):
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
                           'n_parallel_loaders': 8,
-                          'normalize': False,
-                          'normalization_type': None,
+                          'normalize': True,
+                          'normalization_type': '(-1)-1',
                           'mean_substraction': False,
                           'data_augmentation': True,
                           'verbose': 1, 'eval_on_sets': ['val'],
