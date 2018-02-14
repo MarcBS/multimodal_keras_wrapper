@@ -5,8 +5,6 @@ import time
 
 import numpy as np
 
-from keras.layers.convolutional import ZeroPadding2D
-
 
 def bbox(img, mode='max'):
     """
@@ -244,6 +242,8 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
     :param activations:
     :return:
     """
+    from keras.layers.convolutional import ZeroPadding2D
+
     n_classes = len(classes)
     if pairs is None:  # generate any possible combination of two classes
         pairs = tuple(itertools.combinations(range(n_classes), 2))
