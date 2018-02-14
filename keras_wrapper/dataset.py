@@ -14,9 +14,7 @@ from operator import add
 import numpy as np
 from extra.read_write import create_dir_if_not_exists
 from extra.tokenizers import *
-from keras.utils import np_utils
-import keras
-from .utils import bbox
+from .utils import bbox, to_categorical
 
 
 # ------------------------------------------------------- #
@@ -1066,7 +1064,7 @@ class Dataset(object):
 
     @staticmethod
     def loadCategorical(y_raw, nClasses):
-        y = np_utils.to_categorical(y_raw, nClasses).astype(np.uint8)
+        y = to_categorical(y_raw, nClasses).astype(np.uint8)
         return y
 
     # ------------------------------------------------------- #
@@ -1847,12 +1845,12 @@ class Dataset(object):
                           words_so_far, loading_X=loading_X)
         # Use whole sentence as class (classifier model)
         if max_len == 0:
-            y_aux = np_utils.to_categorical(y, vocabulary_len).astype(np.uint8)
+            y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
         # Use words separately (generator model)
         else:
             y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(np.uint8)
             for idx in range(y[0].shape[0]):
-                y_aux[idx] = np_utils.to_categorical(y[0][idx], vocabulary_len).astype(
+                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(
                     np.uint8)
             if sample_weights:
                 y_aux = (y_aux, y[1])  # join data and mask
@@ -2852,6 +2850,7 @@ class Dataset(object):
         # Check if the chosen normalization type exists
         from PIL import Image as pilimage
         from scipy import misc
+        import keras
 
         if normalization_type is None:
             normalization_type = '(-1)-1'
@@ -3245,12 +3244,12 @@ class Dataset(object):
                                       words_so_far=self.words_so_far[id_out], loading_X=False)
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
+                        y_aux = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     else:
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
@@ -3370,12 +3369,12 @@ class Dataset(object):
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
+                        y_aux = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     else:
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
@@ -3521,12 +3520,12 @@ class Dataset(object):
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
+                        y_aux = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     else:
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
