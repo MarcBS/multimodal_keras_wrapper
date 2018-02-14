@@ -80,7 +80,8 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
 
     try:  # Try to save model at one time
         model_wrapper.model.save(model_name + '.h5')
-    except:  # Split saving in model structure / weights
+    except Exception as e: # Split saving in model structure / weights
+        logging.info(str(e))
         # Save model structure
         json_string = model_wrapper.model.to_json()
         open(model_name + '_structure.json', 'w').write(json_string)
@@ -139,9 +140,10 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     try:
         logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
         model = load_model(model_name + '.h5', compile=compile)
-    except:
+    except Exception as e:
+        logging.info(str(e))
         # Load model structure
-        logging.info("<<< Failed -> Loading model from " + model_name + "_structure.json' ... >>>")
+        logging.info("<<< Loading model from " + model_name + "_structure.json' ... >>>")
         model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
         # Load model weights
         model.load_weights(model_name + '_weights.h5')
@@ -217,7 +219,8 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
         logging.info("<<< Loading model from " + model_path + ".h5 ... >>>")
         model.model.set_weights(load_model(model_path + '.h5', compile=False).get_weights())
 
-    except:
+    except Exception as e:
+        logging.info(str(e))
         # Load model structure
         logging.info("<<< Failed -> Loading model from " + model_path + "_weights.h5' ... >>>")
         # Load model weights
