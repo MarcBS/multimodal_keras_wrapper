@@ -266,8 +266,8 @@ class Homogeneous_Data_Batch_Generator(object):
         self.batch_size = batch_size
         self.it = 0
 
-        self.X_batch = None
-        self.Y_batch = None
+        self.X_maxibatch = None
+        self.Y_maxibatch = None
         self.tidx = None
         self.curr_idx = None
         self.batch_idx = None
@@ -283,7 +283,7 @@ class Homogeneous_Data_Batch_Generator(object):
                        'joint_batches': joint_batches}
         self.reset()
 
-    def retrieve_batch(self):
+    def retrieve_maxibatch(self):
 
         if self.set_split == 'train' and not self.predict:
             data_augmentation = self.params['data_augmentation']
@@ -318,37 +318,16 @@ class Homogeneous_Data_Batch_Generator(object):
                                               meanSubstraction=self.params['mean_substraction'],
                                               dataAugmentation=data_augmentation)
 
-        self.X_batch = X_batch
-        self.Y_batch = Y_batch
+        self.X_maxibatch = X_batch
+        self.Y_maxibatch = Y_batch
 
     def reset(self):
-        self.retrieve_batch()
-        text_Y_batch = self.Y_batch[0][1]  # just use mask
+        self.retrieve_maxibatch()
+        text_Y_batch = self.Y_maxibatch[0][1]  # just use mask
         batch_lengths = np.asarray([int(np.sum(cc)) for cc in text_Y_batch])
         self.tidx = batch_lengths.argsort()
         self.curr_idx = 0
 
-    def get_data(self):
-        new_X = []
-        new_Y = []
-        next_idx = min(self.curr_idx + self.batch_size, len(self.tidx))
-        self.batch_tidx = self.tidx[self.curr_idx:next_idx]
-
-        for x_input_idx in range(len(self.X_batch)):
-            x_to_add = [self.X_batch[x_input_idx][i] for i in self.batch_tidx]
-            new_X.append(np.asarray(x_to_add))
-        for y_input_idx in range(len(self.Y_batch)):
-            Y_batch_ = []
-            for data_mask_idx in range(len(self.Y_batch[y_input_idx])):
-                y_to_add = np.asarray([self.Y_batch[y_input_idx][data_mask_idx][i] for i in self.batch_tidx])
-                Y_batch_.append(y_to_add)
-            new_Y.append(tuple(Y_batch_))
-
-        data = self.net.prepareData(new_X, new_Y)
-        self.curr_idx = next_idx
-        if self.curr_idx >= len(self.tidx):
-            self.reset()
-        return data
 
     def generator(self):
         """
@@ -356,8 +335,25 @@ class Homogeneous_Data_Batch_Generator(object):
         :return: generator with the data
         """
         while True:
-            yield self.get_data()
+            new_X = []
+            new_Y = []
+            next_idx = min(self.curr_idx + self.batch_size, len(self.tidx))
+            self.batch_tidx = self.tidx[self.curr_idx:next_idx]
+            for x_input_idx in range(len(self.X_maxibatch)):
+                x_to_add = [self.X_maxibatch[x_input_idx][i] for i in self.batch_tidx]
+                new_X.append(np.asarray(x_to_add))
 
+            for y_input_idx in range(len(self.Y_maxibatch)):
+                Y_batch_ = []
+                for data_mask_idx in range(len(self.Y_maxibatch[y_input_idx])):
+                    y_to_add = np.asarray([self.Y_maxibatch[y_input_idx][data_mask_idx][i] for i in self.batch_tidx])
+                    Y_batch_.append(y_to_add)
+                new_Y.append(tuple(Y_batch_))
+            data = self.net.prepareData(new_X, new_Y)
+            self.curr_idx = next_idx
+            if self.curr_idx >= len(self.tidx):
+                self.reset()
+            yield (data)
 
 # ------------------------------------------------------- #
 #       MAIN CLASS
@@ -1755,7 +1751,7 @@ class Dataset(object):
                 else:
                     X_out[i] = vocab[w]
             if loading_X:
-                X_out = (X_out, None)  # This None simulates a mask
+                X_out = [X_out, None]  # This None simulates a mask
         else:  # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
@@ -1815,7 +1811,7 @@ class Dataset(object):
                     else:
                         X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
                         X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
-            X_out = (X_out, X_mask)
+            X_out = [np.asarray(X_out, dtype='int32'), np.asarray(X_mask, dtype='int8')]
 
         return X_out
 
@@ -3253,10 +3249,11 @@ class Dataset(object):
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
-            Y.append(y)
 
             if type_out == 'dense_text':
-                Y[0] = Y[0][0][:, :, None]
+                y[0] = np.asarray(y[0][:, :, None])
+
+            Y.append(tuple(y))
 
         return [X, Y]
 
@@ -3378,10 +3375,11 @@ class Dataset(object):
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
-            Y.append(y)
 
             if type_out == 'dense_text':
-                Y[0] = Y[0][0][:, :, None]
+                y[0] = np.asarray(y[0][:, :, None])
+
+            Y.append(tuple(y))
 
         return [X, Y]
 
@@ -3533,10 +3531,11 @@ class Dataset(object):
                             y_aux = (y_aux, y[1])  # join data and mask
 
                         y = y_aux
-            Y.append(y)
 
             if type_out == 'dense_text':
-                Y[0] = Y[0][0][:, :, None]
+                y[0] = np.asarray(y[0][:, :, None])
+
+            Y.append(tuple(y))
 
         return Y
 
