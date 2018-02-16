@@ -1811,7 +1811,7 @@ class Dataset(object):
                     else:
                         X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
                         X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
-            X_out = [X_out, X_mask]
+            X_out = [np.asarray(X_out, dtype='int32'), np.asarray(X_mask, dtype='int8')]
 
         return X_out
 
@@ -3249,10 +3249,11 @@ class Dataset(object):
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
-            if type_out == 'dense_text':
-                y[0] = y[0][:, :, None]
 
-            Y.append(y)
+            if type_out == 'dense_text':
+                y[0] = np.asarray(y[0][:, :, None])
+
+            Y.append(tuple(y))
 
         return [X, Y]
 
@@ -3376,8 +3377,9 @@ class Dataset(object):
                         y = y_aux
 
             if type_out == 'dense_text':
-                y[0] = y[0][:, :, None]
-            Y.append(y)
+                y[0] = np.asarray(y[0][:, :, None])
+
+            Y.append(tuple(y))
 
         return [X, Y]
 
@@ -3531,9 +3533,9 @@ class Dataset(object):
                         y = y_aux
 
             if type_out == 'dense_text':
-                y[0] = y[0][:, :, None]
+                y[0] = np.asarray(y[0][:, :, None])
 
-            Y.append(y)
+            Y.append(tuple(y))
 
         return Y
 
