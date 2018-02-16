@@ -16,7 +16,7 @@ from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePool
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json, load_model
-from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
+from keras.optimizers import *
 from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
@@ -496,7 +496,8 @@ class Model_Wrapper(object):
         self.acc_output = acc_output
 
     def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None, epsilon=1e-8,
-                     nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
+                     nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None,
+                     tf_optimizer=True):
         """
             Sets a new optimizer for the CNN model.
             :param nesterov:
@@ -529,24 +530,47 @@ class Model_Wrapper(object):
             self.loss = loss
         if metrics is None:
             metrics = []
-
-        if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum,
-                            nesterov=nesterov)
-        elif optimizer.lower() == 'adam':
-            optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'adagrad':
-            optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'rmsprop':
-            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'nadam':
-            optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'adamax':
-            optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'adadelta':
-            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+        if tf_optimizer and K.backend() == 'tensorflow':
+            import tensorflow as tf
+            if optimizer is None or optimizer.lower() == 'sgd':
+                if self.momentum is None:
+                    optimizer = TFOptimizer(tf.train.GradientDescentOptimizer(lr))
+                else:
+                    optimizer = TFOptimizer(tf.train.MomentumOptimizer(lr, self.momentum, use_nesterov=nesterov))
+            elif optimizer.lower() == 'adam':
+                optimizer = TFOptimizer(tf.train.AdamOptimizer(learning_rate=lr, epsilon=epsilon))
+            elif optimizer.lower() == 'adagrad':
+                optimizer = TFOptimizer(tf.train.AdagradOptimizer(lr))
+            elif optimizer.lower() == 'rmsprop':
+                optimizer = TFOptimizer(tf.train.RMSPropOptimizer(lr, decay=decay, momentum=momentum, epsilon=epsilon))
+            elif optimizer.lower() == 'nadam':
+                logger.warning('The Nadam optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adamax':
+                logger.warning('The Adamax optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adadelta':
+                optimizer = TFOptimizer(tf.train.AdadeltaOptimizer(learning_rate=lr, epsilon=epsilon))
+            else:
+                raise Exception('\tThe chosen optimizer is not implemented.')
         else:
-            raise Exception('\tThe chosen optimizer is not implemented.')
+            if optimizer is None or optimizer.lower() == 'sgd':
+                optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum,
+                                nesterov=nesterov)
+            elif optimizer.lower() == 'adam':
+                optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adagrad':
+                optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'rmsprop':
+                optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'nadam':
+                optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adamax':
+                optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adadelta':
+                optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            else:
+                raise Exception('\tThe chosen optimizer is not implemented.')
 
         if not self.silence:
             logging.info("Compiling model...")
