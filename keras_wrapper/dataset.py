@@ -328,7 +328,6 @@ class Homogeneous_Data_Batch_Generator(object):
         self.tidx = batch_lengths.argsort()
         self.curr_idx = 0
 
-
     def generator(self):
         """
         Gets and processes the data
@@ -354,6 +353,7 @@ class Homogeneous_Data_Batch_Generator(object):
             if self.curr_idx >= len(self.tidx):
                 self.reset()
             yield (data)
+
 
 # ------------------------------------------------------- #
 #       MAIN CLASS
@@ -436,7 +436,7 @@ class Dataset(object):
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
-                                         'text', 'dense_text', #TODO: Document dense_text type!
+                                         'text', 'dense_text',  # TODO: Document dense_text type!
                                          '3DLabel', '3DSemanticLabel',
                                          'id', 'file-name']
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
@@ -1534,7 +1534,6 @@ class Dataset(object):
         self.moses_detokenizer = MosesDetokenizer(lang=language)
         self.moses_detokenizer_built = True
 
-
     @staticmethod
     def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         """
@@ -1742,8 +1741,22 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
+
+        # Max values per uint type:
+        # uint8.max: 255
+        # uint16.max: 65535
+        # uint32.max: 4294967295
+        vocabulary_size = len(vocab.keys())
+
+        if vocabulary_size < 255:
+            dtype_text = 'uint8'
+        elif vocabulary_size < 65535:
+            dtype_text = 'uint16'
+        else:
+            dtype_text = 'uint32'
+
         if max_len == 0:  # use whole sentence as class
-            X_out = np.zeros(n_batch).astype('int32')
+            X_out = np.zeros(n_batch).astype(dtype_text)
             for i in range(n_batch):
                 w = X[i]
                 if '<unk>' in vocab:
@@ -1751,7 +1764,7 @@ class Dataset(object):
                 else:
                     X_out[i] = vocab[w]
             if loading_X:
-                X_out = [X_out, None]  # This None simulates a mask
+                X_out = (X_out, None)  # This None simulates a mask
         else:  # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
@@ -1759,14 +1772,14 @@ class Dataset(object):
                 max_len_batch = max_len
 
             if words_so_far:
-                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
-                null_row = np.ones((1, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                null_row = np.ones((1, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 zero_row = np.zeros((1, max_len_batch)).astype('int8')
                 if offset > 0:
                     null_row[0] = np.append([vocab['<null>']] * offset, null_row[0, :-offset])
             else:
-                X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
 
             if max_len_batch == max_len:
@@ -1811,7 +1824,7 @@ class Dataset(object):
                     else:
                         X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
                         X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
-            X_out = [np.asarray(X_out, dtype='int32'), np.asarray(X_mask, dtype='int8')]
+            X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
 
         return X_out
 
@@ -2016,7 +2029,6 @@ class Dataset(object):
         """
         return detokenize_bpe(caption, separator=separator)
 
-
     @staticmethod
     def detokenize_none_char(caption):
         """
@@ -2035,7 +2047,6 @@ class Dataset(object):
             :return: Detokenized version of caption.
         """
         return detokenize_none_char(caption)
-
 
     def tokenize_moses(self, caption, language='en', lowercase=False, aggressive_dash_splits=False, return_str=True, escape=False):
         """
@@ -2061,7 +2072,6 @@ class Dataset(object):
             tokenized = tokenized.lower()
         return self.moses_tokenizer.tokenize(tokenized, agressive_dash_splits=aggressive_dash_splits,
                                              return_str=return_str, escape=escape)
-
 
     def detokenize_moses(self, caption, language='en', lowercase=False, return_str=True, unescape=True):
         """
@@ -2379,8 +2389,8 @@ class Dataset(object):
 
         # prepare the segmented image
         pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
-        #out_img = np.zeros((h_crop, w_crop, d_crop))
-        out_img = np.zeros((h_crop, w_crop, 3)) # predictions saved as RGB images (3 channels)
+        # out_img = np.zeros((h_crop, w_crop, d_crop))
+        out_img = np.zeros((h_crop, w_crop, 3))  # predictions saved as RGB images (3 channels)
 
         for ih in range(h_crop):
             for iw in range(w_crop):
@@ -2388,7 +2398,6 @@ class Dataset(object):
                 out_img[ih, iw, :] = self.semantic_classes[output_id][lab]
 
         return out_img
-
 
     def preprocess3DSemanticLabel(self, path_list, id, associated_id_in, num_poolings):
         return self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
@@ -2862,7 +2871,7 @@ class Dataset(object):
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "' + id + '".')
             train_mean = copy.copy(self.train_mean[id])
             train_mean = misc.imresize(train_mean, self.img_size_crop[id][0:2])
-            
+
             # Transpose dimensions
             if len(self.img_size[id]) == 3:  # if it is a 3D image
                 # Convert RGB to BGR
@@ -3045,7 +3054,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def getX(self, set_name, init, final, normalization_type='(-1)-1',
-             normalization=True, meanSubstraction=False, 
+             normalization=True, meanSubstraction=False,
              dataAugmentation=True, debug=False):
         """
         Gets all the data samples stored between the positions init to final
@@ -3250,10 +3259,10 @@ class Dataset(object):
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
 
-            if type_out == 'dense_text':
-                y[0] = np.asarray(y[0][:, :, None])
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
 
-            Y.append(tuple(y))
+            Y.append(y)
 
         return [X, Y]
 
@@ -3376,10 +3385,10 @@ class Dataset(object):
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
 
-            if type_out == 'dense_text':
-                y[0] = np.asarray(y[0][:, :, None])
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
 
-            Y.append(tuple(y))
+            Y.append(y)
 
         return [X, Y]
 
@@ -3532,10 +3541,10 @@ class Dataset(object):
 
                         y = y_aux
 
-            if type_out == 'dense_text':
-                y[0] = np.asarray(y[0][:, :, None])
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
 
-            Y.append(tuple(y))
+            Y.append(y)
 
         return Y
 
@@ -3619,7 +3628,7 @@ class Dataset(object):
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
                                                                             '\t Inputs:' + str(plot_ids_in) + ''
-                                                                            '\t Outputs:' + str(self.ids_outputs))
+                                                                                                              '\t Outputs:' + str(self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
         """
