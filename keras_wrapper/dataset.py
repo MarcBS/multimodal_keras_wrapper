@@ -328,7 +328,6 @@ class Homogeneous_Data_Batch_Generator(object):
         self.tidx = batch_lengths.argsort()
         self.curr_idx = 0
 
-
     def generator(self):
         """
         Gets and processes the data
@@ -354,6 +353,7 @@ class Homogeneous_Data_Batch_Generator(object):
             if self.curr_idx >= len(self.tidx):
                 self.reset()
             yield (data)
+
 
 # ------------------------------------------------------- #
 #       MAIN CLASS
@@ -436,7 +436,7 @@ class Dataset(object):
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
-                                         'text', 'dense_text', #TODO: Document dense_text type!
+                                         'text', 'dense_text',  # TODO: Document dense_text type!
                                          '3DLabel', '3DSemanticLabel',
                                          'id', 'file-name']
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
@@ -1534,7 +1534,6 @@ class Dataset(object):
         self.moses_detokenizer = MosesDetokenizer(lang=language)
         self.moses_detokenizer_built = True
 
-
     @staticmethod
     def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         """
@@ -2030,7 +2029,6 @@ class Dataset(object):
         """
         return detokenize_bpe(caption, separator=separator)
 
-
     @staticmethod
     def detokenize_none_char(caption):
         """
@@ -2049,7 +2047,6 @@ class Dataset(object):
             :return: Detokenized version of caption.
         """
         return detokenize_none_char(caption)
-
 
     def tokenize_moses(self, caption, language='en', lowercase=False, aggressive_dash_splits=False, return_str=True, escape=False):
         """
@@ -2075,7 +2072,6 @@ class Dataset(object):
             tokenized = tokenized.lower()
         return self.moses_tokenizer.tokenize(tokenized, agressive_dash_splits=aggressive_dash_splits,
                                              return_str=return_str, escape=escape)
-
 
     def detokenize_moses(self, caption, language='en', lowercase=False, return_str=True, unescape=True):
         """
@@ -2393,8 +2389,8 @@ class Dataset(object):
 
         # prepare the segmented image
         pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
-        #out_img = np.zeros((h_crop, w_crop, d_crop))
-        out_img = np.zeros((h_crop, w_crop, 3)) # predictions saved as RGB images (3 channels)
+        # out_img = np.zeros((h_crop, w_crop, d_crop))
+        out_img = np.zeros((h_crop, w_crop, 3))  # predictions saved as RGB images (3 channels)
 
         for ih in range(h_crop):
             for iw in range(w_crop):
@@ -2402,7 +2398,6 @@ class Dataset(object):
                 out_img[ih, iw, :] = self.semantic_classes[output_id][lab]
 
         return out_img
-
 
     def preprocess3DSemanticLabel(self, path_list, id, associated_id_in, num_poolings):
         return self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
@@ -2876,7 +2871,7 @@ class Dataset(object):
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "' + id + '".')
             train_mean = copy.copy(self.train_mean[id])
             train_mean = misc.imresize(train_mean, self.img_size_crop[id][0:2])
-            
+
             # Transpose dimensions
             if len(self.img_size[id]) == 3:  # if it is a 3D image
                 # Convert RGB to BGR
@@ -3059,7 +3054,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def getX(self, set_name, init, final, normalization_type='(-1)-1',
-             normalization=True, meanSubstraction=False, 
+             normalization=True, meanSubstraction=False,
              dataAugmentation=True, debug=False):
         """
         Gets all the data samples stored between the positions init to final
@@ -3264,11 +3259,10 @@ class Dataset(object):
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
 
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
+
             Y.append(y)
-
-            if type_out == 'dense_text':
-                Y[0] = Y[0][0][:, :, None]
-
 
         return [X, Y]
 
@@ -3391,10 +3385,10 @@ class Dataset(object):
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
 
-            Y.append(y)
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
 
-            if type_out == 'dense_text':
-                Y[0] = Y[0][0][:, :, None]
+            Y.append(y)
 
         return [X, Y]
 
@@ -3547,10 +3541,10 @@ class Dataset(object):
 
                         y = y_aux
 
-            Y.append(y)
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
 
-            if type_out == 'dense_text':
-                Y[0] = Y[0][0][:, :, None]
+            Y.append(y)
 
         return Y
 
@@ -3634,7 +3628,7 @@ class Dataset(object):
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
                                                                             '\t Inputs:' + str(plot_ids_in) + ''
-                                                                            '\t Outputs:' + str(self.ids_outputs))
+                                                                                                              '\t Outputs:' + str(self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
         """
