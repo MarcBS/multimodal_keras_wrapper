@@ -1751,7 +1751,7 @@ class Dataset(object):
                 else:
                     X_out[i] = vocab[w]
             if loading_X:
-                X_out = [X_out, None]  # This None simulates a mask
+                X_out = (X_out, None)  # This None simulates a mask
         else:  # process text as a sequence of words
             if pad_on_batch:
                 max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
@@ -1811,7 +1811,7 @@ class Dataset(object):
                     else:
                         X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
                         X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
-            X_out = [np.asarray(X_out, dtype='int32'), np.asarray(X_mask, dtype='int8')]
+            X_out = (np.asarray(X_out, dtype='int32'), np.asarray(X_mask, dtype='int8'))
 
         return X_out
 
@@ -3250,10 +3250,11 @@ class Dataset(object):
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
 
-            if type_out == 'dense_text':
-                y[0] = np.asarray(y[0][:, :, None])
+            Y.append(y)
 
-            Y.append(tuple(y))
+            if type_out == 'dense_text':
+                Y[0] = Y[0][0][:, :, None]
+
 
         return [X, Y]
 
@@ -3376,10 +3377,10 @@ class Dataset(object):
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
 
-            if type_out == 'dense_text':
-                y[0] = np.asarray(y[0][:, :, None])
+            Y.append(y)
 
-            Y.append(tuple(y))
+            if type_out == 'dense_text':
+                Y[0] = Y[0][0][:, :, None]
 
         return [X, Y]
 
@@ -3532,10 +3533,10 @@ class Dataset(object):
 
                         y = y_aux
 
-            if type_out == 'dense_text':
-                y[0] = np.asarray(y[0][:, :, None])
+            Y.append(y)
 
-            Y.append(tuple(y))
+            if type_out == 'dense_text':
+                Y[0] = Y[0][0][:, :, None]
 
         return Y
 
