@@ -1742,8 +1742,22 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
+
+        # Max values per uint type:
+        # uint8.max: 255
+        # uint16.max: 65535
+        # uint32.max: 4294967295
+        vocabulary_size = len(vocab.keys())
+
+        if vocabulary_size < 255:
+            dtype_text = 'uint8'
+        elif vocabulary_size < 65535:
+            dtype_text = 'uint16'
+        else:
+            dtype_text = 'uint32'
+
         if max_len == 0:  # use whole sentence as class
-            X_out = np.zeros(n_batch).astype('int32')
+            X_out = np.zeros(n_batch).astype(dtype_text)
             for i in range(n_batch):
                 w = X[i]
                 if '<unk>' in vocab:
@@ -1759,14 +1773,14 @@ class Dataset(object):
                 max_len_batch = max_len
 
             if words_so_far:
-                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
-                null_row = np.ones((1, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                null_row = np.ones((1, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 zero_row = np.zeros((1, max_len_batch)).astype('int8')
                 if offset > 0:
                     null_row[0] = np.append([vocab['<null>']] * offset, null_row[0, :-offset])
             else:
-                X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
 
             if max_len_batch == max_len:
@@ -1811,7 +1825,7 @@ class Dataset(object):
                     else:
                         X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
                         X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
-            X_out = (np.asarray(X_out, dtype='int32'), np.asarray(X_mask, dtype='int8'))
+            X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
 
         return X_out
 
