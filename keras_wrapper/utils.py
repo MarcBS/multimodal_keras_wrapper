@@ -676,7 +676,7 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
 def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0):
     """
     Decodes predictions
-    :param preds: Predictions codified as the output of a softmax activation function.
+    :param preds: Predictions codified as the output of a softmax activation function. Shape: (batch, timesteps, vocabulary)
     :param temperature: Temperature for sampling.
     :param index2word: Mapping from word indices into word characters.
     :param sampling_type: 'max_likelihood' or 'multinomial'.
@@ -686,18 +686,13 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
 
     if verbose > 0:
         logging.info('Decoding prediction ...')
-    flattened_preds = preds.reshape(-1, preds.shape[-1])
-    flattened_answer_pred = map(lambda index: index2word[index], sampling(scores=flattened_preds,
-                                                                          sampling_type=sampling_type,
-                                                                          temperature=temperature))
-    answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
-
+    pred_matrix = [map(lambda index: index2word[index], sampling(scores=pred, sampling_type=sampling_type, temperature=temperature)) for pred in preds]
     answer_pred = []
     EOS = '<eos>'
     PAD = '<pad>'
 
-    for a_no in answer_pred_matrix:
-        if len(a_no.shape) > 1:  # only process word by word if our prediction has more than one output
+    for a_no in pred_matrix:
+        if len(a_no) > 1:  # only process word by word if our prediction has more than one output
             init_token_pos = 0
             end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
@@ -871,14 +866,17 @@ def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
         scores = scores['output']
 
     if sampling_type == 'multinomial':
-        preds = np.asarray(scores).astype('float64')
+        preds = np.asarray(scores).astype('float32')
         preds = np.log(preds) / temperature
         exp_preds = np.exp(preds)
         preds = exp_preds / np.sum(exp_preds)
         probas = np.random.multinomial(1, preds, 1)
         return np.argmax(probas)
     elif sampling_type == 'max_likelihood':
-        return np.argmax(scores, axis=-1)
+        if scores.ndim == 3:
+            return np.argmax(scores, axis=2)
+        else:
+            return np.argmax(scores, axis=-1)
     else:
         raise NotImplementedError()
 
