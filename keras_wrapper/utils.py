@@ -1,30 +1,40 @@
-from keras.layers.convolutional import ZeroPadding2D
+import copy
+import itertools
+import logging
+import time
 
 import numpy as np
 
-import copy
-import itertools
-import time
-import logging
-
 
 def bbox(img, mode='max'):
-    '''
-        Returns a bounding box covering all the non-zero area in the image.
-        "mode" : "width_height" returns width in [2] and height in [3], "max" returns xmax in [2] and ymax in [3]
-    '''
+    """
+    Returns a bounding box covering all the non-zero area in the image.
+
+    :param img: Image on which print the bounding box
+    :param mode:  "width_height" returns width in [2] and height in [3], "max" returns xmax in [2] and ymax in [3]
+    :return:
+    """
     rows = np.any(img, axis=1)
     cols = np.any(img, axis=0)
     y, ymax = np.where(rows)[0][[0, -1]]
     x, xmax = np.where(cols)[0][[0, -1]]
 
-    if (mode == 'width_height'):
+    if mode == 'width_height':
         return x, y, xmax - x, ymax - y
-    elif (mode == 'max'):
+    elif mode == 'max':
         return x, y, xmax, ymax
 
 
 def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ecoc_version=2):
+    """
+
+    :param n_classes_ecoc:
+    :param input_shape:
+    :param ds:
+    :param stage1_lr:
+    :param ecoc_version:
+    :return:
+    """
     n_classes = len(ds.classes)
     labels_list = [str(l) for l in range(n_classes)]
 
@@ -38,17 +48,17 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ec
         t = time.time()
 
         # Create each one_vs_one classifier of the intermediate stage
-        if (ecoc_version == 1):
+        if ecoc_version == 1:
             s = Stage(nInput=n_classes, nOutput=n_classes_ecoc, input_shape=input_shape, output_shape=[1, 2],
                       type='One_vs_One_Inception', silence=True)
-        elif (ecoc_version == 2):
+        elif ecoc_version == 2:
             s = Stage(nInput=n_classes, nOutput=n_classes_ecoc, input_shape=input_shape, output_shape=[1, 2],
                       type='One_vs_One_Inception_v2', silence=True)
         # Build input mapping
         input_mapping = dict()
         for i in range(n_classes):
             i_str = str(i)
-            if (i_str in c):
+            if i_str in c:
                 input_mapping[i] = c.index(i_str)
             else:
                 input_mapping[i] = None
@@ -70,6 +80,14 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ec
 
 
 def build_OneVsAllECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr):
+    """
+
+    :param n_classes_ecoc:
+    :param input_shape:
+    :param ds:
+    :param stage1_lr:
+    :return:
+    """
     n_classes = len(ds.classes)
 
     stage = list()
@@ -85,7 +103,7 @@ def build_OneVsAllECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr):
         # Build input mapping
         input_mapping = dict()
         for i in range(n_classes):
-            if (i == c):
+            if i == c:
                 input_mapping[i] = 0
             else:
                 input_mapping[i] = 1
@@ -107,6 +125,15 @@ def build_OneVsAllECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr):
 
 
 def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2):
+    """
+
+    :param pairs:
+    :param input_shape:
+    :param ds:
+    :param lr:
+    :param ecoc_version:
+    :return:
+    """
     n_classes = len(ds.classes)
 
     stage = list()
@@ -120,16 +147,16 @@ def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2
         t = time.time()
 
         # Create each one_vs_one classifier of the intermediate stage
-        if (ecoc_version == 1):
+        if ecoc_version == 1:
             s = Stage(nInput=n_classes, nOutput=2, input_shape=input_shape, output_shape=[2],
                       type='One_vs_One_Inception', silence=True)
-        elif (ecoc_version == 2):
+        elif ecoc_version == 2:
             s = Stage(nInput=n_classes, nOutput=2, input_shape=input_shape, output_shape=[2],
                       type='One_vs_One_Inception_v2', silence=True)
         # Build input mapping
         input_mapping = dict()
         for i in range(n_classes):
-            if (i in c):
+            if i in c:
                 input_mapping[i] = c.index(i)
             else:
                 input_mapping[i] = None
@@ -151,6 +178,15 @@ def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2
 
 
 def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2):
+    """
+
+    :param pairs:
+    :param input_shape:
+    :param ds:
+    :param lr:
+    :param ecoc_version:
+    :return:
+    """
     n_classes = len(ds.classes)
 
     stage = list()
@@ -162,16 +198,16 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
         t = time.time()
 
         # Create each one_vs_one classifier of the intermediate stage
-        if (ecoc_version == 1):
+        if ecoc_version == 1:
             s = Stage(nInput=n_classes, nOutput=3, input_shape=input_shape, output_shape=[3],
                       type='One_vs_One_Inception', silence=True)
-        elif (ecoc_version == 2):
+        elif ecoc_version == 2:
             s = Stage(nInput=n_classes, nOutput=3, input_shape=input_shape, output_shape=[3],
                       type='One_vs_One_Inception_v2', silence=True)
         # Build input mapping
         input_mapping = dict()
         for i in range(n_classes):
-            if (i in c):
+            if i in c:
                 input_mapping[i] = c.index(i)
             else:
                 input_mapping[i] = 2
@@ -194,8 +230,22 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
 
 def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, ecoc_version=3, pairs=None,
                                            functional_api=False, activations=['softmax', 'softmax']):
+    """
+
+    :param net:
+    :param input:
+    :param input_shape:
+    :param classes:
+    :param ecoc_version:
+    :param pairs:
+    :param functional_api:
+    :param activations:
+    :return:
+    """
+    from keras.layers.convolutional import ZeroPadding2D
+
     n_classes = len(classes)
-    if (pairs is None):  # generate any possible combination of two classes
+    if pairs is None:  # generate any possible combination of two classes
         pairs = tuple(itertools.combinations(range(n_classes), 2))
 
     outputs_list = list()
@@ -205,28 +255,28 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
     logging.info("Building " + str(n_pairs) + " OneVsOne structures...")
 
     for i, c in enumerate(pairs):
-        t = time.time()
+        # t = time.time()
 
         # Insert 1s in the corresponding positions of the ecoc table
         ecoc_table[c[0], i, 0] = 1
         ecoc_table[c[1], i, 1] = 1
 
         # Create each one_vs_one classifier of the intermediate stage
-        if (functional_api == False):
-            if (ecoc_version == 1):
+        if not functional_api:
+            if ecoc_version == 1:
                 output_name = net.add_One_vs_One_Inception(input, input_shape, i, nOutput=2, activation=activations[0])
-            elif (ecoc_version == 2):
+            elif ecoc_version == 2:
                 output_name = net.add_One_vs_One_Inception_v2(input, input_shape, i, nOutput=2,
                                                               activation=activations[0])
             else:
                 raise NotImplementedError
         else:
-            if (ecoc_version == 1):
+            if ecoc_version == 1:
                 output_name = net.add_One_vs_One_Inception_Functional(input, input_shape, i, nOutput=2,
                                                                       activation=activations[0])
-            elif (ecoc_version == 2):
+            elif ecoc_version == 2:
                 raise NotImplementedError()
-            elif (ecoc_version == 3 or ecoc_version == 4 or ecoc_version == 5 or ecoc_version == 6):
+            elif ecoc_version == 3 or ecoc_version == 4 or ecoc_version == 5 or ecoc_version == 6:
                 if ecoc_version == 3:
                     nkernels = 16
                 elif ecoc_version == 4:
@@ -237,13 +287,13 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
                     nkernels = 256
                 else:
                     raise NotImplementedError()
-                if (i == 0):
+                if i == 0:
                     in_node = net.model.get_layer(input).output
                     padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')(in_node)
                 output_name = net.add_One_vs_One_3x3_Functional(padding_node, input_shape, i, nkernels, nOutput=2,
                                                                 activation=activations[0])
-            elif (ecoc_version == 7):
-                if (i == 0):
+            elif ecoc_version == 7:
+                if i == 0:
                     in_node = net.model.get_layer(input).output
                     padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')(in_node)
                 output_name = net.add_One_vs_One_3x3_double_Functional(padding_node, input_shape, i, nOutput=2,
@@ -252,12 +302,13 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
                 raise NotImplementedError()
         outputs_list.append(output_name)
 
-        # logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.'%(str(i+1), str(n_pairs), c, (classes[c[0]], classes[c[1]]), str(time.time()-t)))
+        # logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.'%(str(i+1),
+        #  str(n_pairs), c, (classes[c[0]], classes[c[1]]), str(time.time()-t)))
 
     ecoc_table = np.reshape(ecoc_table, [n_classes, 2 * n_pairs])
 
     # Build final Softmax layer
-    if (functional_api == False):
+    if not functional_api:
         output_names = net.add_One_vs_One_Merge(outputs_list, n_classes, activation=activations[1])
     else:
         output_names = net.add_One_vs_One_Merge_Functional(outputs_list, n_classes, activation=activations[1])
@@ -267,8 +318,18 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
 
 
 def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits=['train', 'val', 'test']):
+    """
+
+    :param net:
+    :param ds:
+    :param ecoc_table:
+    :param input_name:
+    :param output_names:
+    :param splits:
+    :return:
+    """
     # Insert ecoc_table in net
-    if (not 'additional_data' in net.__dict__.keys()):
+    if 'additional_data' not in net.__dict__.keys():
         net.additional_data = dict()
     net.additional_data['ecoc_table'] = ecoc_table
 
@@ -300,6 +361,12 @@ def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits
 
 
 def loadGoogleNetForFood101(nClasses=101, load_path='/media/HDD_2TB/CNN_MODELS/GoogleNet'):
+    """
+
+    :param nClasses:
+    :param load_path:
+    :return:
+    """
     logging.info('Loading GoogLeNet...')
 
     # Build model (loading the previously converted Caffe's model)
@@ -312,7 +379,11 @@ def loadGoogleNetForFood101(nClasses=101, load_path='/media/HDD_2TB/CNN_MODELS/G
 
 
 def prepareGoogleNet_Food101(model_wrapper):
-    """    Prepares the GoogleNet model after its conversion from Caffe    """
+    """
+    Prepares the GoogleNet model after its conversion from Caffe
+    :param model_wrapper:
+    :return:
+    """
     # Remove unnecessary intermediate optimizers
     layers_to_delete = ['loss2/ave_pool', 'loss2/conv', 'loss2/relu_conv', 'loss2/fc_flatten', 'loss2/fc',
                         'loss2/relu_fc', 'loss2/drop_fc', 'loss2/classifier', 'output_loss2/loss',
@@ -323,8 +394,11 @@ def prepareGoogleNet_Food101(model_wrapper):
 
 
 def prepareGoogleNet_Food101_ECOC_loss(model_wrapper):
-    """    Prepares the GoogleNet model for inserting an ECOC structure after removing the last part of the net    """
-
+    """
+    Prepares the GoogleNet model for inserting an ECOC structure after removing the last part of the net
+    :param model_wrapper:
+    :return:
+    """
     # Remove all last layers (from 'inception_5a' included)
     layers_to_delete = ['inception_5a/1x1', 'inception_5a/relu_1x1', 'inception_5a/3x3_reduce',
                         'inception_5a/relu_3x3_reduce',
@@ -354,14 +428,22 @@ def prepareGoogleNet_Food101_ECOC_loss(model_wrapper):
 
 
 def prepareGoogleNet_Food101_Stage1(model_wrapper):
-    """    Prepares the GoogleNet model for serving as the first Stage of a Staged_Netork    """
+    """
+    Prepares the GoogleNet model for serving as the first Stage of a Staged_Netork
+    :param model_wrapper:
+    :return:
+    """
     # Adds a new output after the layer 'pool4/3x3_s2'
     model_wrapper.model.add_output(name='pool4', input='pool4/3x3_s2')
 
 
 def prepareGoogleNet_Stage2(stage1, stage2):
-    """    Removes the second part of the GoogleNet for inserting it into the second stage.    """
-
+    """
+    Removes the second part of the GoogleNet for inserting it into the second stage.
+    :param stage1:
+    :param stage2:
+    :return:
+    """
     # Remove all last layers (from 'inception_5a' included)
     layers_to_delete = ['inception_5a/1x1', 'inception_5a/relu_1x1', 'inception_5a/3x3_reduce',
                         'inception_5a/relu_3x3_reduce',
@@ -438,29 +520,36 @@ def prepareGoogleNet_Stage2(stage1, stage2):
     # Add new input
     stage2.model.add_input(name='input_data', input_shape=(832, 7, 7))
     stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs['input_data']
+    """
+    # Insert layers into stage
+     stage2.model = Graph()
+    # Input
+     stage2.model.add_input(name='input_data', input_shape=(832,7,7))
+     for l_name,l,p in zip(layers_to_delete, layers, params):
+        stage2.model.namespace.add(l_name)
+        stage2.model.nodes[l_name] = l
+        stage2.model.node_config.append(p)
+    #input = stage2.model.input # keep input
+    # Connect first layer with input
+     stage2.model.node_config[0]['input'] = 'input_data'
+     stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs['input_data']
+     stage2.model.input_config[0]['input_shape'] = [832,7,7]
 
-
-    ## Insert layers into stage
-    # stage2.model = Graph()
-    ## Input
-    # stage2.model.add_input(name='input_data', input_shape=(832,7,7))
-    # for l_name,l,p in zip(layers_to_delete, layers, params):
-    #    stage2.model.namespace.add(l_name)
-    #    stage2.model.nodes[l_name] = l
-    #    stage2.model.node_config.append(p)
-    ##input = stage2.model.input # keep input
-    ## Connect first layer with input
-    # stage2.model.node_config[0]['input'] = 'input_data'
-    # stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs['input_data']
-    # stage2.model.input_config[0]['input_shape'] = [832,7,7]
-    #    
-    ## Output
-    # stage2.model.add_output(name='loss3/loss3', input=layers_to_delete[-1])
-    ##stage2.model.add_output(name='loss3/loss3_', input=layers_to_delete[-1])
-    ##stage2.model.input = input # recover input
+    # Output
+     stage2.model.add_output(name='loss3/loss3', input=layers_to_delete[-1])
+    #stage2.model.add_output(name='loss3/loss3_', input=layers_to_delete[-1])
+    #stage2.model.input = input # recover input
+    """
 
 
 def simplifyDataset(ds, id_classes, n_classes=50):
+    """
+
+    :param ds:
+    :param id_classes:
+    :param n_classes:
+    :return:
+    """
     logging.info("Simplifying %s from %d to %d classes." % (str(ds.name), len(ds.classes), n_classes))
     ds.classes[id_classes] = ds.classes[id_classes][:n_classes]
 
@@ -472,7 +561,7 @@ def simplifyDataset(ds, id_classes, n_classes=50):
         kept_X = dict()
         exec ('labels_set = ds.Y_' + s + '[id_labels]')
         for i, y in enumerate(labels_set):
-            if (y < n_classes):
+            if y < n_classes:
                 for id_out in ds.ids_outputs:
                     exec ('sample = ds.Y_' + s + '[id_out][i]')
                     try:
@@ -491,11 +580,13 @@ def simplifyDataset(ds, id_classes, n_classes=50):
         exec ('ds.Y_' + s + ' = copy.copy(kept_Y)')
         exec ('ds.len_' + s + ' = len(kept_Y[id_labels])')
 
+
 # Text-related utils
 def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     """
     Converts a one-hot codification into a index-based one
     :param preds: Predictions codified as one-hot vectors.
+    :param pad_sequences: Whether we should pad sequence or not
     :param verbose: Verbosity level, by default 0.
     :return: List of convertedpredictions
     """
@@ -505,6 +596,53 @@ def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
     return preds
+
+
+def indices_2_one_hot(indices, n):
+    """
+    Converts a list of indices into one hot codification
+
+    :param indices: list of indices
+    :param n: integer. Size of the vocabulary
+    :return: numpy array with shape (len(indices), n)
+    """
+    one_hot = np.zeros((len(indices), n), dtype=np.int)
+    for i in range(len(indices)):
+        if indices[i] >= n:
+            raise ValueError("Index out of bounds when converting to one hot")
+        one_hot[i, indices[i]] = 1
+
+    return one_hot
+
+
+# From keras.utils.np_utils
+def to_categorical(y, num_classes=None):
+    """Converts a class vector (integers) to binary class matrix.
+
+    E.g. for use with categorical_crossentropy.
+
+    # Arguments
+        y: class vector to be converted into a matrix
+            (integers from 0 to num_classes).
+        num_classes: total number of classes.
+
+    # Returns
+        A binary matrix representation of the input.
+    """
+    y = np.array(y, dtype='int')
+    input_shape = y.shape
+    if input_shape and input_shape[-1] == 1 and len(input_shape) > 1:
+        input_shape = tuple(input_shape[:-1])
+    y = y.ravel()
+    if not num_classes:
+        num_classes = np.max(y) + 1
+    n = y.shape[0]
+    categorical = np.zeros((n, num_classes))
+    categorical[np.arange(n), y] = 1
+    output_shape = input_shape + (num_classes,)
+    categorical = np.reshape(categorical, output_shape)
+    return categorical
+
 
 # ------------------------------------------------------- #
 #       DECODING FUNCTIONS
@@ -521,16 +659,16 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
     """
     if verbose > 0:
         logging.info('Decoding one hot prediction ...')
-    preds = map(lambda x: np.nonzero(x)[1], preds)
+    preds = map(lambda prediction: np.nonzero(prediction)[1], preds)
     PAD = '<pad>'
-    flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
+    flattened_answer_pred = [map(lambda index: index2word[index], pred) for pred in preds]
     answer_pred_matrix = np.asarray(flattened_answer_pred)
     answer_pred = []
 
     for a_no in answer_pred_matrix:
         end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
         end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        tmp = ' '.join(a_no[:end_token_pos])
+        tmp = ' '.join(a_no[:end_token_pos]).decode('utf-8')
         answer_pred.append(tmp)
     return answer_pred
 
@@ -538,7 +676,7 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
 def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0):
     """
     Decodes predictions
-    :param preds: Predictions codified as the output of a softmax activation function.
+    :param preds: Predictions codified as the output of a softmax activation function. Shape: (batch, timesteps, vocabulary)
     :param temperature: Temperature for sampling.
     :param index2word: Mapping from word indices into word characters.
     :param sampling_type: 'max_likelihood' or 'multinomial'.
@@ -548,20 +686,19 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
 
     if verbose > 0:
         logging.info('Decoding prediction ...')
-    flattened_preds = preds.reshape(-1, preds.shape[-1])
-    flattened_answer_pred = map(lambda x: index2word[x], sampling(scores=flattened_preds,
-                                                                  sampling_type=sampling_type,
-                                                                  temperature=temperature))
-    answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
+    pred_matrix = [map(lambda index: index2word[index], sampling(scores=pred, sampling_type=sampling_type, temperature=temperature)) for pred in preds]
     answer_pred = []
     EOS = '<eos>'
     PAD = '<pad>'
 
-    for a_no in answer_pred_matrix:
-        init_token_pos = 0
-        end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
-        end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+    for a_no in pred_matrix:
+        if len(a_no) > 1:  # only process word by word if our prediction has more than one output
+            init_token_pos = 0
+            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
+            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
+            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+        else:
+            tmp = a_no
         answer_pred.append(tmp)
     return answer_pred
 
@@ -579,7 +716,7 @@ def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0
 
     if verbose > 0:
         logging.info('Decoding prediction ...')
-        
+
     answer_pred = []
     probs_pred = []
     for pred in preds:
@@ -620,6 +757,8 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     for j in xrange(len(trans_words)):
         if trans_words[j] == unk_symbol:
             UNK_src = src_word_seq[hard_alignment[j]]
+            if type(UNK_src) == str:
+                UNK_src = UNK_src.decode('utf-8')
             if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
                 new_trans_words.append(UNK_src)
             elif heuristic == 1:
@@ -632,7 +771,7 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
             elif heuristic == 2:
                 # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                 # Sometimes works better than other heuristics
-                if mapping.get(UNK_src) is not None and UNK_src.decode('utf-8')[0].islower():
+                if mapping.get(UNK_src) is not None and UNK_src[0].islower():
                     new_trans_words.append(mapping[UNK_src])
                 else:
                     new_trans_words.append(UNK_src)
@@ -647,9 +786,15 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                    mapping=None, verbose=0):
     """
     Decodes predictions from the BeamSearch method.
+
     :param preds: Predictions codified as word indices.
     :param index2word: Mapping from word indices into word characters.
+    :param alphas: Attention model weights
+    :param heuristic: Replace unknown words heuristic (0, 1 or 2)
+    :param x_text: Source text (for unk replacement)
+    :param unk_symbol: Unknown words symbol
     :param pad_sequences: Whether we should make a zero-pad on the input sequence.
+    :param mapping: Source-target dictionary (for unk_replace heuristics 1 and 2)
     :param verbose: Verbosity level, by default 0.
     :return: List of decoded predictions
     """
@@ -663,14 +808,12 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
             logging.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-    flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
+    flattened_answer_pred = [map(lambda x: index2word[x].decode('utf-8'), pred) for pred in preds]
     answer_pred = []
 
     if alphas is not None:
         x_text = map(lambda x: x.split(), x_text)
-        hard_alignments = map(
-            lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1),
-            alphas, x_text)
+        hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas, x_text)
         for i, a_no in enumerate(flattened_answer_pred):
             if unk_symbol in a_no:
                 if verbose > 1:
@@ -688,11 +831,11 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                              verbose=verbose)
                 if verbose > 1:
                     print "After unk_replace:", a_no
-            tmp = ' '.join(a_no[:-1])
+            tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     else:
         for a_no in flattened_answer_pred:
-            tmp = ' '.join(a_no[:-1])
+            tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     return answer_pred
 
@@ -716,20 +859,44 @@ def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
     :param scores: array of size #samples x #classes;
     every entry determines a score for sample i having class j
     :param sampling_type:
-    :param temperature: Temperature for the predictions. The higher, the flatter probabilities. Hence more random outputs.
+    :param temperature: Predictions temperature. The higher, the flatter probabilities. Hence more random outputs.
     :return: set of indices chosen as output, a vector of size #samples
     """
     if isinstance(scores, dict):
         scores = scores['output']
 
     if sampling_type == 'multinomial':
-        preds = np.asarray(scores).astype('float64')
+        preds = np.asarray(scores).astype('float32')
         preds = np.log(preds) / temperature
         exp_preds = np.exp(preds)
         preds = exp_preds / np.sum(exp_preds)
         probas = np.random.multinomial(1, preds, 1)
         return np.argmax(probas)
     elif sampling_type == 'max_likelihood':
-        return np.argmax(scores, axis=-1)
+        if scores.ndim == 3:
+            return np.argmax(scores, axis=2)
+        else:
+            return np.argmax(scores, axis=-1)
     else:
         raise NotImplementedError()
+
+
+# Data structures-related utils
+def flatten_list_of_lists(list_of_lists):
+    """
+    Flattens a list of lists
+    :param list_of_lists: List of lists
+    :return: Flatten list of lists
+    """
+    return [item for sublist in list_of_lists for item in sublist]
+
+
+def flatten(l):
+    """
+    Flatten a list (more general than flatten_list_of_lists, but also more inefficient
+    :param l:
+    :return:
+    """
+    if not l:
+        return l
+    return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if type(l) is list else [l]
