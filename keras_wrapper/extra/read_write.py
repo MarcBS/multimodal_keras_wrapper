@@ -9,9 +9,12 @@ Modified by: Marc Bola\~nos
 """
 
 import json
-import numpy as np
-import os
 import logging
+import os
+import codecs
+import numpy as np
+import tables
+
 
 ###
 # Helpers
@@ -31,19 +34,72 @@ def create_dir_if_not_exists(directory):
         logging.info("<<< creating directory " + directory + " ... >>>")
         os.makedirs(directory)
 
+
+def clean_dir(directory):
+    """
+    Creates (or empties) a directory
+    :param directory: Directory to create
+    :return: None
+    """
+
+    if os.path.exists(directory):
+        import shutil
+        print '<<< Warning!: Deleting directory: %s >>>' % directory
+        shutil.rmtree(directory)
+        os.makedirs(directory)
+    else:
+        os.makedirs(directory)
+
+
 ###
 # Main functions
 ###
-def file2list(filepath):
-    with open(filepath, 'r') as f:
-        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0]
-    return lines
+def file2list(filepath, stripfile=True):
+    with codecs.open(filepath, 'r', encoding='utf-8') as f:
+        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in
+                                                                                                 f.readlines()]
+        return lines
 
 
-def numpy2file(filepath, mylist, permission='w'):
+def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
+    if permission == 'w':
+        f = tables.open_file(filepath, mode=permission)
+        atom = tables.Float32Atom()
+        array_c = f.create_earray(f.root, data_name, atom,
+                                  tuple([0] + [mylist.shape[i] for i in range(1, len(mylist.shape))]))
+        array_c.append(mylist)
+        f.close()
+    elif permission == 'a':
+        f = tables.open_file(filepath, mode='a')
+        f.root.data.append(mylist)
+        f.close()
+
+
+def numpy2file(filepath, mylist, permission='w', split=False):
     mylist = np.asarray(mylist)
-    with open(filepath, permission) as f:
-        np.save(f, mylist)
+    if split:
+        for i, filepath_ in enumerate(filepath):
+            with open(filepath_, permission) as f:
+                np.save(f, mylist[i])
+    else:
+        with open(filepath, permission) as f:
+            np.save(f, mylist)
+
+
+def numpy2imgs(folder_path, mylist, imgs_names, dataset):
+    from PIL import Image as pilimage
+    create_dir_if_not_exists(folder_path)
+    n_samples, wh, n_classes = mylist.shape
+
+    for img, name in zip(mylist, imgs_names):
+        name = '_'.join(name.split('/'))
+        file_path = folder_path + "/" + name  # image file
+
+        out_img = dataset.getImageFromPrediction_3DSemanticLabel(img, n_classes)
+
+        # save the segmented image
+        out_img = pilimage.fromarray(np.uint8(out_img))
+        out_img.save(file_path)
 
 
 def listoflists2file(filepath, mylist, permission='w'):
@@ -56,12 +112,20 @@ def listoflists2file(filepath, mylist, permission='w'):
 
 
 def list2file(filepath, mylist, permission='w'):
-    mylist = [str(l) for l in mylist]
+    mylist = [l for l in mylist]
     mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
         mylist = mylist.encode('utf-8')
     with open(filepath, permission) as f:
         f.writelines(mylist)
+
+
+def list2stdout(mylist):
+    mylist = [str(l) for l in mylist]
+    mylist = '\n'.join(mylist)
+    if type(mylist[0]) is unicode:
+        mylist = mylist.encode('utf-8')
+    print mylist
 
 
 def nbest2file(filepath, mylist, separator='|||', permission='w'):
@@ -81,10 +145,18 @@ def nbest2file(filepath, mylist, separator='|||', permission='w'):
     with open(filepath, permission) as f:
         f.writelines(mylist)
 
-def list2vqa(filepath, mylist, qids, permission='w'):
+
+def list2vqa(filepath, mylist, qids, permission='w', extra=None):
     res = []
-    for ans, qst in zip(mylist, qids):
-        res.append({'answer': ans, 'question_id': int(qst)})
+    for i, (ans, qst) in enumerate(zip(mylist, qids)):
+        line = {'answer': ans, 'question_id': int(qst)}
+        if extra is not None:
+            line['reference'] = extra['reference'][i]
+            # line['probs'] = str(extra['probs'][i]) # vector of probabilities for all outputs
+            line['top5'] = str(
+                [[extra['vocab'][p], extra['probs'][i][p]] for p in np.argsort(extra['probs'][i])[::-1][:5]])
+            line['max_prob'] = str(max(extra['probs'][i]))
+        res.append(line)
     with open(filepath, permission) as f:
         json.dump(res, f)
 
@@ -96,7 +168,7 @@ def dump_hdf5_simple(filepath, dataset_name, data):
     h5f.close()
 
 
-def load_hdf5_simple(filepath, dataset_name):
+def load_hdf5_simple(filepath, dataset_name='data'):
     import h5py
     h5f = h5py.File(filepath, 'r')
     tmp = h5f[dataset_name][:]
@@ -112,7 +184,7 @@ def pickle_model(
         index2word_x,
         index2word_y):
     import sys
-    import cPickle as pickle
+    import cPickle
     modifier = 10
     tmp = sys.getrecursionlimit()
     sys.setrecursionlimit(tmp * modifier)
@@ -122,22 +194,22 @@ def pickle_model(
                   'word2index_y': word2index_y,
                   'index2word_x': index2word_x,
                   'index2word_y': index2word_y}
-        pickle.dump(p_dict, f, protocol=2)
+        cPickle.dump(p_dict, f, protocol=cPickle.HIGHEST_PROTOCOL)
     sys.setrecursionlimit(tmp)
 
 
 def unpickle_model(path):
-    import cPickle as pickle
+    import cPickle
     with open(path, 'rb') as f:
-        model = pickle.load(f)['model']
+        model = cPickle.load(f)['model']
     return model
 
 
 def unpickle_vocabulary(path):
-    import cPickle as pickle
+    import cPickle
     p_dict = {}
     with open(path, 'rb') as f:
-        pickle_load = pickle.load(f)
+        pickle_load = cPickle.load(f)
         p_dict['word2index_x'] = pickle_load['word2index_x']
         p_dict['word2index_y'] = pickle_load['word2index_y']
         p_dict['index2word_x'] = pickle_load['index2word_x']
@@ -146,9 +218,9 @@ def unpickle_vocabulary(path):
 
 
 def unpickle_data_provider(path):
-    import cPickle as pickle
+    import cPickle
     with open(path, 'rb') as f:
-        dp = pickle.load(f)['data_provider']
+        dp = cPickle.load(f)['data_provider']
     return dp
 
 
@@ -228,7 +300,7 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
     return score
 
 
-def dict2file(mydict, path, title=None):
+def dict2file(mydict, path, title=None, separator=':'):
     """
     In:
         mydict - dictionary to save in a file
@@ -237,7 +309,7 @@ def dict2file(mydict, path, title=None):
             useful if we write many dictionaries
             into the same file
     """
-    tmp = [str(x[0]) + ':' + str(x[1]) for x in mydict.items()]
+    tmp = [str(x[0]) + separator + str(x[1]) for x in mydict.items()]
     if title is not None:
         output_list = [title]
         output_list.extend(tmp)

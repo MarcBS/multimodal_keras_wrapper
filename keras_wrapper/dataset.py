@@ -442,7 +442,7 @@ class Dataset(object):
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
         #    they will not be used in any way. IDs must be stored in text files with a single id per line
 
-        # List of implem ented input normalization functions
+        # List of implemented input normalization functions
         self.__available_norm_im_vid = ['0-1', '(-1)-1']  # 'image' and 'video' only
         self.__available_norm_feat = ['L2']  # 'image-features' and 'video-features' only
 

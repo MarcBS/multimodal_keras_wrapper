@@ -2355,7 +2355,7 @@ class Model_Wrapper(object):
         else:
             return predictions, references, sources_sampling
 
-    def predictNet(self, ds, parameters=None, postprocess_fun=None, return_inputs=False):
+    def predictNet(self, ds, parameters=None, postprocess_fun=None):
         """
             Returns the predictions of the net on the dataset splits chosen. The input 'parameters' is a dict()
             which may contain the following parameters:
@@ -2367,13 +2367,12 @@ class Model_Wrapper(object):
                                     The output of the function must be a list of results, one per sample.
                                     If postprocess_fun is a list, the second element will be used as an extra
                                      input to the function.
-            :param return_inputs: Return inputs.
             :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
         """
         if parameters is None:
             parameters = dict()
         # Check input parameters and recover default values if needed
-        default_params = {'max_batch_size': 50,
+        default_params = {'batch_size': 50,
                           'n_parallel_loaders': 8,
                           'normalize': True,
                           'normalization_type': None,
@@ -2383,15 +2382,12 @@ class Model_Wrapper(object):
                           'final_sample': -1,
                           'verbose': 1,
                           'predict_on_sets': ['val'],
-                          'max_eval_samples': None,
-                          'pos_unk': False
+                          'max_eval_samples': None
                           }
         params = self.checkParameters(parameters, default_params)
         predictions = dict()
         for s in params['predict_on_sets']:
             predictions[s] = []
-            if return_inputs:
-                inputs = []
             if params['verbose'] > 0:
                 print
                 logging.info("<<< Predicting outputs of " + s + " set >>>")
@@ -2401,15 +2397,15 @@ class Model_Wrapper(object):
                     n_samples = params['final_sample'] - params['init_sample']
                 else:
                     n_samples = eval("ds.len_" + s)
-                num_iterations = int(math.ceil(float(n_samples) / params['max_batch_size']))
-                n_samples = min(eval("ds.len_" + s), num_iterations * params['max_batch_size'])
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
 
                 # Prepare data generator
                 data_gen = Data_Batch_Generator(s,
                                                 self,
                                                 ds,
                                                 num_iterations,
-                                                batch_size=params['max_batch_size'],
+                                                batch_size=params['batch_size'],
                                                 normalization=params['normalize'],
                                                 normalization_type=params['normalization_type'],
                                                 data_augmentation=False,
@@ -2420,13 +2416,13 @@ class Model_Wrapper(object):
 
             else:
                 n_samples = params['n_samples']
-                num_iterations = int(math.ceil(float(n_samples) / params['max_batch_size']))
+                num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
                 # Prepare data generator
                 data_gen = Data_Batch_Generator(s,
                                                 self,
                                                 ds,
                                                 num_iterations,
-                                                batch_size=params['max_batch_size'],
+                                                batch_size=params['batch_size'],
                                                 normalization=params['normalize'],
                                                 normalization_type=params['normalization_type'],
                                                 data_augmentation=False,
@@ -2434,7 +2430,7 @@ class Model_Wrapper(object):
                                                 predict=True,
                                                 random_samples=n_samples).generator()
             # Predict on model
-            if postprocess_fun is None and not return_inputs:
+            if postprocess_fun is None:
                 if int(keras.__version__.split('.')[0]) == 1:
                     # Keras version 1.x
                     out = self.model.predict_generator(data_gen,
@@ -2454,24 +2450,18 @@ class Model_Wrapper(object):
                 processed_samples = 0
                 start_time = time.time()
                 while processed_samples < n_samples:
+                    out = self.model.predict_on_batch(data_gen.next())
 
-                    batch_inputs = data_gen.next()
-                    out = self.model.predict_on_batch(batch_inputs)
-                    if postprocess_fun is not None:
-                        # Apply post-processing function
-                        if isinstance(postprocess_fun, list):
-                            last_processed = min(processed_samples + params['max_batch_size'], n_samples)
-                            out = postprocess_fun[0](out, postprocess_fun[1][processed_samples:last_processed])
-                        else:
-                            out = postprocess_fun(out)
-
-                    predictions[s] += [out]
-
-                    if return_inputs:
-                        inputs += [batch_inputs]
+                    # Apply post-processing function
+                    if isinstance(postprocess_fun, list):
+                        last_processed = min(processed_samples + params['batch_size'], n_samples)
+                        out = postprocess_fun[0](out, postprocess_fun[1][processed_samples:last_processed])
+                    else:
+                        out = postprocess_fun(out)
+                    predictions[s] += out
 
                     # Show progress
-                    processed_samples += params['max_batch_size']
+                    processed_samples += params['batch_size']
                     if processed_samples > n_samples:
                         processed_samples = n_samples
                     eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
@@ -2479,10 +2469,7 @@ class Model_Wrapper(object):
                     sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
                     sys.stdout.flush()
 
-        if return_inputs:
-            return predictions, inputs
-        else:
-            return predictions
+        return predictions
 
     def predictOnBatch(self, X, in_name=None, out_name=None, expand=False):
         """

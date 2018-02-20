@@ -1,13 +1,5 @@
-# from vqaEval import VQAEval
-
-# supported evaluators
 import json
 import logging
-
-from sklearn import metrics as sklearn_metrics
-
-from read_write import list2vqa
-import numpy as np
 
 from localization_utilities import *
 
@@ -16,55 +8,55 @@ from localization_utilities import *
 # EVALUATION FUNCTIONS SELECTOR
 ########################################
 
+
 def get_coco_score(pred_list, verbose, extra_vars, split):
     """
     COCO challenge metrics
-    
-    # Arguments
-        pred_list, dictionary of hypothesis sentences (id, sentence)
-        verbose - if greater than 0 the metric measures are printed out
-        extra_vars - extra variables, here are:
-            extra_vars['references'] - dictionary mapping sample indices to list with all their valid captions (id, [sentences])
+    :param pred_list: dictionary of hypothesis sentences (id, sentence)
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: extra variables, here are:
+            extra_vars['references'] - dict mapping sample indices to list with all valid captions (id, [sentences])
             extra_vars['tokenize_f'] - tokenization function used during model training (used again for validation)
-	    extra_vars['detokenize_f'] - detokenization function used during model training (used again for validation)
-	    extra_vars['tokenize_hypotheses'] - Whether tokenize or not the hypotheses during evaluation
+            extra_vars['detokenize_f'] - detokenization function used during model training (used again for validation)
+            extra_vars['tokenize_hypotheses'] - Whether tokenize or not the hypotheses during evaluation
+    :param split: split on which we are evaluating
+    :return: Dictionary with the coco scores
     """
-    
     from pycocoevalcap.bleu.bleu import Bleu
     from pycocoevalcap.meteor.meteor import Meteor
+    from pycocoevalcap.meteor import accepted_langs
     from pycocoevalcap.cider.cider import Cider
     from pycocoevalcap.rouge.rouge import Rouge
     from pycocoevalcap.ter.ter import Ter
-    from pycocoevalcap.vqa import vqaEval, visual_qa
-    from pycocoevalcap.tokenizer.ptbtokenizer import PTBTokenizer
 
     gts = extra_vars[split]['references']
-    if extra_vars.get('tokenize_hypotheses', True):
+    if extra_vars.get('tokenize_hypotheses', False):
         hypo = {idx: map(extra_vars['tokenize_f'], [lines.strip()]) for (idx, lines) in enumerate(pred_list)}
     else:
         hypo = {idx: [lines.strip()] for (idx, lines) in enumerate(pred_list)}
-    
+
     # Tokenize refereces if needed
-    if extra_vars.get('tokenize_references', True):
+    if extra_vars.get('tokenize_references', False):
         refs = {idx: map(extra_vars['tokenize_f'], gts[idx]) for idx in gts.keys()}
     else:
         refs = gts
 
     # Detokenize references if needed.    
-    if extra_vars.get('apply_detokenization', False) :
+    if extra_vars.get('apply_detokenization', False):
         refs = {idx: map(extra_vars['detokenize_f'], refs[idx]) for idx in refs}
-    
+
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
-        (Meteor(language=extra_vars['language']), "METEOR"),
         (Ter(), "TER"),
         (Rouge(), "ROUGE_L"),
         (Cider(), "CIDEr")
     ]
+    if extra_vars.get('language', 'en') in accepted_langs:
+        scorers.append((Meteor(language=extra_vars['language']), "METEOR"))
 
     final_scores = {}
     for scorer, method in scorers:
-        score, scores = scorer.compute_score(refs, hypo)
+        score, _ = scorer.compute_score(refs, hypo)
         if type(score) == list:
             for m, s in zip(method, score):
                 final_scores[m] = s
@@ -72,7 +64,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
             final_scores[method] = score
 
     if verbose > 0:
-        logging.info('Computing coco scores on the %s split...' % (split))
+        logging.info('Computing coco scores on the %s split...' % split)
     for metric in sorted(final_scores):
         value = final_scores[metric]
         logging.info(metric + ': ' + str(value))
@@ -81,23 +73,26 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
 
 
 def eval_vqa(pred_list, verbose, extra_vars, split):
-    '''
-    VQA challenge metric
-    
-    # Arguments
-        gt_list, dictionary of reference sentences (id, sentence)
-        pred_list, dictionary of hypothesis sentences (id, sentence)
-        verbose - if greater than 0 the metric measures are printed out
-        extra_vars - extra variables, here are:
-                extra_vars['quesFile'] - path to the .json file where the questions are stored
-                extra_vars['annFile'] - path to the .json file where the annotated answers are stored
-                extra_vars['question_ids'] - question identifiers
-    '''
+    """
+    VQA challenge metrics
+    :param pred_list: dictionary of hypothesis sentences (id, sentence)
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: extra variables
+            extra_vars['quesFile'] - path to the .json file where the questions are stored
+            extra_vars['annFile'] - path to the .json file where the annotated answers are stored
+            extra_vars['question_ids'] - question identifiers
+    :param split: split on which we are evaluating
+    :return: Dictionary of VQA accuracies
+    """
+    import datetime
+    from pycocoevalcap.vqa import vqaEval, visual_qa
+    from read_write import list2vqa
+
     quesFile = extra_vars[split]['quesFile']
     annFile = extra_vars[split]['annFile']
 
     # create temporal resFile
-    resFile = 'tmp_res_file.json'
+    resFile = 'tmp_res_file_' + str(datetime.datetime.now()) + '.json'
     list2vqa(resFile, pred_list, extra_vars[split]['question_ids'])
 
     # create vqa object and vqaRes object
@@ -117,7 +112,7 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
     # acc_class_normalized = vqaEval_.accuracy['classNormalizedOverall']
 
     if verbose > 0:
-        logging.info('VQA Metric: Accuracy yes/no is {0}, other is {1}, number is {2}, overall is {3}'. \
+        logging.info('VQA Metric: Accuracy yes/no is {0}, other is {1}, number is {2}, overall is {3}'.
                      format(acc_yes_no, acc_other, acc_number, acc_overall))  # , acc_class_normalized))
     return {'overall accuracy': acc_overall,
             'yes/no accuracy': acc_yes_no,
@@ -126,27 +121,28 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
 
 
 def multilabel_metrics(pred_list, verbose, extra_vars, split):
-    '''
-    Multiclass classification metrics
-    see multilabel ranking metrics in sklearn library for more info:
+    """
+    Multiclass classification metrics. see multilabel ranking metrics in sklearn library for more info:
         http://scikit-learn.org/stable/modules/model_evaluation.html#multilabel-ranking-metrics
-        
-    # Arguments
-        gt_list, dictionary of reference sentences
-        pred_list, dictionary of hypothesis sentences
-        verbose - if greater than 0 the metric measures are printed out
-        extra_vars - extra variables, here are:
-                extra_vars['word2idx'] - dictionary mapping from words to indices
-                extra_vars['references'] - list of GT labels
-    '''
+
+    :param pred_list: dictionary of hypothesis sentences
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: extra variables
+                        extra_vars['word2idx'] - dictionary mapping from words to indices
+                        extra_vars['references'] - list of GT labels
+    :param split: split on which we are evaluating
+    :return: Dictionary of multilabel metrics
+    """
+    from sklearn import metrics as sklearn_metrics
+
     word2idx = extra_vars[split]['word2idx']
-    
+
     # check if an additional dictionary matching raw to basic and general labels is provided
     # in that case a more general evaluation will be considered
     raw2basic = extra_vars[split].get('raw2basic', None)
     if raw2basic is not None:
         logging.info('Applying general evaluation with raw2basic dictionary.')
-    
+
     if raw2basic is None:
         n_classes = len(word2idx)
     else:
@@ -154,7 +150,6 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
         n_classes = len(basic_values)
     n_samples = len(pred_list)
 
-    
     # Create prediction matrix
     y_pred = np.zeros((n_samples, n_classes))
     for i_s, sample in enumerate(pred_list):
@@ -167,18 +162,17 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
 
     # Prepare GT
     gt_list = extra_vars[split]['references']
-    
+
     if raw2basic is None:
         y_gt = np.array(gt_list)
     else:
-        idx2word = {v:k for k,v in word2idx.iteritems()}
+        idx2word = {v: k for k, v in word2idx.iteritems()}
         y_gt = np.zeros((n_samples, n_classes))
         for i_s, sample in enumerate(gt_list):
             for raw_idx, is_active in enumerate(sample):
                 if is_active:
                     word = idx2word[raw_idx].strip()
                     y_gt[i_s, raw2basic[word]] = 1
-        
 
     # Compute Coverage Error
     coverr = sklearn_metrics.coverage_error(y_gt, y_pred)
@@ -191,12 +185,12 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
 
     if verbose > 0:
         logging.info(
-            'Coverage Error (best: avg labels per sample = %f): %f' % (np.sum(y_gt) / float(n_samples), coverr))
+            'Coverage Error (best: avg labels per sample = %f): %f' % (float(np.sum(y_gt)) / float(n_samples), coverr))
         logging.info('Label Ranking Average Precision (best: 1.0): %f' % avgprec)
         logging.info('Label Ranking Loss (best: 0.0): %f' % rankloss)
-        logging.info('Precision: %f' % (precision))
-        logging.info('Recall: %f' % (recall))
-        logging.info('F1 score: %f' % (f1))
+        logging.info('Precision: %f' % precision)
+        logging.info('Recall: %f' % recall)
+        logging.info('F1 score: %f' % f1)
 
     return {'coverage error': coverr,
             'average precision': avgprec,
@@ -207,19 +201,19 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
 
 
 def multiclass_metrics(pred_list, verbose, extra_vars, split):
-    '''
-    Multiclass classification metrics
-    see multilabel ranking metrics in sklearn library for more info:
+    """
+    Multiclass classification metrics. See multilabel ranking metrics in sklearn library for more info:
         http://scikit-learn.org/stable/modules/model_evaluation.html#multilabel-ranking-metrics
-
-    # Arguments
-        pred_list, list of predictions
-        verbose - if greater than 0 the metric measures are printed out
-        extra_vars - dictionary extra variables. Must contain:
+    :param pred_list: list of predictions
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: dictionary extra variables. Must contain:
                 - ['n_classes'] with the total number of existent classes
                 - [split]['references'] with the GT values corresponding to each sample of the current data split
-        split - split of the data where we are applying the evaluation
-    '''
+    :param split: split of the data where we are applying the evaluation
+    :return: dictionary of multiclass metrics
+    """
+    from sklearn import metrics as sklearn_metrics
+
     n_classes = extra_vars['n_classes']
     n_samples = len(pred_list)
     gt_list = extra_vars[split]['references']
@@ -233,19 +227,19 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
         values_gt = gt_list.values()
     except:
         values_gt = gt_list
-    
+
     counts_per_class = np.zeros((n_classes,))
     for i_s, gt_class in enumerate(values_gt):
         y_gt[i_s, gt_class] = 1
         counts_per_class[gt_class] += 1
-        
+
     # Apply balanced accuracy per class
-    inverse_counts_per_class = [sum(counts_per_class)-c_i for c_i in counts_per_class]
-    weights_per_class = [float(c_i)/sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
+    inverse_counts_per_class = [sum(counts_per_class) - c_i for c_i in counts_per_class]
+    weights_per_class = [float(c_i) / sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
     sample_weights = np.zeros((n_samples,))
     for i_s, gt_class in enumerate(values_gt):
         sample_weights[i_s] = weights_per_class[gt_class]
-        
+
     # Compute accuracy
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
     accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights)
@@ -253,11 +247,11 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
 
     if verbose > 0:
-        logging.info('Accuracy: %f' % (accuracy))
-        logging.info('Balanced Accuracy: %f' % (accuracy_balanced))
-        logging.info('Precision: %f' % (precision))
-        logging.info('Recall: %f' % (recall))
-        logging.info('F1 score: %f' % (f1))
+        logging.info('Accuracy: %f' % accuracy)
+        logging.info('Balanced Accuracy: %f' % accuracy_balanced)
+        logging.info('Precision: %f' % precision)
+        logging.info('Recall: %f' % recall)
+        logging.info('F1 score: %f' % f1)
 
     return {'accuracy': accuracy,
             'accuracy_balanced': accuracy_balanced,
@@ -266,23 +260,24 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
             'f1': f1}
 
 
-
 def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
-    '''
+    """
     Semantic Segmentation Accuracy metric
-    # Arguments
-        pred_list, list of predictions
-        verbose - if greater than 0 the metric measures are printed out
-        extra_vars - dictionary extra variables. Must contain:
-                - ['n_classes'] with the total number of existent classes
-                - [split]['references'] with the GT values corresponding to each sample of the current data split
-                - [discard_classes] with the classes not taken into account in the performance evaluation
-        split - split of the data where we are applying the evaluation
-    '''
+
+    :param pred_list: list of predictions
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: dictionary extra variables. Must contain:
+                       - ['n_classes'] with the total number of existent classes
+                       - [split]['references'] with the GT values corresponding to each sample of the current data split
+                       - [discard_classes] with the classes not taken into account in the performance evaluation
+    :param split: split of the data where we are applying the evaluation
+    :return: dictionary containing the semantic global accuracy
+    """
+    from sklearn import metrics as sklearn_metrics
 
     n_classes = extra_vars['n_classes']
     gt_list = extra_vars[split]['references']
-    discard_classes = extra_vars['discard_classes'] # [11]
+    discard_classes = extra_vars['discard_classes']  # [11]
 
     pred_class_list = []
     for sample_score in pred_list:
@@ -312,41 +307,32 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
     # Compute Coverage Error
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
     if verbose > 0:
-        logging.info('Accuracy: %f' %
-                     (accuracy))
+        logging.info('Accuracy: %f' % accuracy)
 
     return {'semantic global accuracy': accuracy}
 
-    """
-    precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
-
-    if verbose > 0:
-        logging.info('Accuracy: %f \t Precision: %f \t Recall: %f \t F1: %f' %
-                     (accuracy, precision, recall, f1))
-
-    return {'accuracy': accuracy,
-            'precision': precision,
-            'recall': recall,
-            'f1': f1}
-    """
-
 
 def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
-    '''
+    """
     Semantic Segmentation Mean IoU metric
-    # Arguments
-        pred_list, list of predictions
-        verbose - if greater than 0 the metric measures are printed out
-        extra_vars - dictionary extra variables. Must contain:
-                - ['n_classes'] with the total number of existent classes
-                - [split]['references'] with the GT values corresponding to each sample of the current data split
-                - [discard_classes] with the classes not taken into account in the performance evaluation
-        split - split of the data where we are applying the evaluation
-    '''
+
+    :param pred_list: list of predictions
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: dictionary extra variables. Must contain:
+                    - ['n_classes'] with the total number of existent classes
+                    - [split]['references'] with the GT values corresponding to each sample of the current data split
+                    - [discard_classes] with the classes not taken into account in the performance evaluation
+    :param split: split of the data where we are applying the evaluation
+    :return: dictionary containing the mean IoU and the semantic global accuracy metrics
+    """
+    from sklearn import metrics as sklearn_metrics
 
     n_classes = extra_vars['n_classes']
     gt_list = extra_vars[split]['references']
-    discard_classes = extra_vars['discard_classes']  # [11]
+    discard_classes = extra_vars['discard_classes']
+
+    np.save('/media/HDD_3TB/bea/gt.npy', gt_list)
+    np.save('/media/HDD_3TB/bea/pred.npy', pred_list)
 
     pred_class_list = []
     for sample_score in pred_list:
@@ -358,8 +344,8 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
         values_gt += list(gt)
 
     # Create ground truth and prediction matrices
-    y_gt = np.zeros((n_samples, ))
-    y_pred = np.zeros((n_samples, ))
+    y_gt = np.zeros((n_samples,))
+    y_pred = np.zeros((n_samples,))
 
     ind_i = 0
     for i_s, (gt_class, pred_class) in enumerate(zip(values_gt, pred_class_list)):
@@ -377,44 +363,44 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
     cm = sklearn_metrics.confusion_matrix(y_gt, y_pred)
     cm_t = cm.transpose()
 
-    inter = np.zeros(n_classes-len(discard_classes))
-    union = np.zeros(n_classes-len(discard_classes))
+    inter = np.zeros(n_classes - len(discard_classes))
+    union = np.zeros(n_classes - len(discard_classes))
     ind_i = 0
-    
-    for l in range(0,n_classes):
+
+    for l in range(0, n_classes):
         if not any([d == l for d in discard_classes]):
             tp = cm[l][l]
-            fn = np.sum(cm[l])-tp
-            fp = np.sum(cm_t[l])-tp
+            fn = np.sum(cm[l]) - tp
+            fp = np.sum(cm_t[l]) - tp
             inter[ind_i] = float(tp)
-            union[ind_i] = float(tp+fp+fn)
+            union[ind_i] = float(tp + fp + fn)
             ind_i += 1
-    
-    mean_iou = np.mean(inter/union)
-    acc = np.sum(inter)/np.sum(cm)
+
+    mean_iou = np.mean(inter / union)
+    acc = np.sum(inter) / np.sum(cm)
     if verbose > 0:
-        logging.info('Mean IoU: %f' %
-                     (mean_iou))
-        logging.info('Accuracy: %f' %
-                     (acc))
+        logging.info('Mean IoU: %f' % mean_iou)
+        logging.info('Accuracy: %f' % float(acc))
 
     return {'mean IoU': mean_iou, 'semantic global accuracy': acc}
 
+
 def averagePrecision(pred_list, verbose, extra_vars, split):
-    '''
-        Computes a Precision-Recall curve and its associated mAP score given a set of precalculated reports.
-        The parameter "report_all" must include the following information for each sample: 
-            [predicted_bboxes, predicted_Y, predicted_scores, GT_bboxes, GT_Y]
-        The parameter 'threshods' defines the range of min_prediction_scores to be tested for computing the 
-        precision-recall curve.
-        
-        # Arguments
-            pred_list, list of hypotheses with the following info [predicted_bboxes, predicted_Y, predicted_scores]
-            verbose - if greater than 0 the metric measures are printed out
-            extra_vars - extra variables, here are:
+    """
+    Computes a Precision-Recall curve and its associated mAP score given a set of precalculated reports.
+    The parameter "report_all" must include the following information for each sample:
+        [predicted_bboxes, predicted_Y, predicted_scores, GT_bboxes, GT_Y]
+    The parameter 'threshods' defines the range of min_prediction_scores to be tested for computing the
+    precision-recall curve.
+
+    :param pred_list: list of hypotheses with the following info [predicted_bboxes, predicted_Y, predicted_scores]
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: extra variables, here are:
                 extra_vars[split]['references'] - list of samples with the following info [GT_bboxes, GT_Y]
                 extra_vars['n_classes'] - number of classes in the detection task
-    '''
+    :param split: split of the data where we are applying the evaluation
+    :return: dictionary containing the aforementioned metrics.
+    """
 
     thresholds = np.arange(0, 1, 0.1)
     fixedIoU = 0.5
@@ -426,8 +412,8 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
     n_thresholds = len(thresholds)
 
     # prepare variables for storing all precision-recall values
-    general_measures = [[] for j in range(n_thresholds)]
-    class_measures = [[] for j in range(n_thresholds)]
+    general_measures = [[] for _ in range(n_thresholds)]
+    class_measures = [[] for _ in range(n_thresholds)]
 
     # compute precision-recall measures for each min_prediction_score threshold
     for thres in range(n_thresholds):
@@ -486,15 +472,15 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
                 total_pred_classes[y] += 1
 
         # Compute general precision / recall / accuracy measures
-        if ((TP + FP) == 0):
+        if (TP + FP) == 0:
             precision = 0.0
         else:
             precision = float(TP) / (TP + FP)
-        if ((TP + FN) == 0):
+        if (TP + FN) == 0:
             recall = 0.0
         else:
             recall = float(TP) / (TP + FN)
-        if ((FP + FN + TP) == 0):
+        if (FP + FN + TP) == 0:
             accuracy = 0.0
         else:
             accuracy = float(TP) / (FP + FN + TP)
@@ -507,15 +493,15 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
             TP = TP_classes[c]
             FP = FP_classes[c]
             FN = FN_classes[c]
-            if ((TP + FP) == 0):
+            if (TP + FP) == 0:
                 precision_classes[c] = 0.0
             else:
                 precision_classes[c] = float(TP) / (TP + FP)
-            if ((TP + FN) == 0):
+            if (TP + FN) == 0:
                 recall_classes[c] = 0.0
             else:
                 recall_classes[c] = float(TP) / (TP + FN)
-            if ((FP + FN + TP) == 0):
+            if (FP + FN + TP) == 0:
                 accuracy_classes[c] = 0.0
             else:
                 accuracy_classes[c] = float(TP) / (FP + FN + TP)
@@ -533,16 +519,18 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
     """
     for thres in range(n_thresholds):
         logging.info(
-            'Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n\tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
+            'Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n
+            \tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
             (thresholds[thres],
              general_measures[thres][0], general_measures[thres][1], general_measures[thres][2],
              general_measures[thres][3], general_measures[thres][4]))
     """
 
     if verbose > 0:
-        logging.info('Average Precision (AP): %f' % (AP))
+        logging.info('Average Precision (AP): %f' % AP)
         logging.info(
-            'Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n\tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
+            'Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n'
+            '\tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
             (thresholds[5],
              general_measures[5][0], general_measures[5][1], general_measures[5][2],
              general_measures[5][3], general_measures[5][4]))
@@ -580,20 +568,29 @@ def _computeAP(prec, rec):
 
 
 def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_scores, GT_bboxes, GT_Y):
-    '''
-        Computes TP, FP, and FN given a set of GT and Prediction BBoxes
-    '''
+    """
+    Computes TP, FP, and FN given a set of GT and Prediction BBoxes
+
+    :param IoU:
+    :param n_classes:
+    :param predicted_bboxes:
+    :param predicted_Y:
+    :param predicted_scores:
+    :param GT_bboxes:
+    :param GT_Y:
+    :return:
+    """
     # General counters (without applying class distinctions)
     TP = 0
     FP = 0
     FN = 0
 
     # Class-specific counters
-    TP_classes = np.zeros((n_classes))
-    FP_classes = np.zeros((n_classes))
-    FN_classes = np.zeros((n_classes))
+    TP_classes = np.zeros(n_classes)
+    FP_classes = np.zeros(n_classes)
+    FN_classes = np.zeros(n_classes)
 
-    if (len(predicted_Y) > 0):
+    if len(predicted_Y) > 0:
         using_recognition = True
     else:
         using_recognition = False
@@ -611,14 +608,14 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
 
     # Compute matchings (sorted by IoU)
     final_matches = []  # stores the final indices for [gt,pred] matches
-    matched_gt = [False for i in range(len(GT_bboxes))]
-    matched_pred = [False for i in range(len(predicted_bboxes))]
+    matched_gt = [False for _ in range(len(GT_bboxes))]
+    matched_pred = [False for _ in range(len(predicted_bboxes))]
     # max_iou = np.argsort(np.array(iou_values, dtype=np.float))[::-1]
     max_scores = np.argsort(np.array(predicted_scores, dtype=np.float))[::-1]
 
     # Sort predictions by "scores"
     i = 0
-    while (i < len(max_scores) and not all(matched_gt)):
+    while i < len(max_scores) and not all(matched_gt):
         # m = match_bboxes[max_iou[i]]
         this_pred_id = max_scores[i]
         m_list = [[p_, match_bboxes[p_]] for p_, p in enumerate(pred_ids) if p == this_pred_id]
@@ -627,9 +624,9 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
 
         # Sort GT by IoU
         j = 0
-        while (j < len(max_iou) and not matched_pred[this_pred_id]):  # if pred has not been matched yet
+        while j < len(max_iou) and not matched_pred[this_pred_id]:  # if pred has not been matched yet
             j_ind = max_iou[j]
-            if (this_iou[j_ind] > IoU and not matched_gt[m_list[j_ind][1][0]]):
+            if this_iou[j_ind] > IoU and not matched_gt[m_list[j_ind][1][0]]:
                 # Assign match
                 matched_gt[m_list[j_ind][1][0]] = True
                 matched_pred[this_pred_id] = True
@@ -639,23 +636,23 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
 
     # Compute FPs, FNs and TPs on the current image
     for m in matched_gt:
-        if (m):
+        if m:
             TP += 1
         else:
             FN += 1
     for m in matched_pred:
-        if (not m):
+        if not m:
             FP += 1
 
     # Compute class-specific counters
-    if (using_recognition):
+    if using_recognition:
         # Check matching pairs
         for m in final_matches:
             y_gt = GT_Y[m[0]]
             y_pred = predicted_Y[m[1]]
 
             # GT and pred coincide
-            if (y_gt == y_pred):
+            if y_gt == y_pred:
                 TP_classes[y_gt] += 1
             # Missclassified but correctly localized
             else:
@@ -663,11 +660,11 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
                 FP_classes[y_pred] += 1
         # Check missed GT bboxes
         for i, m in enumerate(matched_gt):
-            if (not m):
+            if not m:
                 FN_classes[GT_Y[i]] += 1
         # Check mislocalized Pred bboxes
         for i, m in enumerate(matched_pred):
-            if (not m):
+            if not m:
                 FP_classes[predicted_Y[i]] += 1
 
     return [TP, FP, FN, TP_classes, FP_classes, FN_classes]
@@ -675,11 +672,12 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
 
 def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
     """
-
-    :param pred_list:
+    Computes perplexity
+    :param y_pred:
+    :param y_true:
     :param verbose:
-    :param extra_vars:
     :param split:
+    :param mask:
     :return:
     """
 
@@ -690,13 +688,13 @@ def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
         predictions = y_pred.flatten()[truth_mask]
         ppl = np.power(2, np.mean(-np.log2(predictions)))
         if verbose > 0:
-            logging.info('Computing perplexity scores on the %s split...' % (split))
+            logging.info('Computing perplexity scores on the %s split...' % split)
             logging.info('PPL: ' + str(ppl))
         return ppl
     else:
         ppl = np.power(2, np.mean(-np.log2(y_pred)))
         if verbose > 0:
-            logging.info('Computing perplexity scores on the %s split...' % (split))
+            logging.info('Computing perplexity scores on the %s split...' % split)
             logging.info('PPL: ' + str(ppl))
         return ppl
 
@@ -738,7 +736,6 @@ selectMetric = {
     'sem_seg_acc': semantic_segmentation_accuracy,
     'sem_seg_iou': semantic_segmentation_meaniou,
     'ppl': compute_perplexity,
-
 }
 
-select=selectMetric
+select = selectMetric

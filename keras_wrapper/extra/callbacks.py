@@ -534,7 +534,7 @@ StoreModelWeightsOnEpochEnd = StoreModel
 
 class Sample(KerasCallback):
     def __init__(self, model, dataset, gt_id, set_name, n_samples, each_n_updates=10000, extra_vars=None,
-                 is_text=False, index2word_x=None, index2word_y=None, input_text_id=None, print_sources=False, print_truths=True,
+                 is_text=False, index2word_x=None, index2word_y=None, input_text_id=None, print_sources=False,
                  sampling='max_likelihood', temperature=1.,
                  beam_search=False, beam_batch_size=None,
                  batch_size=50, reload_epoch=0, start_sampling_on_epoch=0, is_3DLabel=False,
@@ -588,7 +588,6 @@ class Sample(KerasCallback):
         self.cum_update = 0
         self.epoch_count = 0
         self.print_sources = print_sources
-        self.print_truths = print_truths
         self.verbose = verbose
         super(Sample, self).__init__()
 
@@ -604,27 +603,24 @@ class Sample(KerasCallback):
 
         # Evaluate on each set separately
         for s in self.set_name:
-            params_prediction = {'max_batch_size': self.batch_size,
-                                 'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
-                                 'predict_on_sets': [s],
-                                 'n_samples': self.n_samples,
-                                 'pos_unk': False}
             if self.beam_search:
+                params_prediction = {'max_batch_size': self.batch_size,
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'predict_on_sets': [s],
+                                     'n_samples': self.n_samples,
+                                     'pos_unk': False}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
+                params_prediction = {'batch_size': self.batch_size,
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
+                                     'predict_on_sets': [s],
+                                     'n_samples': self.n_samples}
                 # Convert predictions
                 postprocess_fun = None
                 if self.is_3DLabel:
                     postprocess_fun = [self.ds.convert_3DLabels_to_bboxes, self.extra_vars[s]['references_orig_sizes']]
-
-                if self.print_sources:
-                    predictions, sources = self.model_to_eval.predictNet(self.ds,
-                                                                         params_prediction,
-                                                                         postprocess_fun=postprocess_fun,
-                                                                         return_inputs=self.print_sources)
-                else:
-                    predictions = self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
+                predictions = self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)
 
             if self.print_sources:
                 if self.in_pred_idx is not None:
@@ -644,6 +640,7 @@ class Sample(KerasCallback):
                     alphas = None
                     heuristic = None
 
+                predictions = predictions[s]
                 if self.is_text:
                     if self.out_pred_idx is not None:
                         samples = samples[self.out_pred_idx]
@@ -662,41 +659,28 @@ class Sample(KerasCallback):
                                                          self.index2word_y,
                                                          self.sampling_type,
                                                          verbose=self.verbose)
-                    if self.print_truths:
-                        truths = decode_predictions_one_hot(truths, self.index2word_y, verbose=self.verbose)
+                    truths = decode_predictions_one_hot(truths, self.index2word_y, verbose=self.verbose)
 
                     # Apply detokenization function if needed
                     if self.extra_vars.get('apply_detokenization', False):
                         if self.print_sources:
                             sources = map(self.extra_vars['detokenize_f'], sources)
                         predictions = map(self.extra_vars['detokenize_f'], predictions)
-                        if self.print_truths:
-                            truths = map(self.extra_vars['detokenize_f'], truths)
+                        truths = map(self.extra_vars['detokenize_f'], truths)
 
                 # Write samples
                 if self.print_sources:
                     # Write samples
-                    if self.print_truths:
-                        for i, (source, sample, truth) in enumerate(zip(sources, predictions, truths)):
-                            print("Source     (%d): %s" % (i, str(source.encode('utf-8'))))
-                            print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
-                            print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
-                            print("")
-                    else:
-                        for i, (source, sample) in enumerate(zip(sources, predictions)):
-                            print("Source     (%d): %s" % (i, str(source.encode('utf-8'))))
-                            print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
-                            print("")
+                    for i, (source, sample, truth) in enumerate(zip(sources, predictions, truths)):
+                        print("Source     (%d): %s" % (i, str(source.encode('utf-8'))))
+                        print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
+                        print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
+                        print("")
                 else:
-                    if self.print_truths:
-                        for i, (sample, truth) in enumerate(zip(predictions, truths)):
-                            print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
-                            print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
-                            print("")
-                    else:
-                        for i, sample in enumerate(predictions):
-                            print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
-                            print("")
+                    for i, (sample, truth) in enumerate(zip(predictions, truths)):
+                        print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
+                        print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
+                        print("")
 
 
 SampleEachNUpdates = Sample
