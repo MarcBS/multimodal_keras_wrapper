@@ -61,6 +61,9 @@ class EvalPerformance(KerasCallback):
                  metric_name,
                  set_name,
                  batch_size,
+                 model_name='model',
+                 inputs_mapping_eval=None,
+                 outputs_mapping_eval = None,
                  gt_pos=None,
                  each_n_epochs=1,
                  max_eval_samples=None,
@@ -95,11 +98,15 @@ class EvalPerformance(KerasCallback):
         """
         Evaluates a model each N epochs or updates
 
-        :param model: model to evaluate
+        :param model: Model_Wrapper object model to evaluate
         :param dataset: instance of the class Dataset in keras_wrapper.dataset
 
         :param gt_id: identifier in the Dataset instance of the output data to evaluate
         :param gt_pos: position of the GT output to evaluate in model's outputs
+
+        :param model_name: name of the attribute where the model for prediction is stored in the Model_Wrapper object
+        :param inputs_mapping_eval: dictionary with inputs mapping for evaluation (only needed if different from training mapping)
+        :param outputs_mapping_eval: dictionary with outputs mapping for evaluation (only needed if different from training mapping)
 
         :param metric_name: name of the performance metric
         :param set_name: list with the names of the set splits that will be evaluated
@@ -153,6 +160,11 @@ class EvalPerformance(KerasCallback):
             gt_id = [gt_id]
 
         self.model_to_eval = model
+
+        self.model_name = model_name
+        self.inputs_mapping_eval = inputs_mapping_eval
+        self.outputs_mapping_eval = outputs_mapping_eval
+
         self.ds = dataset
 
         self.gt_id = gt_id
@@ -262,6 +274,10 @@ class EvalPerformance(KerasCallback):
         self.evaluate(self.cum_update, counter_name='iteration', logs=logs)
 
     def evaluate(self, epoch, counter_name='epoch', logs={}):
+
+        # Change inputs and outputs mappings for evaluation
+        changeInOutMappings()
+
         # Evaluate on each set separately
         all_metrics = []
 
@@ -286,7 +302,9 @@ class EvalPerformance(KerasCallback):
                                      'n_parallel_loaders': self.extra_vars.get('n_parallel_loaders', 8),
                                      'predict_on_sets': [s],
                                      'normalize': self.normalize,
-                                     'max_eval_samples': self.max_eval_samples}
+                                     'max_eval_samples': self.max_eval_samples,
+                                     'model_name': self.model_name,
+                                     }
                 # Convert predictions
                 postprocess_fun = None
                 if self.is_3DLabel:
@@ -491,6 +509,23 @@ class EvalPerformance(KerasCallback):
             from keras_wrapper.cnn_model import saveModel
             saveModel(self.model_to_eval, epoch, store_iter=not self.eval_on_epochs)
 
+        # Recover inputs and outputs mappings for resume training
+        recoverInOutMappings()
+
+
+    def changeInOutMappings(self):
+        self.train_mappings = { 'in': self.model_to_eval.inputsMapping,
+                                'out': self.model_to_eval.outputsMapping,
+                              }
+
+        if self.inputs_mapping_eval is not None:
+            self.model_to_eval.setInputsMapping(self.inputs_mapping_eval)
+        if self.outputs_mapping_eval is not None:
+            self.model_to_eval.setOutputsMapping(self.outputs_mapping_eval)
+
+    def recoverInOutMappings(self):
+        self.model_to_eval.setInputsMapping(self.train_mappings['in'])
+        self.model_to_eval.setOutputsMapping(self.train_mappings['out'])
 
 PrintPerformanceMetricOnEpochEndOrEachNUpdates = EvalPerformance
 
@@ -615,7 +650,8 @@ class Sample(KerasCallback):
                 params_prediction = {'batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
-                                     'n_samples': self.n_samples}
+                                     'n_samples': self.n_samples,
+                                     }
                 # Convert predictions
                 postprocess_fun = None
                 if self.is_3DLabel:
