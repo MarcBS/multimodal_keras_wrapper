@@ -15,8 +15,8 @@ from keras.engine.training import Model
 from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
 from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
-from keras.models import Sequential, model_from_json
-from keras.optimizers import Adam, RMSprop, Nadam, Adadelta, SGD, Adagrad, Adamax
+from keras.models import Sequential, model_from_json, load_model
+from keras.optimizers import *
 from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
@@ -78,23 +78,27 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     if not os.path.isdir(path):
         os.makedirs(os.path.dirname(path))
 
-    # Save model structure
-    json_string = model_wrapper.model.to_json()
-    open(model_name + '_structure.json', 'w').write(json_string)
-    # Save model weights
-    model_wrapper.model.save_weights(model_name + '_weights.h5', overwrite=True)
+    try:  # Try to save model at one time
+        model_wrapper.model.save(model_name + '.h5')
+    except Exception as e: # Split saving in model structure / weights
+        logging.info(str(e))
+        # Save model structure
+        json_string = model_wrapper.model.to_json()
+        open(model_name + '_structure.json', 'w').write(json_string)
+        # Save model weights
+        model_wrapper.model.save_weights(model_name + '_weights.h5', overwrite=True)
 
     # Save auxiliary models for optimized search
     if model_wrapper.model_init is not None:
-        logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
         # Save model structure
+        logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
         json_string = model_wrapper.model_init.to_json()
         open(model_name + '_structure_init.json', 'w').write(json_string)
         # Save model weights
         model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
     if model_wrapper.model_next is not None:
-        logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
         # Save model structure
+        logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
         json_string = model_wrapper.model_next.to_json()
         open(model_name + '_structure_next.json', 'w').write(json_string)
         # Save model weights
@@ -107,7 +111,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -133,18 +137,19 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
             model_name = model_path + "/update_" + iteration
 
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
-
-    # Load model structure
-    model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
-
-    # Load model weights
-    model.load_weights(model_name + '_weights.h5')
+    try:
+        logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
+        model = load_model(model_name + '.h5', compile=compile)
+    except Exception as e:
+        logging.info(str(e))
+        # Load model structure
+        logging.info("<<< Loading model from " + model_name + "_structure.json' ... >>>")
+        model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
+        # Load model weights
+        model.load_weights(model_name + '_weights.h5')
 
     # Load auxiliary models for optimized search
-    if os.path.exists(model_name + '_structure_init.json') and \
-            os.path.exists(model_name + '_weights_init.h5') and \
-            os.path.exists(model_name + '_structure_next.json') and \
-            os.path.exists(model_name + '_weights_next.h5'):
+    if os.path.exists(model_name + '_structure_init.json') and os.path.exists(model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and os.path.exists(model_name + '_weights_next.h5'):
         loaded_optimized = True
     else:
         loaded_optimized = False
@@ -153,7 +158,8 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         # Load model structure
         logging.info("<<< Loading optimized model... >>>")
         logging.info("\t <<< Loading model_init from " + model_name + "_structure_init.json ... >>>")
-        model_init = model_from_json(open(model_name + '_structure_init.json').read(), custom_objects=custom_objects)
+        model_init = model_from_json(open(model_name + '_structure_init.json').read(),
+                                     custom_objects=custom_objects)
         # Load model weights
         model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
@@ -186,7 +192,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     return model_wrapper
 
 
-def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False):
+def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile=False):
     """
     Loads a the weights from files to a Model_Wrapper object.
 
@@ -209,8 +215,16 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
 
     logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
-    # Load model weights
-    model.model.load_weights(model_path + '_weights.h5')
+    try:
+        logging.info("<<< Loading model from " + model_path + ".h5 ... >>>")
+        model.model.set_weights(load_model(model_path + '.h5', compile=False).get_weights())
+
+    except Exception as e:
+        logging.info(str(e))
+        # Load model structure
+        logging.info("<<< Failed -> Loading model from " + model_path + "_weights.h5' ... >>>")
+        # Load model weights
+        model.model.load_weights(model_path + '_weights.h5')
 
     # Load auxiliary models for optimized search
     if os.path.exists(model_path + '_weights_init.h5') and os.path.exists(model_path + '_weights_next.h5'):
@@ -369,6 +383,7 @@ class Model_Wrapper(object):
         self.training_parameters = []
         self.testing_parameters = []
         self.training_state = dict()
+        self._dynamic_display = True
 
         # Dictionary for storing any additional data needed
         self.additional_data = dict()
@@ -451,6 +466,10 @@ class Model_Wrapper(object):
                 if d not in self.__data_types:
                     self.__data_types.append(d)
 
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
+                                  sys.stdout.isatty()) or
+                                 'ipykernel' in sys.modules)
+
         self.__modes = ['train', 'val', 'test']
 
     def setInputsMapping(self, inputsMapping):
@@ -482,7 +501,8 @@ class Model_Wrapper(object):
         self.acc_output = acc_output
 
     def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None, epsilon=1e-8,
-                     nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None):
+                     nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None,
+                     tf_optimizer=True):
         """
             Sets a new optimizer for the CNN model.
             :param nesterov:
@@ -515,24 +535,47 @@ class Model_Wrapper(object):
             self.loss = loss
         if metrics is None:
             metrics = []
-
-        if optimizer is None or optimizer.lower() == 'sgd':
-            optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum,
-                            nesterov=nesterov)
-        elif optimizer.lower() == 'adam':
-            optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'adagrad':
-            optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'rmsprop':
-            optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'nadam':
-            optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'adamax':
-            optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
-        elif optimizer.lower() == 'adadelta':
-            optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+        if tf_optimizer and K.backend() == 'tensorflow':
+            import tensorflow as tf
+            if optimizer is None or optimizer.lower() == 'sgd':
+                if self.momentum is None:
+                    optimizer = TFOptimizer(tf.train.GradientDescentOptimizer(lr))
+                else:
+                    optimizer = TFOptimizer(tf.train.MomentumOptimizer(lr, self.momentum, use_nesterov=nesterov))
+            elif optimizer.lower() == 'adam':
+                optimizer = TFOptimizer(tf.train.AdamOptimizer(learning_rate=lr, epsilon=epsilon))
+            elif optimizer.lower() == 'adagrad':
+                optimizer = TFOptimizer(tf.train.AdagradOptimizer(lr))
+            elif optimizer.lower() == 'rmsprop':
+                optimizer = TFOptimizer(tf.train.RMSPropOptimizer(lr, decay=decay, momentum=momentum, epsilon=epsilon))
+            elif optimizer.lower() == 'nadam':
+                logger.warning('The Nadam optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adamax':
+                logger.warning('The Adamax optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adadelta':
+                optimizer = TFOptimizer(tf.train.AdadeltaOptimizer(learning_rate=lr, epsilon=epsilon))
+            else:
+                raise Exception('\tThe chosen optimizer is not implemented.')
         else:
-            raise Exception('\tThe chosen optimizer is not implemented.')
+            if optimizer is None or optimizer.lower() == 'sgd':
+                optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum,
+                                nesterov=nesterov)
+            elif optimizer.lower() == 'adam':
+                optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adagrad':
+                optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'rmsprop':
+                optimizer = RMSprop(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'nadam':
+                optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adamax':
+                optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            elif optimizer.lower() == 'adadelta':
+                optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+            else:
+                raise Exception('\tThe chosen optimizer is not implemented.')
 
         if not self.silence:
             logging.info("Compiling model...")
@@ -1947,8 +1990,12 @@ class Model_Wrapper(object):
 
                     # Count processed samples
                     n_samples_batch = len(X[params['model_inputs'][0]])
-                    sys.stdout.write('\r')
                     sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled + n_samples_batch, n_samples, int(eta)))
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
+
                     sys.stdout.flush()
                     x = dict()
 
@@ -1995,8 +2042,7 @@ class Model_Wrapper(object):
                         if params['pos_unk']:
                             best_alphas.append(np.asarray(alphas[best_score]))
                         total_cost += scores[best_score]
-                        eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) / (
-                            sampled + i_sample + 1)
+                        eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) / (sampled + i_sample + 1)
                         if params['n_samples'] > 0:
                             for output_id in params['model_outputs']:
                                 references.append(Y[output_id][i_sample])
@@ -2218,8 +2264,13 @@ class Model_Wrapper(object):
 
                     for i in range(len(X[params['model_inputs'][0]])):  # process one sample at a time
                         sampled += 1
-                        sys.stdout.write('\r')
+
                         sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                        if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                            sys.stdout.write('\r')
+                        else:
+                            sys.stdout.write('\n')
+
                         sys.stdout.flush()
                         x = dict()
 
@@ -2307,7 +2358,7 @@ class Model_Wrapper(object):
                     if eval('ds.loaded_raw_' + s + '[0]'):
                         sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
                                             stripfile=False)
-                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
+                    predictions[s] = (np.asarray(best_samples), best_alphas, sources)
                 else:
                     predictions[s] = np.asarray(best_samples)
         del data_gen
@@ -2430,9 +2481,13 @@ class Model_Wrapper(object):
                     processed_samples += params['batch_size']
                     if processed_samples > n_samples:
                         processed_samples = n_samples
+
                     eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
-                    sys.stdout.write('\r')
                     sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
                     sys.stdout.flush()
 
         return predictions

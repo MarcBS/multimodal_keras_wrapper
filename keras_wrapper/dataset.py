@@ -14,9 +14,7 @@ from operator import add
 import numpy as np
 from extra.read_write import create_dir_if_not_exists
 from extra.tokenizers import *
-from keras.utils import np_utils
-import keras
-from .utils import bbox
+from .utils import bbox, to_categorical
 
 
 # ------------------------------------------------------- #
@@ -268,8 +266,8 @@ class Homogeneous_Data_Batch_Generator(object):
         self.batch_size = batch_size
         self.it = 0
 
-        self.X_batch = None
-        self.Y_batch = None
+        self.X_maxibatch = None
+        self.Y_maxibatch = None
         self.tidx = None
         self.curr_idx = None
         self.batch_idx = None
@@ -285,7 +283,7 @@ class Homogeneous_Data_Batch_Generator(object):
                        'joint_batches': joint_batches}
         self.reset()
 
-    def retrieve_batch(self):
+    def retrieve_maxibatch(self):
 
         if self.set_split == 'train' and not self.predict:
             data_augmentation = self.params['data_augmentation']
@@ -320,37 +318,15 @@ class Homogeneous_Data_Batch_Generator(object):
                                               meanSubstraction=self.params['mean_substraction'],
                                               dataAugmentation=data_augmentation)
 
-        self.X_batch = X_batch
-        self.Y_batch = Y_batch
+        self.X_maxibatch = X_batch
+        self.Y_maxibatch = Y_batch
 
     def reset(self):
-        self.retrieve_batch()
-        text_Y_batch = self.Y_batch[0][1]  # just use mask
+        self.retrieve_maxibatch()
+        text_Y_batch = self.Y_maxibatch[0][1]  # just use mask
         batch_lengths = np.asarray([int(np.sum(cc)) for cc in text_Y_batch])
         self.tidx = batch_lengths.argsort()
         self.curr_idx = 0
-
-    def get_data(self):
-        new_X = []
-        new_Y = []
-        next_idx = min(self.curr_idx + self.batch_size, len(self.tidx))
-        self.batch_tidx = self.tidx[self.curr_idx:next_idx]
-
-        for x_input_idx in range(len(self.X_batch)):
-            x_to_add = [self.X_batch[x_input_idx][i] for i in self.batch_tidx]
-            new_X.append(np.asarray(x_to_add))
-        for y_input_idx in range(len(self.Y_batch)):
-            Y_batch_ = []
-            for data_mask_idx in range(len(self.Y_batch[y_input_idx])):
-                y_to_add = np.asarray([self.Y_batch[y_input_idx][data_mask_idx][i] for i in self.batch_tidx])
-                Y_batch_.append(y_to_add)
-            new_Y.append(tuple(Y_batch_))
-
-        data = self.net.prepareData(new_X, new_Y)
-        self.curr_idx = next_idx
-        if self.curr_idx >= len(self.tidx):
-            self.reset()
-        return data
 
     def generator(self):
         """
@@ -358,7 +334,25 @@ class Homogeneous_Data_Batch_Generator(object):
         :return: generator with the data
         """
         while True:
-            yield self.get_data()
+            new_X = []
+            new_Y = []
+            next_idx = min(self.curr_idx + self.batch_size, len(self.tidx))
+            self.batch_tidx = self.tidx[self.curr_idx:next_idx]
+            for x_input_idx in range(len(self.X_maxibatch)):
+                x_to_add = [self.X_maxibatch[x_input_idx][i] for i in self.batch_tidx]
+                new_X.append(np.asarray(x_to_add))
+
+            for y_input_idx in range(len(self.Y_maxibatch)):
+                Y_batch_ = []
+                for data_mask_idx in range(len(self.Y_maxibatch[y_input_idx])):
+                    y_to_add = np.asarray([self.Y_maxibatch[y_input_idx][data_mask_idx][i] for i in self.batch_tidx])
+                    Y_batch_.append(y_to_add)
+                new_Y.append(tuple(Y_batch_))
+            data = self.net.prepareData(new_X, new_Y)
+            self.curr_idx = next_idx
+            if self.curr_idx >= len(self.tidx):
+                self.reset()
+            yield (data)
 
 
 # ------------------------------------------------------- #
@@ -443,7 +437,7 @@ class Dataset(object):
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
-                                         'text',
+                                         'text', 'dense_text',  # TODO: Document dense_text type!
                                          '3DLabel', '3DSemanticLabel',
                                          'id', 'file-name']
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
@@ -758,7 +752,7 @@ class Dataset(object):
             data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop, use_RGB)
         elif type == 'video':
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
-        elif type == 'text':
+        elif type == 'text' or type == 'dense_text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
@@ -948,7 +942,7 @@ class Dataset(object):
             self.setClasses(path_list, id)
             data = self.preprocessCategorical(path_list, id,
                                               sample_weights=True if sample_weights and set_name == 'train' else False)
-        elif type == 'text':
+        elif type == 'text' or type == 'dense_text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
@@ -1073,7 +1067,7 @@ class Dataset(object):
 
     @staticmethod
     def loadCategorical(y_raw, nClasses):
-        y = np_utils.to_categorical(y_raw, nClasses).astype(np.uint8)
+        y = to_categorical(y_raw, nClasses).astype(np.uint8)
         return y
 
     # ------------------------------------------------------- #
@@ -1510,7 +1504,6 @@ class Dataset(object):
         :return: None
         """
         import nltk
-        from nltk.tokenize.moses import MosesTokenizer
         try:
             nltk.data.find('misc/perluniprops')
         except LookupError:
@@ -1519,6 +1512,7 @@ class Dataset(object):
             nltk.data.find('corpora/nonbreaking_prefixes')
         except LookupError:
             nltk.download('nonbreaking_prefixes')
+        from nltk.tokenize.moses import MosesTokenizer
 
         self.moses_tokenizer = MosesTokenizer(lang=language)
         self.moses_tokenizer_built = True
@@ -1535,7 +1529,6 @@ class Dataset(object):
         :return: None
         """
         import nltk
-        from nltk.tokenize.moses import MosesDetokenizer
         try:
             nltk.data.find('misc/perluniprops')
         except LookupError:
@@ -1544,10 +1537,9 @@ class Dataset(object):
             nltk.data.find('corpora/nonbreaking_prefixes')
         except LookupError:
             nltk.download('nonbreaking_prefixes')
-
+        from nltk.tokenize.moses import MosesDetokenizer
         self.moses_detokenizer = MosesDetokenizer(lang=language)
         self.moses_detokenizer_built = True
-
 
     @staticmethod
     def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
@@ -1756,8 +1748,22 @@ class Dataset(object):
         """
         vocab = vocabularies['words2idx']
         n_batch = len(X)
+
+        # Max values per uint type:
+        # uint8.max: 255
+        # uint16.max: 65535
+        # uint32.max: 4294967295
+        vocabulary_size = len(vocab.keys())
+
+        if vocabulary_size < 255:
+            dtype_text = 'uint8'
+        elif vocabulary_size < 65535:
+            dtype_text = 'uint16'
+        else:
+            dtype_text = 'uint32'
+
         if max_len == 0:  # use whole sentence as class
-            X_out = np.zeros(n_batch).astype('int32')
+            X_out = np.zeros(n_batch).astype(dtype_text)
             for i in range(n_batch):
                 w = X[i]
                 if '<unk>' in vocab:
@@ -1773,14 +1779,14 @@ class Dataset(object):
                 max_len_batch = max_len
 
             if words_so_far:
-                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
-                null_row = np.ones((1, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                null_row = np.ones((1, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 zero_row = np.zeros((1, max_len_batch)).astype('int8')
                 if offset > 0:
                     null_row[0] = np.append([vocab['<null>']] * offset, null_row[0, :-offset])
             else:
-                X_out = np.ones((n_batch, max_len_batch)).astype('int32') * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
 
             if max_len_batch == max_len:
@@ -1825,7 +1831,7 @@ class Dataset(object):
                     else:
                         X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
                         X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
-            X_out = (X_out, X_mask)
+            X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
 
         return X_out
 
@@ -1855,12 +1861,12 @@ class Dataset(object):
                           words_so_far, loading_X=loading_X)
         # Use whole sentence as class (classifier model)
         if max_len == 0:
-            y_aux = np_utils.to_categorical(y, vocabulary_len).astype(np.uint8)
+            y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
         # Use words separately (generator model)
         else:
             y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(np.uint8)
             for idx in range(y[0].shape[0]):
-                y_aux[idx] = np_utils.to_categorical(y[0][idx], vocabulary_len).astype(
+                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(
                     np.uint8)
             if sample_weights:
                 y_aux = (y_aux, y[1])  # join data and mask
@@ -2030,7 +2036,6 @@ class Dataset(object):
         """
         return detokenize_bpe(caption, separator=separator)
 
-
     @staticmethod
     def detokenize_none_char(caption):
         """
@@ -2049,7 +2054,6 @@ class Dataset(object):
             :return: Detokenized version of caption.
         """
         return detokenize_none_char(caption)
-
 
     def tokenize_moses(self, caption, language='en', lowercase=False, aggressive_dash_splits=False, return_str=True, escape=False):
         """
@@ -2075,7 +2079,6 @@ class Dataset(object):
             tokenized = tokenized.lower()
         return self.moses_tokenizer.tokenize(tokenized, agressive_dash_splits=aggressive_dash_splits,
                                              return_str=return_str, escape=escape)
-
 
     def detokenize_moses(self, caption, language='en', lowercase=False, return_str=True, unescape=True):
         """
@@ -2393,8 +2396,8 @@ class Dataset(object):
 
         # prepare the segmented image
         pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
-        #out_img = np.zeros((h_crop, w_crop, d_crop))
-        out_img = np.zeros((h_crop, w_crop, 3)) # predictions saved as RGB images (3 channels)
+        # out_img = np.zeros((h_crop, w_crop, d_crop))
+        out_img = np.zeros((h_crop, w_crop, 3))  # predictions saved as RGB images (3 channels)
 
         for ih in range(h_crop):
             for iw in range(w_crop):
@@ -2402,7 +2405,6 @@ class Dataset(object):
                 out_img[ih, iw, :] = self.semantic_classes[output_id][lab]
 
         return out_img
-
 
     def preprocess3DSemanticLabel(self, path_list, id, associated_id_in, num_poolings):
         return self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
@@ -2860,6 +2862,7 @@ class Dataset(object):
         # Check if the chosen normalization type exists
         from PIL import Image as pilimage
         from scipy import misc
+        import keras
 
         if normalization_type is None:
             normalization_type = '(-1)-1'
@@ -2875,7 +2878,7 @@ class Dataset(object):
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "' + id + '".')
             train_mean = copy.copy(self.train_mean[id])
             train_mean = misc.imresize(train_mean, self.img_size_crop[id][0:2])
-            
+
             # Transpose dimensions
             if len(self.img_size[id]) == 3:  # if it is a 3D image
                 # Convert RGB to BGR
@@ -3058,7 +3061,7 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def getX(self, set_name, init, final, normalization_type='(-1)-1',
-             normalization=True, meanSubstraction=False, 
+             normalization=True, meanSubstraction=False,
              dataAugmentation=True, debug=False):
         """
         Gets all the data samples stored between the positions init to final
@@ -3114,7 +3117,7 @@ class Dataset(object):
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
-                elif type_in == 'text':
+                elif type_in == 'text' or type_in == 'dense_text':
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
@@ -3195,7 +3198,7 @@ class Dataset(object):
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
-                elif type_in == 'text':
+                elif type_in == 'text' or type_in == 'dense_text':
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
@@ -3258,27 +3261,27 @@ class Dataset(object):
                     y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                                   imlist)
-                elif type_out == 'text':
+                elif type_out == 'text' or type_out == 'dense_text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
                                       words_so_far=self.words_so_far[id_out], loading_X=False)
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
+                        y = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
-                    else:
+                    elif type_out == 'text':
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
-                                np.uint8)
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
-                    y = y_aux
-            Y.append(y)
+                        y = y_aux
 
-        if debug:
-            return [X, Y, [new_last, last, surpassed]]
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
+
+            Y.append(y)
 
         return [X, Y]
 
@@ -3388,7 +3391,7 @@ class Dataset(object):
                     y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                                   imlist)
-                elif type_out == 'text':
+                elif type_out == 'text' or type_out == 'dense_text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
@@ -3396,16 +3399,20 @@ class Dataset(object):
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
+                        y = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
-                    else:
+                    elif type_out == 'text':
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
-                    y = y_aux
+                        y = y_aux
+
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
+
             Y.append(y)
 
         return [X, Y]
@@ -3545,7 +3552,7 @@ class Dataset(object):
                     y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, None,
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                                   imlist)
-                elif type_out == 'text':
+                elif type_out == 'text' or type_out == 'dense_text':
                     y = self.loadText(y, self.vocabulary[id_out],
                                       self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
@@ -3553,17 +3560,21 @@ class Dataset(object):
 
                     # Use whole sentence as class (classifier model)
                     if self.max_text_len[id_out][set_name] == 0:
-                        y_aux = np_utils.to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
+                        y = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
-                    else:
+                    elif type_out == 'text':
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = np_utils.to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
                                 np.uint8)
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
 
-                    y = y_aux
+                        y = y_aux
+
+                if type_out == 'dense_text':
+                    y = (y[0][:, :, None], y[1])
+
             Y.append(y)
 
         return Y
@@ -3648,7 +3659,7 @@ class Dataset(object):
                 raise Exception('Inputs and outputs size '
                                 '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
                                                                             '\t Inputs:' + str(plot_ids_in) + ''
-                                                                            '\t Outputs:' + str(self.ids_outputs))
+                                                                                                              '\t Outputs:' + str(self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
         """
