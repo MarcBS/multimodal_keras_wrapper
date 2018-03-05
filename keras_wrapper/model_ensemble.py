@@ -27,6 +27,10 @@ class BeamSearchEnsemble:
         self.return_alphas = params_prediction.get('coverage_penalty', False) or params_prediction.get('pos_unk', False)
         self.n_best = n_best
         self.verbose = verbose
+
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
+                                  sys.stdout.isatty()) or
+                                 'ipykernel' in sys.modules)
         if self.verbose > 0:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
 
@@ -381,8 +385,12 @@ class BeamSearchEnsemble:
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
-                    sys.stdout.write('\r')
+
                     sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
                     sys.stdout.flush()
                     x = dict()
                     for input_id in params['model_inputs']:
@@ -753,7 +761,11 @@ class BeamSearchEnsemble:
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
-                    sys.stdout.write('\r')
+
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
                     sys.stdout.write("Scored %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
                     sys.stdout.flush()
                     x = dict()
@@ -958,6 +970,9 @@ class PredictEnsemble:
         self.params = params_prediction
         self.verbose = verbose
 
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
+                                  sys.stdout.isatty()) or
+                                 'ipykernel' in sys.modules)
     # PREDICTION FUNCTIONS: Functions for making prediction on input samples
 
     @staticmethod
@@ -1132,8 +1147,11 @@ class PredictEnsemble:
                 if processed_samples > n_samples:
                     processed_samples = n_samples
                 eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
-                sys.stdout.write('\r')
                 sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
+                if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                    sys.stdout.write('\r')
+                else:
+                    sys.stdout.write('\n')
                 sys.stdout.flush()
             predictions[s] = np.concatenate([pred for pred in predictions[s]])
 
