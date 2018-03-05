@@ -276,7 +276,7 @@ class EvalPerformance(KerasCallback):
     def evaluate(self, epoch, counter_name='epoch', logs={}):
 
         # Change inputs and outputs mappings for evaluation
-        changeInOutMappings()
+        self.changeInOutMappings()
 
         # Evaluate on each set separately
         all_metrics = []
@@ -510,8 +510,7 @@ class EvalPerformance(KerasCallback):
             saveModel(self.model_to_eval, epoch, store_iter=not self.eval_on_epochs)
 
         # Recover inputs and outputs mappings for resume training
-        recoverInOutMappings()
-
+        self.recoverInOutMappings()
 
     def changeInOutMappings(self):
         self.train_mappings = { 'in': self.model_to_eval.inputsMapping,
@@ -526,6 +525,7 @@ class EvalPerformance(KerasCallback):
     def recoverInOutMappings(self):
         self.model_to_eval.setInputsMapping(self.train_mappings['in'])
         self.model_to_eval.setOutputsMapping(self.train_mappings['out'])
+
 
 PrintPerformanceMetricOnEpochEndOrEachNUpdates = EvalPerformance
 
