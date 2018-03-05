@@ -1097,7 +1097,7 @@ class Model_Wrapper(object):
         # Train model
         self.model.fit(x,
                        y,
-                       batch_size=min(params['batch_size'], len(x)),
+                       batch_size=min(params['batch_size'], len(x[0])),
                        epochs=params['n_epochs'],
                        verbose=params['verbose'],
                        callbacks=callbacks,
