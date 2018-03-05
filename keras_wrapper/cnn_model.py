@@ -2140,7 +2140,7 @@ class Model_Wrapper(object):
                           'output_max_length_depending_on_x': False,
                           'output_max_length_depending_on_x_factor': 3,
                           'output_min_length_depending_on_x': False,
-                          'output_min_length_depending_on_x_factor': 2
+                          'output_min_length_depending_on_x_factor': 2,
                           }
 
         params = self.checkParameters(parameters, default_params)
@@ -2395,9 +2395,13 @@ class Model_Wrapper(object):
                           'final_sample': -1,
                           'verbose': 1,
                           'predict_on_sets': ['val'],
-                          'max_eval_samples': None
+                          'max_eval_samples': None,
+                          'model_name': 'model', # name of the attribute where the model for prediction is stored
                           }
         params = self.checkParameters(parameters, default_params)
+
+        exec('model_predict = self.'+params['model_name']) # recover model for prediction
+
         predictions = dict()
         for s in params['predict_on_sets']:
             predictions[s] = []
@@ -2446,14 +2450,14 @@ class Model_Wrapper(object):
             if postprocess_fun is None:
                 if int(keras.__version__.split('.')[0]) == 1:
                     # Keras version 1.x
-                    out = self.model.predict_generator(data_gen,
+                    out = model_predict.predict_generator(data_gen,
                                                        val_samples=n_samples,
                                                        max_q_size=params['n_parallel_loaders'],
                                                        nb_worker=1,  # params['n_parallel_loaders'],
                                                        pickle_safe=False)
                 else:
                     # Keras version 2.x
-                    out = self.model.predict_generator(data_gen,
+                    out = model_predict.predict_generator(data_gen,
                                                        num_iterations,
                                                        max_queue_size=params['n_parallel_loaders'],
                                                        workers=1,  # params['n_parallel_loaders'],
@@ -2463,7 +2467,7 @@ class Model_Wrapper(object):
                 processed_samples = 0
                 start_time = time.time()
                 while processed_samples < n_samples:
-                    out = self.model.predict_on_batch(data_gen.next())
+                    out = model_predict.predict_on_batch(data_gen.next())
 
                     # Apply post-processing function
                     if isinstance(postprocess_fun, list):

@@ -433,6 +433,7 @@ class Dataset(object):
         self.__accepted_types_inputs = ['raw-image', 'image-features',
                                         'video', 'video-features',
                                         'text',
+                                        'categorical', 'binary',
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
@@ -770,6 +771,12 @@ class Dataset(object):
             self.inputs_data_augmentation_types[id] = data_augmentation_types
             data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop,
                                                 feat_len)
+        elif type == 'categorical':
+            self.setClasses(path_list, id)
+            data = self.preprocessCategorical(path_list, id,
+                                              sample_weights=True if sample_weights and set_name == 'train' else False)
+        elif type == 'binary':
+            data = self.preprocessBinary(path_list, id, sparse)
         elif type == 'id':
             data = self.preprocessIDs(path_list, id, set_name)
         elif type == 'ghost':
@@ -3122,6 +3129,12 @@ class Dataset(object):
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
                                                normalization_type, normalization, self.features_lengths[id_in],
                                                data_augmentation=dataAugmentation)
+                elif type_in == 'categorical':
+                    nClasses = len(self.dic_classes[id_in])
+                    # load_sample_weights = self.sample_weights[id_out][set_name]
+                    x = self.loadCategorical(x, nClasses)
+                elif type_in == 'binary':
+                    x = self.loadBinary(x, id_in)
             X.append(x)
 
         return X
@@ -3197,6 +3210,12 @@ class Dataset(object):
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], normalization_type,
                                                normalization, self.features_lengths[id_in],
                                                data_augmentation=dataAugmentation)
+                elif type_in == 'categorical':
+                    nClasses = len(self.dic_classes[id_in])
+                    # load_sample_weights = self.sample_weights[id_out][set_name]
+                    x = self.loadCategorical(x, nClasses)
+                elif type_in == 'binary':
+                    x = self.loadBinary(x, id_in)
             X.append(x)
 
         # Recover output samples
@@ -3332,6 +3351,12 @@ class Dataset(object):
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
                                                normalization_type, normalization, self.features_lengths[id_in],
                                                data_augmentation=dataAugmentation)
+                elif type_in == 'categorical':
+                    nClasses = len(self.dic_classes[id_in])
+                    # load_sample_weights = self.sample_weights[id_out][set_name]
+                    x = self.loadCategorical(x, nClasses)
+                elif type_in == 'binary':
+                    x = self.loadBinary(x, id_in)
             X.append(x)
 
         # Recover output samples
@@ -3457,6 +3482,12 @@ class Dataset(object):
                     x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
                                                normalization_type, normalization, self.features_lengths[id_in],
                                                data_augmentation=dataAugmentation)
+                elif type_in == 'categorical':
+                    nClasses = len(self.dic_classes[id_in])
+                    # load_sample_weights = self.sample_weights[id_out][set_name]
+                    x = self.loadCategorical(x, nClasses)
+                elif type_in == 'binary':
+                    x = self.loadBinary(x, id_in)
             X.append(x)
 
         return X
