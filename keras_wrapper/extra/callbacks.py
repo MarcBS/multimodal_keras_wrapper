@@ -225,6 +225,8 @@ class EvalPerformance(KerasCallback):
             #if not type(self.index2word_x) == list:
             self.index2word_x = [self.index2word_x]
 
+            self.min_pred_multilabel = [min_pred_multilabel]
+
             if 0 not in self.extra_vars.keys():
                 self.extra_vars[0] = self.extra_vars
 
@@ -239,6 +241,12 @@ class EvalPerformance(KerasCallback):
                     self.output_types = ["NA"]
             else:
                 self.output_types = [self.output_types]
+
+        else:
+            # Convert min_pred_multilabel to list
+            if type(self.min_pred_multilabel) != type(list()):
+                self.min_pred_multilabel = [self.min_pred_multilabel for i in self.gt_pos]
+
 
         super(EvalPerformance, self).__init__()
 
@@ -388,7 +396,7 @@ class EvalPerformance(KerasCallback):
                 elif type == 'binary':
                     predictions = decode_multilabel(predictions,
                                                     index2word_y,
-                                                    min_val=self.min_pred_multilabel,
+                                                    min_val=self.min_pred_multilabel[gt_pos],
                                                     verbose=self.verbose)
 
                     # Prepare references
