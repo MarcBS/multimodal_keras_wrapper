@@ -418,7 +418,7 @@ class Dataset(object):
         #################################################
 
         # Parameters for managing all the inputs and outputs
-        # List of identifiers for the inputs and outputs and their respective types 
+        # List of identifiers for the inputs and outputs and their respective types
         # (which will define the preprocessing applied)
         self.ids_inputs = []
         self.types_inputs = []  # see accepted types in self.__accepted_types_inputs
@@ -802,6 +802,12 @@ class Dataset(object):
             logging.info(
                 'Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '" and length ' + str(
                     eval('self.len_' + set_name)) + '.')
+
+    def replaceInput(self, data, set_name, type, id):
+        '''
+            Replaces the data in a certain set_name and for a given id
+        '''
+        self.__setInput(data, set_name, type, id, True, False)
 
     def removeInput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
@@ -2733,11 +2739,11 @@ class Dataset(object):
     def setTrainMean(self, mean_image, id, use_RGB=True, normalization=False):
         """
             Loads a pre-calculated training mean image, 'mean_image' can either be:
-            
+
             - numpy.array (complete image)
             - list with a value per channel
             - string with the path to the stored image.
-            
+
         :param mean_image:
         :param user_RGB: set to False for grayscale images
         :param normalization:
@@ -2846,7 +2852,7 @@ class Dataset(object):
                    external=False, loaded=False):
         """
         Loads a set of images from disk.
-            
+
         :param images : list of image string names or list of matrices representing images (only if loaded==True)
         :param id : identifier in the Dataset object of the data we are loading
         :param normalization_type: type of normalization applied
@@ -3065,7 +3071,7 @@ class Dataset(object):
              dataAugmentation=True, debug=False):
         """
         Gets all the data samples stored between the positions init to final
-            
+
         :param set_name: 'train', 'val' or 'test' set
         :param init: initial position in the corresponding set split.
                      Must be bigger or equal than 0 and smaller than final.
@@ -3581,7 +3587,7 @@ class Dataset(object):
 
     # ------------------------------------------------------- #
     #       AUXILIARY FUNCTIONS
-    #           
+    #
     # ------------------------------------------------------- #
 
     def __str__(self):
@@ -3643,7 +3649,7 @@ class Dataset(object):
     def __checkLengthSet(self, set_name):
         """
         Check that the length of the inputs and outputs match. Only checked if the input is not optional.
-        :param set_name: 
+        :param set_name:
         :return:
         """
         if eval('self.loaded_' + set_name + '[0] and self.loaded_' + set_name + '[1]'):
