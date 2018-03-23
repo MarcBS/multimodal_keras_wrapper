@@ -933,7 +933,7 @@ class Model_Wrapper(object):
         # Store model
         if params['epochs_for_save'] >= 0:
             callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-            callbacks.append(callback_store_model)
+            callbacks.insert(0, callback_store_model)
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':

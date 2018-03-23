@@ -3,6 +3,7 @@ from __future__ import print_function
 import warnings
 
 import evaluation
+from keras import backend as K
 from keras.callbacks import Callback as KerasCallback
 from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
     decode_multilabel
@@ -247,7 +248,6 @@ class EvalPerformance(KerasCallback):
             if type(self.min_pred_multilabel) != type(list()):
                 self.min_pred_multilabel = [self.min_pred_multilabel for i in self.gt_pos]
 
-
         super(EvalPerformance, self).__init__()
 
     def on_epoch_end(self, epoch, logs={}):
@@ -323,7 +323,7 @@ class EvalPerformance(KerasCallback):
                     self.model_to_eval.predictNet(self.ds, params_prediction, postprocess_fun=postprocess_fun)[s]
 
             # Single-output model
-            if not self.gt_pos or self.gt_pos == 0:
+            if not self.gt_pos or self.gt_pos == 0 or len(self.gt_pos) == 1:
                 predictions_all = [predictions_all]
                 gt_positions = [0]
 
@@ -339,6 +339,8 @@ class EvalPerformance(KerasCallback):
                                                                                                   self.write_type,
                                                                                                   self.index2word_y,
                                                                                                   self.index2word_x):
+
+                print(len(predictions_all))
 
                 predictions = predictions_all[gt_pos]
 
@@ -904,9 +906,14 @@ class LearningRateReducer(KerasCallback):
     def reduce_lr(self, current_nb):
         new_rate = self.reduce_rate if self.reduction_function == 'linear' else \
             np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
-        lr = self.model.optimizer.lr.get_value()
-        self.new_lr = np.float32(lr * new_rate)
-        self.model.optimizer.lr.set_value(self.new_lr)
+        if K.backend() == 'tensorflow':
+            lr = K.get_value(self.model.optimizer.lr)
+            self.new_lr = np.float32(lr * new_rate)
+            K.set_value(self.model.optimizer.lr, self.new_lr)
+        else:
+            lr = self.model.optimizer.lr.get_value()
+            self.new_lr = np.float32(lr * new_rate)
+            self.model.optimizer.lr.set_value(self.new_lr)
 
         if self.reduce_each_epochs and self.verbose > 0:
             logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr), float(self.new_lr)))
