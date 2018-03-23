@@ -64,16 +64,19 @@ def loadDataset(dataset_path):
 #       DATA BATCH GENERATOR CLASS
 # ------------------------------------------------------- #
 
-def dataLoad(process_name, net, dataset, queues):
+def dataLoad(process_name, net, dataset, max_queue_len, queues):
     print "Starting "+process_name+"..."
     in_queue, out_queue = queues
 
     while True:
+        while out_queue.qsize() > max_queue_len:
+            pass
+
         # available modes are 'indices' and 'consecutive'
-        [mode, predict, set_split, ind,
-            normalization, normalization_type,
-            mean_substraction, data_augmentation]    =  in_queue.get()
-        
+        data_queue = in_queue.get()
+        ##print data_queue
+        [mode, predict, set_split, ind, normalization, normalization_type, mean_substraction, data_augmentation] = data_queue
+
         # Recovers a batch of data
         if predict:
             if mode == 'indices':
@@ -84,7 +87,7 @@ def dataLoad(process_name, net, dataset, queues):
                                                     meanSubstraction=mean_substraction,
                                                     dataAugmentation=data_augmentation)
             elif mode == 'consecutive':
-                X_batch = dataset.getX_FromIndices(set_split,
+                X_batch = dataset.getX(set_split,
                                                     ind[0], ind[1],
                                                     normalization=normalization,
                                                     normalization_type=normalization_type,
@@ -166,6 +169,9 @@ class Data_Batch_Generator(object):
                        'n_parallel_loaders': n_parallel_loaders}
 
     def __del__(self):
+        self.terminateThreads()
+
+    def terminateThreads(self):
         for t in self.thread_list:
             t.terminate()
 
@@ -174,6 +180,8 @@ class Data_Batch_Generator(object):
         Gets and processes the data
         :return: generator with the data
         """
+
+        self.terminateThreads()
 
         if self.set_split == 'train' and not self.predict:
             data_augmentation = self.params['data_augmentation']
@@ -189,7 +197,7 @@ class Data_Batch_Generator(object):
             # create process
             new_process = multiprocessing.Process(target=dataLoad,
                                                   args=('dataLoad_process_'+str(i),
-                                                  self.net, self.dataset, [in_queue, out_queue]))
+                                                  self.net, self.dataset, int(self.params['n_parallel_loaders']*1.5), [in_queue, out_queue]))
             self.thread_list.append(new_process) # store processes for terminating later
             new_process.start()
 

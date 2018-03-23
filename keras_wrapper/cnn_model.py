@@ -1000,7 +1000,8 @@ class Model_Wrapper(object):
                                              n_parallel_loaders=params['n_parallel_loaders']).generator()
 
         # Are we going to validate on 'val' data?
-        if 'val' in params['eval_on_sets']:
+        if False: # TODO: loss calculation on val set is deactivated
+        #if 'val' in params['eval_on_sets']:
             # Calculate how many validation iterations are we going to perform per test
             n_valid_samples = ds.len_val
             if params['num_iterations_val'] is None:
@@ -2395,7 +2396,7 @@ class Model_Wrapper(object):
         default_params = {'batch_size': 50,
                           'n_parallel_loaders': 8,
                           'normalize': True,
-                          'normalization_type': None,
+                          'normalization_type': '(-1)-1',
                           'mean_substraction': False,
                           'n_samples': None,
                           'init_sample': -1,

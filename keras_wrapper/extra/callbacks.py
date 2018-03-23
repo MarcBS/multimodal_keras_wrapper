@@ -16,7 +16,8 @@ def checkDefaultParamsBeamSearch(params):
     default_params = {'max_batch_size': 50,
                       'beam_size': 5,
                       'maxlen': 30,
-                      'normalize': False,
+                      'normalize': True,
+                      'normalization_type': '(-1)-1',
                       'words_so_far': False,
                       'n_parallel_loaders': 5,
                       'optimized_search': False,
@@ -69,7 +70,8 @@ class EvalPerformance(KerasCallback):
                  each_n_epochs=1,
                  max_eval_samples=None,
                  extra_vars=None,
-                 normalize=False,
+                 normalize=True,
+                 normalization_type='(-1)-1',
                  output_types=None,
                  is_text=False,
                  is_multilabel=False,
@@ -119,6 +121,7 @@ class EvalPerformance(KerasCallback):
         :param output_types: list with type identifiers of the different outputs to evaluate
                              (len must coincide with gt_post)
         :param normalize: switch on/off data normalization
+        :param normalization_type: normalization process applied
         :param min_pred_multilabel: minimum prediction value considered for positive prediction
         :param index2word_y: mapping from the indices to words (only needed if is_text==True)
         :param input_text_id:
@@ -195,6 +198,7 @@ class EvalPerformance(KerasCallback):
         self.each_n_epochs = each_n_epochs
         self.extra_vars = extra_vars
         self.normalize = normalize
+        self.normalization_type = normalization_type
         self.save_path = save_path
         self.eval_on_epochs = eval_on_epochs
         self.eval_orig_size = eval_orig_size
@@ -299,6 +303,7 @@ class EvalPerformance(KerasCallback):
                                      self.beam_batch_size is not None else self.batch_size,
                                      'pos_unk': False,
                                      'normalize': self.normalize,
+                                     'normalization_type': self.normalization_type,
                                      'max_eval_samples': self.max_eval_samples
                                      }
 
@@ -310,6 +315,7 @@ class EvalPerformance(KerasCallback):
                                      'n_parallel_loaders': self.extra_vars.get('n_parallel_loaders', 8),
                                      'predict_on_sets': [s],
                                      'normalize': self.normalize,
+                                     'normalization_type': self.normalization_type,
                                      'max_eval_samples': self.max_eval_samples,
                                      'model_name': self.model_name,
                                      }
