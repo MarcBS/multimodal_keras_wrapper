@@ -6,6 +6,48 @@ import time
 import numpy as np
 
 
+class MultiprocessQueue():
+    """
+        Wrapper class for encapsulating the behaviour of some multiprocessing
+        communication structures.
+
+        See how Queues and Pipes work in the following link
+        https://docs.python.org/2/library/multiprocessing.html#multiprocessing-examples
+    """
+    def __init__(self, manager, type='Queue'):
+        if type != 'Queue' and type != 'Pipe':
+            raise NotImplementedError('Not valid multiprocessing queue of type '+type)
+
+        self.type = type
+        if type == 'Queue':
+            self.queue = eval('manager.'+type+'()')
+        else:
+            self.queue = eval(type+'()')
+
+    def put(self, elem):
+        if self.type == 'Queue':
+            self.queue.put(elem)
+        elif self.type == 'Pipe':
+            self.queue[1].send(elem)
+
+    def get(self):
+        if self.type == 'Queue':
+            return self.queue.get()
+        elif self.type == 'Pipe':
+            return self.queue[0].recv()
+
+    def qsize(self):
+        if self.type == 'Queue':
+            return self.queue.qsize()
+        elif self.type == 'Pipe':
+            return -1
+
+    def empty(self):
+        if self.type == 'Queue':
+            return self.queue.empty()
+        elif self.type == 'Pipe':
+            return not self.queue[0].poll()
+
 def bbox(img, mode='max'):
     """
     Returns a bounding box covering all the non-zero area in the image.
