@@ -64,7 +64,7 @@ def loadDataset(dataset_path):
 #       DATA BATCH GENERATOR CLASS
 # ------------------------------------------------------- #
 
-def dataLoad(process_name, net, dataset, queue):
+def dataLoad(process_name, net, dataset, queues):
     print "Starting "+process_name+"..."
     in_queue, out_queue = queues
 
@@ -73,7 +73,7 @@ def dataLoad(process_name, net, dataset, queue):
         [mode, predict, set_split, ind,
             normalization, normalization_type,
             mean_substraction, data_augmentation]    =  in_queue.get()
-
+        
         # Recovers a batch of data
         if predict:
             if mode == 'indices':
@@ -94,7 +94,7 @@ def dataLoad(process_name, net, dataset, queue):
                 raise NotImplementedError("Data retrieval mode '"+mode+"' is not implemented.")
             data = net.prepareData(X_batch, None)[0]
         else:
-            X_batch, Y_batch = dataset.getXY_FromIndices(set_split,
+            X_batch, Y_batch = dataset.getXY(set_split,
                                                         ind[0],
                                                         normalization=normalization,
                                                         normalization_type=normalization_type,
@@ -125,7 +125,8 @@ class Data_Batch_Generator(object):
                  shuffle=True,
                  temporally_linked=False,
                  init_sample=-1,
-                 final_sample=-1):
+                 final_sample=-1,
+                 n_parallel_loaders=1):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -140,6 +141,7 @@ class Data_Batch_Generator(object):
         :param random_samples: Retrieves this number of training samples
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
+        :param n_parallel_loaders: Number of parallel loaders that will be used.
         """
         self.set_split = set_split
         self.dataset = dataset
@@ -150,6 +152,7 @@ class Data_Batch_Generator(object):
         self.init_sample = init_sample
         self.final_sample = final_sample
         self.next_idx = None
+        self.thread_list = []
 
         # Several parameters
         self.params = {'batch_size': batch_size,
@@ -159,7 +162,12 @@ class Data_Batch_Generator(object):
                        'normalization_type': normalization_type,
                        'num_iterations': num_iterations,
                        'random_samples': random_samples,
-                       'shuffle': shuffle}
+                       'shuffle': shuffle,
+                       'n_parallel_loaders': n_parallel_loaders}
+
+    def __del__(self):
+        for t in self.thread_list:
+            t.terminate()
 
     def generator(self):
         """
@@ -174,17 +182,16 @@ class Data_Batch_Generator(object):
 
         # Initialize list of parallel data loaders
         thread_mngr = multiprocessing.Manager()
-        thread_list = []
         in_queue = MultiprocessQueue(thread_mngr, type='Queue')# if self.params['n_parallel_loaders'] > 1 else 'Pipe')
         out_queue = MultiprocessQueue(thread_mngr, type='Queue')# if self.params['n_parallel_loaders'] > 1 else 'Pipe')
-		# Create a queue per function
-		for i in range(self.params['n_parallel_loaders']):
-			# create process
-			new_process = multiprocessing.Process(target=dataLoad,
-										args=('dataLoad_process_'+str(i),
-											self.net, self.dataset, [in_queue, out_queue]))
-			thread_list.append(new_process) # store processes for terminating later
-			new_process.start()
+        # Create a queue per function
+        for i in range(self.params['n_parallel_loaders']):
+            # create process
+            new_process = multiprocessing.Process(target=dataLoad,
+                                                  args=('dataLoad_process_'+str(i),
+                                                  self.net, self.dataset, [in_queue, out_queue]))
+            self.thread_list.append(new_process) # store processes for terminating later
+            new_process.start()
 
         it = 0
         while True:

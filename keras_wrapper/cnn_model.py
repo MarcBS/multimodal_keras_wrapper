@@ -996,7 +996,8 @@ class Model_Wrapper(object):
                                              normalization_type=params['normalization_type'],
                                              data_augmentation=params['data_augmentation'],
                                              mean_substraction=params['mean_substraction'],
-                                             shuffle=params['shuffle']).generator()
+                                             shuffle=params['shuffle'],
+                                             n_parallel_loaders=params['n_parallel_loaders']).generator()
 
         # Are we going to validate on 'val' data?
         if 'val' in params['eval_on_sets']:
@@ -1012,7 +1013,8 @@ class Model_Wrapper(object):
                                            normalization_type=params['normalization_type'],
                                            data_augmentation=False,
                                            mean_substraction=params['mean_substraction'],
-                                           shuffle=False).generator()
+                                           shuffle=False,
+                                           n_parallel_loaders=params['n_parallel_loaders']).generator()
         else:
             val_gen = None
             n_valid_samples = None
@@ -1137,7 +1139,8 @@ class Model_Wrapper(object):
                                         normalization=params['normalize'],
                                         normalization_type=params['normalization_type'],
                                         data_augmentation=False,
-                                        mean_substraction=params['mean_substraction']).generator()
+                                        mean_substraction=params['mean_substraction'],
+                                        n_parallel_loaders=params['n_parallel_loaders']).generator()
 
         out = self.model.evaluate_generator(data_gen,
                                             val_samples=n_samples,
@@ -1936,7 +1939,8 @@ class Model_Wrapper(object):
                                                              normalization_type=params['normalization_type'],
                                                              data_augmentation=False,
                                                              mean_substraction=params['mean_substraction'],
-                                                             predict=True)
+                                                             predict=True,
+                                                             n_parallel_loaders=params['n_parallel_loaders'])
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
@@ -1951,7 +1955,8 @@ class Model_Wrapper(object):
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=False,
                                                              random_samples=n_samples,
-                                                             temporally_linked=params['temporally_linked'])
+                                                             temporally_linked=params['temporally_linked'],
+                                                             n_parallel_loaders=params['n_parallel_loaders'])
                     data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
@@ -2210,7 +2215,8 @@ class Model_Wrapper(object):
                                                              normalization_type=params['normalization_type'],
                                                              data_augmentation=False,
                                                              mean_substraction=params['mean_substraction'],
-                                                             predict=True)
+                                                             predict=True,
+                                                             n_parallel_loaders=params['n_parallel_loaders'])
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
@@ -2225,7 +2231,8 @@ class Model_Wrapper(object):
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=False,
                                                              random_samples=n_samples,
-                                                             temporally_linked=params['temporally_linked'])
+                                                             temporally_linked=params['temporally_linked'],
+                                                             n_parallel_loaders=params['n_parallel_loaders'])
                     data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
@@ -2429,7 +2436,8 @@ class Model_Wrapper(object):
                                                 mean_substraction=params['mean_substraction'],
                                                 init_sample=params['init_sample'],
                                                 final_sample=params['final_sample'],
-                                                predict=True).generator()
+                                                predict=True,
+                                                n_parallel_loaders=params['n_parallel_loaders']).generator()
 
             else:
                 n_samples = params['n_samples']
@@ -2445,7 +2453,8 @@ class Model_Wrapper(object):
                                                 data_augmentation=False,
                                                 mean_substraction=params['mean_substraction'],
                                                 predict=True,
-                                                random_samples=n_samples).generator()
+                                                random_samples=n_samples,
+                                                n_parallel_loaders=params['n_parallel_loaders']).generator()
             # Predict on model
             if postprocess_fun is None:
                 if int(keras.__version__.split('.')[0]) == 1:
@@ -2650,7 +2659,8 @@ class Model_Wrapper(object):
                                             normalization_type=params['normalization_type'],
                                             data_augmentation=False,
                                             mean_substraction=params['mean_substraction'],
-                                            predict=False).generator()
+                                            predict=False,
+                                            n_parallel_loaders=params['n_parallel_loaders']).generator()
             sources_sampling = []
             scores = []
             total_cost = 0
