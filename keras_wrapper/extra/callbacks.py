@@ -529,8 +529,8 @@ class EvalPerformance(KerasCallback):
         self.recoverInOutMappings()
 
     def changeInOutMappings(self):
-        self.train_mappings = { 'in': self.model_to_eval.inputsMapping,
-                                'out': self.model_to_eval.outputsMapping,
+        self.train_mappings = {'in': self.model_to_eval.inputsMapping,
+                               'out': self.model_to_eval.outputsMapping,
                               }
 
         if self.inputs_mapping_eval is not None:
