@@ -660,8 +660,9 @@ class Model_Wrapper(object):
             if key not in params:
                 params[key] = default_val
 
-        #if 'n_parallel_loaders' in params and params['n_parallel_loaders'] > 1:
-        #    logging.info('WARNING: parallel loaders are not implemented')
+        if 'n_parallel_loaders' in params and params['n_parallel_loaders'] > 1:
+            logging.info('WARNING: parallel loaders are not implemented')
+            params['n_parallel_loaders'] = 1
 
         return params
 
