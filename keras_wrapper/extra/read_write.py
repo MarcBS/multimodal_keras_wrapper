@@ -112,7 +112,7 @@ def listoflists2file(filepath, mylist, permission='w'):
 
 
 def list2file(filepath, mylist, permission='w'):
-    mylist = [l for l in mylist]
+    mylist = [str(l) for l in mylist]
     mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
         mylist = mylist.encode('utf-8')
