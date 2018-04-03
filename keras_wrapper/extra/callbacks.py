@@ -913,9 +913,9 @@ class LearningRateReducer(KerasCallback):
         new_rate = self.reduce_rate if self.reduction_function == 'linear' else \
             np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
         if K.backend() == 'tensorflow':
-            lr = K.get_value(self.model.optimizer.lr)
+            lr = self.model.optimizer.get_lr()
             self.new_lr = np.float32(lr * new_rate)
-            K.set_value(self.model.optimizer.lr, self.new_lr)
+            self.model.optimizer.set_lr(self.new_lr)
         else:
             lr = self.model.optimizer.lr.get_value()
             self.new_lr = np.float32(lr * new_rate)
