@@ -103,7 +103,7 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
 
 
 def listoflists2file(filepath, mylist, permission='w'):
-    mylist = [str(sublist) for sublist in mylist]
+    mylist = [unicode(sublist) for sublist in mylist]
     mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
         mylist = mylist.encode('utf-8')
@@ -112,7 +112,7 @@ def listoflists2file(filepath, mylist, permission='w'):
 
 
 def list2file(filepath, mylist, permission='w'):
-    mylist = [l for l in mylist]
+    mylist = [unicode(l) for l in mylist]
     mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
         mylist = mylist.encode('utf-8')
@@ -121,7 +121,7 @@ def list2file(filepath, mylist, permission='w'):
 
 
 def list2stdout(mylist):
-    mylist = [str(l) for l in mylist]
+    mylist = [l for l in mylist]
     mylist = '\n'.join(mylist)
     if type(mylist[0]) is unicode:
         mylist = mylist.encode('utf-8')
@@ -136,7 +136,7 @@ def nbest2file(filepath, mylist, separator='|||', permission='w'):
             for l3 in l2:
                 if type(l3) is list:
                     l3 = l3[0]
-                a.append(str(l3) + ' |||')
+                a.append(unicode(l3) + ' |||')
             a = ' '.join(a + [' '])
             newlist.append(a.strip()[:-len(separator)].strip())
     mylist = '\n'.join(newlist)
@@ -152,7 +152,6 @@ def list2vqa(filepath, mylist, qids, permission='w', extra=None):
         line = {'answer': ans, 'question_id': int(qst)}
         if extra is not None:
             line['reference'] = extra['reference'][i]
-            # line['probs'] = str(extra['probs'][i]) # vector of probabilities for all outputs
             line['top5'] = str(
                 [[extra['vocab'][p], extra['probs'][i][p]] for p in np.argsort(extra['probs'][i])[::-1][:5]])
             line['max_prob'] = str(max(extra['probs'][i]))
@@ -309,7 +308,7 @@ def dict2file(mydict, path, title=None, separator=':'):
             useful if we write many dictionaries
             into the same file
     """
-    tmp = [str(x[0]) + separator + str(x[1]) for x in mydict.items()]
+    tmp = [unicode(x[0]) + separator + unicode(x[1]) for x in mydict.items()]
     if title is not None:
         output_list = [title]
         output_list.extend(tmp)

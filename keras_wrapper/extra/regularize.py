@@ -12,6 +12,7 @@ def Regularize(layer, params,
                apply_batch_normalization=True,
                apply_prelu=True,
                apply_dropout=True,
+               apply_l1=True,
                apply_l2=True):
     """
     Apply the regularization specified in parameters to the layer
@@ -23,6 +24,7 @@ def Regularize(layer, params,
     :param apply_dropout: If False, dropout won't be applied, independently of params
     :param apply_prelu: If False, prelu won't be applied, independently of params
     :param apply_batch_normalization: If False, batch normalization won't be applied, independently of params
+    :param apply_l1: If False, l1 normalization won't be applied, independently of params
     :param apply_l2: If False, l2 normalization won't be applied, independently of params
     :return: Regularized layer
     """
@@ -51,6 +53,9 @@ def Regularize(layer, params,
 
     if apply_dropout and params.get('DROPOUT_P', 0) > 0:
         shared_layers_list.append(Dropout(params.get('DROPOUT_P', 0.5), name=name + '_dropout'))
+
+    if apply_l1 and params.get('USE_L1', False):
+        shared_layers_list.append(Lambda(L1_norm, name=name + '_L1_norm'))
 
     if apply_l2 and params.get('USE_L2', False):
         shared_layers_list.append(Lambda(L2_norm, name=name + '_L2_norm'))
