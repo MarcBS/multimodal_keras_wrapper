@@ -379,7 +379,7 @@ class Model_Wrapper(object):
         self.net_type = type
         self.lr = 0.01  # insert default learning rate
         self.momentum = 1.0 - self.lr  # insert default momentum
-        self.loss = 'categorical_crossentropy'  # default loss function
+        self.loss = None  # default loss function
         self.training_parameters = []
         self.testing_parameters = []
         self.training_state = dict()
@@ -500,7 +500,7 @@ class Model_Wrapper(object):
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None, epsilon=1e-8,
+    def setOptimizer(self, lr=None, momentum=None, loss='categorical_crossentropy', loss_weights=None, metrics=None, epsilon=1e-8,
                      nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None,
                      tf_optimizer=True):
         """
@@ -529,10 +529,7 @@ class Model_Wrapper(object):
             momentum = self.momentum
         else:
             self.momentum = momentum
-        if loss is None:
-            loss = self.loss
-        else:
-            self.loss = loss
+        self.loss = loss
         if metrics is None:
             metrics = []
         if tf_optimizer and K.backend() == 'tensorflow':
