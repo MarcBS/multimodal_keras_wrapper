@@ -480,7 +480,7 @@ class Dataset(object):
         self.__accepted_types_inputs = ['raw-image', 'image-features',
                                         'video', 'video-features',
                                         'text',
-                                        'categorical', 'binary',
+                                        'categorical', 'categorical_raw', 'binary',
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
@@ -707,7 +707,8 @@ class Dataset(object):
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
                  bpe_codes=None, separator='@@',  # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
-                 max_video_len=26  # 'video'
+                 max_video_len=26,  # 'video'
+                sparse = False,  # 'binary'
                  ):
         """
         Loads a list which can contain all samples from either the 'train', 'val', or
@@ -820,8 +821,9 @@ class Dataset(object):
                                                 feat_len)
         elif type == 'categorical':
             self.setClasses(path_list, id)
-            data = self.preprocessCategorical(path_list, id,
-                                              sample_weights=True if sample_weights and set_name == 'train' else False)
+            data = self.preprocessCategorical(path_list, id)
+        elif type == 'categorical_raw':
+            data = self.preprocessIDs(path_list, id, set_name)
         elif type == 'binary':
             data = self.preprocessBinary(path_list, id, sparse)
         elif type == 'id':
@@ -3186,6 +3188,8 @@ class Dataset(object):
                     nClasses = len(self.dic_classes[id_in])
                     # load_sample_weights = self.sample_weights[id_out][set_name]
                     x = self.loadCategorical(x, nClasses)
+                elif type_in == 'categorical_raw':
+                    x = np.array(x)
                 elif type_in == 'binary':
                     x = self.loadBinary(x, id_in)
             X.append(x)
@@ -3267,6 +3271,9 @@ class Dataset(object):
                     nClasses = len(self.dic_classes[id_in])
                     # load_sample_weights = self.sample_weights[id_out][set_name]
                     x = self.loadCategorical(x, nClasses)
+                    print x.shape
+                elif type_in == 'categorical_raw':
+                    x = np.array(x)
                 elif type_in == 'binary':
                     x = self.loadBinary(x, id_in)
             X.append(x)
@@ -3419,6 +3426,8 @@ class Dataset(object):
                     nClasses = len(self.dic_classes[id_in])
                     # load_sample_weights = self.sample_weights[id_out][set_name]
                     x = self.loadCategorical(x, nClasses)
+                elif type_in == 'categorical_raw':
+                    x = np.array(x)
                 elif type_in == 'binary':
                     x = self.loadBinary(x, id_in)
             X.append(x)
@@ -3550,6 +3559,8 @@ class Dataset(object):
                     nClasses = len(self.dic_classes[id_in])
                     # load_sample_weights = self.sample_weights[id_out][set_name]
                     x = self.loadCategorical(x, nClasses)
+                elif type_in == 'categorical_raw':
+                    x = np.array(x)
                 elif type_in == 'binary':
                     x = self.loadBinary(x, id_in)
             X.append(x)
