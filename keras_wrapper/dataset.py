@@ -16,8 +16,8 @@ from extra.read_write import create_dir_if_not_exists
 from extra.tokenizers import *
 from .utils import bbox, to_categorical
 
-from .utils import MultiprocessQueue
-import multiprocessing
+#from .utils import MultiprocessQueue
+#import multiprocessing
 
 
 # ------------------------------------------------------- #
@@ -64,6 +64,7 @@ def loadDataset(dataset_path):
 #       DATA BATCH GENERATOR CLASS
 # ------------------------------------------------------- #
 
+"""
 def dataLoad(process_name, net, dataset, max_queue_len, queues):
     print "Starting "+process_name+"..."
     in_queue, out_queue = queues
@@ -106,7 +107,7 @@ def dataLoad(process_name, net, dataset, max_queue_len, queues):
             data = net.prepareData(X_batch, Y_batch)
 
         out_queue.put(data)
-
+"""
 
 class Data_Batch_Generator(object):
     """
@@ -129,7 +130,7 @@ class Data_Batch_Generator(object):
                  temporally_linked=False,
                  init_sample=-1,
                  final_sample=-1,
-                 n_parallel_loaders=1):
+                 n_parallel_loaders=None):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -144,7 +145,6 @@ class Data_Batch_Generator(object):
         :param random_samples: Retrieves this number of training samples
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
-        :param n_parallel_loaders: Number of parallel loaders that will be used.
         """
         self.set_split = set_split
         self.dataset = dataset
@@ -155,7 +155,6 @@ class Data_Batch_Generator(object):
         self.init_sample = init_sample
         self.final_sample = final_sample
         self.next_idx = None
-        self.thread_list = []
 
         # Several parameters
         self.params = {'batch_size': batch_size,
@@ -165,15 +164,7 @@ class Data_Batch_Generator(object):
                        'normalization_type': normalization_type,
                        'num_iterations': num_iterations,
                        'random_samples': random_samples,
-                       'shuffle': shuffle,
-                       'n_parallel_loaders': n_parallel_loaders}
-
-    def __del__(self):
-        self.terminateThreads()
-
-    def terminateThreads(self):
-        for t in self.thread_list:
-            t.terminate()
+                       'shuffle': shuffle}
 
     def generator(self):
         """
@@ -181,28 +172,13 @@ class Data_Batch_Generator(object):
         :return: generator with the data
         """
 
-        self.terminateThreads()
-
         if self.set_split == 'train' and not self.predict:
             data_augmentation = self.params['data_augmentation']
         else:
             data_augmentation = False
 
-        # Initialize list of parallel data loaders
-        thread_mngr = multiprocessing.Manager()
-        in_queue = MultiprocessQueue(thread_mngr, type='Queue')# if self.params['n_parallel_loaders'] > 1 else 'Pipe')
-        out_queue = MultiprocessQueue(thread_mngr, type='Queue')# if self.params['n_parallel_loaders'] > 1 else 'Pipe')
-        # Create a queue per function
-        for i in range(self.params['n_parallel_loaders']):
-            # create process
-            new_process = multiprocessing.Process(target=dataLoad,
-                                                  args=('dataLoad_process_'+str(i),
-                                                  self.net, self.dataset, int(self.params['n_parallel_loaders']*1.5), [in_queue, out_queue]))
-            self.thread_list.append(new_process) # store processes for terminating later
-            new_process.start()
-
         it = 0
-        while True:
+        while 1:
             if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
                     not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
                 silence = self.dataset.silence
@@ -223,8 +199,7 @@ class Data_Batch_Generator(object):
                 batch_size = final_sample - init_sample
                 it = 0
 
-            ##### Recovers a batch of data #####
-            # random data selection
+            # Recovers a batch of data
             if self.params['random_samples'] > 0:
                 num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
                 if self.temporally_linked:
@@ -237,38 +212,64 @@ class Data_Batch_Generator(object):
                     indices = np.random.randint(0, n_samples_split, num_retrieve)
                 self.params['random_samples'] -= num_retrieve
 
-                # Prepare query data for parallel data loaders
-                query_data = ['indices', self.predict, self.set_split, [indices],
-                                self.params['normalization'], self.params['normalization_type'],
-                                self.params['mean_substraction'], data_augmentation]
+                # At sampling from train/val, we always have Y
+                if self.predict:
+                    X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                            indices,
+                                                            normalization=self.params['normalization'],
+                                                            normalization_type=self.params['normalization_type'],
+                                                            meanSubstraction=self.params['mean_substraction'],
+                                                            dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, None)[0]
 
-            # specific data selection
+                else:
+                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                      indices,
+                                                                      normalization=self.params['normalization'],
+                                                                      normalization_type=self.params['normalization_type'],
+                                                                      meanSubstraction=self.params['mean_substraction'],
+                                                                      dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
+
             elif self.init_sample > -1 and self.final_sample > -1:
                 indices = range(self.init_sample, self.final_sample)
+                if self.predict:
+                    X_batch = self.dataset.getX_FromIndices(self.set_split,
+                                                            indices,
+                                                            normalization=self.params['normalization'],
+                                                            normalization_type=self.params['normalization_type'],
+                                                            meanSubstraction=self.params['mean_substraction'],
+                                                            dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, None)[0]
 
-                # Prepare query data for parallel data loaders
-                query_data = ['indices', self.predict, self.set_split, [indices],
-                                self.params['normalization'], self.params['normalization_type'],
-                                self.params['mean_substraction'], data_augmentation]
+                else:
+                    X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
+                                                                      indices,
+                                                                      normalization=self.params['normalization'],
+                                                                      normalization_type=self.params['normalization_type'],
+                                                                      meanSubstraction=self.params['mean_substraction'],
+                                                                      dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
 
-            # consecutive data selection
             else:
                 if self.predict:
-                    query_data = ['consecutive', self.predict, self.set_split, [init_sample, final_sample],
-                                    self.params['normalization'], self.params['normalization_type'],
-                                    self.params['mean_substraction'], data_augmentation]
+                    X_batch = self.dataset.getX(self.set_split,
+                                                init_sample,
+                                                final_sample,
+                                                normalization=self.params['normalization'],
+                                                normalization_type=self.params['normalization_type'],
+                                                meanSubstraction=self.params['mean_substraction'],
+                                                dataAugmentation=False)
+                    data = self.net.prepareData(X_batch, None)[0]
                 else:
-                    query_data = ['consecutive', self.predict, self.set_split, [batch_size],
-                                    self.params['normalization'], self.params['normalization_type'],
-                                    self.params['mean_substraction'], data_augmentation]
-
-            # Insert data in queue
-            in_queue.put(query_data)
-
-            # Check if there is processed data in queue
-            while out_queue.qsize() > 0:
-                data = out_queue.get()
-                yield(data)
+                    X_batch, Y_batch = self.dataset.getXY(self.set_split,
+                                                          batch_size,
+                                                          normalization=self.params['normalization'],
+                                                          normalization_type=self.params['normalization_type'],
+                                                          meanSubstraction=self.params['mean_substraction'],
+                                                          dataAugmentation=data_augmentation)
+                    data = self.net.prepareData(X_batch, Y_batch)
+            yield (data)
 
 
 class Homogeneous_Data_Batch_Generator(object):
