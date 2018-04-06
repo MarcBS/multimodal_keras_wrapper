@@ -93,7 +93,7 @@ class EvalPerformance(KerasCallback):
                  start_eval_on_epoch=0,
                  is_3DLabel=False,
                  sampling_type='max_likelihood',
-                 save_each_evaluation=True,
+                 save_each_evaluation=False,
                  out_pred_idx=None,
                  max_plot=1.0,
                  do_plot=True,
@@ -330,7 +330,8 @@ class EvalPerformance(KerasCallback):
 
             # Single-output model
             if not self.gt_pos or self.gt_pos == 0 or len(self.gt_pos) == 1:
-                predictions_all = [predictions_all]
+                if len(self.gt_pos) != 1 or len(predictions_all)==1:
+                    predictions_all = [predictions_all]
                 gt_positions = [0]
 
             # Multi-output model
@@ -913,9 +914,12 @@ class LearningRateReducer(KerasCallback):
         new_rate = self.reduce_rate if self.reduction_function == 'linear' else \
             np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
         if K.backend() == 'tensorflow':
-            lr = self.model.optimizer.get_lr()
+            print('WARNING: learning rate decay is deactivated when using TensorFlow') 
+            """
+            lr = self.model.optimizer.optimizer.get_lr()
             self.new_lr = np.float32(lr * new_rate)
-            self.model.optimizer.set_lr(self.new_lr)
+            self.model.optimizer.optimizer.set_lr(self.new_lr)
+            """
         else:
             lr = self.model.optimizer.lr.get_value()
             self.new_lr = np.float32(lr * new_rate)

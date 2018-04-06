@@ -139,7 +139,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
     try:
         logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
-        model = load_model(model_name + '.h5', compile=compile)
+        model = load_model(model_name + '.h5', custom_objects=custom_objects, compile=compile)
     except Exception as e:
         logging.info(str(e))
         # Load model structure
