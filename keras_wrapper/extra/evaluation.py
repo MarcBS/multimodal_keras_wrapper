@@ -219,7 +219,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     n_classes = extra_vars['n_classes']
     
     n_samples = len(pred_list)
-
+    logging.info("------NSamples: "+str(n_samples))
     gt_list = extra_vars[split]['references']
     pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
     # Create prediction matrix

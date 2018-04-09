@@ -330,7 +330,7 @@ class EvalPerformance(KerasCallback):
 
             # Single-output model
             if not self.gt_pos or self.gt_pos == 0 or len(self.gt_pos) == 1:
-                if len(self.gt_pos) != 1 or len(predictions_all)==1:
+                if len(predictions_all)!=2:
                     predictions_all = [predictions_all]
                 gt_positions = [0]
 
