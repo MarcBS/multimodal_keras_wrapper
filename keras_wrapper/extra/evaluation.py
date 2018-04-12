@@ -200,6 +200,8 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
             'f1': f1}
 
 
+import numpy as np
+
 def multiclass_metrics(pred_list, verbose, extra_vars, split):
     """
     Multiclass classification metrics. See multilabel ranking metrics in sklearn library for more info:
@@ -215,7 +217,9 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     from sklearn import metrics as sklearn_metrics
 
     n_classes = extra_vars['n_classes']
+    
     n_samples = len(pred_list)
+    logging.info("------NSamples: "+str(n_samples))
     gt_list = extra_vars[split]['references']
     pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
     # Create prediction matrix

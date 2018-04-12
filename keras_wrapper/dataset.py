@@ -3298,8 +3298,19 @@ class Dataset(object):
                     nClasses = len(self.dic_classes[id_out])
                     # load_sample_weights = self.sample_weights[id_out][set_name]
                     y = self.loadCategorical(y, nClasses)
+                    #print '------------'
+                    #print nClasses
+                    #print id_out
+                    #print y.shape
+                    #y = y[:,:-1]
+                    #print y.shape
                 elif type_out == 'binary':
                     y = self.loadBinary(y, id_out)
+                    #print '------------'
+                    #print id_out
+                    #print y.shape
+                    #y = y[:,:-1]
+                    #print y.shape
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
                 elif type_out == '3DLabel':
