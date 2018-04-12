@@ -185,16 +185,16 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
 
     if verbose > 0:
         logging.info(
-            'Coverage Error (best: avg labels per sample = %f): %f' % (float(np.sum(y_gt)) / float(n_samples), coverr))
-        logging.info('Label Ranking Average Precision (best: 1.0): %f' % avgprec)
-        logging.info('Label Ranking Loss (best: 0.0): %f' % rankloss)
-        logging.info('Precision: %f' % precision)
-        logging.info('Recall: %f' % recall)
-        logging.info('F1 score: %f' % f1)
+            '"coverage_error" (best: avg labels per sample = %f): %f' % (float(np.sum(y_gt)) / float(n_samples), coverr))
+        logging.info('Label Ranking "average_precision" (best: 1.0): %f' % avgprec)
+        logging.info('Label "ranking_loss" (best: 0.0): %f' % rankloss)
+        logging.info('precision: %f' % precision)
+        logging.info('recall: %f' % recall)
+        logging.info('f1: %f' % f1)
 
-    return {'coverage error': coverr,
-            'average precision': avgprec,
-            'ranking loss': rankloss,
+    return {'coverage_error': coverr,
+            'average_precision': avgprec,
+            'ranking_loss': rankloss,
             'precision': precision,
             'recall': recall,
             'f1': f1}
@@ -219,7 +219,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     n_classes = extra_vars['n_classes']
     
     n_samples = len(pred_list)
-    logging.info("------NSamples: "+str(n_samples))
+    logging.info("---# of samples: "+str(n_samples))
     gt_list = extra_vars[split]['references']
     pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
     # Create prediction matrix
@@ -251,14 +251,14 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
 
     if verbose > 0:
-        logging.info('Accuracy: %f' % accuracy)
-        logging.info('Balanced Accuracy: %f' % accuracy_balanced)
-        logging.info('Precision: %f' % precision)
-        logging.info('Recall: %f' % recall)
-        logging.info('F1 score: %f' % f1)
+        logging.info('accuracy: %f' % accuracy, )
+        logging.info('balanced_accuracy: %f' % accuracy_balanced)
+        logging.info('precision: %f' % precision)
+        logging.info('recall: %f' % recall)
+        logging.info('f1: %f' % f1)
 
     return {'accuracy': accuracy,
-            'accuracy_balanced': accuracy_balanced,
+            'balanced_accuracy': accuracy_balanced,
             'precision': precision,
             'recall': recall,
             'f1': f1}

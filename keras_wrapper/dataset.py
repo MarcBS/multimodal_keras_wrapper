@@ -97,7 +97,7 @@ def dataLoad(process_name, net, dataset, max_queue_len, queues):
                 raise NotImplementedError("Data retrieval mode '"+mode+"' is not implemented.")
             data = net.prepareData(X_batch, None)[0]
         else:
-            X_batch, Y_batch = dataset.getXY(set_split,
+            X_batch, Y_batch = dataset.getXY_FromIndices(set_split,
                                                         ind[0],
                                                         normalization=normalization,
                                                         normalization_type=normalization_type,
@@ -258,7 +258,7 @@ class Parallel_Data_Batch_Generator(object):
                                     self.params['normalization'], self.params['normalization_type'],
                                     self.params['mean_substraction'], data_augmentation]
                 else:
-                    query_data = ['consecutive', self.predict, self.set_split, [batch_size],
+                    query_data = ['consecutive', self.predict, self.set_split, [range(init_sample,final_sample)],
                                     self.params['normalization'], self.params['normalization_type'],
                                     self.params['mean_substraction'], data_augmentation]
 
@@ -3063,7 +3063,6 @@ class Dataset(object):
                    dataAugmentation=True, daRandomParams=None,
                    useBGR=False,
                    external=False, loaded=False):
-        print images
         """
         Loads a set of images from disk.
 
@@ -3155,8 +3154,8 @@ class Dataset(object):
                     logging.disable(logging.NOTSET)
 
                 except:
-                    logging.warning("WARNING!")
-                    logging.warning("Can't load image " + im)
+                    print "WARNING!"
+                    print "Can't load image " + im
                     im = np.zeros(tuple(self.img_size[id]))
 
             # Convert to RGB
@@ -3519,7 +3518,6 @@ class Dataset(object):
                 if type_out == 'dense_text':
                     y = (y[0][:, :, None], y[1])
 
-            print y
             Y.append(y)
 
         return [X, Y]
