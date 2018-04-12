@@ -506,6 +506,7 @@ class Dataset(object):
         self.vocabulary_len = dict()  # number of words in the vocabulary
         self.text_offset = dict()  # number of timesteps that the text is shifted (to the right)
         self.fill_text = dict()  # text padding mode
+        self.label_smoothing = dict() # Epsilon value for label smoothing. See arxiv.org/abs/1512.00567.
         self.pad_on_batch = dict()  # text padding mode: If pad_on_batch, the sample will have the maximum length
         # of the current batch. Else, it will have a fixed length (max_text_len)
         self.words_so_far = dict()  # if True, each sample will be represented as the complete set of words until
@@ -920,8 +921,7 @@ class Dataset(object):
             logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
-                  add_additional=False,
-                  sample_weights=False,
+                  add_additional=False, sample_weights=False, label_smoothing=0.,
                   tokenization='tokenize_none', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
                   bpe_codes=None, separator='@@',  # 'text'
@@ -944,7 +944,7 @@ class Dataset(object):
                                 the data with id that was already declared in the dataset
         :param add_additional: adds additional data to an already existent output ID
         :param sample_weights: switch on/off sample weights usage for the current output
-
+        :param label_smoothing: epsilon value for label smoothing. See arxiv.org/abs/1512.00567.
             # 'text'-related parameters
 
         :param tokenization: type of tokenization applied (must be declared as a method of this class)
@@ -992,6 +992,10 @@ class Dataset(object):
             raise NotImplementedError(
                 'The output type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
                     self.__accepted_types_outputs))
+
+        if self.label_smoothing.get(id) is None:
+            self.label_smoothing[id] = dict()
+        self.label_smoothing[id][set_name] = label_smoothing
 
         # Preprocess the output data depending on its type
         if type == 'categorical':
@@ -1892,7 +1896,7 @@ class Dataset(object):
         return X_out
 
     def loadTextOneHot(self, X, vocabularies, vocabulary_len, max_len, offset, fill, pad_on_batch, words_so_far,
-                       sample_weights=False, loading_X=False):
+                       sample_weights=False, loading_X=False, label_smoothing=0.):
 
         """
         Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
@@ -1922,8 +1926,9 @@ class Dataset(object):
         else:
             y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(np.uint8)
             for idx in range(y[0].shape[0]):
-                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(
-                    np.uint8)
+                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(np.uint8)
+                if label_smoothing > 0.:
+                    y_aux[idx] = ((1-label_smoothing) * y_aux[idx] + (label_smoothing / vocabulary_len)).astype(np.float32)
             if sample_weights:
                 y_aux = (y_aux, y[1])  # join data and mask
         return y_aux
@@ -3323,8 +3328,7 @@ class Dataset(object):
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                                   imlist)
                 elif type_out == 'text' or type_out == 'dense_text':
-                    y = self.loadText(y, self.vocabulary[id_out],
-                                      self.max_text_len[id_out][set_name], self.text_offset[id_out],
+                    y = self.loadText(y, self.vocabulary[id_out], self.max_text_len[id_out][set_name], self.text_offset[id_out],
                                       fill=self.fill_text[id_out], pad_on_batch=self.pad_on_batch[id_out],
                                       words_so_far=self.words_so_far[id_out], loading_X=False)
                     # Use whole sentence as class (classifier model)
@@ -3332,9 +3336,15 @@ class Dataset(object):
                         y = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     elif type_out == 'text':
-                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
+                        if hasattr(self, 'label_smoothing') and self.label_smoothing[id_out][set_name] > 0.:
+                            y_aux_type = np.float32
+                        else:
+                            y_aux_type = np.uint8
+                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(y_aux_type)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(np.uint8)
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(y_aux_type)
+                            if hasattr(self, 'label_smoothing') and self.label_smoothing[id_out][set_name] > 0.:
+                                y_aux[idx] = ((1.-self.label_smoothing[id_out][set_name]) * y_aux[idx] + (self.label_smoothing[id_out][set_name] / self.vocabulary_len[id_out]))
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
@@ -3465,10 +3475,15 @@ class Dataset(object):
                         y = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     elif type_out == 'text':
-                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
+                        if hasattr(self, 'label_smoothing') and self.label_smoothing[id_out][set_name] > 0.:
+                            y_aux_type = np.float32
+                        else:
+                            y_aux_type = np.uint8
+                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(y_aux_type)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
-                                np.uint8)
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(y_aux_type)
+                            if hasattr(self, 'label_smoothing') and self.label_smoothing[id_out][set_name] > 0.:
+                                y_aux[idx] = ((1.-self.label_smoothing[id_out][set_name]) * y_aux[idx] + (self.label_smoothing[id_out][set_name] / self.vocabulary_len[id_out]))
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
                         y = y_aux
@@ -3628,10 +3643,15 @@ class Dataset(object):
                         y = to_categorical(y, self.vocabulary_len[id_out]).astype(np.uint8)
                     # Use words separately (generator model)
                     elif type_out == 'text':
-                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(np.uint8)
+                        if hasattr(self, 'label_smoothing') and self.label_smoothing[id_out][set_name] > 0.:
+                            y_aux_type = np.float32
+                        else:
+                            y_aux_type = np.uint8
+                        y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(y_aux_type)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(
-                                np.uint8)
+                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(np.uint8)
+                            if hasattr(self, 'label_smoothing') and self.label_smoothing[id_out][set_name] > 0.:
+                                y_aux[idx] = ((1.-self.label_smoothing[id_out][set_name]) * y_aux[idx] + (self.label_smoothing[id_out][set_name] / self.vocabulary_len[id_out]))
                         if self.sample_weights[id_out][set_name]:
                             y_aux = (y_aux, y[1])  # join data and mask
 
