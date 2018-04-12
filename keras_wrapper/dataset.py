@@ -16,8 +16,8 @@ from extra.read_write import create_dir_if_not_exists
 from extra.tokenizers import *
 from .utils import bbox, to_categorical
 
-#from .utils import MultiprocessQueue
-#import multiprocessing
+from .utils import MultiprocessQueue
+import multiprocessing
 
 
 # ------------------------------------------------------- #
@@ -64,7 +64,6 @@ def loadDataset(dataset_path):
 #       DATA BATCH GENERATOR CLASS
 # ------------------------------------------------------- #
 
-"""
 def dataLoad(process_name, net, dataset, max_queue_len, queues):
     print "Starting "+process_name+"..."
     in_queue, out_queue = queues
@@ -98,7 +97,7 @@ def dataLoad(process_name, net, dataset, max_queue_len, queues):
                 raise NotImplementedError("Data retrieval mode '"+mode+"' is not implemented.")
             data = net.prepareData(X_batch, None)[0]
         else:
-            X_batch, Y_batch = dataset.getXY(set_split,
+            X_batch, Y_batch = dataset.getXY_FromIndices(set_split,
                                                         ind[0],
                                                         normalization=normalization,
                                                         normalization_type=normalization_type,
@@ -107,7 +106,170 @@ def dataLoad(process_name, net, dataset, max_queue_len, queues):
             data = net.prepareData(X_batch, Y_batch)
 
         out_queue.put(data)
-"""
+
+
+class Parallel_Data_Batch_Generator(object):
+    """
+    Batch generator class. Retrieves batches of data.
+    """
+
+    def __init__(self,
+                 set_split,
+                 net,
+                 dataset,
+                 num_iterations,
+                 batch_size=50,
+                 normalization=True,
+                 normalization_type=None,
+                 data_augmentation=True,
+                 mean_substraction=False,
+                 predict=False,
+                 random_samples=-1,
+                 shuffle=True,
+                 temporally_linked=False,
+                 init_sample=-1,
+                 final_sample=-1,
+                 n_parallel_loaders=1):
+        """
+        Initializes the Data_Batch_Generator
+        :param set_split: Split (train, val, test) to retrieve data
+        :param net: Net which use the data
+        :param dataset: Dataset instance
+        :param num_iterations: Maximum number of iterations
+        :param batch_size: Size of the minibatch
+        :param normalization: Switches on/off the normalization of images
+        :param data_augmentation: Switches on/off the data augmentation of the input
+        :param mean_substraction: Switches on/off the mean substraction for images
+        :param predict: Whether we are predicting or training
+        :param random_samples: Retrieves this number of training samples
+        :param shuffle: Shuffle the training dataset
+        :param temporally_linked: Indicates if we are using a temporally-linked model
+        :param n_parallel_loaders: Number of parallel loaders that will be used.
+        """
+        self.set_split = set_split
+        self.dataset = dataset
+        self.net = net
+        self.predict = predict
+        self.temporally_linked = temporally_linked
+        self.first_idx = -1
+        self.init_sample = init_sample
+        self.final_sample = final_sample
+        self.next_idx = None
+        self.thread_list = []
+
+        # Several parameters
+        self.params = {'batch_size': batch_size,
+                       'data_augmentation': data_augmentation,
+                       'mean_substraction': mean_substraction,
+                       'normalization': normalization,
+                       'normalization_type': normalization_type,
+                       'num_iterations': num_iterations,
+                       'random_samples': random_samples,
+                       'shuffle': shuffle,
+                       'n_parallel_loaders': n_parallel_loaders}
+
+    def __del__(self):
+        self.terminateThreads()
+
+    def terminateThreads(self):
+        for t in self.thread_list:
+            t.terminate()
+
+    def generator(self):
+        """
+        Gets and processes the data
+        :return: generator with the data
+        """
+
+        self.terminateThreads()
+
+        if self.set_split == 'train' and not self.predict:
+            data_augmentation = self.params['data_augmentation']
+        else:
+            data_augmentation = False
+
+        # Initialize list of parallel data loaders
+        thread_mngr = multiprocessing.Manager()
+        in_queue = MultiprocessQueue(thread_mngr, type='Queue')# if self.params['n_parallel_loaders'] > 1 else 'Pipe')
+        out_queue = MultiprocessQueue(thread_mngr, type='Queue')# if self.params['n_parallel_loaders'] > 1 else 'Pipe')
+        # Create a queue per function
+        for i in range(self.params['n_parallel_loaders']):
+            # create process
+            new_process = multiprocessing.Process(target=dataLoad,
+                                                  args=('dataLoad_process_'+str(i),
+                                                  self.net, self.dataset, int(self.params['n_parallel_loaders']*1.5), [in_queue, out_queue]))
+            self.thread_list.append(new_process) # store processes for terminating later
+            new_process.start()
+
+        it = 0
+        while True:
+            if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
+                    not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+                silence = self.dataset.silence
+                self.dataset.silence = True
+                self.dataset.shuffleTraining()
+                self.dataset.silence = silence
+            if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
+                self.dataset.resetCounters(set_name=self.set_split)
+            it += 1
+
+            # Checks if we are finishing processing the data split
+            init_sample = (it - 1) * self.params['batch_size']
+            final_sample = it * self.params['batch_size']
+            batch_size = self.params['batch_size']
+            n_samples_split = eval("self.dataset.len_" + self.set_split)
+            if final_sample >= n_samples_split:
+                final_sample = n_samples_split
+                batch_size = final_sample - init_sample
+                it = 0
+
+            # Recovers a batch of data
+            # random data selection
+            if self.params['random_samples'] > 0:
+                num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
+                if self.temporally_linked:
+                    if self.first_idx == -1:
+                        self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
+                        self.next_idx = self.first_idx
+                    indices = range(self.next_idx, self.next_idx + num_retrieve)
+                    self.next_idx += num_retrieve
+                else:
+                    indices = np.random.randint(0, n_samples_split, num_retrieve)
+                self.params['random_samples'] -= num_retrieve
+
+                # Prepare query data for parallel data loaders
+                query_data = ['indices', self.predict, self.set_split, [indices],
+                                self.params['normalization'], self.params['normalization_type'],
+                                self.params['mean_substraction'], data_augmentation]
+
+            # specific data selection
+            elif self.init_sample > -1 and self.final_sample > -1:
+                indices = range(self.init_sample, self.final_sample)
+
+                # Prepare query data for parallel data loaders
+                query_data = ['indices', self.predict, self.set_split, [indices],
+                                self.params['normalization'], self.params['normalization_type'],
+                                self.params['mean_substraction'], data_augmentation]
+
+            # consecutive data selection
+            else:
+                if self.predict:
+                    query_data = ['consecutive', self.predict, self.set_split, [init_sample, final_sample],
+                                    self.params['normalization'], self.params['normalization_type'],
+                                    self.params['mean_substraction'], data_augmentation]
+                else:
+                    query_data = ['consecutive', self.predict, self.set_split, [range(init_sample,final_sample)],
+                                    self.params['normalization'], self.params['normalization_type'],
+                                    self.params['mean_substraction'], data_augmentation]
+
+            # Insert data in queue
+            in_queue.put(query_data)
+
+            # Check if there is processed data in queue
+            while out_queue.qsize() > 0:
+                data = out_queue.get()
+                yield(data)
+
 
 class Data_Batch_Generator(object):
     """
@@ -129,8 +291,7 @@ class Data_Batch_Generator(object):
                  shuffle=True,
                  temporally_linked=False,
                  init_sample=-1,
-                 final_sample=-1,
-                 n_parallel_loaders=None):
+                 final_sample=-1):
         """
         Initializes the Data_Batch_Generator
         :param set_split: Split (train, val, test) to retrieve data
@@ -146,6 +307,7 @@ class Data_Batch_Generator(object):
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
         """
+
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
@@ -2904,6 +3066,7 @@ class Dataset(object):
     def loadImages(self, images, id, normalization_type='(-1)-1',
                    normalization=True, meanSubstraction=False,
                    dataAugmentation=True, daRandomParams=None,
+                   useBGR=False,
                    external=False, loaded=False):
         """
         Loads a set of images from disk.
@@ -2943,10 +3106,11 @@ class Dataset(object):
             # Transpose dimensions
             if len(self.img_size[id]) == 3:  # if it is a 3D image
                 # Convert RGB to BGR
-                if self.img_size[id][2] == 3:  # if has 3 channels
-                    train_mean = train_mean[:, :, ::-1]
-                if keras.backend.image_data_format() == 'channels_first':
-                    train_mean = train_mean.transpose(2, 0, 1)
+                if useBGR:
+                    if self.img_size[id][2] == 3:  # if has 3 channels
+                        train_mean = train_mean[:, :, ::-1]
+                    if keras.backend.image_data_format() == 'channels_first':
+                        train_mean = train_mean.transpose(2, 0, 1)
 
             # Also normalize training mean image if we are applying normalization to images
             if normalization:
@@ -3062,10 +3226,11 @@ class Dataset(object):
             # Permute dimensions
             if len(self.img_size[id]) == 3:
                 # Convert RGB to BGR
-                if self.img_size[id][2] == 3:  # if has 3 channels
-                    im = im[:, :, ::-1]
-                if keras.backend.image_data_format() == 'channels_first':
-                    im = im.transpose(2, 0, 1)
+                if useBGR:
+                    if self.img_size[id][2] == 3:  # if has 3 channels
+                        im = im[:, :, ::-1]
+                    if keras.backend.image_data_format() == 'channels_first':
+                        im = im.transpose(2, 0, 1)
             else:
                 pass
 

@@ -347,8 +347,6 @@ class EvalPerformance(KerasCallback):
                                                                                                   self.index2word_y,
                                                                                                   self.index2word_x):
 
-                print(len(predictions_all))
-
                 predictions = predictions_all[gt_pos]
 
                 if self.verbose > 0:
