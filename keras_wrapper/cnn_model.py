@@ -20,7 +20,7 @@ from keras.optimizers import *
 from keras.regularizers import l2
 from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
-from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
+from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator, Parallel_Data_Batch_Generator
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
@@ -659,7 +659,6 @@ class Model_Wrapper(object):
 
         if 'n_parallel_loaders' in params and params['n_parallel_loaders'] > 1:
             logging.info('WARNING: parallel loaders are not implemented')
-            params['n_parallel_loaders'] = 1
 
         return params
 
@@ -762,7 +761,7 @@ class Model_Wrapper(object):
                           'joint_batches': 4,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
-                          'n_parallel_loaders': 8,
+                          'n_parallel_loaders': 1,
                           'normalize': True,
                           'normalization_type': '(-1)-1',
                           'mean_substraction': False,
@@ -842,7 +841,7 @@ class Model_Wrapper(object):
                           'joint_batches': 4,
                           'epochs_for_save': 1,
                           'num_iterations_val': None,
-                          'n_parallel_loaders': 8,
+                          'n_parallel_loaders': 1,
                           'normalize': False,
                           'normalization_type': None,
                           'mean_substraction': False,
@@ -984,8 +983,8 @@ class Model_Wrapper(object):
                                                          normalization_type=params['normalization_type'],
                                                          data_augmentation=params['data_augmentation'],
                                                          mean_substraction=params['mean_substraction']).generator()
-        else:
-            train_gen = Data_Batch_Generator('train',
+        elif params['n_parallel_loaders'] > 1:
+            train_gen = Parallel_Data_Batch_Generator('train',
                                              self,
                                              ds,
                                              state['n_iterations_per_epoch'],
@@ -996,6 +995,17 @@ class Model_Wrapper(object):
                                              mean_substraction=params['mean_substraction'],
                                              shuffle=params['shuffle'],
                                              n_parallel_loaders=params['n_parallel_loaders']).generator()
+        else:
+            train_gen = Data_Batch_Generator('train',
+                                             self,
+                                             ds,
+                                             state['n_iterations_per_epoch'],
+                                             batch_size=params['batch_size'],
+                                             normalization=params['normalize'],
+                                             normalization_type=params['normalization_type'],
+                                             data_augmentation=params['data_augmentation'],
+                                             mean_substraction=params['mean_substraction'],
+                                             shuffle=params['shuffle']).generator()
 
         # Are we going to validate on 'val' data?
         if False: # TODO: loss calculation on val set is deactivated
@@ -1006,7 +1016,8 @@ class Model_Wrapper(object):
                 params['num_iterations_val'] = int(math.ceil(float(n_valid_samples) / params['batch_size']))
 
             # prepare data generator
-            val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+            if params['n_parallel_loaders'] > 1:
+                val_gen = Parallel_Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
                                            batch_size=params['batch_size'],
                                            normalization=params['normalize'],
                                            normalization_type=params['normalization_type'],
@@ -1014,6 +1025,14 @@ class Model_Wrapper(object):
                                            mean_substraction=params['mean_substraction'],
                                            shuffle=False,
                                            n_parallel_loaders=params['n_parallel_loaders']).generator()
+            else:
+            	val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+                                           batch_size=params['batch_size'],
+                                           normalization=params['normalize'],
+                                           normalization_type=params['normalization_type'],
+                                           data_augmentation=False,
+                                           mean_substraction=params['mean_substraction'],
+                                           shuffle=False).generator()
         else:
             val_gen = None
             n_valid_samples = None
@@ -1118,7 +1137,7 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
+                          'n_parallel_loaders': 1,
                           'normalize': True,
                           'normalization_type': None,
                           'mean_substraction': False}
@@ -1133,13 +1152,21 @@ class Model_Wrapper(object):
 
         # Test model
         # We won't use an Homogeneous_Batch_Generator for testing
-        data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
+        if params['n_parallel_loaders'] > 1:
+            data_gen = Parallel_Data_Batch_Generator('test', self, ds, num_iterations,
                                         batch_size=params['batch_size'],
                                         normalization=params['normalize'],
                                         normalization_type=params['normalization_type'],
                                         data_augmentation=False,
                                         mean_substraction=params['mean_substraction'],
                                         n_parallel_loaders=params['n_parallel_loaders']).generator()
+        else:
+            data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
+                                        batch_size=params['batch_size'],
+                                        normalization=params['normalize'],
+                                        normalization_type=params['normalization_type'],
+                                        data_augmentation=False,
+                                        mean_substraction=params['mean_substraction']).generator()
 
         out = self.model.evaluate_generator(data_gen,
                                             val_samples=n_samples,
@@ -1845,7 +1872,7 @@ class Model_Wrapper(object):
             parameters = dict()
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
+                          'n_parallel_loaders': 1,
                           'beam_size': 5,
                           'beam_batch_size': 50,
                           'normalize': True,
@@ -1932,7 +1959,8 @@ class Model_Wrapper(object):
                     n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
                                                              batch_size=params['batch_size'],
                                                              normalization=params['normalize'],
                                                              normalization_type=params['normalization_type'],
@@ -1940,13 +1968,22 @@ class Model_Wrapper(object):
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=True,
                                                              n_parallel_loaders=params['n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             normalization_type=params['normalization_type'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=True)
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
                     num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
                                                              batch_size=params['batch_size'],
                                                              normalization=params['normalize'],
                                                              normalization_type=params['normalization_type'],
@@ -1956,6 +1993,16 @@ class Model_Wrapper(object):
                                                              random_samples=n_samples,
                                                              temporally_linked=params['temporally_linked'],
                                                              n_parallel_loaders=params['n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             normalization_type=params['normalization_type'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=False,
+                                                             random_samples=n_samples,
+                                                             temporally_linked=params['temporally_linked'])
                     data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
@@ -2112,7 +2159,7 @@ class Model_Wrapper(object):
             parameters = dict()
         # Check input parameters and recover default values if needed
         default_params = {'max_batch_size': 50,
-                          'n_parallel_loaders': 8,
+                          'n_parallel_loaders': 1,
                           'beam_size': 5,
                           'beam_batch_size': 50,
                           'normalize': True,
@@ -2208,7 +2255,8 @@ class Model_Wrapper(object):
                     num_iterations = int(math.ceil(float(n_samples)))  # / params['max_batch_size']))
                     n_samples = min(eval("ds.len_" + s), num_iterations)  # * params['batch_size'])
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
                                                              batch_size=1,
                                                              normalization=params['normalize'],
                                                              normalization_type=params['normalization_type'],
@@ -2216,13 +2264,22 @@ class Model_Wrapper(object):
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=True,
                                                              n_parallel_loaders=params['n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                             batch_size=1,
+                                                             normalization=params['normalize'],
+                                                             normalization_type=params['normalization_type'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=True)
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
                     num_iterations = int(math.ceil(float(n_samples)))  # / params['batch_size']))
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
                                                              batch_size=1,
                                                              normalization=params['normalize'],
                                                              normalization_type=params['normalization_type'],
@@ -2232,6 +2289,16 @@ class Model_Wrapper(object):
                                                              random_samples=n_samples,
                                                              temporally_linked=params['temporally_linked'],
                                                              n_parallel_loaders=params['n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                             batch_size=1,
+                                                             normalization=params['normalize'],
+                                                             normalization_type=params['normalization_type'],
+                                                             data_augmentation=False,
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=False,
+                                                             random_samples=n_samples,
+                                                             temporally_linked=params['temporally_linked'])
                     data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
@@ -2392,7 +2459,7 @@ class Model_Wrapper(object):
             parameters = dict()
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
+                          'n_parallel_loaders': 1,
                           'normalize': True,
                           'normalization_type': '(-1)-1',
                           'mean_substraction': False,
@@ -2424,7 +2491,8 @@ class Model_Wrapper(object):
                 n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
 
                 # Prepare data generator
-                data_gen = Data_Batch_Generator(s,
+                if params['n_parallel_loaders'] > 1:
+                    data_gen = Parallel_Data_Batch_Generator(s,
                                                 self,
                                                 ds,
                                                 num_iterations,
@@ -2437,12 +2505,26 @@ class Model_Wrapper(object):
                                                 final_sample=params['final_sample'],
                                                 predict=True,
                                                 n_parallel_loaders=params['n_parallel_loaders']).generator()
+                else:
+                    data_gen = Data_Batch_Generator(s,
+                                                self,
+                                                ds,
+                                                num_iterations,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                normalization_type=params['normalization_type'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                init_sample=params['init_sample'],
+                                                final_sample=params['final_sample'],
+                                                predict=True).generator()
 
             else:
                 n_samples = params['n_samples']
                 num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
                 # Prepare data generator
-                data_gen = Data_Batch_Generator(s,
+                if params['n_parallel_loaders'] > 1:
+                    data_gen = Parallel_Data_Batch_Generator(s,
                                                 self,
                                                 ds,
                                                 num_iterations,
@@ -2454,6 +2536,18 @@ class Model_Wrapper(object):
                                                 predict=True,
                                                 random_samples=n_samples,
                                                 n_parallel_loaders=params['n_parallel_loaders']).generator()
+                else:
+                    data_gen = Data_Batch_Generator(s,
+                                                self,
+                                                ds,
+                                                num_iterations,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                normalization_type=params['normalization_type'],
+                                                data_augmentation=False,
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=True,
+                                                random_samples=n_samples).generator()
             # Predict on model
             if postprocess_fun is None:
                 if int(keras.__version__.split('.')[0]) == 1:
@@ -2612,7 +2706,7 @@ class Model_Wrapper(object):
 
         # Check input parameters and recover default values if needed
         default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
+                          'n_parallel_loaders': 1,
                           'beam_size': 5,
                           'normalize': True,
                           'normalization_type': None,
@@ -2648,7 +2742,8 @@ class Model_Wrapper(object):
 
             # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
             # TODO: We prepare data as model 0... Different data preparators for each model?
-            data_gen = Data_Batch_Generator(s,
+            if params['n_parallel_loaders'] > 1:
+                data_gen = Parallel_Data_Batch_Generator(s,
                                             self.models[0],
                                             self.dataset,
                                             num_iterations,
@@ -2660,6 +2755,18 @@ class Model_Wrapper(object):
                                             mean_substraction=params['mean_substraction'],
                                             predict=False,
                                             n_parallel_loaders=params['n_parallel_loaders']).generator()
+            else:
+                data_gen = Data_Batch_Generator(s,
+                                            self.models[0],
+                                            self.dataset,
+                                            num_iterations,
+                                            shuffle=False,
+                                            batch_size=params['batch_size'],
+                                            normalization=params['normalize'],
+                                            normalization_type=params['normalization_type'],
+                                            data_augmentation=False,
+                                            mean_substraction=params['mean_substraction'],
+                                            predict=False).generator()
             sources_sampling = []
             scores = []
             total_cost = 0
