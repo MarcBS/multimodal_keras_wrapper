@@ -13,7 +13,7 @@ from keras_wrapper.utils import one_hot_2_indices
 
 
 class BeamSearchEnsemble:
-    def __init__(self, models, dataset, params_prediction, n_best=False, verbose=0):
+    def __init__(self, models, dataset, params_prediction, model_weights=None, n_best=False, verbose=0):
         """
 
         :param models:
@@ -27,6 +27,7 @@ class BeamSearchEnsemble:
         self.return_alphas = params_prediction.get('coverage_penalty', False) or params_prediction.get('pos_unk', False)
         self.n_best = n_best
         self.verbose = verbose
+        self.model_weights = np.asarray([1. / len(models)] * len(models), dtype=np.float32) if (model_weights is None) or (model_weights == []) else model_weights
 
         self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
                                   sys.stdout.isatty()) or
@@ -61,7 +62,8 @@ class BeamSearchEnsemble:
                 prev_outs_list.append(next_outs)
             else:
                 probs_list.append(model.predict_cond(X, states_below, params, ii))
-        probs = sum(probs_list[i] for i in xrange(len(models))) / float(len(models))
+
+        probs = sum(probs_list[i] * self.model_weights[i] for i in xrange(len(models)))
 
         if self.return_alphas:
             alphas = np.asarray(sum(alphas_list[i] for i in xrange(len(models))))
