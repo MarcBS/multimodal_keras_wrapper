@@ -1333,8 +1333,13 @@ class Model_Wrapper(object):
         if ii > 1:  # timestep > 1 (model_next to model_next)
             for idx, next_out_name in enumerate(self.ids_outputs_next):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params[
-                        'pad_on_batch'] else states_below
+                    if params.get('attend_on_output', False):
+                        if params.get('pad_on_batch', True):
+                           states_below = states_below[:, :ii].reshape(n_samples, -1)
+                    else:
+                        if params.get('pad_on_batch', True):
+                           states_below = states_below[:, -1].reshape(n_samples, -1)
+                    in_data[self.ids_inputs_next[0]] = states_below
                 if idx > 0:  # first output must be the output probs.
                     if next_out_name in self.matchings_next_to_next.keys():
                         next_in_name = self.matchings_next_to_next[next_out_name]
@@ -1347,13 +1352,22 @@ class Model_Wrapper(object):
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
                 else:
                     in_data[model_input] = copy.copy(X[model_input])
-            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1) if \
-                params['pad_on_batch'] else states_below
+                if params.get('pad_on_batch', True):
+                   states_below = states_below.reshape(n_samples, -1)
+
+            in_data[params['model_inputs'][params['state_below_index']]] = states_below
+
         elif ii == 1:  # timestep == 1 (model_init to model_next)
             for idx, init_out_name in enumerate(self.ids_outputs_init):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params[
-                        'pad_on_batch'] else states_below
+                    if params.get('attend_on_output', False):
+                        if params.get('pad_on_batch', True):
+                           states_below = states_below[:, :ii].reshape(n_samples, -1)
+                    else:
+                        if params.get('pad_on_batch', True):
+                           states_below = states_below[:, -1].reshape(n_samples, -1)
+                    in_data[self.ids_inputs_next[0]] = states_below
+
                 if idx > 0:  # first output must be the output probs.
                     if init_out_name in self.matchings_init_to_next.keys():
                         next_in_name = self.matchings_init_to_next[init_out_name]
@@ -1895,6 +1909,7 @@ class Model_Wrapper(object):
                           'link_index_id': 'link_index',
                           'state_below_index': -1,
                           'max_eval_samples': None,
+                          'attend_on_output': False
                           }
         params = self.checkParameters(parameters, default_params)
 
@@ -2192,6 +2207,7 @@ class Model_Wrapper(object):
                           'output_max_length_depending_on_x_factor': 3,
                           'output_min_length_depending_on_x': False,
                           'output_min_length_depending_on_x_factor': 2,
+                          'attend_on_output': False
                           }
 
         params = self.checkParameters(parameters, default_params)

@@ -37,7 +37,8 @@ def checkDefaultParamsBeamSearch(params):
                       'output_max_length_depending_on_x': False,
                       'output_max_length_depending_on_x_factor': 3,
                       'output_min_length_depending_on_x': False,
-                      'output_min_length_depending_on_x_factor': 2
+                      'output_min_length_depending_on_x_factor': 2,
+                      'attend_on_output': False
                       }
 
     for k, v in params.iteritems():
