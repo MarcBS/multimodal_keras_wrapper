@@ -248,7 +248,8 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
     accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights)
     # Compute Precision, Recall and F1 score
-    precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
+    avrg = extra_vars.get('average_mode', None)
+    precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average=avrg)
 
     if verbose > 0:
         logging.info('accuracy: %f' % accuracy, )
