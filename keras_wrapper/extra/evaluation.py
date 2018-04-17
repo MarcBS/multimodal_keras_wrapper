@@ -254,9 +254,9 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     if verbose > 0:
         logging.info('accuracy: %f' % accuracy, )
         logging.info('balanced_accuracy: %f' % accuracy_balanced)
-        logging.info('precision: %f' % precision)
-        logging.info('recall: %f' % recall)
-        logging.info('f1: %f' % f1)
+        logging.info('precision: ' + str(precision))
+        logging.info('recall: ' + str(recall))
+        logging.info('f1: ' + str(f1))
 
     return {'accuracy': accuracy,
             'balanced_accuracy': accuracy_balanced,
