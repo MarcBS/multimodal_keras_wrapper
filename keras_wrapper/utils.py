@@ -923,7 +923,7 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
             logging.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-    flattened_answer_pred = [map(lambda x: index2word[x].decode('utf-8'), pred) for pred in preds]
+    flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
     answer_pred = []
 
     if alphas is not None:
