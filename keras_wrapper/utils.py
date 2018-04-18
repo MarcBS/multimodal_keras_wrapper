@@ -14,15 +14,16 @@ class MultiprocessQueue():
         See how Queues and Pipes work in the following link
         https://docs.python.org/2/library/multiprocessing.html#multiprocessing-examples
     """
+
     def __init__(self, manager, type='Queue'):
         if type != 'Queue' and type != 'Pipe':
-            raise NotImplementedError('Not valid multiprocessing queue of type '+type)
+            raise NotImplementedError('Not valid multiprocessing queue of type ' + type)
 
         self.type = type
         if type == 'Queue':
-            self.queue = eval('manager.'+type+'()')
+            self.queue = eval('manager.' + type + '()')
         else:
-            self.queue = eval(type+'()')
+            self.queue = eval(type + '()')
 
     def put(self, elem):
         if self.type == 'Queue':
@@ -47,6 +48,7 @@ class MultiprocessQueue():
             return self.queue.empty()
         elif self.type == 'Pipe':
             return not self.queue[0].poll()
+
 
 def bbox(img, mode='max'):
     """
@@ -621,6 +623,72 @@ def simplifyDataset(ds, id_classes, n_classes=50):
         exec ('ds.X_' + s + ' = copy.copy(kept_X)')
         exec ('ds.Y_' + s + ' = copy.copy(kept_Y)')
         exec ('ds.len_' + s + ' = len(kept_Y[id_labels])')
+
+
+def average_models(models, output_model, weights=None):
+    from keras_wrapper.cnn_model import loadModel, saveModel
+    assert type(models) == list, 'You must give a list of models to average.'
+    assert len(models) > 0, 'You provided an empty list of models to average!'
+
+    model_weights = np.asarray([1. / len(models)] * len(models), dtype=np.float32) if (weights is None) or (weights == []) else np.asarray(weights, dtype=np.float32)
+    assert len(model_weights) == len(models), 'You must give a list of weights of the same size than the list of models.'
+    loaded_models = [loadModel(m, -1, full_path=True) for m in models]
+
+    # Check that all models are compatible
+    assert all([hasattr(loaded_model, 'model') for loaded_model in loaded_models]), \
+        'Not all models have the attribute "model".'
+
+    assert all([hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]), \
+        'Not all models have the attribute "model_init".'
+
+    assert all([hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]), \
+        'Not all models have the attribute "model_next".'
+
+    # Check all layers are the same
+    assert all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model.weights))] for loaded_model in
+                loaded_models]), 'Not all models have the same weights!'
+    if hasattr(loaded_models[0], 'model_init'):
+        assert all([[str(loaded_models[0].model_init.weights[i]) == str(loaded_model.model_init.weights[i]) for i in range(len(loaded_models[0].model.weights))] for loaded_model in
+                    loaded_models]), 'Not all models have the same weights!'
+    assert all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model_init.weights))] for loaded_model in
+                loaded_models]), 'Not all model_inits have the same weights!'
+    if hasattr(loaded_models[0], 'model_next'):
+        assert all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in range(len(loaded_models[0].model_next.weights))] for loaded_model in
+                    loaded_models]), 'Not all model_nexts have the same weights!'
+
+    # Retrieve weights, weigh them and overwrite in model[0].
+    current_weights = loaded_models[0].model.get_weights()
+    loaded_models[0].model.set_weights([current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+    # We have model_init
+    if hasattr(loaded_models[0], 'model_init'):
+        current_weights = loaded_models[0].model_init.get_weights()
+        loaded_models[0].model_init.set_weights([current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+
+    # We have model_next
+    if hasattr(loaded_models[0], 'model_next'):
+        current_weights = loaded_models[0].model_next.get_weights()
+        loaded_models[0].model_next.set_weights([current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+
+    # Weighted sum of all models
+    for m in range(1, len(models)):
+        current_weights = loaded_models[m].model.get_weights()
+        prev_weights = loaded_models[0].model.get_weights()
+        loaded_models[0].model.set_weights([current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+
+        # We have model_init
+        if hasattr(loaded_models[0], 'model_init'):
+            current_weights = loaded_models[m].model_init.get_weights()
+            prev_weights = loaded_models[0].model_init.get_weights()
+            loaded_models[0].model_init.set_weights([current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+
+        # We have model_next
+        if hasattr(loaded_models[0], 'model_next'):
+            current_weights = loaded_models[m].model_next.get_weights()
+            prev_weights = loaded_models[0].model_next.get_weights()
+            loaded_models[0].model_next.set_weights([current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+
+    # Save averaged model
+    saveModel(loaded_models[0], -1, path=output_model, full_path=True, store_iter=False)
 
 
 # Text-related utils

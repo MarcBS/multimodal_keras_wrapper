@@ -76,7 +76,8 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
 
     # Create models dir
     if not os.path.isdir(path):
-        os.makedirs(os.path.dirname(path))
+        if not os.path.isdir(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
 
     try:  # Try to save model at one time
         model_wrapper.model.save(model_name + '.h5')
@@ -172,8 +173,9 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     # Load Model_Wrapper information
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
-    except:  # backwards compatibility
+    except Exception as e:
         # try:
+        logging.info(str(e))
         model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
         # except:
         #    raise Exception(ValueError)
