@@ -352,7 +352,7 @@ class EvalPerformance(KerasCallback):
 
                 if self.verbose > 0:
                     print('')
-                    logging.info('Prediction output ' + str(gt_pos) + ': ' + str(gt_id) + ' (' + type + ')')
+                    logging.info('Prediction output ' + str(gt_pos) + ': ' + str(gt_id) + ' (' + str(type) + ')')
 
                 # Postprocess outputs of type text
                 if type == 'text':
