@@ -1154,10 +1154,10 @@ class Dataset(object):
             raise NotImplementedError(
                 'The output type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
                     self.__accepted_types_outputs))
-
-        if hasattr(self, 'label_smoothing') and self.label_smoothing.get(id) is None:
-            self.label_smoothing[id] = dict()
-        self.label_smoothing[id][set_name] = label_smoothing
+        if hasattr(self, 'label_smoothing'):
+            if self.label_smoothing.get(id) is None:
+                self.label_smoothing[id] = dict()
+            self.label_smoothing[id][set_name] = label_smoothing
 
         # Preprocess the output data depending on its type
         if type == 'categorical':
