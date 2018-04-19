@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-
+from __future__ import print_function
+from six import iteritems
 import copy
 import logging
 import math
@@ -51,7 +52,7 @@ class BeamSearchEnsemble:
         probs_list = []
         prev_outs_list = []
         alphas_list = []
-        for i, model in enumerate(models):
+        for i, model in list(enumerate(models)):
             if self.optimized_search:
                 [model_probs, next_outs] = model.predict_cond_optimized(X, states_below, params,
                                                                         ii, prev_out=prev_outs[i])
@@ -63,10 +64,10 @@ class BeamSearchEnsemble:
             else:
                 probs_list.append(model.predict_cond(X, states_below, params, ii))
 
-        probs = sum(probs_list[i] * self.model_weights[i] for i in xrange(len(models)))
+        probs = sum(probs_list[i] * self.model_weights[i] for i in range(len(models)))
 
         if self.return_alphas:
-            alphas = np.asarray(sum(alphas_list[i] for i in xrange(len(models))))
+            alphas = np.asarray(sum(alphas_list[i] for i in range(len(models))))
         else:
             alphas = None
         if self.optimized_search:
@@ -144,7 +145,7 @@ class BeamSearchEnsemble:
             state_below = np.asarray([null_sym] * live_k) if pad_on_batch else \
                 np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
         prev_outs = [None] * len(self.models)
-        for ii in xrange(maxlen):
+        for ii in range(maxlen):
             # for every possible live sample calc prob for every possible label
             if self.optimized_search:  # use optimized search model if available
                 [probs, prev_outs, alphas] = self.predict_cond(self.models, X, state_below, params, ii,
@@ -161,7 +162,7 @@ class BeamSearchEnsemble:
             ranks_flat = cand_flat.argsort()[:(k - dead_k)]
             # Decypher flatten indices
             voc_size = log_probs.shape[1]
-            trans_indices = ranks_flat / voc_size  # index of row
+            trans_indices = ranks_flat // voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
             best_cost = costs[0]
@@ -171,7 +172,7 @@ class BeamSearchEnsemble:
             new_hyp_scores = np.zeros(k - dead_k).astype('float32')
             if self.return_alphas:
                 new_hyp_alphas = []
-            for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
+            for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
                 if params['search_pruning']:
                     if costs[idx] < k * best_cost:
                         new_hyp_samples.append(hyp_samples[ti] + [wi])
@@ -193,7 +194,7 @@ class BeamSearchEnsemble:
             hyp_scores = []
             hyp_alphas = []
             indices_alive = []
-            for idx in xrange(len(new_hyp_samples)):
+            for idx in range(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == eos_sym:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
@@ -241,7 +242,7 @@ class BeamSearchEnsemble:
 
         # dump every remaining one
         if live_k > 0:
-            for idx in xrange(live_k):
+            for idx in range(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
                 if self.return_alphas:
@@ -411,7 +412,7 @@ class BeamSearchEnsemble:
 
                         if params['coverage_penalty']:
                             coverage_penalties = []
-                            for k, sample in enumerate(samples):
+                            for k, sample in list(enumerate(samples)):
                                 # We assume that source sentences are at the first position of x
                                 x_sentence = x[params['model_inputs'][0]][0]
                                 alpha = np.asarray(alphas[k])
@@ -535,7 +536,7 @@ class BeamSearchEnsemble:
 
             if params['coverage_penalty']:
                 coverage_penalties = []
-                for k, sample in enumerate(samples):
+                for k, sample in list(enumerate(samples)):
                     # We assume that source sentences are at the first position of x
                     x_sentence = x[params['model_inputs'][0]][0]
                     alpha = np.asarray(alphas[k])
@@ -622,7 +623,7 @@ class BeamSearchEnsemble:
 
 
         prev_outs = [None] * len(self.models)
-        for ii in xrange(len(Y)):
+        for ii in range(len(Y)):
             # for every possible live sample calc prob for every possible label
             if self.optimized_search:  # use optimized search model if available
                 [probs, prev_outs, alphas] = self.predict_cond(self.models, X, state_below, params, ii,
@@ -883,10 +884,10 @@ class BeamSearchEnsemble:
         total_cost = 0
         sampled = 0
         X = dict()
-        for i, input_id in enumerate(params['model_inputs']):
+        for i, input_id in list(enumerate(params['model_inputs'])):
             X[input_id] = data[0][i]
         Y = dict()
-        for i, output_id in enumerate(params['model_outputs']):
+        for i, output_id in list(enumerate(params['model_outputs'])):
             Y[output_id] = data[1][i]
 
         for i in range(len(X[params['model_inputs'][0]])):
@@ -935,7 +936,7 @@ class BeamSearchEnsemble:
         """
         DEPRECATED, use predictBeamSearchNet() instead.
         """
-        print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
+        logging.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet()
 
     @staticmethod
@@ -947,12 +948,12 @@ class BeamSearchEnsemble:
         params = dict()
 
         # Check input parameters' validity
-        for key, val in input_params.iteritems():
+        for key, val in iteritems(input_params):
             if key in valid_params:
                 params[key] = val
 
         # Use default parameters if not provided
-        for key, default_val in default_params.iteritems():
+        for key, default_val in iteritems(default_params):
             if key not in params:
                 params[key] = default_val
 
@@ -1001,9 +1002,9 @@ class PredictEnsemble:
         """
 
         outs_list = []
-        for i, m in enumerate(models):
+        for i, m in list(enumerate(models)):
             outs_list.append(m.model.predict_on_batch(data_gen, val_samples, max_q_size))
-        outs = sum(outs_list[i] for i in xrange(len(models))) / float(len(models))
+        outs = sum(outs_list[i] for i in range(len(models))) / float(len(models))
         return outs
 
     @staticmethod
@@ -1027,9 +1028,9 @@ class PredictEnsemble:
         """
 
         outs_list = []
-        for i, m in enumerate(models):
+        for i, m in list(enumerate(models)):
             outs_list.append(m.model.predict_on_batch(X))
-        outs = sum(outs_list[i] for i in xrange(len(models))) / float(len(models))
+        outs = sum(outs_list[i] for i in range(len(models))) / float(len(models))
         return outs
 
     def predictNet(self):
@@ -1169,12 +1170,12 @@ class PredictEnsemble:
         params = dict()
 
         # Check input parameters' validity
-        for key, val in input_params.iteritems():
+        for key, val in iteritems(input_params):
             if key in valid_params:
                 params[key] = val
 
         # Use default parameters if not provided
-        for key, default_val in default_params.iteritems():
+        for key, default_val in iteritems(default_params):
             if key not in params:
                 params[key] = default_val
 

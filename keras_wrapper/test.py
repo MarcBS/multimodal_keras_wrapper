@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+from __future__ import print_function
 import logging
 
 import numpy as np
@@ -23,32 +25,32 @@ def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, at
         return True
 
     if verbose > 0:
-        print "Checking model next weights"
+        print ("Checking model next weights")
 
     if model_next is not None:
         model_next_names = map(lambda x: str(x), model_next.weights)
-        for (index_next, name) in enumerate(model_next_names):
+        for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model_names.index(name)
             assert np.allclose(model.weights[index_model].get_value(), model_next.weights[index_next].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model index: ' + str(index_model) + ' model_next index ' + \
                 str(index_next) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
     if verbose > 0:
-        print "==========================="
-        print "Checking model init weights"
+        print ("===========================")
+        print ("Checking model init weights")
 
     if model_init is not None:
         model_init_names = map(lambda x: str(x), model_init.weights)
-        for (index_init, name) in enumerate(model_init_names):
+        for (index_init, name) in list(enumerate(model_init_names)):
             index_model = model_names.index(name)
             assert np.allclose(model.weights[index_model].get_value(), model_init.weights[index_init].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model index: ' + str(index_model) + ' model_init index ' + \
                 str(index_init) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_init, "at model_init - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_init, "at model_init - position", index_model, "at model are close")
     return True
 
 
@@ -82,85 +84,85 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
     model2_names = map(lambda x: str(x), model2.weights)
 
     if verbose > 0:
-        print "==========================="
-        print "Checking model weights"
+        print ("===========================")
+        print ("Checking model weights")
 
     logging.info("Checking model_next 1 is close to model_next 2")
     if model1 is not None:
         model_next_names = map(lambda x: str(x), model1.weights)
-        for (index_next, name) in enumerate(model_next_names):
+        for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model2_names.index(name)
             assert np.allclose(model2.weights[index_model].get_value(), model1.weights[index_next].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model2 index: ' + str(index_model) + ' model1 index ' + \
                 str(index_next) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if model2 is not None:
         model_next_names = map(lambda x: str(x), model2.weights)
-        for (index_next, name) in enumerate(model_next_names):
+        for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model1_names.index(name)
             assert np.allclose(model1.weights[index_model].get_value(), model2.weights[index_next].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model1 index: ' + str(index_model) + ' model2 index ' + \
                 str(index_next) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if verbose > 0:
-        print "==========================="
-        print "Checking model next weights"
+        print ("===========================")
+        print ("Checking model next weights")
 
     logging.info("Checking model_next 1 is close to model_next 2")
     if model1_next is not None:
         model_next_names = map(lambda x: str(x), model1_next.weights)
-        for (index_next, name) in enumerate(model_next_names):
+        for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model2_names.index(name)
             assert np.allclose(model2.weights[index_model].get_value(), model1_next.weights[index_next].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model2 index: ' + str(index_model) + ' model1_next index ' + \
                 str(index_next) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if model2_next is not None:
         model_next_names = map(lambda x: str(x), model2_next.weights)
-        for (index_next, name) in enumerate(model_next_names):
+        for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model1_names.index(name)
             assert np.allclose(model1.weights[index_model].get_value(), model2_next.weights[index_next].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model1 index: ' + str(index_model) + ' model2_next index ' + \
                 str(index_next) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if verbose > 0:
-        print "==========================="
-        print "Checking model init weights"
+        print ("===========================")
+        print ("Checking model init weights")
 
     logging.info("Checking model_next 1 is close to model_next 2")
     if model1_init is not None:
         model_next_names = map(lambda x: str(x), model1_init.weights)
-        for (index_next, name) in enumerate(model_next_names):
+        for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model2_names.index(name)
             assert np.allclose(model2.weights[index_model].get_value(), model1_init.weights[index_next].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model2 index: ' + str(index_model) + ' model1_init index ' + \
                 str(index_next) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if model2_init is not None:
         model_next_names = map(lambda x: str(x), model2_init.weights)
-        for (index_next, name) in enumerate(model_next_names):
+        for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model1_names.index(name)
             assert np.allclose(model1.weights[index_model].get_value(), model2_init.weights[index_next].get_value(),
                                rtol=rtol, atol=atol), \
                 'Parameters ' + name + ' are not close! (model1 index: ' + str(index_model) + ' model2_next index ' + \
                 str(index_next) + ')'
             if verbose > 0:
-                print "Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close"
+                print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     return True
 
@@ -183,6 +185,7 @@ def main_test():
 #################################
 
 def classifyFood101():
+    from keras_wrapper.cnn_model import CNN_Model, loadModel, saveModel
     logging.info('Defining CNN model and training it.')
 
     # Load food classification dataset
@@ -301,7 +304,6 @@ def loadFlickr8k():
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
     logging.info('Sample data loaded correctly.')
-    print
 
 
 def loadMSVD():
@@ -360,8 +362,6 @@ def loadMSVD():
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
     logging.info('Sample data loaded correctly.')
-    print
-
 
 def loadFood101():
     logging.info('Loading Food101 dataset')
@@ -403,6 +403,3 @@ def loadFood101():
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
     logging.info('Sample data loaded correctly.')
-    print
-
-# main_test()

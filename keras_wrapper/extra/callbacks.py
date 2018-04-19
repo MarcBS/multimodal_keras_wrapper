@@ -1,13 +1,13 @@
+# -*- coding: utf-8 -*-
 from __future__ import print_function
-
+from six import iteritems
 import warnings
-
-import evaluation
 from keras import backend as K
 from keras.callbacks import Callback as KerasCallback
 from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
     decode_multilabel
-from read_write import *
+from keras_wrapper.extra import evaluation
+from keras_wrapper.extra.read_write import *
 import copy
 
 
@@ -41,8 +41,8 @@ def checkDefaultParamsBeamSearch(params):
                       'attend_on_output': False
                       }
 
-    for k, v in params.iteritems():
-        if k in default_params.keys() or k in required_params:
+    for k, v in iteritems(params):
+        if k in list(default_params) or k in required_params:
             default_params[k] = v
 
     for k in required_params:
@@ -233,7 +233,7 @@ class EvalPerformance(KerasCallback):
 
             self.min_pred_multilabel = [min_pred_multilabel]
 
-            if 0 not in self.extra_vars.keys():
+            if 0 not in list(self.extra_vars):
                 self.extra_vars[0] = self.extra_vars
 
             if self.output_types is None:
@@ -723,13 +723,13 @@ class Sample(KerasCallback):
                 # Write samples
                 if self.print_sources:
                     # Write samples
-                    for i, (source, sample, truth) in enumerate(zip(sources, predictions, truths)):
+                    for i, (source, sample, truth) in list(enumerate(zip(sources, predictions, truths))):
                         print("Source     (%d): %s" % (i, str(source.encode('utf-8'))))
                         print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
                         print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
                         print("")
                 else:
-                    for i, (sample, truth) in enumerate(zip(predictions, truths)):
+                    for i, (sample, truth) in list(enumerate(zip(predictions, truths))):
                         print("Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
                         print("Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
                         print("")

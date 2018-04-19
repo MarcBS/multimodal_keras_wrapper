@@ -123,7 +123,7 @@ def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
         maps[s] = resize(map, tuple([W.shape[1]] + reshape_size), order=1, preserve_range=True)
 
         for c in range(W.shape[1]):
-            for enum_conv, i_conv in enumerate(ind_best[c]):
+            for enum_conv, i_conv in list(enumerate(ind_best[c])):
                 convs[s, c, enum_conv] = resize(X[s, i_conv], reshape_size, order=1, preserve_range=True)
 
     return [maps, predictions, convs]
