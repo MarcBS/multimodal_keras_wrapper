@@ -778,7 +778,7 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
     for a_no in answer_pred_matrix:
         end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
         end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        tmp = ' '.join(a_no[:end_token_pos]).decode('utf-8')
+        tmp = u' '.join(a_no[:end_token_pos])
         answer_pred.append(tmp)
     return answer_pred
 
@@ -811,7 +811,7 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
             init_token_pos = 0
             end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+            tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
             tmp = a_no
         answer_pred.append(tmp)
