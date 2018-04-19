@@ -15,7 +15,7 @@ The following dependencies are required for using this library:
 
  - [Anaconda](https://www.continuum.io/downloads)
  - Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
- - [cloud](https://pypi.python.org/pypi/cloud/2.8.5) >= 2.8.5
+ - [cloudpickle](https://pypi.org/project/cloudpickle)
  - [scipy](https://pypi.python.org/pypi/scipy/0.7.0)
  - [coco-caption](https://github.com/lvapeab/coco-caption.git)
 

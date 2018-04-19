@@ -1,11 +1,18 @@
-import cPickle as pk
+# -*- coding: utf-8 -*-
+from __future__ import print_function
+from six import iteritems
 import copy
 import math
 import shutil
 import sys
 import time
 
-import cloud.serialization.cloudpickle as cloudpk
+if sys.version_info.major == 3:
+    import _pickle  as pk
+else:
+    import cPickle as pk
+
+import cloudpickle as cloudpk
 import matplotlib as mpl
 
 import keras
@@ -261,10 +268,10 @@ def transferWeights(old_model, new_model, layers_mapping):
 
     logging.info("<<< Transferring weights from models. >>>")
 
-    old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(old_model.model.layers)])
-    new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(new_model.model.layers)])
+    old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in list(enumerate(old_model.model.layers))])
+    new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in list(enumerate(new_model.model.layers))])
 
-    for lold, lnew in layers_mapping.iteritems():
+    for lold, lnew in iteritems(layers_mapping):
         # Check if layers exist in both models
         if lold in old_layer_dict and lnew in new_layer_dict:
 
@@ -275,29 +282,29 @@ def transferWeights(old_model, new_model, layers_mapping):
             # Find weight sizes matchings for each layer (without repetitions)
             new_shapes = [w.shape for w in new]
             mapping_weights = dict()
-            for pos_old, wo in enumerate(old):
+            for pos_old, wo in list(enumerate(old)):
                 old_shape = wo.shape
                 indices = [i for i, shp in enumerate(new_shapes) if shp == old_shape]
                 if indices:
                     for ind in indices:
-                        if ind not in mapping_weights.keys():
+                        if ind not in list(mapping_weights):
                             mapping_weights[ind] = pos_old
                             break
 
             # Alert for any weight matrix not inserted to new model
-            for pos_old, wo in enumerate(old):
-                if pos_old not in mapping_weights.values():
+            for pos_old, wo in list(enumerate(old)):
+                if pos_old not in list(mapping_weights.values()):
                     logging.info('  Pre-trained weight matrix of layer "' + lold +
                                  '" with dimensions ' + str(wo.shape) + ' can not be inserted to new model.')
 
             # Alert for any weight matrix not modified
-            for pos_new, wn in enumerate(new):
-                if pos_new not in mapping_weights.keys():
+            for pos_new, wn in list(enumerate(new)):
+                if pos_new not in list(mapping_weights):
                     logging.info('  New model weight matrix of layer "' + lnew +
                                  '" with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
 
             # Transfer weights for each layer
-            for new_idx, old_idx in mapping_weights.iteritems():
+            for new_idx, old_idx in iteritems(mapping_weights):
                 new[new_idx] = old[old_idx]
             new_model.model.layers[new_layer_dict[lnew][1]].set_weights(new)
 
@@ -498,7 +505,7 @@ class Model_Wrapper(object):
             :param acc_output: name of the model's output that will be used for calculating
                               the accuracy of the model (only needed for Graph models)
         """
-        if isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1:
+        if isinstance(self.model, Sequential) and len(list(outputsMapping)) > 1:
             raise Exception("When using Sequential models only one output can be provided in outputsMapping")
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
@@ -649,14 +656,14 @@ class Model_Wrapper(object):
         params = dict()
 
         # Check input parameters' validity
-        for key, val in input_params.iteritems():
+        for key, val in iteritems(input_params):
             if key in valid_params:
                 params[key] = val
             else:
                 raise Exception("Parameter '" + key + "' is not a valid parameter.")
 
         # Use default parameters if not provided
-        for key, default_val in default_params.iteritems():
+        for key, default_val in iteritems(default_params):
             if key not in params:
                 params[key] = default_val
 
@@ -802,7 +809,7 @@ class Model_Wrapper(object):
                           }
         params = self.checkParameters(parameters, default_params)
         # Set params['start_reduction_on_epoch'] = params['lr_decay'] by default
-        if params['lr_decay'] is not None and 'start_reduction_on_epoch' not in parameters.keys():
+        if params['lr_decay'] is not None and 'start_reduction_on_epoch' not in list(parameters):
             params['start_reduction_on_epoch'] = params['lr_decay']
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
@@ -953,7 +960,7 @@ class Model_Wrapper(object):
                                                                   len(params['tensorboard_params'][
                                                                           'word_embeddings_labels']))
                 # Prepare word embeddings mapping
-                for i, layer_name in enumerate(params['tensorboard_params']['embeddings_layer_names']):
+                for i, layer_name in list(enumerate(params['tensorboard_params']['embeddings_layer_names'])):
                     layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
                     mapping_name = layer_label + '.tsv'
                     dict2file(ds.vocabulary[layer_label]['words2idx'],
@@ -1278,7 +1285,7 @@ class Model_Wrapper(object):
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
                 aux_in_data = {}
-                for k, v in in_data.iteritems():
+                for k, v in iteritems(in_data):
                     aux_in_data[k] = np.expand_dims(v[i], axis=0)
                 predicted_out = model.predict_on_batch(aux_in_data)
                 if i == 0:
@@ -1336,7 +1343,7 @@ class Model_Wrapper(object):
         # Get inputs
         ##########################################
         if ii > 1:  # timestep > 1 (model_next to model_next)
-            for idx, next_out_name in enumerate(self.ids_outputs_next):
+            for idx, next_out_name in list(enumerate(self.ids_outputs_next)):
                 if idx == 0:
                     if params.get('attend_on_output', False):
                         if params.get('pad_on_batch', True):
@@ -1347,7 +1354,7 @@ class Model_Wrapper(object):
                             states_below = states_below[:, -1].reshape(n_samples, -1)
                     in_data[self.ids_inputs_next[0]] = states_below
                 if idx > 0:  # first output must be the output probs.
-                    if next_out_name in self.matchings_next_to_next.keys():
+                    if next_out_name in list(self.matchings_next_to_next):
                         next_in_name = self.matchings_next_to_next[next_out_name]
                         if prev_out[idx].shape[0] == 1:
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
@@ -1363,7 +1370,7 @@ class Model_Wrapper(object):
             in_data[params['model_inputs'][params['state_below_index']]] = states_below
 
         elif ii == 1:  # timestep == 1 (model_init to model_next)
-            for idx, init_out_name in enumerate(self.ids_outputs_init):
+            for idx, init_out_name in list(enumerate(self.ids_outputs_init)):
                 if idx == 0:
                     if params.get('attend_on_output', False):
                         if params.get('pad_on_batch', True):
@@ -1375,7 +1382,7 @@ class Model_Wrapper(object):
                     in_data[self.ids_inputs_next[0]] = states_below
 
                 if idx > 0:  # first output must be the output probs.
-                    if init_out_name in self.matchings_init_to_next.keys():
+                    if init_out_name in list(self.matchings_init_to_next):
                         next_in_name = self.matchings_init_to_next[init_out_name]
                         if prev_out[idx].shape[0] == 1:
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
@@ -1401,7 +1408,7 @@ class Model_Wrapper(object):
             #  Make beam_batch_size-sample-sized batches
             for i in range(0, n_samples, params['beam_batch_size']):
                 aux_in_data = {}
-                for k, v in in_data.iteritems():
+                for k, v in iteritems(in_data):
                     max_pos = min([i + params['beam_batch_size'], n_samples, len(v)])
                     aux_in_data[k] = v[i:max_pos]
                     # aux_in_data[k] = np.expand_dims(v[i], axis=0)
@@ -1505,7 +1512,7 @@ class Model_Wrapper(object):
                 np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
         prev_out = None
 
-        for ii in xrange(maxlen):
+        for ii in range(maxlen):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
@@ -1524,7 +1531,7 @@ class Model_Wrapper(object):
             ranks_flat = cand_flat.argsort()[:(k - dead_k)]
             # Decypher flatten indices
             voc_size = log_probs.shape[1]
-            trans_indices = ranks_flat / voc_size  # index of row
+            trans_indices = ranks_flat // voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
             best_cost = costs[0]
@@ -1534,7 +1541,7 @@ class Model_Wrapper(object):
             new_hyp_scores = np.zeros(k - dead_k).astype('float32')
             if ret_alphas:
                 new_hyp_alphas = []
-            for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
+            for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
                 if params['search_pruning']:
                     if costs[idx] < k * best_cost:
                         new_hyp_samples.append(hyp_samples[ti] + [wi])
@@ -1556,7 +1563,7 @@ class Model_Wrapper(object):
             hyp_scores = []
             hyp_alphas = []
             indices_alive = []
-            for idx in xrange(len(new_hyp_samples)):
+            for idx in range(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == eos_sym:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
@@ -1597,7 +1604,7 @@ class Model_Wrapper(object):
 
         # dump every remaining one
         if live_k > 0:
-            for idx in xrange(live_k):
+            for idx in range(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
                 if ret_alphas:
@@ -1611,7 +1618,7 @@ class Model_Wrapper(object):
         """
         DEPRECATED, use predictBeamSearchNet() instead.
         """
-        print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
+        logger.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet(ds, parameters)
 
     def predictBeamSearchNet_NEW(self, ds, parameters=None):
@@ -1788,7 +1795,7 @@ class Model_Wrapper(object):
                 start_time = time.time()
                 eta = -1
                 for _ in range(num_iterations):
-                    data = data_gen.next()
+                    data = next(data_gen)
                     X = dict()
                     if params['n_samples'] > 0:
                         s_dict = {}
@@ -1825,7 +1832,7 @@ class Model_Wrapper(object):
                         if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
                             for i in range(n_samples_batch):
                                 link = int(X[params['link_index_id']][i])
-                                if link not in previous_outputs[input_id].keys():
+                                if link not in list(previous_outputs[input_id]):
                                     # input to current sample was not processed yet
                                     link = -1
                                 prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
@@ -1837,7 +1844,7 @@ class Model_Wrapper(object):
                                                      pad_on_batch=ds.pad_on_batch[input_id],
                                                      words_so_far=ds.words_so_far[input_id],
                                                      loading_X=True)[0]
-                                if input_id in x.keys():
+                                if input_id in list(x):
                                     x[input_id] = np.concatenate((x[input_id], in_val))
                                 else:
                                     x[input_id] = in_val
@@ -1863,7 +1870,7 @@ class Model_Wrapper(object):
                         if params['pos_unk']:
                             best_alphas.append(np.asarray(alphas[best_score]))
                         total_cost += scores[best_score]
-                        eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) / (sampled + i_sample + 1)
+                        eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) // (sampled + i_sample + 1)
                         if params['n_samples'] > 0:
                             for output_id in params['model_outputs']:
                                 references.append(Y[output_id][i_sample])
@@ -1872,7 +1879,7 @@ class Model_Wrapper(object):
                         if params['temporally_linked']:
                             first_idx = max(0, data_gen_instance.first_idx)
                             # TODO: Make it more general
-                            for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
+                            for (output_id, input_id) in iteritems(self.matchings_sample_to_next_sample):
                                 # Get all words previous to the padding
                                 previous_outputs[input_id][first_idx + sampled + i_sample] = best_sample[:sum(
                                     [int(elem > 0) for elem in best_sample])]
@@ -2085,7 +2092,7 @@ class Model_Wrapper(object):
                 start_time = time.time()
                 eta = -1
                 for j in range(num_iterations):
-                    data = data_gen.next()
+                    data = next(data_gen)
                     X = dict()
                     if params['n_samples'] > 0:
                         s_dict = {}
@@ -2121,7 +2128,7 @@ class Model_Wrapper(object):
                         for input_id in params['model_inputs']:
                             if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
                                 link = int(X[params['link_index_id']][i])
-                                if link not in previous_outputs[input_id].keys():
+                                if link not in list(previous_outputs[input_id]):
                                     # input to current sample was not processed yet
                                     link = -1
                                 prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
@@ -2152,7 +2159,7 @@ class Model_Wrapper(object):
 
                             if params['coverage_penalty']:
                                 coverage_penalties = []
-                                for k, sample in enumerate(samples):
+                                for k, sample in list(enumerate(samples)):
                                     # We assume that source sentences are at the first position of x
                                     x_sentence = x[params['model_inputs'][0]][0]
                                     alpha = np.asarray(alphas[k])
@@ -2186,7 +2193,7 @@ class Model_Wrapper(object):
                         if params['temporally_linked']:
                             first_idx = max(0, data_gen_instance.first_idx)
                             # TODO: Make it more general
-                            for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
+                            for (output_id, input_id) in iteritems(self.matchings_sample_to_next_sample):
                                 # Get all words previous to the padding
                                 previous_outputs[input_id][first_idx + sampled - 1] = best_sample[:sum(
                                     [int(elem > 0) for elem in best_sample])]
@@ -2244,13 +2251,11 @@ class Model_Wrapper(object):
                           }
         params = self.checkParameters(parameters, default_params)
 
-        exec ('model_predict = self.' + params['model_name'])  # recover model for prediction
-
+        model_predict = getattr(self, params['model_name']) # recover model for prediction
         predictions = dict()
         for s in params['predict_on_sets']:
             predictions[s] = []
             if params['verbose'] > 0:
-                print
                 logging.info("<<< Predicting outputs of " + s + " set >>>")
             # Calculate how many iterations are we going to perform
             if params['n_samples'] is None:
@@ -2340,7 +2345,7 @@ class Model_Wrapper(object):
                 processed_samples = 0
                 start_time = time.time()
                 while processed_samples < n_samples:
-                    out = model_predict.predict_on_batch(data_gen.next())
+                    out = model_predict.predict_on_batch(next(data_gen))
 
                     # Apply post-processing function
                     if isinstance(postprocess_fun, list):
@@ -2417,7 +2422,7 @@ class Model_Wrapper(object):
                 if pad_on_batch else np.asarray([np.zeros(params['maxlen'])])
 
         prev_out = None
-        for ii in xrange(len(Y)):
+        for ii in range(len(Y)):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out, _] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
@@ -2545,7 +2550,7 @@ class Model_Wrapper(object):
             start_time = time.time()
             eta = -1
             for j in range(num_iterations):
-                data = data_gen.next()
+                data = next(data_gen)
                 X = dict()
                 s_dict = {}
                 for input_id in params['model_inputs']:
@@ -2599,7 +2604,7 @@ class Model_Wrapper(object):
         :return:
         """
 
-        print "WARNING!: deprecated function, use utils.sample() instead"
+        logger.warning("Deprecated function, use utils.sample() instead.")
         return sample(a, temperature=temperature)
 
     @staticmethod
@@ -2614,7 +2619,7 @@ class Model_Wrapper(object):
                             Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples
         """
-        print "WARNING!: deprecated function, use utils.sampling() instead"
+        logger.warning("Deprecated function, use utils.sampling() instead")
         return sampling(scores, sampling_type=sampling_type, temperature=temperature)
 
     @staticmethod
@@ -2628,7 +2633,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions.
         """
-        print "WARNING!: deprecated function, use utils.decode_predictions() instead"
+        logger.warning("Deprecated function, use utils.decode_predictions() instead.")
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
     @staticmethod
@@ -2646,7 +2651,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level
         :return: trg_word_seq with replaced unknown words
         """
-        print "WARNING!: deprecated function, use utils.replace_unknown_words() instead"
+        logger.warning("Deprecated function, use utils.replace_unknown_words() instead.")
         return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                                      heuristic=heuristic, mapping=mapping, verbose=verbose)
 
@@ -2667,7 +2672,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
+        logger.warning("Deprecated function, use utils.decode_predictions_beam_search() instead.")
         return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
                                               x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
                                               mapping=mapping, verbose=verbose)
@@ -2681,7 +2686,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of converted predictions
         """
-        print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
+        logger.warning("Deprecated function, use utils.one_hot_2_indices() instead.")
         return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
 
     @staticmethod
@@ -2693,7 +2698,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        print "WARNING!: deprecated function, use utils.decode_predictions_one_hot() instead"
+        logger.warning("Deprecated function, use utils.decode_predictions_one_hot() instead.")
         return decode_predictions_one_hot(preds, index2word, verbose=verbose)
 
     def prepareData(self, X_batch, Y_batch=None):
@@ -2714,27 +2719,27 @@ class Model_Wrapper(object):
     def _prepareSequentialData(self, X, Y=None, sample_weights=False):
 
         # Format input data
-        if len(self.inputsMapping.keys()) == 1:  # single input
+        if len(list(self.inputsMapping)) == 1:  # single input
             X = X[self.inputsMapping[0]]
         else:
-            X_new = [0 for _ in range(len(self.inputsMapping.keys()))]  # multiple inputs
-            for in_model, in_ds in self.inputsMapping.iteritems():
+            X_new = [0 for _ in range(len(list(self.inputsMapping)))]  # multiple inputs
+            for in_model, in_ds in iteritems(self.inputsMapping):
                 X_new[in_model] = X[in_ds]
             X = X_new
 
         # Format output data (only one output possible for Sequential models)
         Y_sample_weights = None
         if Y is not None:
-            if len(self.outputsMapping.keys()) == 1:  # single output
+            if len(list(self.outputsMapping)) == 1:  # single output
                 if isinstance(Y[self.outputsMapping[0]], tuple):
                     Y = Y[self.outputsMapping[0]][0]
                     Y_sample_weights = Y[self.outputsMapping[0]][1]
                 else:
                     Y = Y[self.outputsMapping[0]]
             else:
-                Y_new = [0 for _ in range(len(self.outputsMapping.keys()))]  # multiple outputs
-                Y_sample_weights = [None for _ in range(len(self.outputsMapping.keys()))]
-                for out_model, out_ds in self.outputsMapping.iteritems():
+                Y_new = [0 for _ in range(len(list(self.outputsMapping)))]  # multiple outputs
+                Y_sample_weights = [None for _ in range(len(list(self.outputsMapping)))]
+                for out_model, out_ds in iteritems(self.outputsMapping):
                     if isinstance(Y[out_ds], tuple):
                         Y_new[out_model] = Y[out_ds][0]
                         Y_sample_weights[out_model] = Y[out_ds][1]
@@ -2750,12 +2755,12 @@ class Model_Wrapper(object):
         Y_sample_weights = dict()
 
         # Format input data
-        for in_model, in_ds in self.inputsMapping.iteritems():
+        for in_model, in_ds in iteritems(self.inputsMapping):
             X_new[in_model] = X[in_ds]
 
         # Format output data
         if Y is not None:
-            for out_model, out_ds in self.outputsMapping.iteritems():
+            for out_model, out_ds in iteritems(self.outputsMapping):
                 if isinstance(Y[out_ds], tuple):
                     Y_new[out_model] = Y[out_ds][0]
                     Y_sample_weights[out_model] = Y[out_ds][1]
@@ -2772,7 +2777,7 @@ class Model_Wrapper(object):
 
         accuracies = dict()
         top_accuracies = dict()
-        for key, val in prediction.iteritems():
+        for key, val in iteritems(prediction):
             pred = np_utils.categorical_probas_to_classes(val)
             top_pred = np.argsort(val, axis=1)[:, ::-1][:, :np.min([topN, val.shape[1]])]
             GT = np_utils.categorical_probas_to_classes(data[key])
@@ -2835,17 +2840,17 @@ class Model_Wrapper(object):
         obj_str += 'MODEL TYPE: ' + self.model.__class__.__name__ + '\n'
         if isinstance(self.model, Sequential):
             obj_str += "INPUT: " + str(tuple(self.model.layers[0].input_shape)) + "\n"
-            for i, layer in enumerate(self.model.layers):
+            for i, layer in list(enumerate(self.model.layers)):
                 obj_str += str(layer.name) + ' ' + str(layer.output_shape) + '\n'
             obj_str += "OUTPUT: " + str(self.model.layers[-1].output_shape) + "\n"
         else:
-            for i, inputs in enumerate(self.model.input_config):
+            for i, inputs in list(enumerate(self.model.input_config)):
                 obj_str += "INPUT (" + str(i) + "): " + str(inputs['name']) + ' ' + str(
                     tuple(inputs['input_shape'])) + "\n"
             for node in self.model.node_config:
                 obj_str += str(node['name']) + ', in [' + str(node['input']) + ']' + ', out_shape: ' + str(
                     self.model.nodes[node['name']].output_shape) + '\n'
-            for i, outputs in enumerate(self.model.output_config):
+            for i, outputs in list(enumerate(self.model.output_config)):
                 obj_str += "OUTPUT (" + str(i) + "): " + str(outputs['name']) + ', in [' + str(
                     outputs['input']) + ']' + ', out_shape: ' + str(
                     self.model.outputs[outputs['name']].output_shape) + "\n"
@@ -4093,9 +4098,9 @@ class Model_Wrapper(object):
         X_next = dict()
         for model_input in params['model_inputs']:
             X_next[model_input] = []
-            for i_sample, live in enumerate(live_k):
+            for i_sample, live in list(enumerate(live_k)):
                 if debug:
-                    print 'repeating X live', live
+                    print('repeating X live', live)
                 X_next[model_input].append(np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), 1, axis=0))
             X_next[model_input] = np.concatenate(X_next[model_input])
             if debug:
@@ -4114,13 +4119,13 @@ class Model_Wrapper(object):
                 [np.zeros(params['maxlen'])] * all_live_k)
 
         prev_out_next = None
-        for ii in xrange(params['maxlen']):
+        for ii in range(params['maxlen']):
 
             # PREDICT
             if debug:
-                print 'predicting step', ii
-                for kk, v in X_next.iteritems():
-                    print 'len ' + kk + '', len(v)
+                print ('predicting step', ii)
+                for kk, v in iteritems(X_next):
+                    print ('len ' + kk + '', len(v))
 
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
@@ -4136,8 +4141,7 @@ class Model_Wrapper(object):
             state_below = []
             if params['optimized_search']:
                 prev_out_new = [[] for _ in prev_out]
-            for pos_sample, sample_identifier in enumerate(
-                    sample_identifier_prediction):  # process one sample at a time
+            for pos_sample, sample_identifier in list(enumerate(sample_identifier_prediction)):  # process one sample at a time
 
                 # Only continue if not all beam subsamples are dead for the current sample
                 if dead_k[pos_sample] < k:
@@ -4153,7 +4157,7 @@ class Model_Wrapper(object):
                     ranks_flat = cand_flat.argsort()[:(k - dead_k[pos_sample])]
                     # Decypher flatten indices
                     voc_size = probs.shape[1]
-                    trans_indices = ranks_flat / voc_size  # index of row
+                    trans_indices = ranks_flat // voc_size  # index of row
                     word_indices = ranks_flat % voc_size  # index of col
                     costs = cand_flat[ranks_flat]
                     # Form a beam for the next iteration
@@ -4162,7 +4166,7 @@ class Model_Wrapper(object):
                     new_hyp_scores = np.zeros(k - dead_k[pos_sample]).astype('float32')
                     if params['pos_unk']:
                         new_hyp_alphas = []
-                    for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
+                    for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
                         new_hyp_samples.append(hyp_samples[pos_sample][ti] + [wi])
                         new_trans_indices.append(ti)
                         new_hyp_scores[idx] = copy.copy(costs[idx])
@@ -4176,7 +4180,7 @@ class Model_Wrapper(object):
                     if params['pos_unk']:
                         hyp_alphas[pos_sample] = []
                     indices_alive = []
-                    for idx in xrange(len(new_hyp_samples)):
+                    for idx in range(len(new_hyp_samples)):
                         if new_hyp_samples[idx][-1] == 0:  # finished sample
                             samples[pos_sample].append(new_hyp_samples[idx])
                             sample_scores[pos_sample].append(new_hyp_scores[idx])
@@ -4211,14 +4215,12 @@ class Model_Wrapper(object):
             X_next = dict()
             for model_input in params['model_inputs']:
                 X_next[model_input] = []
-                for i_sample, live in enumerate(live_k):
+                for i_sample, live in list(enumerate(live_k)):
                     if debug:
-                        print 'repeating X live', live
+                        print ('repeating X live', live)
                     X_next[model_input].append(
                         np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), live, axis=0))
                 X_next[model_input] = np.concatenate(X_next[model_input])
-                if debug:
-                    print
 
             # Create 'state_below' for next step
             state_below = np.concatenate(state_below)
@@ -4244,14 +4246,14 @@ class Model_Wrapper(object):
                 for idx_vars in range(len(prev_out)):
                     try:
                         prev_out[idx_vars] = np.concatenate(prev_out_new[idx_vars])
-                    except Exception, e:
-                        print len(prev_out_new[idx_vars])
-                        print prev_out_new[idx_vars][0].shape
-                        print prev_out_new[idx_vars][1].shape
-                        print prev_out_new[idx_vars][2].shape
-                        print prev_out_new[idx_vars][-2].shape
-                        print prev_out_new[idx_vars][-1].shape
-                        print e
+                    except Exception as e:
+                        print (len(prev_out_new[idx_vars]))
+                        print (prev_out_new[idx_vars][0].shape)
+                        print (prev_out_new[idx_vars][1].shape)
+                        print (prev_out_new[idx_vars][2].shape)
+                        print (prev_out_new[idx_vars][-2].shape)
+                        print (prev_out_new[idx_vars][-1].shape)
+                        print (e)
                         raise Exception()
 
                 prev_out_next = prev_out
@@ -4262,13 +4264,14 @@ class Model_Wrapper(object):
                 num_up_to_here = sum(live_k[:i])
                 sample_identifier_prediction += [range(num_up_to_here, num_up_to_here + live)]
 
-        for pos_sample, sample_identifier in enumerate(sample_identifier_prediction):  # process one sample at a time
+        for pos_sample, sample_identifier in list(enumerate(sample_identifier_prediction)):  # process one sample at a time
             if live_k[pos_sample] > 0:
-                for idx in xrange(live_k[pos_sample]):
+                for idx in range(live_k[pos_sample]):
                     samples[pos_sample].append(hyp_samples[pos_sample][idx])
                     sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
                     if params['pos_unk']:
                         sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
+
         if params['pos_unk']:
             return samples, sample_scores, sample_alphas
         else:

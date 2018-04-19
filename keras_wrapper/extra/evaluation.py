@@ -1,13 +1,14 @@
+# -*- coding: utf-8 -*-
+from __future__ import print_function
+from six import iteritems
+from builtins import map, zip
 import json
 import logging
 
-from localization_utilities import *
+from keras_wrapper.extra.localization_utilities import *
 
 
-########################################
 # EVALUATION FUNCTIONS SELECTOR
-########################################
-
 
 def get_coco_score(pred_list, verbose, extra_vars, split):
     """
@@ -31,19 +32,19 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
 
     gts = extra_vars[split]['references']
     if extra_vars.get('tokenize_hypotheses', False):
-        hypo = {idx: map(extra_vars['tokenize_f'], [lines.strip()]) for (idx, lines) in enumerate(pred_list)}
+        hypo = {idx: list(map(extra_vars['tokenize_f'], [lines.strip()])) for (idx, lines) in list(enumerate(pred_list))}
     else:
-        hypo = {idx: [lines.strip()] for (idx, lines) in enumerate(pred_list)}
+        hypo = {idx: [lines.strip()] for (idx, lines) in list(enumerate(pred_list))}
 
     # Tokenize refereces if needed
     if extra_vars.get('tokenize_references', False):
-        refs = {idx: map(extra_vars['tokenize_f'], gts[idx]) for idx in gts.keys()}
+        refs = {idx: list(map(extra_vars['tokenize_f'], gts[idx])) for idx in list(gts)}
     else:
         refs = gts
 
     # Detokenize references if needed.    
     if extra_vars.get('apply_detokenization', False):
-        refs = {idx: map(extra_vars['detokenize_f'], refs[idx]) for idx in refs}
+        refs = {idx: list(map(extra_vars['detokenize_f'], refs[idx])) for idx in refs}
 
     scorers = [
         (Bleu(4), ["Bleu_1", "Bleu_2", "Bleu_3", "Bleu_4"]),
@@ -58,7 +59,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
     for scorer, method in scorers:
         score, _ = scorer.compute_score(refs, hypo)
         if type(score) == list:
-            for m, s in zip(method, score):
+            for m, s in list(zip(method, score)):
                 final_scores[m] = s
         else:
             final_scores[method] = score
@@ -85,6 +86,7 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
     :return: Dictionary of VQA accuracies
     """
     import datetime
+    import os
     from pycocoevalcap.vqa import vqaEval, visual_qa
     from read_write import list2vqa
 
@@ -152,7 +154,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
 
     # Create prediction matrix
     y_pred = np.zeros((n_samples, n_classes))
-    for i_s, sample in enumerate(pred_list):
+    for i_s, sample in list(enumerate(pred_list)):
         for word in sample:
             if raw2basic is None:
                 y_pred[i_s, word2idx[word]] = 1
@@ -166,10 +168,10 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     if raw2basic is None:
         y_gt = np.array(gt_list)
     else:
-        idx2word = {v: k for k, v in word2idx.iteritems()}
+        idx2word = {v: k for k, v in iteritems(word2idx)}
         y_gt = np.zeros((n_samples, n_classes))
-        for i_s, sample in enumerate(gt_list):
-            for raw_idx, is_active in enumerate(sample):
+        for i_s, sample in list(enumerate(gt_list)):
+            for raw_idx, is_active in list(enumerate(sample)):
                 if is_active:
                     word = idx2word[raw_idx].strip()
                     y_gt[i_s, raw2basic[word]] = 1
@@ -202,6 +204,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
 
 import numpy as np
 
+
 def multiclass_metrics(pred_list, verbose, extra_vars, split):
     """
     Multiclass classification metrics. See multilabel ranking metrics in sklearn library for more info:
@@ -217,23 +220,23 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     from sklearn import metrics as sklearn_metrics
 
     n_classes = extra_vars['n_classes']
-    
+
     n_samples = len(pred_list)
-    logging.info("---# of samples: "+str(n_samples))
+    logging.info("---# of samples: " + str(n_samples))
     gt_list = extra_vars[split]['references']
     pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
     # Create prediction matrix
     y_pred = np.zeros((n_samples, n_classes))
     y_gt = np.zeros((n_samples, n_classes))
-    for i_s, pred_class in enumerate(pred_class_list):
+    for i_s, pred_class in list(enumerate(pred_class_list)):
         y_pred[i_s, pred_class] = 1
     try:
-        values_gt = gt_list.values()
+        values_gt = list(gt_list.values())
     except:
         values_gt = gt_list
 
     counts_per_class = np.zeros((n_classes,))
-    for i_s, gt_class in enumerate(values_gt):
+    for i_s, gt_class in list(enumerate(values_gt)):
         y_gt[i_s, gt_class] = 1
         counts_per_class[gt_class] += 1
 
@@ -241,7 +244,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     inverse_counts_per_class = [sum(counts_per_class) - c_i for c_i in counts_per_class]
     weights_per_class = [float(c_i) / sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
     sample_weights = np.zeros((n_samples,))
-    for i_s, gt_class in enumerate(values_gt):
+    for i_s, gt_class in list(enumerate(values_gt)):
         sample_weights[i_s] = weights_per_class[gt_class]
 
     # Compute accuracy
@@ -298,7 +301,7 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
     y_pred = np.zeros((n_samples, n_classes))
 
     ind_i = 0
-    for i_s, (gt_class, pred_class) in enumerate(zip(values_gt, pred_class_list)):
+    for i_s, (gt_class, pred_class) in list(enumerate(zip(values_gt, pred_class_list))):
         if not any([d == gt_class for d in discard_classes]):
             y_pred[ind_i, pred_class] = 1
             y_gt[ind_i, gt_class] = 1
@@ -353,7 +356,7 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
     y_pred = np.zeros((n_samples,))
 
     ind_i = 0
-    for i_s, (gt_class, pred_class) in enumerate(zip(values_gt, pred_class_list)):
+    for i_s, (gt_class, pred_class) in list(enumerate(zip(values_gt, pred_class_list))):
         if not any([d == gt_class for d in discard_classes]):
             y_gt[ind_i] = gt_class
             y_pred[ind_i] = pred_class
@@ -447,7 +450,7 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
             aux_predicted_bboxes = []
             aux_predicted_Y = []
             aux_predicted_scores = []
-            for pos, score in enumerate(predicted_scores):
+            for pos, score in list(enumerate(predicted_scores)):
                 if score > thresholds[thres]:
                     aux_predicted_bboxes.append(predicted_bboxes[pos])
                     aux_predicted_Y.append(predicted_Y[pos])
@@ -604,8 +607,8 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
     iou_values = []
     pred_ids = []
     match_bboxes = []
-    for i, gt in enumerate(GT_bboxes):
-        for j, pred in enumerate(predicted_bboxes):
+    for i, gt in list(enumerate(GT_bboxes)):
+        for j, pred in list(enumerate(predicted_bboxes)):
             # compute IoU
             iou_values.append(computeIoU(gt, pred))
             pred_ids.append(j)
@@ -623,7 +626,7 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
     while i < len(max_scores) and not all(matched_gt):
         # m = match_bboxes[max_iou[i]]
         this_pred_id = max_scores[i]
-        m_list = [[p_, match_bboxes[p_]] for p_, p in enumerate(pred_ids) if p == this_pred_id]
+        m_list = [[p_, match_bboxes[p_]] for p_, p in list(enumerate(pred_ids)) if p == this_pred_id]
         this_iou = [iou_values[p] for p, m in m_list]
         max_iou = np.argsort(np.array(this_iou, dtype=np.float))[::-1]
 
@@ -664,11 +667,11 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
                 FN_classes[y_gt] += 1
                 FP_classes[y_pred] += 1
         # Check missed GT bboxes
-        for i, m in enumerate(matched_gt):
+        for i, m in list(enumerate(matched_gt)):
             if not m:
                 FN_classes[GT_Y[i]] += 1
         # Check mislocalized Pred bboxes
-        for i, m in enumerate(matched_pred):
+        for i, m in list(enumerate(matched_pred)):
             if not m:
                 FP_classes[predicted_Y[i]] += 1
 
@@ -704,9 +707,7 @@ def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
         return ppl
 
 
-########################################
 # AUXILIARY FUNCTIONS
-########################################
 
 def vqa_store(question_id_list, answer_list, path):
     """
@@ -720,7 +721,7 @@ def vqa_store(question_id_list, answer_list, path):
     question_answer_pairs = []
     assert len(question_id_list) == len(answer_list), \
         'must be the same number of questions and answers'
-    for q, a in zip(question_id_list, answer_list):
+    for q, a in list(zip(question_id_list, answer_list)):
         question_answer_pairs.append({'question_id': q, 'answer': str(a)})
     with open(path, 'w') as f:
         json.dump(question_answer_pairs, f)
@@ -728,7 +729,7 @@ def vqa_store(question_id_list, answer_list, path):
 
 def caption_store(samples, path):
     with open(path, 'w') as f:
-        print >> f, '\n'.join(samples)
+        print('\n'.join(samples), file=f)
 
 
 # List of evaluation functions and their identifiers (will be used in params['METRICS'])

@@ -6,9 +6,12 @@ from keras_wrapper.cnn_model import saveModel
 from keras_wrapper.deprecated.thread_loader import ThreadDataLoader, retrieveXY
 
 mpl.use('Agg')  # run matplotlib without X server (GUI)
-
+import sys
 import numpy as np
-import cPickle as pk
+if sys.version_info.major == 3:
+    import _pickle  as pk
+else:
+    import cPickle as pk
 
 import time
 import os

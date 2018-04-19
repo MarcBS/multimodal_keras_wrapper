@@ -1,9 +1,14 @@
+# -*- coding: utf-8 -*-
 import copy
 import itertools
 import logging
 import time
-
 import numpy as np
+import sys
+if sys.version_info.major == 2:
+    from itertools import imap as map
+    from itertools import izip as zip
+    from itertools import ifilter as filter
 
 
 class MultiprocessQueue():
@@ -298,7 +303,7 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
 
     logging.info("Building " + str(n_pairs) + " OneVsOne structures...")
 
-    for i, c in enumerate(pairs):
+    for i, c in list(enumerate(pairs)):
         # t = time.time()
 
         # Insert 1s in the corresponding positions of the ecoc table
@@ -603,8 +608,8 @@ def simplifyDataset(ds, id_classes, n_classes=50):
     for s in ['train', 'val', 'test']:
         kept_Y = dict()
         kept_X = dict()
-        exec ('labels_set = ds.Y_' + s + '[id_labels]')
-        for i, y in enumerate(labels_set):
+        labels_set = getattr(ds, 'Y_' + s)[id_labels]
+        for i, y in list(enumerate(labels_set)):
             if y < n_classes:
                 for id_out in ds.ids_outputs:
                     exec ('sample = ds.Y_' + s + '[id_out][i]')
@@ -702,7 +707,7 @@ def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     """
     if verbose > 0:
         logging.info('Converting one hot prediction into indices...')
-    preds = map(lambda x: np.argmax(x, axis=1), preds)
+    preds = list(map(lambda x: np.argmax(x, axis=1), preds))
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
     return preds
@@ -769,16 +774,16 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
     """
     if verbose > 0:
         logging.info('Decoding one hot prediction ...')
-    preds = map(lambda prediction: np.argmax(prediction, axis=1), preds)
+    preds = list(map(lambda prediction: np.argmax(prediction, axis=1), preds))
     PAD = '<pad>'
-    flattened_answer_pred = [map(lambda index: index2word[index], pred) for pred in preds]
+    flattened_answer_pred = [list(map(lambda index: index2word[index], pred)) for pred in preds]
     answer_pred_matrix = np.asarray(flattened_answer_pred)
     answer_pred = []
 
     for a_no in answer_pred_matrix:
-        end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
+        end_token_pos = [j for j, x in list(enumerate(a_no)) if x == PAD]
         end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        a_no = [a.decode('utf-8') if type(a)==str else a for a in a_no]
+        a_no = [a.decode('utf-8') if type(a) == str and sys.version_info.major == 2 else a for a in a_no]
         tmp = u' '.join(a_no[:end_token_pos])
         answer_pred.append(tmp)
     return answer_pred
@@ -798,9 +803,9 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     if verbose > 0:
         logging.info('Decoding prediction ...')
     flattened_preds = preds.reshape(-1, preds.shape[-1])
-    flattened_answer_pred = map(lambda index: index2word[index], sampling(scores=flattened_preds,
+    flattened_answer_pred = list(map(lambda index: index2word[index], sampling(scores=flattened_preds,
                                                                           sampling_type=sampling_type,
-                                                                          temperature=temperature))
+                                                                          temperature=temperature)))
     answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
 
     answer_pred = []
@@ -810,9 +815,9 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     for a_no in answer_pred_matrix:
         if len(a_no.shape) > 1:  # only process word by word if our prediction has more than one output
             init_token_pos = 0
-            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
+            end_token_pos = [j for j, x in list(enumerate(a_no)) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            a_no = [a.decode('utf-8') if type(a)==str else a for a in a_no]
+            a_no = [a.decode('utf-8') if type(a)==str and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
             tmp = a_no
@@ -839,7 +844,7 @@ def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0
     for pred in preds:
         current_pred = []
         current_probs = []
-        for ind, word in enumerate(pred):
+        for ind, word in list(enumerate(pred)):
             if word >= min_val:
                 current_pred.append(index2word[ind])
                 current_probs.append(word)
@@ -868,10 +873,7 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     """
     trans_words = trg_word_seq
     new_trans_words = []
-    if verbose > 2:
-        print "Input sentence:", src_word_seq
-        print "Hard alignments", hard_alignment
-    for j in xrange(len(trans_words)):
+    for j in range(len(trans_words)):
         if trans_words[j] == unk_symbol:
             UNK_src = src_word_seq[hard_alignment[j]]
             if type(UNK_src) == str:
@@ -925,20 +927,14 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
             logging.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-    flattened_answer_pred = [map(lambda x: index2word[x], pred) for pred in preds]
+    flattened_answer_pred = [list(map(lambda x: index2word[x], pred)) for pred in preds]
     answer_pred = []
 
     if alphas is not None:
-        x_text = map(lambda x: x.split(), x_text)
-        hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas, x_text)
-        for i, a_no in enumerate(flattened_answer_pred):
+        x_text = list(map(lambda x: x.split(), x_text))
+        hard_alignments = list(map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas, x_text))
+        for i, a_no in list(enumerate(flattened_answer_pred)):
             if unk_symbol in a_no:
-                if verbose > 1:
-                    print unk_symbol, "at sentence number", i
-                    print "hypothesis:", a_no
-                    if verbose > 2:
-                        print "alphas:", alphas[i]
-
                 a_no = replace_unknown_words(x_text[i],
                                              a_no,
                                              hard_alignments[i],
@@ -946,14 +942,12 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                              heuristic=heuristic,
                                              mapping=mapping,
                                              verbose=verbose)
-                if verbose > 1:
-                    print "After unk_replace:", a_no
-            a_no = [a.decode('utf-8') if type(a)==str else a for a in a_no]
+            a_no = [a.decode('utf-8') if type(a)==str and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     else:
         for a_no in flattened_answer_pred:
-            a_no = [a.decode('utf-8') if type(a)==str else a for a in a_no]
+            a_no = [a.decode('utf-8') if type(a)==str and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     return answer_pred
