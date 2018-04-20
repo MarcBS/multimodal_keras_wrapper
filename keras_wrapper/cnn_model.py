@@ -11,7 +11,6 @@ if sys.version_info.major == 3:
     import _pickle  as pk
 else:
     import cPickle as pk
-
 import cloudpickle as cloudpk
 import matplotlib as mpl
 
@@ -179,11 +178,17 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
 
     # Load Model_Wrapper information
     try:
-        model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
+        if sys.version_info.major == 3:
+            model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'), encoding='latin1')
+        else:
+            model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except Exception as e:
         # try:
         logging.info(str(e))
-        model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
+        if sys.version_info.major == 3:
+            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'), encoding='latin1')
+        else:
+            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
         # except:
         #    raise Exception(ValueError)
 

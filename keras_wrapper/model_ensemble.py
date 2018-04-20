@@ -366,7 +366,7 @@ class BeamSearchEnsemble:
             if self.n_best:
                 n_best_list = []
             for _ in range(num_iterations):
-                data = data_gen.next()
+                data = next(data_gen)
                 X = dict()
                 if params['n_samples'] > 0:
                     s_dict = {}
@@ -751,7 +751,7 @@ class BeamSearchEnsemble:
             start_time = time.time()
             eta = -1
             for j in range(num_iterations):
-                data = data_gen.next()
+                data = next(data_gen)
                 X = dict()
                 s_dict = {}
                 for input_id in params['model_inputs']:
@@ -1133,7 +1133,7 @@ class PredictEnsemble:
             processed_samples = 0
             start_time = time.time()
             while processed_samples < n_samples:
-                out = self.predict_on_batch(self.models, data_gen.next())
+                out = self.predict_on_batch(self.models, next(data_gen))
                 # Apply post-processing function
                 if self.postprocess_fun is not None:
                     if isinstance(self.postprocess_fun, list):

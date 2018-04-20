@@ -64,8 +64,10 @@ def loadDataset(dataset_path):
     """
 
     logging.info("<<< Loading Dataset instance from " + dataset_path + " ... >>>")
-
-    dataset = pk.load(open(dataset_path, 'rb'))
+    if sys.version_info.major == 3:
+        dataset = pk.load(open(dataset_path, 'rb'), encoding='latin1')
+    else:
+        dataset = pk.load(open(dataset_path, 'rb'))
 
     logging.info("<<< Dataset instance loaded >>>")
     return dataset
@@ -2175,7 +2177,10 @@ class Dataset(object):
         """
         if not self.silence:
             logging.info("Loading source -- target mapping.")
-        self.mapping = pk.load(open(path_list, 'rb'))
+        if sys.version_info.major == 3:
+            self.mapping = pk.load(open(path_list, 'rb'), encoding='utf-8')
+        else:
+            self.mapping = pk.load(open(path_list, 'rb'))
         if not self.silence:
             logging.info("Source -- target mapping loaded with a total of %d words." % len(list(self.mapping)))
 
