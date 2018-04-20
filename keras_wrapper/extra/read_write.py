@@ -210,14 +210,20 @@ def pickle_model(
 
 def unpickle_model(path):
     with open(path, 'rb') as f:
-        model = pk.load(f)['model']
+        if sys.version_info.major == 3:
+            model = pk.load(f, encoding='latin1')['model']
+        else:
+            model = pk.load(f)['model']
     return model
 
 
 def unpickle_vocabulary(path):
     p_dict = {}
     with open(path, 'rb') as f:
-        pickle_load = pk.load(f)
+        if sys.version_info.major == 3:
+            pickle_load = pk.load(f, encoding='latin1')
+        else:
+            pickle_load = pk.load(f)
         p_dict['word2index_x'] = pickle_load['word2index_x']
         p_dict['word2index_y'] = pickle_load['word2index_y']
         p_dict['index2word_x'] = pickle_load['index2word_x']
@@ -227,7 +233,10 @@ def unpickle_vocabulary(path):
 
 def unpickle_data_provider(path):
     with open(path, 'rb') as f:
-        dp = pk.load(f)['data_provider']
+        if sys.version_info.major == 3:
+            dp = pk.load(f, encoding='latin1')['data_provider']
+        else:
+            dp = pk.load(f)['data_provider']
     return dp
 
 
@@ -347,4 +356,9 @@ def pkl2dict(path):
     :param path: Path to the pkl file to load
     :return: Dict() containing the loaded pkl
     """
-    return pk.load(open(path))
+    with open(path, 'rb') as f:
+        if sys.version_info.major == 2:
+            return pk.load(f)
+        else:
+            return pk.load(f, encoding='latin1')
+
