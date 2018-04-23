@@ -331,7 +331,7 @@ def dict2file(mydict, path, title=None, separator=':'):
         output_list.extend(tmp)
     else:
         output_list = tmp
-    list2file(path, output_list, 'a')
+    list2file(path, output_list, 'ab')
 
 
 def dict2pkl(mydict, path):
