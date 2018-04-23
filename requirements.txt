@@ -3,6 +3,7 @@ six
 toolz
 cloudpickle
 matplotlib
+nltk
 scipy
 future
 cython
