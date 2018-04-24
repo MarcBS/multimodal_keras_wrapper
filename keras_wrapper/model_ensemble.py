@@ -621,7 +621,6 @@ class BeamSearchEnsemble:
             state_below = np.asarray([null_sym]) \
                 if pad_on_batch else np.asarray([np.zeros(params['state_below_maxlen']) + null_sym])
 
-
         prev_outs = [None] * len(self.models)
         for ii in range(len(Y)):
             # for every possible live sample calc prob for every possible label
@@ -632,7 +631,7 @@ class BeamSearchEnsemble:
                 probs = self.predict_cond(self.models, X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
             score -= np.log(probs[0, int(Y[ii])])
-            state_below = np.asarray([Y[:ii]], dtype='int64')
+            state_below = np.asarray([Y[:ii + 1]], dtype='int64')
             if self.return_alphas:
                 all_alphas.append(alphas[0])
             # we must include an additional dimension if the input for each timestep are all the generated words so far
