@@ -230,7 +230,8 @@ class Parallel_Data_Batch_Generator(object):
             init_sample = (it - 1) * self.params['batch_size']
             final_sample = it * self.params['batch_size']
             batch_size = self.params['batch_size']
-            n_samples_split = eval("self.dataset.len_" + self.set_split)
+            # n_samples_split = eval("self.dataset.len_" + self.set_split)
+            n_samples_split = getattr(self.dataset, "len_" + self.set_split)
             if final_sample >= n_samples_split:
                 final_sample = n_samples_split
                 batch_size = final_sample - init_sample
@@ -368,7 +369,8 @@ class Data_Batch_Generator(object):
             init_sample = (it - 1) * self.params['batch_size']
             final_sample = it * self.params['batch_size']
             batch_size = self.params['batch_size']
-            n_samples_split = eval("self.dataset.len_" + self.set_split)
+            # n_samples_split = eval("self.dataset.len_" + self.set_split)
+            n_samples_split = getattr(self.dataset, "len_" + self.set_split)
             if final_sample >= n_samples_split:
                 final_sample = n_samples_split
                 batch_size = final_sample - init_sample
@@ -381,7 +383,7 @@ class Data_Batch_Generator(object):
                     if self.first_idx == -1:
                         self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
                         self.next_idx = self.first_idx
-                    indices = range(self.next_idx, self.next_idx + num_retrieve)
+                    indices = list(range(self.next_idx, self.next_idx + num_retrieve))
                     self.next_idx += num_retrieve
                 else:
                     indices = np.random.randint(0, n_samples_split, num_retrieve)
@@ -407,7 +409,7 @@ class Data_Batch_Generator(object):
                     data = self.net.prepareData(X_batch, Y_batch)
 
             elif self.init_sample > -1 and self.final_sample > -1:
-                indices = range(self.init_sample, self.final_sample)
+                indices = list(range(self.init_sample, self.final_sample))
                 if self.predict:
                     X_batch = self.dataset.getX_FromIndices(self.set_split,
                                                             indices,
@@ -528,7 +530,9 @@ class Homogeneous_Data_Batch_Generator(object):
         batch_size = self.batch_size * joint_batches
         init_sample = (self.it - 1) * batch_size
         final_sample = self.it * batch_size
-        n_samples_split = eval("self.dataset.len_" + self.set_split)
+        # n_samples_split = eval("self.dataset.len_" + self.set_split)
+        n_samples_split = getattr(self.dataset, "len_" + self.set_split)
+
         if final_sample >= n_samples_split:
             final_sample = n_samples_split
             batch_size = final_sample - init_sample
@@ -863,7 +867,7 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of input data
-        keys_X_set = eval('list(self.X_raw_' + set_name + ')')
+        keys_X_set = list(getattr(self, 'X_raw_' + set_name))
         if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
@@ -973,7 +977,7 @@ class Dataset(object):
         if img_size_crop is None:
             img_size_crop = [227, 227, 3]
         # Insert type and id of input data
-        keys_X_set = eval('list(self.X_' + set_name + ')')
+        keys_X_set = list(getattr(self, 'X_' + set_name))
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
@@ -1057,8 +1061,7 @@ class Dataset(object):
 
         if not self.silence:
             logging.info(
-                'Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '" and length ' + str(
-                    eval('self.len_' + set_name)) + '.')
+                'Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '" and length ' + str(getattr(self, 'len_' + set_name)) + '.')
 
     def replaceInput(self, data, set_name, type, id):
         '''
@@ -1068,7 +1071,8 @@ class Dataset(object):
 
     def removeInput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
-        keys_X_set = eval('list(self.X_' + set_name + ')')
+        # eval('list(self.X_' + set_name + ')')
+        keys_X_set =  getattr(self, 'X_' + set_name)
         if id in self.ids_inputs:
             ind_remove = self.ids_inputs.index(id)
             del self.ids_inputs[ind_remove]
@@ -1111,7 +1115,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of input data
-        keys_Y_set = eval('list(self.Y_raw_' + set_name + ')')
+        # eval('list(self.Y_raw_' + set_name + ')')
+        keys_Y_set = list(getattr(self, 'Y_raw_' + set_name))
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             self.types_inputs.append(type)
@@ -1202,7 +1207,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of output data
-        keys_Y_set = eval('list(self.Y_' + set_name + ')')
+        #keys_Y_set = eval('list(self.Y_' + set_name + ')')
+        keys_Y_set = list(getattr(self, 'Y_' + set_name))
         if id not in self.ids_outputs:
             self.ids_outputs.append(id)
             self.types_outputs.append(type)
@@ -1271,12 +1277,12 @@ class Dataset(object):
 
         if not self.silence:
             logging.info(
-                'Loaded "' + set_name + '" set outputs of type "' + type + '" with id "' + id + '" and length ' + str(
-                    eval('self.len_' + set_name)) + '.')
+                'Loaded "' + set_name + '" set outputs of type "' + type + '" with id "' + id + '" and length ' + str(getattr(self, 'len_' + set_name)) + '.')
 
     def removeOutput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
-        keys_Y_set = eval('list(self.Y_' + set_name + ')')
+        #keys_Y_set = eval('list(self.Y_' + set_name + ')')
+        keys_Y_set = list(getattr(self, 'Y_' + set_name))
         if id in self.ids_outputs:
             ind_remove = self.ids_outputs.index(id)
             del self.ids_outputs[ind_remove]
@@ -2520,7 +2526,8 @@ class Dataset(object):
             if this_last >= n_videos:
                 v = this_last % n_videos
                 this_last = v
-            idx[v] = int(sum(eval('self.X_' + set_name + '[id][:this_last]')))
+            # idx[v] = int(sum(eval('self.X_' + set_name + '[id][:this_last]')))
+            idx[v] = int(sum(getattr(self, 'Y_' + set_name)[id][:this_last]))
 
         # load images from each video
         for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
@@ -3390,7 +3397,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
 
-        if final > eval('self.len_' + set_name):
+        # if final > eval('self.len_' + set_name):
+        if final > getattr(self, 'len_' + set_name):
             raise Exception('"final" index must be smaller than the number of samples in the set.')
         if init < 0:
             raise Exception('"init" index must be equal or greater than 0.')
@@ -3402,13 +3410,15 @@ class Dataset(object):
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
-                    x = eval('self.X_' + set_name + '[id_in][init:final]')
+                    # x = eval('self.X_' + set_name + '[id_in][init:final]')
+                    x = getattr(self, 'X_' + set_name)[id_in][init:final]
                     assert len(x) == (final - init)
                 except:
                     x = [[]] * (final - init)
                     ghost_x = True
             else:
-                x = eval('self.X_' + set_name + '[id_in][init:final]')
+                # x = eval('self.X_' + set_name + '[id_in][init:final]')
+                x = getattr(self, 'X_' + set_name)[id_in][init:final]
 
             if not debug and not ghost_x:
                 if type_in == 'raw-image':
@@ -3479,18 +3489,20 @@ class Dataset(object):
             if id_in in self.optional_inputs:
                 try:
                     if surpassed:
-                        x = eval('self.X_' + set_name + '[id_in][last:]') + eval(
-                            'self.X_' + set_name + '[id_in][0:new_last]')
+                        # x = eval('self.X_' + set_name + '[id_in][last:]') + eval('self.X_' + set_name + '[id_in][0:new_last]')
+                        x = getattr(self, 'X_' + set_name)[id_in][last:] + getattr(self, 'X_' + set_name)[id_in][0:new_last]
                     else:
-                        x = eval('self.X_' + set_name + '[id_in][last:new_last]')
+                        # x = eval('self.X_' + set_name + '[id_in][last:new_last]')
+                        x = getattr(self, 'X_' + set_name)[id_in][last:new_last]
                 except:
                     x = []
             else:
                 if surpassed:
-                    x = eval('self.X_' + set_name + '[id_in][last:]') + eval(
-                        'self.X_' + set_name + '[id_in][0:new_last]')
+                    # x = eval('self.X_' + set_name + '[id_in][last:]') + eval('self.X_' + set_name + '[id_in][0:new_last]')
+                    x = getattr(self, 'X_' + set_name)[id_in][last:] + getattr(self, 'X_' + set_name)[id_in][0:new_last]
                 else:
-                    x = eval('self.X_' + set_name + '[id_in][last:new_last]')
+                    # x = eval('self.X_' + set_name + '[id_in][last:new_last]')
+                    x = getattr(self, 'X_' + set_name)[id_in][last:new_last]
 
             # Pre-process inputs
             if not debug:
@@ -3529,9 +3541,12 @@ class Dataset(object):
         Y = []
         for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
             if surpassed:
-                y = eval('self.Y_' + set_name + '[id_out][last:]') + eval('self.Y_' + set_name + '[id_out][0:new_last]')
+                # y = eval('self.Y_' + set_name + '[id_out][last:]') + eval('self.Y_' + set_name + '[id_out][0:new_last]')
+                y = getattr(self, 'Y_' + set_name)[id_out][last:] + getattr(self, 'Y_' + set_name)[id_out][0:new_last]
+
             else:
-                y = eval('self.Y_' + set_name + '[id_out][last:new_last]')
+                # y = eval('self.Y_' + set_name + '[id_out][last:new_last]')
+                y = getattr(self, 'Y_' + set_name)[id_out][last:new_last]
 
             # Pre-process outputs
             if not debug:
@@ -3547,10 +3562,12 @@ class Dataset(object):
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     if surpassed:
-                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:]') + eval(
-                            'self.X_' + set_name + '[assoc_id_in][0:new_last]')
+                        # imlist = eval('self.X_' + set_name + '[assoc_id_in][last:]') + eval('self.X_' + set_name + '[assoc_id_in][0:new_last]')
+                        imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:] + getattr(self, 'X_' + set_name)[assoc_id_in][0:new_last]
+
                     else:
-                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:new_last]')
+                        # imlist = eval('self.X_' + set_name + '[assoc_id_in][last:new_last]')
+                        imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:new_last]
 
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
@@ -3560,10 +3577,12 @@ class Dataset(object):
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
                     if surpassed:
-                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:]') + eval(
-                            'self.X_' + set_name + '[assoc_id_in][0:new_last]')
+                        # imlist = eval('self.X_' + set_name + '[assoc_id_in][last:]') + eval('self.X_' + set_name + '[assoc_id_in][0:new_last]')
+                        imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:] + getattr(self, 'X_' + set_name)[assoc_id_in][0:new_last]
+
                     else:
-                        imlist = eval('self.X_' + set_name + '[assoc_id_in][last:new_last]')
+                        # imlist = eval('self.X_' + set_name + '[assoc_id_in][last:new_last]')
+                        imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:new_last]
 
                     y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
@@ -3626,16 +3645,20 @@ class Dataset(object):
 
         # Recover input samples
         X = []
+        k = list(k)
         for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
-                    x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                    # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                    x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
+
                 except:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
-                x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
 
             # if(set_name=='val'):
             #    logging.info(x)
@@ -3676,7 +3699,8 @@ class Dataset(object):
         # Recover output samples
         Y = []
         for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
-            y = [eval('self.Y_' + set_name + '[id_out][index]') for index in k]
+            # y = [eval('self.Y_' + set_name + '[id_out][index]') for index in k]
+            y = [getattr(self, 'Y_' + set_name)[id_out][index] for index in k]
 
             # if(set_name=='val'):
             #    logging.info(y)
@@ -3693,7 +3717,9 @@ class Dataset(object):
                 elif type_out == '3DLabel':
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
+                    # imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
+                    imlist = [getattr(self, 'X_' + set_name)[assoc_id_in][index] for index in k]
+
                     y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
@@ -3701,7 +3727,8 @@ class Dataset(object):
                     nClasses = len(self.classes[id_out])
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
+                    # imlist = [eval('self.X_' + set_name + '[assoc_id_in][index]') for index in k]
+                    imlist = [getattr(self, 'X_' + set_name)[assoc_id_in][index] for index in k]
                     y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                                   imlist)
@@ -3768,12 +3795,14 @@ class Dataset(object):
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
-                    x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                    # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                    x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
                 except:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
-                x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
+                x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
 
             # if(set_name=='val'):
             #    logging.info(x)
@@ -3837,7 +3866,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 1)
 
-        if final > eval('self.len_' + set_name):
+        # if final > eval('self.len_' + set_name):
+        if final > getattr(self, 'len_' + set_name):
             raise Exception('"final" index must be smaller than the number of samples in the set.')
         if init < 0:
             raise Exception('"init" index must be equal or greater than 0.')
@@ -3847,8 +3877,8 @@ class Dataset(object):
         # Recover output samples
         Y = []
         for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
-            y = eval('self.Y_' + set_name + '[id_out][init:final]')
-
+            # y = eval('self.Y_' + set_name + '[id_out][init:final]')
+            y = getattr(self, 'Y_' + set_name)[id_out][init:final]
             # Pre-process outputs
             if not debug:
                 if type_out == 'categorical':
@@ -3861,7 +3891,9 @@ class Dataset(object):
                 elif type_out == '3DLabel':
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
+                    # imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
+                    imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
+
                     y = self.load3DLabels(y, nClasses, dataAugmentation, None,
                                           self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                           imlist)
@@ -3869,7 +3901,8 @@ class Dataset(object):
                     nClasses = len(self.classes[id_out])
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
+                    # imlist = eval('self.X_' + set_name + '[assoc_id_in][init:final]')
+                    imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
                     y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, None,
                                                   self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                                   imlist)
@@ -3946,7 +3979,8 @@ class Dataset(object):
         :param pos:
         :return:
         """
-        if eval('not self.loaded_' + set_name + '[pos]'):
+        # if eval('not self.loaded_' + set_name + '[pos]'):
+        if not getattr(self, 'loaded_' + set_name)[pos]:
             if pos == 0:
                 raise Exception('Set ' + set_name + ' samples are not loaded yet.')
             elif pos == 1:
@@ -3972,7 +4006,8 @@ class Dataset(object):
         :param set_name:
         :return:
         """
-        if eval('self.loaded_' + set_name + '[0] and self.loaded_' + set_name + '[1]'):
+        # if eval('self.loaded_' + set_name + '[0] and self.loaded_' + set_name + '[1]'):
+        if getattr(self, 'loaded_' + set_name)[0] and getattr(self, 'loaded_' + set_name)[1]:
             lengths = []
             plot_ids_in = []
             for id_in in self.ids_inputs:
@@ -3996,9 +4031,12 @@ class Dataset(object):
         """
         # self.__lock_read.acquire()  # LOCK (for avoiding reading the same samples by different threads)
 
-        new_last = eval('self.last_' + set_name + '+k')
-        last = eval('self.last_' + set_name)
-        length = eval('self.len_' + set_name)
+        # new_last = eval('self.last_' + set_name + '+k')
+        # last = eval('self.last_' + set_name)
+        # length = eval('self.len_' + set_name)
+        new_last = getattr(self, 'last_' + set_name) + k
+        last = getattr(self, 'last_' + set_name)
+        length = getattr(self, 'len_' + set_name)
         if new_last > length:
             new_last = new_last - length
             surpassed = True
