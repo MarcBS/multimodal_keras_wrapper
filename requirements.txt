@@ -8,7 +8,5 @@ scipy
 future
 cython
 sklearn
---allow-external keras
---allow-unverified keras
 git+https://github.com/MarcBS/keras#egg=keras
 
