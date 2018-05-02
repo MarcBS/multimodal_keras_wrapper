@@ -386,6 +386,7 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
 
     mean_iou = np.mean(inter / union)
     acc = np.sum(inter) / np.sum(cm)
+    
     if verbose > 0:
         logging.info('Mean IoU: %f' % mean_iou)
         logging.info('Accuracy: %f' % float(acc))

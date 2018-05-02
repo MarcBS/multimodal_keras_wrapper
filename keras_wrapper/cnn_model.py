@@ -18,8 +18,7 @@ import keras
 from keras import backend as K
 from keras.applications.vgg19 import VGG19
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
-from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
+from keras.layers import concatenate, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json, load_model
 from keras.optimizers import *
@@ -34,8 +33,13 @@ from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_pr
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
+    from keras.layers import Convolution2D as Conv2D
+    from keras.layers import Deconvolution2D as Conv2DTranspose
 else:
     from keras.layers import Concatenate
+    from keras.layers import Conv2D
+    from keras.layers import Conv2DTranspose
+
 mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 
@@ -3008,37 +3012,37 @@ class Model_Wrapper(object):
 
         # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
         # this applies 32 convolution filters of size 3x3 each.
-        x = Convolution2D(32, 3, 3, border_mode='valid')(inp)
+        x = Conv2D(32, (3, 3), padding='valid')(inp)
         x = Activation('relu')(x)
-        x = Convolution2D(32, 3, 3)(x)
-        x = Activation('relu')(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
-        x = Dropout(0.25)(x)
-
-        x = Convolution2D(64, 3, 3, border_mode='valid')(x)
-        x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
+        x = Conv2D(32, (3, 3))(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
         x = Dropout(0.25)(x)
 
-        x = Convolution2D(128, 3, 3, border_mode='valid')(x)
+        x = Conv2D(64, (3, 3), padding='valid')(x)
         x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
-        x = Activation('relu')(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
-        x = Dropout(0.25)(x)
-
-        x = Convolution2D(256, 3, 3, border_mode='valid')(x)
-        x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
+        x = Conv2D(64, (3, 3))(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
         x = Dropout(0.25)(x)
 
-        x = Convolution2D(256, 3, 3, border_mode='valid')(x)
+        x = Conv2D(128, (3, 3), padding='valid')(x)
         x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
+        x = Conv2D(64, (3, 3))(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Conv2D(256, (3, 3), padding='valid')(x)
+        x = Activation('relu')(x)
+        x = Conv2D(64, (3, 3))(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Conv2D(256, (3, 3), padding='valid')(x)
+        x = Activation('relu')(x)
+        x = Conv2D(64, (3, 3))(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
         x = Dropout(0.25)(x)
@@ -3067,37 +3071,37 @@ class Model_Wrapper(object):
         self.model = Sequential()
         # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
         # this applies 32 convolution filters of size 3x3 each.
-        self.model.add(Convolution2D(32, 3, 3, border_mode='valid', input_shape=input_shape))
+        self.model.add(Conv2D(32, (3, 3), padding='valid', input_shape=input_shape))
         self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(32, 3, 3))
-        self.model.add(Activation('relu'))
-        self.model.add(MaxPooling2D(pool_size=(2, 2)))
-        self.model.add(Dropout(0.25))
-
-        self.model.add(Convolution2D(64, 3, 3, border_mode='valid'))
-        self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(32, (3, 3)))
         self.model.add(Activation('relu'))
         self.model.add(MaxPooling2D(pool_size=(2, 2)))
         self.model.add(Dropout(0.25))
 
-        self.model.add(Convolution2D(128, 3, 3, border_mode='valid'))
+        self.model.add(Conv2D(64, (3, 3), padding='valid'))
         self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
-        self.model.add(Activation('relu'))
-        self.model.add(MaxPooling2D(pool_size=(2, 2)))
-        self.model.add(Dropout(0.25))
-
-        self.model.add(Convolution2D(256, 3, 3, border_mode='valid'))
-        self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(Activation('relu'))
         self.model.add(MaxPooling2D(pool_size=(2, 2)))
         self.model.add(Dropout(0.25))
 
-        self.model.add(Convolution2D(256, 3, 3, border_mode='valid'))
+        self.model.add(Conv2D(128, (3, 3), padding='valid'))
         self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
+        self.model.add(Activation('relu'))
+        self.model.add(MaxPooling2D(pool_size=(2, 2)))
+        self.model.add(Dropout(0.25))
+
+        self.model.add(Conv2D(256, (3, 3), padding='valid'))
+        self.model.add(Activation('relu'))
+        self.model.add(Conv2D(64, (3, 3)))
+        self.model.add(Activation('relu'))
+        self.model.add(MaxPooling2D(pool_size=(2, 2)))
+        self.model.add(Dropout(0.25))
+
+        self.model.add(Conv2D(256, (3, 3), padding='valid'))
+        self.model.add(Activation('relu'))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(Activation('relu'))
         self.model.add(MaxPooling2D(pool_size=(2, 2)))
         self.model.add(Dropout(0.25))
@@ -3123,11 +3127,11 @@ class Model_Wrapper(object):
 
         self.model = Sequential()
         self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
-        self.model.add(Convolution2D(32, 1, 1, activation='relu'))
+        self.model.add(Conv2D(32, (1, 1), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(16, 3, 3, activation='relu'))
+        self.model.add(Conv2D(16, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(8, 3, 3, activation='relu'))
+        self.model.add(Conv2D(8, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(1, 1)))
 
         self.model.add(Flatten())
@@ -3146,39 +3150,39 @@ class Model_Wrapper(object):
 
         self.model = Sequential()
         self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
-        self.model.add(Convolution2D(64, 3, 3, activation='relu'))
+        self.model.add(Conv2D(64, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(64, 3, 3, activation='relu'))
+        self.model.add(Conv2D(64, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3, activation='relu'))
+        self.model.add(Conv2D(128, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3, activation='relu'))
+        self.model.add(Conv2D(128, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3, activation='relu'))
+        self.model.add(Conv2D(256, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3, activation='relu'))
+        self.model.add(Conv2D(256, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3, activation='relu'))
+        self.model.add(Conv2D(256, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(Flatten())
@@ -3200,51 +3204,51 @@ class Model_Wrapper(object):
 
         self.model = Sequential()
         self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(64, 3, 3))
-        self.model.add(PReLU())
-        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-        self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3))
-        self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3))
+        self.model.add(Conv2D(128, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3))
-        self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3))
+        self.model.add(Conv2D(128, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(256, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(256, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(256, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(512, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(512, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(512, (3, 3)))
+        self.model.add(PReLU())
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+        self.model.add(ZeroPadding2D((1, 1)))
+        self.model.add(Conv2D(512, (3, 3)))
+        self.model.add(PReLU())
+        self.model.add(ZeroPadding2D((1, 1)))
+        self.model.add(Conv2D(512, (3, 3)))
+        self.model.add(PReLU())
+        self.model.add(ZeroPadding2D((1, 1)))
+        self.model.add(Conv2D(512, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
@@ -3269,39 +3273,39 @@ class Model_Wrapper(object):
         vis_input = Input(shape=input_shape, name="vis_input")
 
         x = ZeroPadding2D((1, 1))(vis_input)
-        x = Convolution2D(64, 3, 3, activation='relu')(x)
+        x = Conv2D(64, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(64, 3, 3, activation='relu')(x)
+        x = Conv2D(64, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(128, 3, 3, activation='relu')(x)
+        x = Conv2D(128, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(128, 3, 3, activation='relu')(x)
+        x = Conv2D(128, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = Conv2D(256, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = Conv2D(256, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = Conv2D(256, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2),
                          name='last_max_pool')(x)
 
@@ -3371,61 +3375,60 @@ class Model_Wrapper(object):
             W_regularizer = None
             b_regularizer = None
 
-        pathway1 = Convolution2D(branch1[0], 1, 1,
+        pathway1 = Conv2D(branch1[0], (1, 1),
                                  subsample=subsample,
                                  activation=activation,
-                                 border_mode=border_mode,
+                                 padding=border_mode,
                                  W_regularizer=W_regularizer,
                                  b_regularizer=b_regularizer,
                                  bias=False,
                                  dim_ordering=dim_ordering)(x)
 
-        pathway2 = Convolution2D(branch2[0], 1, 1,
+        pathway2 = Conv2D(branch2[0], (1, 1),
                                  subsample=subsample,
                                  activation=activation,
-                                 border_mode=border_mode,
+                                 padding=border_mode,
                                  W_regularizer=W_regularizer,
                                  b_regularizer=b_regularizer,
                                  bias=False,
                                  dim_ordering=dim_ordering)(x)
-        pathway2 = Convolution2D(branch2[1], 3, 3,
+        pathway2 = Conv2D(branch2[1], (3, 3),
                                  subsample=subsample,
                                  activation=activation,
-                                 border_mode=border_mode,
+                                 padding=border_mode,
                                  W_regularizer=W_regularizer,
                                  b_regularizer=b_regularizer,
                                  bias=False,
                                  dim_ordering=dim_ordering)(pathway2)
 
-        pathway3 = Convolution2D(branch3[0], 1, 1,
+        pathway3 = Conv2D(branch3[0], (1, 1),
                                  subsample=subsample,
                                  activation=activation,
-                                 border_mode=border_mode,
+                                 padding=border_mode,
                                  W_regularizer=W_regularizer,
                                  b_regularizer=b_regularizer,
                                  bias=False,
                                  dim_ordering=dim_ordering)(x)
-        pathway3 = Convolution2D(branch3[1], 5, 5,
+        pathway3 = Conv2D(branch3[1], (5, 5),
                                  subsample=subsample,
                                  activation=activation,
-                                 border_mode=border_mode,
+                                 padding=border_mode,
                                  W_regularizer=W_regularizer,
                                  b_regularizer=b_regularizer,
                                  bias=False,
                                  dim_ordering=dim_ordering)(pathway3)
 
         pathway4 = MaxPooling2D(pool_size=(1, 1), dim_ordering=dim_ordering)(x)
-        pathway4 = Convolution2D(branch4[0], 1, 1,
+        pathway4 = Conv2D(branch4[0], (1, 1),
                                  subsample=subsample,
                                  activation=activation,
-                                 border_mode=border_mode,
+                                 padding=border_mode,
                                  W_regularizer=W_regularizer,
                                  b_regularizer=b_regularizer,
                                  bias=False,
                                  dim_ordering=dim_ordering)(pathway4)
 
-        return merge([pathway1, pathway2, pathway3, pathway4],
-                     mode='concat', concat_axis=concat_axis)
+        return concatenate([pathway1, pathway2, pathway3, pathway4], axis=concat_axis)
 
     @staticmethod
     def conv_layer(x, nb_filter, nb_row, nb_col, dim_ordering,
@@ -3439,10 +3442,10 @@ class Model_Wrapper(object):
             W_regularizer = None
             b_regularizer = None
 
-        x = Convolution2D(nb_filter, nb_row, nb_col,
+        x = Conv2D(nb_filter, (nb_row, nb_col),
                           subsample=subsample,
                           activation=activation,
-                          border_mode=border_mode,
+                          padding=border_mode,
                           W_regularizer=W_regularizer,
                           b_regularizer=b_regularizer,
                           bias=False,
@@ -3631,7 +3634,7 @@ class Model_Wrapper(object):
     def add_One_vs_One_3x3_Functional(input, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
-        out_3x3 = Convolution2D(nkernels, 3, 3, name='3x3/ecoc_' + str(id_branch), activation='relu')(input)
+        out_3x3 = Conv2D(nkernels, (3, 3), name='3x3/ecoc_' + str(id_branch), activation='relu')(input)
 
         # Average Pooling    pool_size=(7,7)
         x = AveragePooling2D(pool_size=input_shape, strides=(1, 1), name='ave_pool/ecoc_' + str(id_branch))(out_3x3)
@@ -3648,13 +3651,13 @@ class Model_Wrapper(object):
     def add_One_vs_One_3x3_double_Functional(input, input_shape, id_branch, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
-        out_3x3 = Convolution2D(64, 3, 3, name='3x3_1/ecoc_' + str(id_branch), activation='relu')(input)
+        out_3x3 = Conv2D(64, (3, 3), name='3x3_1/ecoc_' + str(id_branch), activation='relu')(input)
 
         # Max Pooling
         x = MaxPooling2D(strides=(2, 2), pool_size=(2, 2), name='max_pool/ecoc_' + str(id_branch))(out_3x3)
 
         # 3x3 convolution
-        x = Convolution2D(32, 3, 3, name='3x3_2/ecoc_' + str(id_branch), activation='relu')(x)
+        x = Conv2D(32, (3, 3), name='3x3_2/ecoc_' + str(id_branch), activation='relu')(x)
 
         # Softmax
         output_name = 'fc_OnevsOne_' + str(id_branch) + '/out'
@@ -3732,27 +3735,27 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        self.model.add_node(Convolution2D(kernels_1x1, 1, 1), name=id + '/1x1', input=input_layer)
+        self.model.add_node(Conv2D(kernels_1x1, (1, 1)), name=id + '/1x1', input=input_layer)
         self.model.add_node(Activation('relu'), name=id + '/relu_1x1', input=id + '/1x1')
 
         # Branch 2
-        self.model.add_node(Convolution2D(kernels_3x3_reduce, 1, 1), name=id + '/3x3_reduce', input=input_layer)
+        self.model.add_node(Conv2D(kernels_3x3_reduce, (1, 1)), name=id + '/3x3_reduce', input=input_layer)
         self.model.add_node(Activation('relu'), name=id + '/relu_3x3_reduce', input=id + '/3x3_reduce')
         self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/3x3_zeropadding', input=id + '/relu_3x3_reduce')
-        self.model.add_node(Convolution2D(kernels_3x3, 3, 3), name=id + '/3x3', input=id + '/3x3_zeropadding')
+        self.model.add_node(Conv2D(kernels_3x3, (3, 3)), name=id + '/3x3', input=id + '/3x3_zeropadding')
         self.model.add_node(Activation('relu'), name=id + '/relu_3x3', input=id + '/3x3')
 
         # Branch 3
-        self.model.add_node(Convolution2D(kernels_5x5_reduce, 1, 1), name=id + '/5x5_reduce', input=input_layer)
+        self.model.add_node(Conv2D(kernels_5x5_reduce, (1, 1)), name=id + '/5x5_reduce', input=input_layer)
         self.model.add_node(Activation('relu'), name=id + '/relu_5x5_reduce', input=id + '/5x5_reduce')
         self.model.add_node(ZeroPadding2D((2, 2)), name=id + '/5x5_zeropadding', input=id + '/relu_5x5_reduce')
-        self.model.add_node(Convolution2D(kernels_5x5, 5, 5), name=id + '/5x5', input=id + '/5x5_zeropadding')
+        self.model.add_node(Conv2D(kernels_5x5, (5, 5)), name=id + '/5x5', input=id + '/5x5_zeropadding')
         self.model.add_node(Activation('relu'), name=id + '/relu_5x5', input=id + '/5x5')
 
         # Branch 4
         self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/pool_zeropadding', input=input_layer)
         self.model.add_node(MaxPooling2D((3, 3), strides=(1, 1)), name=id + '/pool', input=id + '/pool_zeropadding')
-        self.model.add_node(Convolution2D(kernels_pool_projection, 1, 1), name=id + '/pool_proj', input=id + '/pool')
+        self.model.add_node(Conv2D(kernels_pool_projection, (1, 1)), name=id + '/pool_proj', input=id + '/pool')
         self.model.add_node(Activation('relu'), name=id + '/relu_pool_proj', input=id + '/pool_proj')
 
         # Concatenate
@@ -3778,26 +3781,26 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        x_b1 = Convolution2D(kernels_1x1, 1, 1, name=id + '/1x1', activation='relu')(input_layer)
+        x_b1 = Conv2D(kernels_1x1, (1, 1), name=id + '/1x1', activation='relu')(input_layer)
 
         # Branch 2
-        x_b2 = Convolution2D(kernels_3x3_reduce, 1, 1, name=id + '/3x3_reduce', activation='relu')(input_layer)
+        x_b2 = Conv2D(kernels_3x3_reduce, (1, 1), name=id + '/3x3_reduce', activation='relu')(input_layer)
         x_b2 = ZeroPadding2D((1, 1), name=id + '/3x3_zeropadding')(x_b2)
-        x_b2 = Convolution2D(kernels_3x3, 3, 3, name=id + '/3x3', activation='relu')(x_b2)
+        x_b2 = Conv2D(kernels_3x3, (3, 3), name=id + '/3x3', activation='relu')(x_b2)
 
         # Branch 3
-        x_b3 = Convolution2D(kernels_5x5_reduce, 1, 1, name=id + '/5x5_reduce', activation='relu')(input_layer)
+        x_b3 = Conv2D(kernels_5x5_reduce, (1, 1), name=id + '/5x5_reduce', activation='relu')(input_layer)
         x_b3 = ZeroPadding2D((2, 2), name=id + '/5x5_zeropadding')(x_b3)
-        x_b3 = Convolution2D(kernels_5x5, 5, 5, name=id + '/5x5', activation='relu')(x_b3)
+        x_b3 = Conv2D(kernels_5x5, (5, 5), name=id + '/5x5', activation='relu')(x_b3)
 
         # Branch 4
         x_b4 = ZeroPadding2D((1, 1), name=id + '/pool_zeropadding')(input_layer)
         x_b4 = MaxPooling2D((3, 3), strides=(1, 1), name=id + '/pool')(x_b4)
-        x_b4 = Convolution2D(kernels_pool_projection, 1, 1, name=id + '/pool_proj', activation='relu')(x_b4)
+        x_b4 = Conv2D(kernels_pool_projection, (1, 1), name=id + '/pool_proj', activation='relu')(x_b4)
 
         # Concatenate
         out_name = id + '/concat'
-        out_node = merge([x_b1, x_b2, x_b3, x_b4], mode='concat', concat_axis=1, name=out_name)
+        out_node = concatenate([x_b1, x_b2, x_b3, x_b4], axis=1, name=out_name)
 
         return [out_node, out_name]
 
@@ -3820,7 +3823,7 @@ class Model_Wrapper(object):
         # join outputs from OneVsOne classifiers
         ecoc_loss_name = 'ecoc_loss'
         final_loss_name = 'final_loss/out'
-        ecoc_loss = merge(inputs_list, name=ecoc_loss_name, mode='concat', concat_axis=1)
+        ecoc_loss = concatenate(inputs_list, name=ecoc_loss_name, axis=1)
         drop = Dropout(0.5, name='final_loss/drop')(ecoc_loss)
         # apply final joint prediction
         final_loss = Dense(nOutput, activation=activation, name=final_loss_name)(drop)
@@ -3855,7 +3858,7 @@ class Model_Wrapper(object):
 
         # Layers
         self.model.add_node(ZeroPadding2D((1, 1)), name='CAM_conv/zeropadding', input='input')
-        self.model.add_node(Convolution2D(1024, 3, 3), name='CAM_conv', input='CAM_conv/zeropadding')
+        self.model.add_node(Conv2D(1024, (3, 3)), name='CAM_conv', input='CAM_conv/zeropadding')
         self.model.add_node(Activation('relu'), name='CAM_conv/relu', input='CAM_conv')
         self.model.add_node(AveragePooling2D(pool_size=(14, 14)), name='GAP', input='CAM_conv/relu')
         self.model.add_node(Flatten(), name='GAP/flatten', input='GAP')
@@ -3908,9 +3911,9 @@ class Model_Wrapper(object):
             new_layer = self.add_dense_layer(prev_layer, k, drop, init_weights, name=name_dense)
             list_outputs.append(new_layer)
             # Merge with previous layer
-            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=axis, name=name_merge)
+            prev_layer = concatenate([new_layer, prev_layer], axis=axis, name=name_merge)
 
-        return merge(list_outputs, mode='concat', concat_axis=axis, name=name_merge)
+        return concatenate(list_outputs, axis=axis, name=name_merge)
 
     @staticmethod
     def add_dense_layer(in_layer, k, drop, init_weights, name=None):
@@ -3943,7 +3946,7 @@ class Model_Wrapper(object):
 
         out_layer = BatchNormalization(mode=2, axis=1, name=name_batch)(in_layer)
         out_layer = Activation('relu', name=name_activ)(out_layer)
-        out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same', name=name_conv)(out_layer)
+        out_layer = Conv2D(k, (3, 3), kernel_initializer=init_weights, padding='same', name=name_conv)(out_layer)
         if drop > 0.0:
             out_layer = Dropout(drop, name=name_drop)(out_layer)
         return out_layer
@@ -3982,17 +3985,18 @@ class Model_Wrapper(object):
         else:
             raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
+
         # Dense Block
         x_dense = self.add_dense_block(x, nb_layers, growth, drop,
                                        init_weights)  # (growth*nb_layers) feature maps added
 
         # Concatenate and skip connection recovery for upsampling path
-        skip = merge([x, x_dense], mode='concat', concat_axis=axis)
+        skip = concatenate([x, x_dense], axis=axis)
 
         # Transition Down
         x_out = BatchNormalization(mode=2, axis=1)(skip)
         x_out = Activation('relu')(x_out)
-        x_out = Convolution2D(nb_filters_conv, 1, 1, init=init_weights, border_mode='same')(x_out)
+        x_out = Conv2D(nb_filters_conv, (1, 1), kernel_initializer=init_weights, padding='same')(x_out)
         if drop > 0.0:
             x_out = Dropout(drop)(x_out)
         x_out = MaxPooling2D(pool_size=(pool_size, pool_size))(x_out)
@@ -4027,12 +4031,20 @@ class Model_Wrapper(object):
 
         :return: output layer
         """
-        x = Deconvolution2D(nb_filters_deconv, 3, 3,
-                            subsample=(2, 2),
-                            init=init_weights, border_mode='valid')(x)
+
+        if K.image_dim_ordering() == 'th':
+            axis = 1
+        elif K.image_dim_ordering() == 'tf':
+            axis = -1
+        else:
+            raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
+
+        x = Conv2DTranspose(nb_filters_deconv, (3, 3),
+                            strides=(2, 2),
+                            kernel_initializer=init_weights, padding='valid')(x)
 
         # Skip connection concatenation
-        x = Concatenate(cropping=[None, None, 'center', 'center'])([skip_conn, x])
+        x = Concatenate(axis=axis, cropping=[None, None, 'center', 'center'])([skip_conn, x])
 
         # Dense Block
         x = self.add_dense_block(x, nb_layers, growth, drop, init_weights,
