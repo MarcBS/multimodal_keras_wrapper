@@ -3194,8 +3194,8 @@ class Dataset(object):
                 if useBGR:
                     if self.img_size[id][2] == 3:  # if has 3 channels
                         train_mean = train_mean[:, :, ::-1]
-                    if keras.backend.image_data_format() == 'channels_first':
-                        train_mean = train_mean.transpose(2, 0, 1)
+                if keras.backend.image_data_format() == 'channels_first':
+                    train_mean = train_mean.transpose(2, 0, 1)
 
             # Also normalize training mean image if we are applying normalization to images
             if normalization:
