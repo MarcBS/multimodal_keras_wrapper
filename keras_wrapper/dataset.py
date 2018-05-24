@@ -3186,7 +3186,7 @@ class Dataset(object):
                 raise Exception('Training mean is not loaded or calculated yet for the input with id "' + id + '".')
             train_mean = copy.copy(self.train_mean[id])
             train_mean = misc.imresize(train_mean, self.img_size_crop[id][0:2])
-	    train_mean = train_mean.astype(np.float64)
+            train_mean = train_mean.astype(np.float64)
 
             # Transpose dimensions
             if len(self.img_size[id]) == 3:  # if it is a 3D image
