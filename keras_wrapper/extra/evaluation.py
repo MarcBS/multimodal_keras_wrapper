@@ -339,9 +339,6 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
     gt_list = extra_vars[split]['references']
     discard_classes = extra_vars['discard_classes']
 
-    np.save('/media/HDD_3TB/bea/gt.npy', gt_list)
-    np.save('/media/HDD_3TB/bea/pred.npy', pred_list)
-
     pred_class_list = []
     for sample_score in pred_list:
         pred_class_list += list(np.argmax(sample_score, axis=1))

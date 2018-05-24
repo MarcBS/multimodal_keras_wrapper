@@ -3314,7 +3314,7 @@ class Dataset(object):
                 if useBGR:
                     if self.img_size[id][2] == 3:  # if has 3 channels
                         im = im[:, :, ::-1]
-              	if keras.backend.image_data_format() == 'channels_first':
+                if keras.backend.image_data_format() == 'channels_first':
                     im = im.transpose(2, 0, 1)
             else:
                 pass
