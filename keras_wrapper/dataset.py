@@ -3037,7 +3037,7 @@ class Dataset(object):
 
         return data
 
-    def setTrainMean(self, mean_image, id, use_RGB=True, normalization=False):
+    def setTrainMean(self, mean_image, id, normalization=False):
         """
             Loads a pre-calculated training mean image, 'mean_image' can either be:
 
@@ -3046,7 +3046,6 @@ class Dataset(object):
             - string with the path to the stored image.
 
         :param mean_image:
-        :param user_RGB: set to False for grayscale images
         :param normalization:
         :param id: identifier of the type of input whose train mean is being introduced.
         """
