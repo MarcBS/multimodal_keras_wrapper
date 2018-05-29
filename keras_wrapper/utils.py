@@ -721,7 +721,7 @@ def indices_2_one_hot(indices, n):
     :param n: integer. Size of the vocabulary
     :return: numpy array with shape (len(indices), n)
     """
-    one_hot = np.zeros((len(indices), n), dtype=np.int)
+    one_hot = np.zeros((len(indices), n), dtype=np.int8)
     for i in range(len(indices)):
         if indices[i] >= n:
             raise ValueError("Index out of bounds when converting to one hot")
@@ -908,7 +908,7 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
 
     :param preds: Predictions codified as word indices.
     :param index2word: Mapping from word indices into word characters.
-    :param alphas: Attention model weights
+    :param alphas: Attention model weights: Float matrix with shape (I, J) (I: number of target items; J: number of source items).
     :param heuristic: Replace unknown words heuristic (0, 1 or 2)
     :param x_text: Source text (for unk replacement)
     :param unk_symbol: Unknown words symbol
