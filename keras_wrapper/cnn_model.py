@@ -16,7 +16,6 @@ import matplotlib as mpl
 
 import keras
 from keras import backend as K
-from keras.applications.vgg19 import VGG19
 from keras.engine.training import Model
 from keras.layers import concatenate, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
@@ -3323,6 +3322,7 @@ class Model_Wrapper(object):
         # Define inputs and outputs IDs
         self.ids_inputs = ['input_1']
         self.ids_outputs = ['predictions']
+        from keras.applications.vgg19 import VGG19
 
         # Load VGG19 model pre-trained on ImageNet
         self.model = VGG19()
@@ -3341,6 +3341,7 @@ class Model_Wrapper(object):
         # Define inputs and outputs IDs
         self.ids_inputs = ['input_1']
         self.ids_outputs = ['predictions']
+        from keras.applications.vgg19 import VGG19
 
         # Load VGG19 model pre-trained on ImageNet
         self.model = VGG19(weights='imagenet', layers_lr=0.001)
