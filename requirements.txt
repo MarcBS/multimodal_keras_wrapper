@@ -7,6 +7,8 @@ nltk
 scipy
 future
 cython
+keras_applications
+keras_preprocessing
 sklearn
 git+https://github.com/MarcBS/keras#egg=keras
 
