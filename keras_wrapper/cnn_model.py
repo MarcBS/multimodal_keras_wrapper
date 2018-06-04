@@ -8,7 +8,7 @@ import sys
 import time
 
 if sys.version_info.major == 3:
-    import _pickle  as pk
+    import _pickle as pk
 else:
     import cPickle as pk
 import cloudpickle as cloudpk
