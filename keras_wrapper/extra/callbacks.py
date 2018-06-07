@@ -923,7 +923,7 @@ class LearningRateReducer(KerasCallback):
                                   float(current_nb) * self.half_life ** self.warmup_exp))
 
         else:
-            raise NotImplementedError, 'The decay function %s is not implemented.' % str(self.reduction_function)
+            raise NotImplementedError('The decay function %s is not implemented.' % str(self.reduction_function))
 
         if self.reduction_function == 'noam':
             lr = self.initial_lr
