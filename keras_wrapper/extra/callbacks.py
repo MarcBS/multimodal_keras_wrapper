@@ -846,16 +846,19 @@ class EarlyStopping(KerasCallback):
 
 
 class LearningRateReducer(KerasCallback):
-    def __init__(self, reduce_rate=0.99, reduce_each_epochs=True, reduce_frequency=1, start_reduction_on_epoch=0,
-                 exp_base=0.5, half_life=50000, reduction_function='linear', epsilon=1e-11, verbose=1):
+    def __init__(self, initial_lr=1., reduce_rate=0.99, reduce_each_epochs=True, reduce_frequency=1, start_reduction_on_epoch=0,
+                 exp_base=0.5, half_life=50000, warmup_exp=-1.5, reduction_function='linear', epsilon=1e-11, verbose=1):
         """
         Reduces learning rate during the training.
         Two different decays are implemented:
             * linear:
                 lr = reduce_rate * lr
             * exponential:
-                lr = exp_base^{current_step / half_life) * reduce_rate * lr
+                lr = exp_base**{current_step / half_life) * reduce_rate * lr
+            * noam:
+                lr = initial_lr * min(current_step**exp_base, current_step * half_life ** warmup_exp)
 
+        :param initial_lr: Initial learning rate.
         :param reduce_rate: Reduction rate.
         :param reduce_each_epochs: Whether we reduce each epochs or each updates.
         :param reduce_frequency: Reduce each this number of epochs/updates
@@ -869,20 +872,21 @@ class LearningRateReducer(KerasCallback):
 
         super(LearningRateReducer, self).__init__()
 
+        self.initial_lr = np.float32(initial_lr)
         self.reduce_rate = reduce_rate
         self.reduce_each_epochs = reduce_each_epochs
         self.reduce_frequency = reduce_frequency
-
         self.exp_base = exp_base
         self.half_life = half_life
         self.reduction_function = reduction_function
+        self.warmup_exp = warmup_exp
         self.start_reduction_on_epoch = start_reduction_on_epoch
         self.verbose = verbose
         self.current_update_nb = 0
         self.epsilon = epsilon
         self.epoch = 0
         self.new_lr = None
-        assert self.reduction_function in ['linear', 'exponential'], 'Reduction function "%s" unimplemented!' % \
+        assert self.reduction_function in ['linear', 'exponential', 'noam'], 'Reduction function "%s" unimplemented!' % \
                                                                      str(self.reduction_function)
 
     def on_epoch_end(self, epoch, logs={}):
@@ -910,19 +914,24 @@ class LearningRateReducer(KerasCallback):
         self.reduce_lr(self.current_update_nb)
 
     def reduce_lr(self, current_nb):
-        new_rate = self.reduce_rate if self.reduction_function == 'linear' else \
-            np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
-        if K.backend() == 'tensorflow':
-            print('WARNING: learning rate decay is deactivated when using TensorFlow') 
-            """
-            lr = self.model.optimizer.optimizer.get_lr()
-            self.new_lr = np.float32(lr * new_rate)
-            self.model.optimizer.optimizer.set_lr(self.new_lr)
-            """
+        if self.reduction_function == 'linear':
+            new_rate = self.reduce_rate
+        elif self.reduction_function == 'exponential':
+            new_rate = np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
+        elif self.reduction_function == 'noam':
+            new_rate = np.float32(min(float(current_nb)** self.exp_base,
+                                  float(current_nb) * self.half_life ** self.warmup_exp))
+
+        else:
+            raise NotImplementedError, 'The decay function %s is not implemented.' % str(self.reduction_function)
+
+        if self.reduction_function == 'noam':
+            lr = self.initial_lr
         else:
             lr = self.model.optimizer.lr.get_value()
-            self.new_lr = np.float32(lr * new_rate)
-            self.model.optimizer.lr.set_value(self.new_lr)
+        self.new_lr = np.float32(lr * new_rate)
+
+        K.set_value(self.model.optimizer.lr, self.new_lr)
 
         if self.reduce_each_epochs and self.verbose > 0:
             logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr), float(self.new_lr)))
