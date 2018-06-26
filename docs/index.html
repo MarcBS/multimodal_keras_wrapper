@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Welcome to Staged Keras Wrapper’s documentation! &mdash; Staged Keras Wrapper 0.55 documentation</title>
+  <title>Welcome to Multimodal Keras Wrapper’s documentation! &mdash; Multimodal Keras Wrapper 0.55 documentation</title>
   
 
   
@@ -30,8 +30,8 @@
   
 
   
-    <link rel="top" title="Staged Keras Wrapper 0.55 documentation" href="#"/>
-        <link rel="next" title="Available Modules" href="code.html"/> 
+    <link rel="top" title="Multimodal Keras Wrapper 0.55 documentation" href="#"/>
+        <link rel="next" title="Introduction" href="intro.html"/> 
 
   
   <script src="_static/js/modernizr.min.js"></script>
@@ -49,7 +49,7 @@
           
 
           
-            <a href="#" class="icon icon-home"> Staged Keras Wrapper
+            <a href="#" class="icon icon-home"> Multimodal Keras Wrapper
           
 
           
@@ -81,7 +81,9 @@
             
             
                 <ul>
-<li class="toctree-l1"><a class="reference internal" href="code.html">Available Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Available Modules</a></li>
 </ul>
 
             
@@ -95,7 +97,7 @@
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
         <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="#">Staged Keras Wrapper</a>
+        <a href="#">Multimodal Keras Wrapper</a>
       </nav>
 
 
@@ -112,7 +114,7 @@
   <ul class="wy-breadcrumbs">
     <li><a href="#">Docs</a> &raquo;</li>
       
-    <li>Welcome to Staged Keras Wrapper&#8217;s documentation!</li>
+    <li>Welcome to Multimodal Keras Wrapper&#8217;s documentation!</li>
       <li class="wy-breadcrumbs-aside">
         
           
@@ -126,19 +128,37 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="welcome-to-staged-keras-wrapper-s-documentation">
-<h1>Welcome to Staged Keras Wrapper&#8217;s documentation!<a class="headerlink" href="#welcome-to-staged-keras-wrapper-s-documentation" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="welcome-to-multimodal-keras-wrapper-s-documentation">
+<h1>Welcome to Multimodal Keras Wrapper&#8217;s documentation!<a class="headerlink" href="#welcome-to-multimodal-keras-wrapper-s-documentation" title="Permalink to this headline">¶</a></h1>
 <p>Contents:</p>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="code.html">Available Modules</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="code.html#module-keras_wrapper.dataset">dataset.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#module-keras_wrapper.cnn_model">cnn_model.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#module-keras_wrapper.staged_network">staged_network.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#module-keras_wrapper.stage">stage.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#module-keras_wrapper.ecoc_classifier">ecoc_classifier.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#module-keras_wrapper.utils">utils.py</a></li>
-<li class="toctree-l2"><a class="reference internal" href="code.html#module-keras_wrapper.thread_loader">thread_loader.py</a></li>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#multimodal-keras-wrapper">Multimodal Keras Wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#documentation">Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#dependencies">Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#projects">Projects</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#keras">Keras</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#basic-components">Basic components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#creating-a-dataset">Creating a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#saving-or-loading-a-dataset">Saving or loading a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#creating-a-model-wrapper">Creating a Model_Wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#saving-or-loading-a-model-wrapper">Saving or loading a Model_Wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#connecting-a-dataset-to-a-model-wrapper">Connecting a Dataset to a Model_Wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#training">Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial.html#prediction">Prediction</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Available Modules</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#module-keras_wrapper.dataset">dataset.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#module-keras_wrapper.cnn_model">cnn_model.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#callbacks-keras-wrapper-py">callbacks_keras_wrapper.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#module-keras_wrapper.beam_search_ensemble">beam_search_ensemble.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modules.html#module-keras_wrapper.utils">utils.py</a></li>
 </ul>
 </li>
 </ul>
@@ -160,7 +180,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="code.html" class="btn btn-neutral float-right" title="Available Modules" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="intro.html" class="btn btn-neutral float-right" title="Introduction" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
     </div>

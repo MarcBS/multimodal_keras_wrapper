@@ -1,0 +1,374 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Tutorial &mdash; Multimodal Keras Wrapper 0.55 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="Multimodal Keras Wrapper 0.55 documentation" href="index.html"/>
+        <link rel="next" title="Available Modules" href="modules.html"/>
+        <link rel="prev" title="Introduction" href="intro.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> Multimodal Keras Wrapper
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.55
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#basic-components">Basic components</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-dataset">Creating a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#saving-or-loading-a-dataset">Saving or loading a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-model-wrapper">Creating a Model_Wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#saving-or-loading-a-model-wrapper">Saving or loading a Model_Wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#connecting-a-dataset-to-a-model-wrapper">Connecting a Dataset to a Model_Wrapper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training">Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#prediction">Prediction</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="modules.html">Available Modules</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">Multimodal Keras Wrapper</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+ 
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Tutorial</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/tutorial.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="tutorial">
+<span id="tutorial"></span><h1>Tutorial<a class="headerlink" href="#tutorial" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="basic-components">
+<span id="basic-components"></span><h2>Basic components<a class="headerlink" href="#basic-components" title="Permalink to this headline">¶</a></h2>
+<p>There are two basic components that have to be built in order to use the Multimodal Keras Wrapper,
+which are a <strong><a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/6d0b11248fd353cc189f674dc30beaf9689da182/keras_wrapper/dataset.py#L331">Dataset</a></strong> and a <strong><a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/6d0b11248fd353cc189f674dc30beaf9689da182/keras_wrapper/cnn_model.py#L154">Model_Wrapper</a></strong>.</p>
+<p>The class <strong>Dataset</strong> is in charge of:</p>
+<ul class="simple">
+<li>Storing, preprocessing and loading any kind of data for training a model (inputs).</li>
+<li>Storing, preprocessing and loading the ground truth associated to our data (outputs).</li>
+<li>Loading the data in batches for training or prediction.</li>
+</ul>
+<p>The Datasets can manage different <a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/6d0b11248fd353cc189f674dc30beaf9689da182/keras_wrapper/dataset.py#L389-L390">types of input/output data</a>, which can be summarized as:</p>
+<ul class="simple">
+<li>input types: &#8216;raw-image&#8217;, &#8216;video&#8217;, &#8216;image-features&#8217;, &#8216;video-features&#8217;, &#8216;text&#8217;</li>
+<li>output types: &#8216;categorical&#8217;, &#8216;binary&#8217;, &#8216;real&#8217;, &#8216;text&#8217;, &#8216;3DLabel&#8217;</li>
+</ul>
+<p>Currently, the class Dataset can be used for multiple kinds of multimodal problems,
+e.g. image/video classification, detection, multilabel prediction, regression, image/video captioning,
+visual question answering, multimodal translation, neural machine translation, etc.</p>
+<p>The class <strong>Model_Wrapper</strong> is in charge of:</p>
+<ul class="simple">
+<li>Storing an instance of a Keras&#8217; model.</li>
+<li>Receiving the inputs/outputs of the class Dataset and using the model for training or prediction.</li>
+<li>Providing two different methods for prediction. Either <a class="reference external" href="http://marcbs.github.io/multimodal_keras_wrapper/modules.html#keras_wrapper.cnn_model.Model_Wrapper.predictNet">predictNet()</a>, which uses a conventional Keras model for prediction, or <a class="reference external" href="http://marcbs.github.io/multimodal_keras_wrapper/modules.html#keras_wrapper.cnn_model.Model_Wrapper.predictBeamSearchNet">predictBeamSearchNet()</a>, which applies a BeamSearch for sequence generative models and additionally allows to create separate models <strong>model_init</strong> and <strong>model_next</strong> for applying an optimized prediction (see <a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/b348ce9d52404434b1e98316c7f09b5d5fd3df00/keras_wrapper/cnn_model.py#L1319-L1328">this</a> and <a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/f269207a65bfc77d5c2c89ea708bad8bff7f72ab/keras_wrapper/cnn_model.py#L1057">this</a> for further information).</li>
+</ul>
+<p>In this tutorial we will learn how to create each of the two basic components and how use a
+model for training and prediction.</p>
+</div>
+<div class="section" id="creating-a-dataset">
+<span id="creating-a-dataset"></span><h2>Creating a Dataset<a class="headerlink" href="#creating-a-dataset" title="Permalink to this headline">¶</a></h2>
+<p>First, let&#8217;s create a simple Dataset object with some sample data.
+The data used for this example can be found in <code class="docutils literal"><span class="pre">/repository_root/data/sample_data</span></code>.</p>
+<p>Dataset parameters definition.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">keras_wrapper.dataset</span> <span class="k">import</span> <span class="n">Dataset</span>
+
+<span class="n">dataset_name</span> <span class="o">=</span> <span class="s1">&#39;test_dataset&#39;</span>
+<span class="n">image_id</span> <span class="o">=</span> <span class="s1">&#39;input_image&#39;</span>
+<span class="n">label_id</span> <span class="o">=</span> <span class="s1">&#39;output_label&#39;</span>
+<span class="n">images_size</span> <span class="o">=</span> <span class="p">[</span><span class="mi">256</span><span class="p">,</span> <span class="mi">256</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+<span class="n">images_crop_size</span> <span class="o">=</span> <span class="p">[</span><span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>
+<span class="n">train_mean</span> <span class="o">=</span> <span class="p">[</span><span class="mf">103.939</span><span class="p">,</span> <span class="mf">116.779</span><span class="p">,</span> <span class="mf">123.68</span><span class="p">]</span>
+<span class="n">base_path</span> <span class="o">=</span> <span class="s1">&#39;&lt;/absolute/path/to/multimodal_keras_wrapper&gt;/data/sample_data&#39;</span>
+</pre></div>
+</div>
+<p>Empty dataset instance creation</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ds</span> <span class="o">=</span> <span class="n">Dataset</span><span class="p">(</span><span class="n">dataset_name</span><span class="p">,</span> <span class="n">base_path</span><span class="o">+</span><span class="s1">&#39;/images&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Insert dataset/model inputs</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># train split</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">setInput</span><span class="p">(</span><span class="n">base_path</span> <span class="o">+</span> <span class="s1">&#39;/train.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;train&#39;</span><span class="p">,</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;raw-image&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">image_id</span><span class="p">,</span>
+            <span class="n">img_size</span><span class="o">=</span><span class="n">images_size</span><span class="p">,</span> <span class="n">img_size_crop</span><span class="o">=</span><span class="n">images_crop_size</span><span class="p">)</span>
+<span class="c1"># val split</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">setInput</span><span class="p">(</span><span class="n">base_path</span> <span class="o">+</span> <span class="s1">&#39;/val.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;val&#39;</span><span class="p">,</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;raw-image&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">image_id</span><span class="p">,</span>
+            <span class="n">img_size</span><span class="o">=</span><span class="n">images_size</span><span class="p">,</span> <span class="n">img_size_crop</span><span class="o">=</span><span class="n">images_crop_size</span><span class="p">)</span>
+<span class="c1"># test split</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">setInput</span><span class="p">(</span><span class="n">base_path</span> <span class="o">+</span> <span class="s1">&#39;/test.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;test&#39;</span><span class="p">,</span>
+            <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;raw-image&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">image_id</span><span class="p">,</span>
+            <span class="n">img_size</span><span class="o">=</span><span class="n">images_size</span><span class="p">,</span> <span class="n">img_size_crop</span><span class="o">=</span><span class="n">images_crop_size</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Insert pre-calculated images train mean</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">ds</span><span class="o">.</span><span class="n">setTrainMean</span><span class="p">(</span><span class="n">train_mean</span><span class="p">,</span> <span class="n">image_id</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Insert dataset/model outputs</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="c1"># train split </span>
+<span class="n">ds</span><span class="o">.</span><span class="n">setOutput</span><span class="p">(</span><span class="n">base_path</span><span class="o">+</span><span class="s1">&#39;/train_labels.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;train&#39;</span><span class="p">,</span>
+           <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;categorical&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">label_id</span><span class="p">)</span>
+<span class="c1"># val split</span>
+<span class="n">ds</span><span class="o">.</span><span class="n">setOutput</span><span class="p">(</span><span class="n">base_path</span><span class="o">+</span><span class="s1">&#39;/val_labels.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;val&#39;</span><span class="p">,</span>
+           <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;categorical&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">label_id</span><span class="p">)</span>
+<span class="c1"># test split        </span>
+<span class="n">ds</span><span class="o">.</span><span class="n">setOutput</span><span class="p">(</span><span class="n">base_path</span><span class="o">+</span><span class="s1">&#39;/test_labels.txt&#39;</span><span class="p">,</span> <span class="s1">&#39;test&#39;</span><span class="p">,</span>
+           <span class="nb">type</span><span class="o">=</span><span class="s1">&#39;categorical&#39;</span><span class="p">,</span> <span class="nb">id</span><span class="o">=</span><span class="n">label_id</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="saving-or-loading-a-dataset">
+<span id="saving-or-loading-a-dataset"></span><h2>Saving or loading a Dataset<a class="headerlink" href="#saving-or-loading-a-dataset" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">keras_wrapper.dataset</span> <span class="k">import</span> <span class="n">saveDataset</span><span class="p">,</span> <span class="n">loadDataset</span>
+
+<span class="n">save_path</span> <span class="o">=</span> <span class="s1">&#39;&lt;/absolute/path/to/multimodal_keras_wrapper&gt;/Datasets&#39;</span>
+
+<span class="c1"># Save dataset</span>
+<span class="n">saveDataset</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">save_path</span><span class="p">)</span>
+
+<span class="c1"># Load dataset</span>
+<span class="n">ds</span> <span class="o">=</span> <span class="n">loadDataset</span><span class="p">(</span><span class="n">save_path</span><span class="o">+</span><span class="s1">&#39;/Dataset_&#39;</span><span class="o">+</span><span class="n">dataset_name</span><span class="o">+</span><span class="s1">&#39;.pkl&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In addition, we can print some basic information of the data stored in the dataset:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="nb">print</span> <span class="n">ds</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="creating-a-model-wrapper">
+<span id="creating-a-model-wrapper"></span><h2>Creating a Model_Wrapper<a class="headerlink" href="#creating-a-model-wrapper" title="Permalink to this headline">¶</a></h2>
+<p>Model_Wrapper parameters definition.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">keras_wrapper.cnn_model</span> <span class="k">import</span> <span class="n">Model_Wrapper</span>
+
+<span class="n">model_name</span> <span class="o">=</span> <span class="s1">&#39;our_model&#39;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="s1">&#39;VGG_19_ImageNet&#39;</span>
+<span class="n">save_path</span> <span class="o">=</span> <span class="s1">&#39;&lt;/absolute/path/to/multimodal_keras_wrapper&gt;/Models/&#39;</span>
+</pre></div>
+</div>
+<p>Create a basic CNN model</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">net</span> <span class="o">=</span> <span class="n">Model_Wrapper</span><span class="p">(</span><span class="n">nOutput</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">type</span><span class="p">,</span> <span class="n">model_name</span><span class="o">=</span><span class="n">model_name</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="n">images_crop_size</span><span class="p">)</span>
+<span class="n">net</span><span class="o">.</span><span class="n">setOptimizer</span><span class="p">(</span><span class="n">lr</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;accuracy&#39;</span><span class="p">])</span> <span class="c1"># compile it</span>
+</pre></div>
+</div>
+<p>By default, the model type built is the one defined in <a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/6d0b11248fd353cc189f674dc30beaf9689da182/keras_wrapper/cnn_model.py#L2003">Model_Wrapper.basic_model()</a>.
+Although, any kind of custom model can be defined just by:</p>
+<ul class="simple">
+<li>Defining a new method for the class Model_Wrapper which builds the model and stores it in self.model.</li>
+<li>Referencing it with type=&#8217;method_name&#8217; when creating a new Model_Wrapper instance.</li>
+</ul>
+</div>
+<div class="section" id="saving-or-loading-a-model-wrapper">
+<span id="saving-or-loading-a-model-wrapper"></span><h2>Saving or loading a Model_Wrapper<a class="headerlink" href="#saving-or-loading-a-model-wrapper" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">keras_wrapper.cnn_model</span> <span class="k">import</span> <span class="n">saveModel</span><span class="p">,</span> <span class="n">loadModel</span>
+
+<span class="n">save_epoch</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="c1"># Save model</span>
+<span class="n">saveModel</span><span class="p">(</span><span class="n">net</span><span class="p">,</span> <span class="n">save_epoch</span><span class="p">)</span>
+
+<span class="c1"># Load model</span>
+<span class="n">net</span> <span class="o">=</span> <span class="n">loadModel</span><span class="p">(</span><span class="n">save_path</span><span class="o">+</span><span class="s1">&#39;/&#39;</span><span class="o">+</span><span class="n">model_name</span><span class="p">,</span> <span class="n">save_epoch</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="connecting-a-dataset-to-a-model-wrapper">
+<span id="connecting-a-dataset-to-a-model-wrapper"></span><h2>Connecting a Dataset to a Model_Wrapper<a class="headerlink" href="#connecting-a-dataset-to-a-model-wrapper" title="Permalink to this headline">¶</a></h2>
+<p>In order to provide a correct communication between the Dataset and the Model_Wrapper objects, we have to provide the links between the Dataset ids positions and their corresponding layer identifiers in the Keras&#8217; Model as a dictionary.</p>
+<p>In this case we only have one input and one output, for this reason both ids are mapped to position 0 of our Dataset.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">net</span><span class="o">.</span><span class="n">setInputsMapping</span><span class="p">({</span><span class="n">net</span><span class="o">.</span><span class="n">ids_inputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="mi">0</span><span class="p">})</span>
+<span class="n">net</span><span class="o">.</span><span class="n">setOutputsMapping</span><span class="p">({</span><span class="n">net</span><span class="o">.</span><span class="n">ids_outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="mi">0</span><span class="p">})</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="training">
+<span id="training"></span><h2>Training<a class="headerlink" href="#training" title="Permalink to this headline">¶</a></h2>
+<p>We can specify several options for training our model, which are <a class="reference external" href="http://marcbs.github.io/multimodal_keras_wrapper/modules.html#keras_wrapper.cnn_model.Model_Wrapper.trainNet">summarized here</a>. If any of them is overriden then the <a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/011393580b2253a01c168d638b8c0bd06fe6d522/keras_wrapper/cnn_model.py#L454-L458">default values</a> will be used.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">train_overriden_parameters</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;n_epochs&#39;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">&#39;batch_size&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">}</span>
+
+<span class="n">net</span><span class="o">.</span><span class="n">trainNet</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">train_overriden_parameters</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="prediction">
+<span id="prediction"></span><h2>Prediction<a class="headerlink" href="#prediction" title="Permalink to this headline">¶</a></h2>
+<p>The same applies to the prediction method. We can find the <a class="reference external" href="http://marcbs.github.io/multimodal_keras_wrapper/modules.html#keras_wrapper.cnn_model.Model_Wrapper.predictNet">available parameters here</a> and the <a class="reference external" href="https://github.com/MarcBS/multimodal_keras_wrapper/blob/011393580b2253a01c168d638b8c0bd06fe6d522/keras_wrapper/cnn_model.py#L1468-L1470">default values here</a>.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">predict_overriden_parameters</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;batch_size&#39;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s1">&#39;predict_on_sets&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;test&#39;</span><span class="p">]}</span>
+
+<span class="n">net</span><span class="o">.</span><span class="n">predictNet</span><span class="p">(</span><span class="n">ds</span><span class="p">,</span> <span class="n">predict_overriden_parameters</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="modules.html" class="btn btn-neutral float-right" title="Available Modules" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="intro.html" class="btn btn-neutral" title="Introduction" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Marc Bolaños.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.55',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
