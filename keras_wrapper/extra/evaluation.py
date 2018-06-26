@@ -219,6 +219,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     """
     from sklearn import metrics as sklearn_metrics
     import numpy as np
+
     n_classes = extra_vars['n_classes']
 
     n_samples = len(pred_list)
