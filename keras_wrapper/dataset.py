@@ -22,6 +22,8 @@ else:
 
 from collections import Counter
 from operator import add
+from PIL import Image as pilimage
+from PIL import ImageEnhance
 import numpy as np
 from keras_wrapper.extra.read_write import create_dir_if_not_exists
 from keras_wrapper.extra.tokenizers import *
@@ -462,9 +464,9 @@ class Data_Batch_Generator(object):
                                                 normalization_type=self.params['normalization_type'],
                                                 meanSubstraction=self.params['mean_substraction'],
                                                 dataAugmentation=False,
-                                                wo_da_patch_type=wo_da_patch_type, 
-                                                da_patch_type=da_patch_type, 
-                                                da_enhance_list=da_enhance_list)
+                                                wo_da_patch_type=self.params['wo_da_patch_type'], 
+                                                da_patch_type=self.params['da_patch_type'], 
+                                                da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, None)[0]
                 else:
                     X_batch, Y_batch = self.dataset.getXY(self.set_split,
@@ -472,10 +474,10 @@ class Data_Batch_Generator(object):
                                                           normalization=self.params['normalization'],
                                                           normalization_type=self.params['normalization_type'],
                                                           meanSubstraction=self.params['mean_substraction'],
-                                                          dataAugmentation=data_augmentation,
-                                                          wo_da_patch_type=wo_da_patch_type, 
-                                                          da_patch_type=da_patch_type, 
-                                                          da_enhance_list=da_enhance_list)
+                                                          dataAugmentation=self.params['data_augmentation'],
+                                                          wo_da_patch_type=self.params['wo_da_patch_type'], 
+                                                          da_patch_type=self.params['da_patch_type'], 
+                                                          da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, Y_batch)
             yield (data)
 
@@ -3189,9 +3191,9 @@ class Dataset(object):
     def loadImages(self, images, id, normalization_type='(-1)-1',
                    normalization=True, meanSubstraction=False,
                    dataAugmentation=True, daRandomParams=None,
+                   wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
                    useBGR=False,
-                   external=False, loaded=False,
-                   wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[]):
+                   external=False, loaded=False):
         """
         Loads a set of images from disk.
 
@@ -3324,8 +3326,8 @@ class Dataset(object):
                 # TODO: 
                 # da_patch_type: resize_and_rndcrop, rndcrop_and_resize, resizekp_and_rndcrop.
                 # da_enhance_list: brightness, color, sharpness, contrast.
-                
                 min_value_enhance = 0.25
+                im = pilimage.fromarray(im.astype(np.uint8))
                 image_enhance_dict = {'brightness': 'ImageEnhance.Brightness(im)', 'color':'ImageEnhance.Color(im)',
                                       'sharpness':'ImageEnhance.Sharpness(im)',  'contrast':'ImageEnhance.Contrast(im)'}
                 
