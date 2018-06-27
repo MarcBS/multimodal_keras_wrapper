@@ -411,9 +411,9 @@ class Data_Batch_Generator(object):
                                                             normalization_type=self.params['normalization_type'],
                                                             meanSubstraction=self.params['mean_substraction'],
                                                             dataAugmentation=data_augmentation,
-                                                            wo_da_patch_type=wo_da_patch_type, 
-                                                            da_patch_type=da_patch_type, 
-                                                            da_enhance_list=da_enhance_list
+                                                            wo_da_patch_type=self.params['wo_da_patch_type'], 
+                                                            da_patch_type=self.params['da_patch_type'], 
+                                                            da_enhance_list=self.params['da_enhance_list']
                                                             )
                     data = self.net.prepareData(X_batch, None)[0]
 
@@ -424,9 +424,9 @@ class Data_Batch_Generator(object):
                                                                       normalization_type=self.params['normalization_type'],
                                                                       meanSubstraction=self.params['mean_substraction'],
                                                                       dataAugmentation=data_augmentation,
-                                                                      wo_da_patch_type=wo_da_patch_type, 
-                                                                      da_patch_type=da_patch_type, 
-                                                                      da_enhance_list=da_enhance_list)
+                                                                      wo_da_patch_type=self.params['wo_da_patch_type'], 
+                                                                      da_patch_type=self.params['da_patch_type'], 
+                                                                      da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, Y_batch)
 
             elif self.init_sample > -1 and self.final_sample > -1:
@@ -438,9 +438,9 @@ class Data_Batch_Generator(object):
                                                             normalization_type=self.params['normalization_type'],
                                                             meanSubstraction=self.params['mean_substraction'],
                                                             dataAugmentation=data_augmentatio,
-                                                            wo_da_patch_type=wo_da_patch_type, 
-                                                            da_patch_type=da_patch_type, 
-                                                            da_enhance_list=da_enhance_listn)
+                                                            wo_da_patch_type=self.params['wo_da_patch_type'], 
+                                                            da_patch_type=self.params['da_patch_type'], 
+                                                            da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, None)[0]
 
                 else:
@@ -450,9 +450,9 @@ class Data_Batch_Generator(object):
                                                                       normalization_type=self.params['normalization_type'],
                                                                       meanSubstraction=self.params['mean_substraction'],
                                                                       dataAugmentation=data_augmentation,
-                                                                      wo_da_patch_type=wo_da_patch_type, 
-                                                                      da_patch_type=da_patch_type, 
-                                                                      da_enhance_list=da_enhance_list)
+                                                                      wo_da_patch_type=self.params['wo_da_patch_type'], 
+                                                                      da_patch_type=self.params['da_patch_type'], 
+                                                                      da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, Y_batch)
 
             else:
@@ -474,7 +474,7 @@ class Data_Batch_Generator(object):
                                                           normalization=self.params['normalization'],
                                                           normalization_type=self.params['normalization_type'],
                                                           meanSubstraction=self.params['mean_substraction'],
-                                                          dataAugmentation=self.params['data_augmentation'],
+                                                          dataAugmentation=data_augmentation,
                                                           wo_da_patch_type=self.params['wo_da_patch_type'], 
                                                           da_patch_type=self.params['da_patch_type'], 
                                                           da_enhance_list=self.params['da_enhance_list'])
@@ -583,9 +583,9 @@ class Homogeneous_Data_Batch_Generator(object):
                                               normalization=self.params['normalization'],
                                               meanSubstraction=self.params['mean_substraction'],
                                               dataAugmentation=data_augmentation,
-                                              wo_da_patch_type=wo_da_patch_type, 
-                                              da_patch_type=da_patch_type, 
-                                              da_enhance_list=da_enhance_list)
+                                              wo_da_patch_type=self.params['wo_da_patch_type'], 
+                                              da_patch_type=self.params['da_patch_type'], 
+                                              da_enhance_list=self.params['da_enhance_list'])
 
         self.X_maxibatch = X_batch
         self.Y_maxibatch = Y_batch
