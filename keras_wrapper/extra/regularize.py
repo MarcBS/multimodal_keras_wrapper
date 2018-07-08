@@ -1,6 +1,6 @@
 from keras.layers.noise import GaussianNoise
 from keras.layers.advanced_activations import ChannelWisePReLU as PReLU
-from keras.layers.normalization import BatchNormalization, L2_norm
+from keras.layers.normalization import BatchNormalization, L2_norm, L1_norm
 from keras.regularizers import l2
 from keras.layers.core import Dropout, Lambda
 
