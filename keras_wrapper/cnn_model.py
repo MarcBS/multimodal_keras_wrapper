@@ -784,6 +784,9 @@ class Model_Wrapper(object):
                           'normalization_type': '(-1)-1',
                           'mean_substraction': False,
                           'data_augmentation': True,
+                          'wo_da_patch_type': 'whole', # wo_da_patch_type = 'central_crop' or 'whole'. 
+                          'da_patch_type':'resize_and_rndcrop', # da_patch_type = 'resize_and_rndcrop', 'rndcrop_and_resize' or 'resizekp_and_rndcrop'.
+                          'da_enhance_list':[], # da_enhance_list = {brightness, color, sharpness, contrast}
                           'verbose': 1, 'eval_on_sets': ['val'],
                           'reload_epoch': 0,
                           'extra_callbacks': [],
@@ -866,6 +869,9 @@ class Model_Wrapper(object):
                           'normalization_type': None,
                           'mean_substraction': False,
                           'data_augmentation': True,
+                          'wo_da_patch_type': 'whole', # wo_da_patch_type = 'central_crop' or 'whole'. 
+                          'da_patch_type':'resize_and_rndcrop', # da_patch_type = 'resize_and_rndcrop', 'rndcrop_and_resize' or 'resizekp_and_rndcrop'.
+                          'da_enhance_list':[], # da_enhance_list = {brightness, color, sharpness, contrast}
                           'verbose': 1,
                           'eval_on_sets': ['val'],
                           'reload_epoch': 0,
@@ -1006,6 +1012,9 @@ class Model_Wrapper(object):
                                                          normalization=params['normalize'],
                                                          normalization_type=params['normalization_type'],
                                                          data_augmentation=params['data_augmentation'],
+                                                         wo_da_patch_type = params['wo_da_patch_type'], 
+                                                         da_patch_type = params['da_patch_type'], 
+                                                         da_enhance_list = params['da_enhance_list'], 
                                                          mean_substraction=params['mean_substraction']).generator()
         elif params['n_parallel_loaders'] > 1:
             train_gen = Parallel_Data_Batch_Generator('train',
@@ -1016,6 +1025,9 @@ class Model_Wrapper(object):
                                                       normalization=params['normalize'],
                                                       normalization_type=params['normalization_type'],
                                                       data_augmentation=params['data_augmentation'],
+                                                      wo_da_patch_type = params['wo_da_patch_type'], 
+                                                      da_patch_type = params['da_patch_type'], 
+                                                      da_enhance_list = params['da_enhance_list'], 
                                                       mean_substraction=params['mean_substraction'],
                                                       shuffle=params['shuffle'],
                                                       n_parallel_loaders=params['n_parallel_loaders']).generator()
@@ -1028,6 +1040,9 @@ class Model_Wrapper(object):
                                              normalization=params['normalize'],
                                              normalization_type=params['normalization_type'],
                                              data_augmentation=params['data_augmentation'],
+                                             wo_da_patch_type = params['wo_da_patch_type'], 
+                                             da_patch_type = params['da_patch_type'], 
+                                             da_enhance_list = params['da_enhance_list'], 
                                              mean_substraction=params['mean_substraction'],
                                              shuffle=params['shuffle']).generator()
 
@@ -1166,6 +1181,7 @@ class Model_Wrapper(object):
                           'n_parallel_loaders': 1,
                           'normalize': True,
                           'normalization_type': None,
+                          'wo_da_patch_type' : 'whole', 
                           'mean_substraction': False}
         params = self.checkParameters(parameters, default_params)
         self.testing_parameters.append(copy.copy(params))
@@ -1184,6 +1200,7 @@ class Model_Wrapper(object):
                                                      normalization=params['normalize'],
                                                      normalization_type=params['normalization_type'],
                                                      data_augmentation=False,
+                                                     wo_da_patch_type = params['wo_da_patch_type'],
                                                      mean_substraction=params['mean_substraction'],
                                                      n_parallel_loaders=params['n_parallel_loaders']).generator()
         else:
@@ -1192,6 +1209,7 @@ class Model_Wrapper(object):
                                             normalization=params['normalize'],
                                             normalization_type=params['normalization_type'],
                                             data_augmentation=False,
+                                            wo_da_patch_type = params['wo_da_patch_type'],
                                             mean_substraction=params['mean_substraction']).generator()
 
         out = self.model.evaluate_generator(data_gen,
@@ -2254,6 +2272,7 @@ class Model_Wrapper(object):
                           'n_parallel_loaders': 1,
                           'normalize': True,
                           'normalization_type': '(-1)-1',
+                          'wo_da_patch_type' : 'whole',
                           'mean_substraction': False,
                           'n_samples': None,
                           'init_sample': -1,
@@ -2290,6 +2309,7 @@ class Model_Wrapper(object):
                                                              normalization=params['normalize'],
                                                              normalization_type=params['normalization_type'],
                                                              data_augmentation=False,
+                                                             wo_da_patch_type = params['wo_da_patch_type'],
                                                              mean_substraction=params['mean_substraction'],
                                                              init_sample=params['init_sample'],
                                                              final_sample=params['final_sample'],
@@ -2304,6 +2324,7 @@ class Model_Wrapper(object):
                                                     normalization=params['normalize'],
                                                     normalization_type=params['normalization_type'],
                                                     data_augmentation=False,
+                                                    wo_da_patch_type = params['wo_da_patch_type'],
                                                     mean_substraction=params['mean_substraction'],
                                                     init_sample=params['init_sample'],
                                                     final_sample=params['final_sample'],
@@ -2322,6 +2343,7 @@ class Model_Wrapper(object):
                                                              normalization=params['normalize'],
                                                              normalization_type=params['normalization_type'],
                                                              data_augmentation=False,
+                                                             wo_da_patch_type = params['wo_da_patch_type'],
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=True,
                                                              random_samples=n_samples,
@@ -2335,6 +2357,7 @@ class Model_Wrapper(object):
                                                     normalization=params['normalize'],
                                                     normalization_type=params['normalization_type'],
                                                     data_augmentation=False,
+                                                    wo_da_patch_type = params['wo_da_patch_type'],
                                                     mean_substraction=params['mean_substraction'],
                                                     predict=True,
                                                     random_samples=n_samples).generator()
@@ -2500,6 +2523,7 @@ class Model_Wrapper(object):
                           'beam_size': 5,
                           'normalize': True,
                           'normalization_type': None,
+                          'wo_da_patch_type' : 'whole', 
                           'mean_substraction': False,
                           'predict_on_sets': ['val'],
                           'maxlen': 20,
@@ -2542,6 +2566,7 @@ class Model_Wrapper(object):
                                                          normalization=params['normalize'],
                                                          normalization_type=params['normalization_type'],
                                                          data_augmentation=False,
+                                                         wo_da_patch_type = params['wo_da_patch_type'],
                                                          mean_substraction=params['mean_substraction'],
                                                          predict=False,
                                                          n_parallel_loaders=params['n_parallel_loaders']).generator()
@@ -2555,6 +2580,7 @@ class Model_Wrapper(object):
                                                 normalization=params['normalize'],
                                                 normalization_type=params['normalization_type'],
                                                 data_augmentation=False,
+                                                wo_da_patch_type = params['wo_da_patch_type'],
                                                 mean_substraction=params['mean_substraction'],
                                                 predict=False).generator()
             sources_sampling = []

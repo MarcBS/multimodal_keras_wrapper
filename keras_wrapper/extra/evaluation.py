@@ -218,6 +218,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     :return: dictionary of multiclass metrics
     """
     from sklearn import metrics as sklearn_metrics
+    import numpy as np
 
     n_classes = extra_vars['n_classes']
 
@@ -253,8 +254,28 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     # Compute Precision, Recall and F1 score
     avrg = extra_vars.get('average_mode', None)
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average=avrg)
+    # Compute Confusion Matrix
+    cf = sklearn_metrics.confusion_matrix(np.argmax(y_gt,-1), np.argmax(y_pred,-1))
+    identity = np.identity(n_classes)
+    neg_identity = 1 - identity
+    # Compute TP, FP and FN from Confusion Matrix.
+    tp = np.diag(cf)
+    fp = np.sum(cf*neg_identity, axis=1)
+    fn = np.sum(cf*neg_identity, axis=0)
+    # Compute precision and recall per class
+    condition_positive = tp + fn
+    pred_condition_positive = tp + fp
+    precision_per_class = tp/pred_condition_positive
+    recall_per_class = tp/condition_positive
+    # Compute top 5 fp classes
+    top5_fps = np.argpartition(cf*neg_identity, -5)[:,-5:][:,::-1]
+    # Compute top 5 accuracy
+    arg_top5_pred = np.argpartition(y_pred, -5)[:,-5:]
+    arg_gt = np.argmax(y_gt, -1)
+    top5_acc = np.mean(np.max(arg_top5_pred == np.repeat(np.expand_dims(arg_gt,-1), 5, -1),-1))
 
     if verbose > 0:
+        logging.info('Top5 Accuracy: %f' % top5_acc)
         logging.info('accuracy: %f' % accuracy, )
         logging.info('balanced_accuracy: %f' % accuracy_balanced)
         logging.info('precision: ' + str(precision))
@@ -265,7 +286,11 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
             'balanced_accuracy': accuracy_balanced,
             'precision': precision,
             'recall': recall,
-            'f1': f1}
+            'f1': f1,
+            'top5_acc': top5_acc,
+            'precision_per_class': list(precision_per_class),
+            'recall_per_class': list(recall_per_class),
+            'top5_fps': list(top5_fps)}
 
 
 def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
