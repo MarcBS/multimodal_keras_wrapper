@@ -22,13 +22,12 @@ from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json, load_model
 from keras.optimizers import *
 from keras.regularizers import l2
-from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator, Parallel_Data_Batch_Generator
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
-    decode_predictions_beam_search, replace_unknown_words, sample, sampling
+    decode_predictions_beam_search, replace_unknown_words, sample, sampling, categorical_probas_to_classes
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
@@ -2818,9 +2817,9 @@ class Model_Wrapper(object):
         accuracies = dict()
         top_accuracies = dict()
         for key, val in iteritems(prediction):
-            pred = np_utils.categorical_probas_to_classes(val)
+            pred = categorical_probas_to_classes(val)
             top_pred = np.argsort(val, axis=1)[:, ::-1][:, :np.min([topN, val.shape[1]])]
-            GT = np_utils.categorical_probas_to_classes(data[key])
+            GT = categorical_probas_to_classes(data[key])
 
             # Top1 accuracy
             correct = [1 if pred[i] == GT[i] else 0 for i in range(len(pred))]
@@ -2838,7 +2837,7 @@ class Model_Wrapper(object):
             Calculates the topN accuracy obtained from a set of samples on a Sequential model.
         """
         top_pred = np.argsort(pred, axis=1)[:, ::-1][:, :np.min([topN, pred.shape[1]])]
-        pred = np_utils.categorical_probas_to_classes(pred)
+        pred = categorical_probas_to_classes(pred)
         GT = np_utils.categorical_probas_to_classes(GT)
 
         # Top1 accuracy
