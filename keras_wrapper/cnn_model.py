@@ -2864,42 +2864,6 @@ class Model_Wrapper(object):
         print_summary(self.model.layers)
         return ''
 
-        obj_str = '-----------------------------------------------------------------------------------\n'
-        class_name = self.__class__.__name__
-        obj_str += '\t\t' + class_name + ' instance\n'
-        obj_str += '-----------------------------------------------------------------------------------\n'
-
-        # Print pickled attributes
-        for att in self.__toprint:
-            obj_str += att + ': ' + str(self.__dict__[att])
-            obj_str += '\n'
-
-        # Print layers structure
-        obj_str += "\n::: Layers structure:\n\n"
-        obj_str += 'MODEL TYPE: ' + self.model.__class__.__name__ + '\n'
-        if isinstance(self.model, Sequential):
-            obj_str += "INPUT: " + str(tuple(self.model.layers[0].input_shape)) + "\n"
-            for i, layer in list(enumerate(self.model.layers)):
-                obj_str += str(layer.name) + ' ' + str(layer.output_shape) + '\n'
-            obj_str += "OUTPUT: " + str(self.model.layers[-1].output_shape) + "\n"
-        else:
-            for i, inputs in list(enumerate(self.model.input_config)):
-                obj_str += "INPUT (" + str(i) + "): " + str(inputs['name']) + ' ' + str(
-                    tuple(inputs['input_shape'])) + "\n"
-            for node in self.model.node_config:
-                obj_str += str(node['name']) + ', in [' + str(node['input']) + ']' + ', out_shape: ' + str(
-                    self.model.nodes[node['name']].output_shape) + '\n'
-            for i, outputs in list(enumerate(self.model.output_config)):
-                obj_str += "OUTPUT (" + str(i) + "): " + str(outputs['name']) + ', in [' + str(
-                    outputs['input']) + ']' + ', out_shape: ' + str(
-                    self.model.outputs[outputs['name']].output_shape) + "\n"
-
-        obj_str += '-----------------------------------------------------------------------------------\n'
-
-        print_summary(self.model.layers)
-
-        return obj_str
-
     def log(self, mode, data_type, value):
         """
         Stores the train and val information for plotting the training progress.
