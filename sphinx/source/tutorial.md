@@ -30,7 +30,8 @@ model for training and prediction.
 ## Creating a Dataset
 
 First, let's create a simple Dataset object with some sample data. 
-The data used for this example can be found in `/repository_root/data/sample_data`.
+The data used for this example can be obtained by executing `/repository_root/data/get_data.sh`. 
+This will download the data used for this example into `/repository_root/data/sample_data`.
 
 
 Dataset parameters definition.

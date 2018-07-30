@@ -758,6 +758,9 @@ def to_categorical(y, num_classes=None):
     categorical = np.reshape(categorical, output_shape)
     return categorical
 
+def categorical_probas_to_classes(p):
+    return np.argmax(p, axis=1)
+
 
 # ------------------------------------------------------- #
 #       DECODING FUNCTIONS

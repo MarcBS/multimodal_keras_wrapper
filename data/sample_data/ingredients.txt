@@ -1,2 +1,0 @@
-apple,sugar,salt,butter,egg,water,lemon juice,cinnamon,flour
-rice,water,rice vinegar,salt,tuna,salmon
