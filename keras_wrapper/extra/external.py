@@ -27,35 +27,70 @@ argparse.open = open
 
 
 class BPE(object):
-    def __init__(self, codes, separator='@@', vocab=None, glossaries=None):
+
+    def __init__(self, codes, merges=-1, separator='@@', vocab=None, glossaries=None):
+
+        codes.seek(0)
+        offset=1
 
         # check version information
         firstline = codes.readline()
         if firstline.startswith('#version:'):
-            self.version = tuple([int(x) for x in re.sub(r'(\.0+)*$', '', firstline.split()[-1]).split(".")])
+            self.version = tuple([int(x) for x in re.sub(r'(\.0+)*$','', firstline.split()[-1]).split(".")])
+            offset += 1
         else:
             self.version = (0, 1)
             codes.seek(0)
 
-        self.bpe_codes = [tuple(item.split()) for item in codes]
+        self.bpe_codes = [tuple(item.strip('\r\n ').split(' ')) for (n, item) in enumerate(codes) if (n < merges or merges == -1)]
+
+        for i, item in enumerate(self.bpe_codes):
+            if len(item) != 2:
+                sys.stderr.write('Error: invalid line {0} in BPE codes file: {1}\n'.format(i+offset, ' '.join(item)))
+                sys.stderr.write('The line should exist of exactly two subword units, separated by whitespace\n')
+                sys.exit(1)
 
         # some hacking to deal with duplicates (only consider first instance)
-        self.bpe_codes = dict([(code, i) for (i, code) in reversed(list(enumerate(self.bpe_codes)))])
+        self.bpe_codes = dict([(code,i) for (i,code) in reversed(list(enumerate(self.bpe_codes)))])
 
-        self.bpe_codes_reverse = dict([(pair[0] + pair[1], pair) for pair, i in list(iteritems(self.bpe_codes))])
-
+        self.bpe_codes_reverse = dict([(pair[0] + pair[1], pair) for pair,i in self.bpe_codes.items()])
         self.separator = separator
-
         self.vocab = vocab
 
         self.glossaries = glossaries if glossaries else []
 
         self.cache = {}
 
+    def process_line(self, line):
+        """segment line, dealing with leading and trailing whitespace"""
+
+        out = ""
+
+        leading_whitespace = len(line)-len(line.lstrip('\r\n '))
+        if leading_whitespace:
+            out += line[:leading_whitespace]
+
+        out += self.segment(line)
+
+        trailing_whitespace = len(line)-len(line.rstrip('\r\n '))
+        if trailing_whitespace and trailing_whitespace != len(line):
+            out += line[-trailing_whitespace:]
+
+        return out
+
     def segment(self, sentence):
         """segment single sentence (whitespace-tokenized string) with BPE encoding"""
+        segments = self.segment_tokens(sentence.strip('\r\n ').split(' '))
+        return ' '.join(segments)
+
+    def segment_tokens(self, tokens):
+        """segment a sequence of tokens with BPE encoding"""
         output = []
-        for word in sentence.split():
+        for word in tokens:
+            # eliminate double spaces
+            if not word:
+                continue
+            print ("word", word)
             new_word = [out for segment in self._isolate_glossaries(word)
                         for out in encode(segment,
                                           self.bpe_codes,
@@ -65,19 +100,19 @@ class BPE(object):
                                           self.version,
                                           self.cache,
                                           self.glossaries)]
-
             for item in new_word[:-1]:
                 output.append(item + self.separator)
             output.append(new_word[-1])
 
-        return ' '.join(output)
+        return output
 
     def _isolate_glossaries(self, word):
         word_segments = [word]
         for gloss in self.glossaries:
             word_segments = [out_segments for segment in word_segments
-                             for out_segments in isolate_glossary(segment, gloss)]
+                                 for out_segments in isolate_glossary(segment, gloss)]
         return word_segments
+
 
 
 def get_pairs(word):
@@ -92,7 +127,6 @@ def get_pairs(word):
         prev_char = char
     return pairs
 
-
 def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache, glossaries=None):
     """Encode word based on list of BPE merge operations, which are applied consecutively
     """
@@ -100,14 +134,15 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
     if orig in cache:
         return cache[orig]
 
-    if orig in glossaries:
-        cache[orig] = (orig,)
-        return orig,
+    for glossary in glossaries:
+        if re.match('^'+glossary+'$', orig):
+            cache[orig] = (orig,)
+            return (orig,)
 
     if version == (0, 1):
         word = tuple(orig) + ('</w>',)
-    elif version == (0, 2):  # more consistent handling of word-final segments
-        word = tuple(orig[:-1]) + (orig[-1] + '</w>',)
+    elif version == (0, 2): # more consistent handling of word-final segments
+        word = tuple(orig[:-1]) + ( orig[-1] + '</w>',)
     else:
         raise NotImplementedError
 
@@ -117,7 +152,7 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
         return orig
 
     while True:
-        bigram = min(pairs, key=lambda pair: bpe_codes.get(pair, float('inf')))
+        bigram = min(pairs, key = lambda pair: bpe_codes.get(pair, float('inf')))
         if bigram not in bpe_codes:
             break
         first, second = bigram
@@ -132,8 +167,8 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
                 new_word.extend(word[i:])
                 break
 
-            if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
-                new_word.append(first + second)
+            if word[i] == first and i < len(word)-1 and word[i+1] == second:
+                new_word.append(first+second)
                 i += 2
             else:
                 new_word.append(word[i])
@@ -149,14 +184,13 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
     if word[-1] == '</w>':
         word = word[:-1]
     elif word[-1].endswith('</w>'):
-        word = word[:-1] + (word[-1].replace('</w>', ''),)
+        word = word[:-1] + (word[-1].replace('</w>',''),)
 
     if vocab:
         word = check_vocab_and_split(word, bpe_codes_reverse, vocab, separator)
 
     cache[orig] = word
     return word
-
 
 def recursive_split(segment, bpe_codes, vocab, separator, final=False):
     """Recursively split segment into smaller units (by reversing BPE merges)
@@ -169,7 +203,7 @@ def recursive_split(segment, bpe_codes, vocab, separator, final=False):
         else:
             left, right = bpe_codes[segment]
     except:
-        # sys.stderr.write('cannot split {0} further.\n'.format(segment))
+        #sys.stderr.write('cannot split {0} further.\n'.format(segment))
         yield segment
         return
 
@@ -185,7 +219,6 @@ def recursive_split(segment, bpe_codes, vocab, separator, final=False):
         for item in recursive_split(right, bpe_codes, vocab, separator, final):
             yield item
 
-
 def check_vocab_and_split(orig, bpe_codes, vocab, separator):
     """Check for each segment in word if it is in-vocabulary,
     and segment OOV segments into smaller units by reversing the BPE merge operations"""
@@ -196,7 +229,7 @@ def check_vocab_and_split(orig, bpe_codes, vocab, separator):
         if segment + separator in vocab:
             out.append(segment)
         else:
-            # sys.stderr.write('OOV: {0}\n'.format(segment))
+            #sys.stderr.write('OOV: {0}\n'.format(segment))
             for item in recursive_split(segment, bpe_codes, vocab, separator, False):
                 out.append(item)
 
@@ -204,7 +237,7 @@ def check_vocab_and_split(orig, bpe_codes, vocab, separator):
     if segment in vocab:
         out.append(segment)
     else:
-        # sys.stderr.write('OOV: {0}\n'.format(segment))
+        #sys.stderr.write('OOV: {0}\n'.format(segment))
         for item in recursive_split(segment, bpe_codes, vocab, separator, True):
             out.append(item)
 
@@ -218,13 +251,12 @@ def read_vocabulary(vocab_file, threshold):
     vocabulary = set()
 
     for line in vocab_file:
-        word, freq = line.split()
+        word, freq = line.strip('\r\n ').split(' ')
         freq = int(freq)
-        if threshold is None or freq >= threshold:
+        if threshold == None or freq >= threshold:
             vocabulary.add(word)
 
     return vocabulary
-
 
 def isolate_glossary(word, glossary):
     """
@@ -235,9 +267,10 @@ def isolate_glossary(word, glossary):
     For example, if 'USA' is the glossary and '1934USABUSA' the word, the return value is:
         ['1934', 'USA', 'B', 'USA']
     """
-    if word == glossary or glossary not in word:
+    # regex equivalent of (if word == glossary or glossary not in word)
+    if re.match('^'+glossary+'$', word) or not re.search(glossary, word):
         return [word]
     else:
-        splits = word.split(glossary)
-        segments = [segment.strip() for split in splits[:-1] for segment in [split, glossary] if segment != '']
-        return segments + [splits[-1].strip()] if splits[-1] != '' else segments
+        splits = re.split(glossary, word)
+        segments = [segment.strip('\r\n ') for (n_split, split) in enumerate(splits[:-1]) for segment in [split, re.findall(glossary, word)[n_split]] if segment != '']
+        return segments + [splits[-1].strip('\r\n ')] if splits[-1] != '' else segments

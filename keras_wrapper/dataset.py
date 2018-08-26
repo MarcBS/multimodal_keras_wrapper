@@ -735,7 +735,7 @@ class Dataset(object):
         # (e.g. t=0 'a', t=1 'a dog', t=2 'a dog is', etc.)
         self.mapping = dict()  # Source -- Target predefined word mapping
         self.BPE = None  # Byte Pair Encoding instance
-        self.BPE_separator = None
+        self.BPE_separator = '@@'
         self.BPE_built = False
         self.moses_tokenizer = None
         self.moses_detokenizer = False
@@ -1824,7 +1824,7 @@ class Dataset(object):
         if not self.silence:
             logging.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
 
-    def build_bpe(self, codes, separator='@@', vocabulary=None, glossaries=None):
+    def build_bpe(self, codes, merges=-1, separator=u'@@', vocabulary=None, glossaries=None):
         """
         Constructs a BPE encoder instance. Currently, vocabulary and glossaries options are not implemented.
         :param codes: File with BPE codes (created by learn_bpe.py)
@@ -1837,7 +1837,7 @@ class Dataset(object):
         """
         from keras_wrapper.extra.external import BPE
         with open(codes, 'r') as cods:
-            self.BPE = BPE(cods, separator, vocabulary, glossaries)
+            self.BPE = BPE(cods, merges=merges, separator=separator, vocab=vocabulary, glossaries=glossaries)
         self.BPE_separator = separator
         self.BPE_built = True
 
