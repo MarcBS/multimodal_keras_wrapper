@@ -126,9 +126,8 @@ class BeamSearchEnsemble:
                          params['output_min_length_depending_on_x_factor'] + 1e-7) \
                 if params['output_min_length_depending_on_x'] else 0
         else:
-            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym)
-                         / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
-                params['output_min_length_depending_on_x'] else 0
+            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) /
+                         params['output_min_length_depending_on_x_factor'] + 1e-7) if params['output_min_length_depending_on_x'] else 0
 
             maxlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) * params[
                 'output_max_length_depending_on_x_factor']) if \
@@ -403,8 +402,7 @@ class BeamSearchEnsemble:
 
                     if params['length_penalty'] or params['coverage_penalty']:
                         if params['length_penalty']:
-                            length_penalties = [((5 + len(sample)) ** params['length_norm_factor']
-                                                 / (5 + 1) ** params['length_norm_factor'])
+                            length_penalties = [((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])
                                                 # this 5 is a magic number by Google...
                                                 for sample in samples]
                         else:
@@ -528,8 +526,7 @@ class BeamSearchEnsemble:
 
         if params['length_penalty'] or params['coverage_penalty']:
             if params['length_penalty']:
-                length_penalties = [((5 + len(sample)) ** params['length_norm_factor']
-                                     / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
+                length_penalties = [((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
                                     for sample in samples]
             else:
                 length_penalties = [1.0 for _ in samples]
@@ -782,9 +779,7 @@ class BeamSearchEnsemble:
 
                     if params['length_penalty'] or params['coverage_penalty']:
                         if params['length_penalty']:
-                            length_penalty = ((5 + len(sample)) ** params['length_norm_factor']
-                                              / (5 + 1) ** params[
-                                                  'length_norm_factor'])  # this 5 is a magic number by Google...
+                            length_penalty = ((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
                         else:
                             length_penalty = 1.0
 
@@ -903,9 +898,7 @@ class BeamSearchEnsemble:
 
             if params['length_penalty'] or params['coverage_penalty']:
                 if params['length_penalty']:
-                    length_penalty = ((5 + len(sample)) ** params['length_norm_factor']
-                                      / (5 + 1) ** params[
-                                          'length_norm_factor'])  # this 5 is a magic number by Google...
+                    length_penalty = ((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
                 else:
                     length_penalty = 1.0
 

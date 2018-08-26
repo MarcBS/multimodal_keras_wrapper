@@ -2,13 +2,13 @@
 import copy
 import itertools
 import logging
-import time
-import numpy as np
 import sys
+import time
+
+import numpy as np
+
 if sys.version_info.major == 2:
     from itertools import imap as map
-    from itertools import izip as zip
-    from itertools import ifilter as filter
 
 
 class MultiprocessQueue():
@@ -121,8 +121,7 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ec
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
-            str(count + 1), str(n_combs), c, str(time.time() - t)))
+        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (str(count + 1), str(n_combs), c, str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -636,61 +635,77 @@ def average_models(models, output_model, weights=None):
     assert len(models) > 0, 'You provided an empty list of models to average!'
 
     model_weights = np.asarray([1. / len(models)] * len(models), dtype=np.float32) if (weights is None) or (weights == []) else np.asarray(weights, dtype=np.float32)
-    assert len(model_weights) == len(models), 'You must give a list of weights of the same size than the list of models.'
+    assert len(model_weights) == len(
+        models), 'You must give a list of weights of the same size than the list of models.'
     loaded_models = [loadModel(m, -1, full_path=True) for m in models]
 
     # Check that all models are compatible
     assert all([hasattr(loaded_model, 'model') for loaded_model in loaded_models]), \
         'Not all models have the attribute "model".'
 
-    assert all([hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]), \
+    assert all([hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]) or all(
+        [not hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]), \
         'Not all models have the attribute "model_init".'
 
-    assert all([hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]), \
+    assert all([hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]) or all(
+        [not hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]), \
         'Not all models have the attribute "model_next".'
 
     # Check all layers are the same
-    assert all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model.weights))] for loaded_model in
+    assert all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
+                 range(len(loaded_models[0].model.weights))] for loaded_model in
                 loaded_models]), 'Not all models have the same weights!'
     if hasattr(loaded_models[0], 'model_init'):
-        assert all([[str(loaded_models[0].model_init.weights[i]) == str(loaded_model.model_init.weights[i]) for i in range(len(loaded_models[0].model.weights))] for loaded_model in
+        assert all([[str(loaded_models[0].model_init.weights[i]) == str(loaded_model.model_init.weights[i]) for i in
+                     range(len(loaded_models[0].model.weights))] for loaded_model in
                     loaded_models]), 'Not all models have the same weights!'
-    assert all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model_init.weights))] for loaded_model in
+    assert all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
+                 range(len(loaded_models[0].model_init.weights))] for loaded_model in
                 loaded_models]), 'Not all model_inits have the same weights!'
     if hasattr(loaded_models[0], 'model_next'):
-        assert all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in range(len(loaded_models[0].model_next.weights))] for loaded_model in
+        assert all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in
+                     range(len(loaded_models[0].model_next.weights))] for loaded_model in
                     loaded_models]), 'Not all model_nexts have the same weights!'
 
     # Retrieve weights, weigh them and overwrite in model[0].
     current_weights = loaded_models[0].model.get_weights()
-    loaded_models[0].model.set_weights([current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+    loaded_models[0].model.set_weights(
+        [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
     # We have model_init
     if hasattr(loaded_models[0], 'model_init'):
         current_weights = loaded_models[0].model_init.get_weights()
-        loaded_models[0].model_init.set_weights([current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+        loaded_models[0].model_init.set_weights(
+            [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
 
     # We have model_next
     if hasattr(loaded_models[0], 'model_next'):
         current_weights = loaded_models[0].model_next.get_weights()
-        loaded_models[0].model_next.set_weights([current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+        loaded_models[0].model_next.set_weights(
+            [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
 
     # Weighted sum of all models
     for m in range(1, len(models)):
         current_weights = loaded_models[m].model.get_weights()
         prev_weights = loaded_models[0].model.get_weights()
-        loaded_models[0].model.set_weights([current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+        loaded_models[0].model.set_weights(
+            [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+             range(len(current_weights))])
 
         # We have model_init
         if hasattr(loaded_models[0], 'model_init'):
             current_weights = loaded_models[m].model_init.get_weights()
             prev_weights = loaded_models[0].model_init.get_weights()
-            loaded_models[0].model_init.set_weights([current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+            loaded_models[0].model_init.set_weights(
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                 range(len(current_weights))])
 
         # We have model_next
         if hasattr(loaded_models[0], 'model_next'):
             current_weights = loaded_models[m].model_next.get_weights()
             prev_weights = loaded_models[0].model_next.get_weights()
-            loaded_models[0].model_next.set_weights([current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+            loaded_models[0].model_next.set_weights(
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                 range(len(current_weights))])
 
     # Save averaged model
     saveModel(loaded_models[0], -1, path=output_model, full_path=True, store_iter=False)
@@ -758,6 +773,7 @@ def to_categorical(y, num_classes=None):
     categorical = np.reshape(categorical, output_shape)
     return categorical
 
+
 def categorical_probas_to_classes(p):
     return np.argmax(p, axis=1)
 
@@ -807,8 +823,8 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
         logging.info('Decoding prediction ...')
     flattened_preds = preds.reshape(-1, preds.shape[-1])
     flattened_answer_pred = list(map(lambda index: index2word[index], sampling(scores=flattened_preds,
-                                                                          sampling_type=sampling_type,
-                                                                          temperature=temperature)))
+                                                                               sampling_type=sampling_type,
+                                                                               temperature=temperature)))
     answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
 
     answer_pred = []
@@ -820,7 +836,7 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
             init_token_pos = 0
             end_token_pos = [j for j, x in list(enumerate(a_no)) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            a_no = [a.decode('utf-8') if type(a)==str and sys.version_info.major == 2 else a for a in a_no]
+            a_no = [a.decode('utf-8') if type(a) == str and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
             tmp = a_no
@@ -935,7 +951,9 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
 
     if alphas is not None:
         x_text = list(map(lambda x: x.split(), x_text))
-        hard_alignments = list(map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas, x_text))
+        hard_alignments = list(
+            map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas,
+                x_text))
         for i, a_no in list(enumerate(flattened_answer_pred)):
             if unk_symbol in a_no:
                 a_no = replace_unknown_words(x_text[i],
@@ -945,12 +963,12 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                              heuristic=heuristic,
                                              mapping=mapping,
                                              verbose=verbose)
-            a_no = [a.decode('utf-8') if type(a)==str and sys.version_info.major == 2 else a for a in a_no]
+            a_no = [a.decode('utf-8') if type(a) == str and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     else:
         for a_no in flattened_answer_pred:
-            a_no = [a.decode('utf-8') if type(a)==str and sys.version_info.major == 2 else a for a in a_no]
+            a_no = [a.decode('utf-8') if type(a) == str and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     return answer_pred

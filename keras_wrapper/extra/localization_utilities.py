@@ -12,7 +12,7 @@ import numpy as np
 
 
 def prepareCAM(snet):
-    ''' Prepares the network for generating Class Activation Mappings '''
+    """ Prepares the network for generating Class Activation Mappings """
 
     # Adds the output for heatmap generation
     snet.getStage(1).model.add_output(name='GAP/conv', input='CAM_conv/relu')
@@ -26,10 +26,10 @@ def prepareCAM(snet):
 
 
 def loadImagesDataset(ds, init, final, load_original=True):
-    '''
+    """
         Loads a list of images and their pre-processed representations "X" ready for applying a forward pass.
         The images loaded are stored in the Dataset object "test" division.
-    '''
+    """
 
     X = ds.getX('test', init, final, normalization=False, meanSubstraction=True, dataAugmentation=False)
     if (load_original):
@@ -46,10 +46,10 @@ def loadImagesDataset(ds, init, final, load_original=True):
 
 
 def loadImagesExternal(ds, list_imgs, load_original=True):
-    '''
+    """
         Loads a list of images and their pre-processed representations "X" ready for applying a forward pass.
         The images loaded are external to the Dataset object.
-    '''
+    """
 
     X = ds.loadImages(list_imgs, False, True, False, external=True)
     if (load_original):
@@ -64,9 +64,9 @@ def loadImagesExternal(ds, list_imgs, load_original=True):
 
 
 def applyForwardPass(snet, X):
-    '''
+    """
         Applies a forward pass through the GAP network on the pre-processed "X" images.
-    '''
+    """
     # Apply forward pass
     # X = snet.forwardUntilStage(X,1)['inception_4e']
     X = snet.forwardUntilStage(X, 1)[snet._Staged_Network__inNames[1]]
@@ -76,32 +76,13 @@ def applyForwardPass(snet, X):
     return [X, predictions]
 
 
-# def computeCAM(snet, X, W, reshape_size=[256, 256]):
-#    '''
-#        Applies a forward pass of the pre-processed samples "X" in the GAP net "snet" and generates the resulting 
-#        CAM "maps" using the GAP weights "W" with the defined size "reshape_size".
-#    '''
-#    
-#    # Apply forward pass in GAP model
-#    [X, predictions] = applyForwardPass(snet, X)
-#    
-#    # Compute heatmaps (CAMs) for each class [n_samples, n_classes, height, width]
-#    maps = np.zeros((X.shape[0], W.shape[1], reshape_size[0], reshape_size[1]))
-#    for s in range(X.shape[0]):
-#        weighted_activation = np.dot(np.transpose(W), np.reshape(X[s], (W.shape[0], X.shape[2]*X.shape[3])))
-#        map = np.reshape(weighted_activation, (W.shape[1], X.shape[2], X.shape[3]))
-#        maps[s] = resize(map, tuple([W.shape[1]]+reshape_size), order=1, preserve_range=True)
-#        
-#    return [maps, predictions]
-
-
 def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
-    '''
-        Applies a forward pass of the pre-processed samples "X" in the GAP net "snet" and generates the resulting 
-        CAM "maps" using the GAP weights "W" with the defined size "reshape_size".
-        Additionally, it returns the best "n_top_convs" convolutional features for each of the classes. The ranking is 
-        computed considering the weight Wi assigned to the i-th feature map.
-    '''
+    """
+    Applies a forward pass of the pre-processed samples "X" in the GAP net "snet" and generates the resulting
+    CAM "maps" using the GAP weights "W" with the defined size "reshape_size".
+    Additionally, it returns the best "n_top_convs" convolutional features for each of the classes. The ranking is
+    computed considering the weight Wi assigned to the i-th feature map.
+    """
     from skimage.transform import resize
 
     # Apply forward pass in GAP model
@@ -129,35 +110,36 @@ def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
     return [maps, predictions, convs]
 
 
-# def getBestConvFeatures(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
-#    '''
-#        Returns the best "n_top_convs" convolutional features for each of the classes. The ranking is 
-#        computed considering the weight Wi assigned to the i-th feature map.
-#    '''
-#    # Apply forward pass in GAP model
-#    [X, predictions] = applyForwardPass(snet, X)
-#    
-#    # Get indices of best convolutional features for each class
-#    ind_best = np.zeros((W.shape[1], n_top_convs))
-#    for c in range(W.shape[1]):
-#        ind_best[c,:] = np.argsort(W[:,c])[::-1][:20]
-#
-#    # Store top convolutional features
-#    convs = np.zeros((X.shape[0], W.shape[1], n_top_convs, reshape_size[0], reshape_size[1]))
-#    for s in range(X.shape[0]):
-#        for c in range(W.shape[1]):
-#            for enum_conv, i_conv in enumerate(ind_best[c]):
-#                convs[s,c,enum_conv] = resize(X[s,i_conv], reshape_size, order=1, preserve_range=True)
-#        
-#    return convs
+'''
+def getBestConvFeatures(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
+   """
+       Returns the best "n_top_convs" convolutional features for each of the classes. The ranking is
+       computed considering the weight Wi assigned to the i-th feature map.
+   """
+   # Apply forward pass in GAP model
+   [X, predictions] = applyForwardPass(snet, X)
 
+   # Get indices of best convolutional features for each class
+   ind_best = np.zeros((W.shape[1], n_top_convs))
+   for c in range(W.shape[1]):
+       ind_best[c,:] = np.argsort(W[:,c])[::-1][:20]
+
+   # Store top convolutional features
+   convs = np.zeros((X.shape[0], W.shape[1], n_top_convs, reshape_size[0], reshape_size[1]))
+   for s in range(X.shape[0]):
+       for c in range(W.shape[1]):
+           for enum_conv, i_conv in enumerate(ind_best[c]):
+               convs[s,c,enum_conv] = resize(X[s,i_conv], reshape_size, order=1, preserve_range=True)
+
+   return convs
+'''
 
 
 def bbox(img, mode='width_height'):
-    '''
+    """
         Returns a bounding box covering all the non-zero area in the image.
         "mode" : "width_height" returns width in [2] and height in [3], "max" returns xmax in [2] and ymax in [3]
-    '''
+    """
     rows = np.any(img, axis=1)
     cols = np.any(img, axis=0)
     y, ymax = np.where(rows)[0][[0, -1]]
@@ -170,9 +152,9 @@ def bbox(img, mode='width_height'):
 
 
 def computeIoU(GT, pred):
-    '''
+    """
         Calculates the Intersectino over Union value of two bounding boxes.
-    '''
+    """
     intersection = max(0, min(GT[2], pred[2]) - max(GT[0], pred[0])) * max(0, min(GT[3], pred[3]) - max(GT[1], pred[1]))
     gt_area = (GT[2] - GT[0]) * float((GT[3] - GT[1]))
     pred_area = (pred[2] - pred[0]) * float((pred[3] - pred[1]))
@@ -182,7 +164,7 @@ def computeIoU(GT, pred):
 
 def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_restriction=0.1, box_expansion=0.2,
                       use_gpu=True):
-    '''
+    """
     Reference:
         Bolaños, Marc, and Petia Radeva. "Simultaneous Food Localization and Recognition." arXiv preprint arXiv:1604.07953 (2016).
 
@@ -199,7 +181,7 @@ def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_r
         :param use_gpu: boolean indicating if we want to use the GPU for applying NMS
         :return: [predicted_bboxes, predicted_scores], containing a list of bboxes coordinates on the first position
                 and a list of their corresponding scores on the second position
-    '''
+    """
     from skimage.transform import resize
     from scipy import ndimage
 
@@ -291,7 +273,7 @@ def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_r
 
 
 def recognizeBBoxes(img_path, predicted_bboxes, recognition_net, ds, remove_non_food=None):
-    '''
+    """
     Description:
         Apply food recognition on a set of bounding boxes provided.
 
@@ -303,7 +285,7 @@ def recognizeBBoxes(img_path, predicted_bboxes, recognition_net, ds, remove_non_
         :param remove_non_food: if not None then all bounding boxes predicted as class 'remove_non_food' will be removed from the detections
         :return: [final_bboxes, predicted_scores, predicted_Y], containing a list of bboxes coordinates on the first position,
                 a list of their corresponding scores on the second position and a list of class ids on the last position.
-    '''
+    """
     from scipy import misc
 
     predicted_Y = []

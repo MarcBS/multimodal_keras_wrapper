@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-from six import iteritems
-from functools import reduce
 
 import copy
 import fnmatch
@@ -9,21 +7,19 @@ import logging
 import ntpath
 import os
 import random
-import re
 import sys
+from functools import reduce
+
+from six import iteritems
 
 if sys.version_info.major == 3:
-    import _pickle  as pk
+    import _pickle as pk
 else:
     import cPickle as pk
-    from itertools import imap as map
     from itertools import izip as zip
-    from itertools import ifilter as filter
 
 from collections import Counter
 from operator import add
-from PIL import Image as pilimage
-from PIL import ImageEnhance
 import numpy as np
 from keras_wrapper.extra.read_write import create_dir_if_not_exists
 from keras_wrapper.extra.tokenizers import *
@@ -137,8 +133,8 @@ class Parallel_Data_Batch_Generator(object):
                  normalization=True,
                  normalization_type=None,
                  data_augmentation=True,
-                 wo_da_patch_type='whole', 
-                 da_patch_type='resize_and_rndcrop', 
+                 wo_da_patch_type='whole',
+                 da_patch_type='resize_and_rndcrop',
                  da_enhance_list=[],
                  mean_substraction=False,
                  predict=False,
@@ -178,9 +174,9 @@ class Parallel_Data_Batch_Generator(object):
         # Several parameters
         self.params = {'batch_size': batch_size,
                        'data_augmentation': data_augmentation,
-                       'wo_da_patch_type': wo_da_patch_type, 
-                       'da_patch_type': da_patch_type, 
-                       'da_enhance_list': da_enhance_list,        
+                       'wo_da_patch_type': wo_da_patch_type,
+                       'da_patch_type': da_patch_type,
+                       'da_enhance_list': da_enhance_list,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
                        'normalization_type': normalization_type,
@@ -307,8 +303,8 @@ class Data_Batch_Generator(object):
                  normalization=True,
                  normalization_type=None,
                  data_augmentation=True,
-                 wo_da_patch_type='whole', 
-                 da_patch_type='resize_and_rndcrop', 
+                 wo_da_patch_type='whole',
+                 da_patch_type='resize_and_rndcrop',
                  da_enhance_list=[],
                  mean_substraction=False,
                  predict=False,
@@ -346,9 +342,9 @@ class Data_Batch_Generator(object):
         # Several parameters
         self.params = {'batch_size': batch_size,
                        'data_augmentation': data_augmentation,
-                       'wo_da_patch_type': wo_da_patch_type, 
-                       'da_patch_type': da_patch_type, 
-                       'da_enhance_list': da_enhance_list,                       
+                       'wo_da_patch_type': wo_da_patch_type,
+                       'da_patch_type': da_patch_type,
+                       'da_enhance_list': da_enhance_list,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
                        'normalization_type': normalization_type,
@@ -411,8 +407,8 @@ class Data_Batch_Generator(object):
                                                             normalization_type=self.params['normalization_type'],
                                                             meanSubstraction=self.params['mean_substraction'],
                                                             dataAugmentation=data_augmentation,
-                                                            wo_da_patch_type=self.params['wo_da_patch_type'], 
-                                                            da_patch_type=self.params['da_patch_type'], 
+                                                            wo_da_patch_type=self.params['wo_da_patch_type'],
+                                                            da_patch_type=self.params['da_patch_type'],
                                                             da_enhance_list=self.params['da_enhance_list']
                                                             )
                     data = self.net.prepareData(X_batch, None)[0]
@@ -421,11 +417,12 @@ class Data_Batch_Generator(object):
                     X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
                                                                       indices,
                                                                       normalization=self.params['normalization'],
-                                                                      normalization_type=self.params['normalization_type'],
+                                                                      normalization_type=self.params[
+                                                                          'normalization_type'],
                                                                       meanSubstraction=self.params['mean_substraction'],
                                                                       dataAugmentation=data_augmentation,
-                                                                      wo_da_patch_type=self.params['wo_da_patch_type'], 
-                                                                      da_patch_type=self.params['da_patch_type'], 
+                                                                      wo_da_patch_type=self.params['wo_da_patch_type'],
+                                                                      da_patch_type=self.params['da_patch_type'],
                                                                       da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, Y_batch)
 
@@ -438,8 +435,8 @@ class Data_Batch_Generator(object):
                                                             normalization_type=self.params['normalization_type'],
                                                             meanSubstraction=self.params['mean_substraction'],
                                                             dataAugmentation=data_augmentatio,
-                                                            wo_da_patch_type=self.params['wo_da_patch_type'], 
-                                                            da_patch_type=self.params['da_patch_type'], 
+                                                            wo_da_patch_type=self.params['wo_da_patch_type'],
+                                                            da_patch_type=self.params['da_patch_type'],
                                                             da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, None)[0]
 
@@ -447,11 +444,12 @@ class Data_Batch_Generator(object):
                     X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
                                                                       indices,
                                                                       normalization=self.params['normalization'],
-                                                                      normalization_type=self.params['normalization_type'],
+                                                                      normalization_type=self.params[
+                                                                          'normalization_type'],
                                                                       meanSubstraction=self.params['mean_substraction'],
                                                                       dataAugmentation=data_augmentation,
-                                                                      wo_da_patch_type=self.params['wo_da_patch_type'], 
-                                                                      da_patch_type=self.params['da_patch_type'], 
+                                                                      wo_da_patch_type=self.params['wo_da_patch_type'],
+                                                                      da_patch_type=self.params['da_patch_type'],
                                                                       da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, Y_batch)
 
@@ -464,8 +462,8 @@ class Data_Batch_Generator(object):
                                                 normalization_type=self.params['normalization_type'],
                                                 meanSubstraction=self.params['mean_substraction'],
                                                 dataAugmentation=False,
-                                                wo_da_patch_type=self.params['wo_da_patch_type'], 
-                                                da_patch_type=self.params['da_patch_type'], 
+                                                wo_da_patch_type=self.params['wo_da_patch_type'],
+                                                da_patch_type=self.params['da_patch_type'],
                                                 da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, None)[0]
                 else:
@@ -475,8 +473,8 @@ class Data_Batch_Generator(object):
                                                           normalization_type=self.params['normalization_type'],
                                                           meanSubstraction=self.params['mean_substraction'],
                                                           dataAugmentation=data_augmentation,
-                                                          wo_da_patch_type=self.params['wo_da_patch_type'], 
-                                                          da_patch_type=self.params['da_patch_type'], 
+                                                          wo_da_patch_type=self.params['wo_da_patch_type'],
+                                                          da_patch_type=self.params['da_patch_type'],
                                                           da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, Y_batch)
             yield (data)
@@ -497,8 +495,8 @@ class Homogeneous_Data_Batch_Generator(object):
                  normalization=False,
                  normalization_type=None,
                  data_augmentation=True,
-                 wo_da_patch_type='whole', 
-                 da_patch_type='resize_and_rndcrop', 
+                 wo_da_patch_type='whole',
+                 da_patch_type='resize_and_rndcrop',
                  da_enhance_list=[],
                  mean_substraction=False,
                  predict=False,
@@ -535,9 +533,9 @@ class Homogeneous_Data_Batch_Generator(object):
         self.batch_tidx = None
         # Several parameters
         self.params = {'data_augmentation': data_augmentation,
-                       'wo_da_patch_type': wo_da_patch_type, 
-                       'da_patch_type': da_patch_type, 
-                       'da_enhance_list': da_enhance_list,        
+                       'wo_da_patch_type': wo_da_patch_type,
+                       'da_patch_type': da_patch_type,
+                       'da_enhance_list': da_enhance_list,
                        'mean_substraction': mean_substraction,
                        'normalization': normalization,
                        'normalization_type': normalization_type,
@@ -583,8 +581,8 @@ class Homogeneous_Data_Batch_Generator(object):
                                               normalization=self.params['normalization'],
                                               meanSubstraction=self.params['mean_substraction'],
                                               dataAugmentation=data_augmentation,
-                                              wo_da_patch_type=self.params['wo_da_patch_type'], 
-                                              da_patch_type=self.params['da_patch_type'], 
+                                              wo_da_patch_type=self.params['wo_da_patch_type'],
+                                              da_patch_type=self.params['da_patch_type'],
                                               da_enhance_list=self.params['da_enhance_list'])
 
         self.X_maxibatch = X_batch
@@ -1113,17 +1111,14 @@ class Dataset(object):
 
     def removeInput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
-        # eval('list(self.X_' + set_name + ')')
-        keys_X_set =  getattr(self, 'X_' + set_name)
+        keys_X_set = getattr(self, 'X_' + set_name)
         if id in self.ids_inputs:
             ind_remove = self.ids_inputs.index(id)
             del self.ids_inputs[ind_remove]
             del self.types_inputs[ind_remove]
-            # exec ('del self.X_' + set_name + '[id]')
-
             aux_dict = getattr(self, 'X_' + set_name)
             del aux_dict[id]
-            setattr(self,  'X_' + set_name, aux_dict)
+            setattr(self, 'X_' + set_name, aux_dict)
             del aux_dict
 
         elif id not in keys_X_set:
@@ -1249,7 +1244,6 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of output data
-        #keys_Y_set = eval('list(self.Y_' + set_name + ')')
         keys_Y_set = list(getattr(self, 'Y_' + set_name))
         if id not in self.ids_outputs:
             self.ids_outputs.append(id)
@@ -1323,7 +1317,6 @@ class Dataset(object):
 
     def removeOutput(self, set_name, id='label', type='categorical'):
         # Ensure that the output exists before removing it
-        #keys_Y_set = eval('list(self.Y_' + set_name + ')')
         keys_Y_set = list(getattr(self, 'Y_' + set_name))
         if id in self.ids_outputs:
             ind_remove = self.ids_outputs.index(id)
@@ -1333,7 +1326,7 @@ class Dataset(object):
 
             aux_dict = getattr(self, 'Y_' + set_name)
             del aux_dict[id]
-            setattr(self,  'Y_' + set_name, aux_dict)
+            setattr(self, 'Y_' + set_name, aux_dict)
             del aux_dict
 
         elif id not in keys_Y_set:
@@ -1641,7 +1634,7 @@ class Dataset(object):
 
         # Build vocabulary
         error_vocab = False
-        if build_vocabulary == True:
+        if build_vocabulary:
             self.build_vocabulary(sentences, id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words,
                                   use_extra_words=(max_text_len != 0))
         elif isinstance(build_vocabulary, str):
@@ -3285,16 +3278,16 @@ class Dataset(object):
                 # wo_da_patch_type = central_crop, whole.
                 if wo_da_patch_type == 'central_crop':
                     # Use central crop.
-                    im = self.getResizeImageWODistorsion(im,id)
+                    im = self.getResizeImageWODistorsion(im, id)
                     im = np.asarray(im, dtype=type_imgs)
-                    
-                    centerw, centerh = np.floor(np.shape(im)[0]*0.5), np.floor(np.shape(im)[1]*0.5)
-                    halfw, halfh = np.floor(self.img_size_crop[id][0]*0.5), np.floor(self.img_size_crop[id][1]*0.5)
 
-                    if self.img_size_crop[id][0]%2 == 0:
-                        im = im[centerw-halfw:centerw+halfw,centerh-halfh:centerh+halfh, :]
+                    centerw, centerh = np.floor(np.shape(im)[0] * 0.5), np.floor(np.shape(im)[1] * 0.5)
+                    halfw, halfh = np.floor(self.img_size_crop[id][0] * 0.5), np.floor(self.img_size_crop[id][1] * 0.5)
+
+                    if self.img_size_crop[id][0] % 2 == 0:
+                        im = im[centerw - halfw:centerw + halfw, centerh - halfh:centerh + halfh, :]
                     else:
-                        im = im[centerw-halfw:centerw+halfw+1,centerh-halfh:centerh+halfh+1, :]
+                        im = im[centerw - halfw:centerw + halfw + 1, centerh - halfh:centerh + halfh + 1, :]
                 elif wo_da_patch_type == 'whole':
                     # Use whole image
                     im = misc.imresize(im, (self.img_size_crop[id][0], self.img_size_crop[id][1]))
@@ -3304,46 +3297,47 @@ class Dataset(object):
                     im = np.expand_dims(im, 2)
 
             else:
-                # TODO: 
+                # TODO:
                 # da_patch_type: resize_and_rndcrop, rndcrop_and_resize, resizekp_and_rndcrop.
                 # da_enhance_list: brightness, color, sharpness, contrast.
                 min_value_enhance = 0.25
                 im = pilimage.fromarray(im.astype(np.uint8))
-                image_enhance_dict = {'brightness': 'ImageEnhance.Brightness(im)', 'color':'ImageEnhance.Color(im)',
-                                      'sharpness':'ImageEnhance.Sharpness(im)',  'contrast':'ImageEnhance.Contrast(im)'}
-                
+                image_enhance_dict = {'brightness': 'ImageEnhance.Brightness(im)', 'color': 'ImageEnhance.Color(im)',
+                                      'sharpness': 'ImageEnhance.Sharpness(im)',
+                                      'contrast': 'ImageEnhance.Contrast(im)'}
+
                 for da_enhance in da_enhance_list:
                     image_enhance = eval(image_enhance_dict[da_enhance])
-                    im = image_enhance.enhance((1-min_value_enhance)+random.random()*min_value_enhance*2)
-                
+                    im = image_enhance.enhance((1 - min_value_enhance) + random.random() * min_value_enhance * 2)
+
                 randomParams = daRandomParams[images[i]]
-                
+
                 if da_patch_type == "rndcrop_and_resize":
                     w, h, d = np.shape(im)
-                    mins = w if w< h else h
-                    mincropfactor = 0.5   
+                    mins = w if w < h else h
+                    mincropfactor = 0.5
                     maxcropfactor = 1.0
-        
-                    random_factor = (maxcropfactor-random.random()*(maxcropfactor-mincropfactor))
+
+                    random_factor = (maxcropfactor - random.random() * (maxcropfactor - mincropfactor))
                     nw = int(random_factor * mins)
-                    random_factor = (maxcropfactor-random.random()*(maxcropfactor-mincropfactor))
+                    random_factor = (maxcropfactor - random.random() * (maxcropfactor - mincropfactor))
                     nh = int(random_factor * mins)
-        
-                    iw = int((w-nw)* random.random())
-                    ih = int((h-nh)* random.random())
-        
-                    im = im.crop((ih,iw, ih+nh, iw+nw))
-                    im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0])) 
+
+                    iw = int((w - nw) * random.random())
+                    ih = int((h - nh) * random.random())
+
+                    im = im.crop((ih, iw, ih + nh, iw + nw))
+                    im = im.resize((self.img_size_crop[id][1], self.img_size_crop[id][0]))
                     im = np.asarray(im, dtype=type_imgs)
                 elif da_patch_type == "resizekp_and_rndcrop":
-                    im = self.getResizeImageWODistorsion(im,id)
+                    im = self.getResizeImageWODistorsion(im, id)
                     # Take random crop
                     left = randomParams["left"]
                     right = np.add(left, self.img_size_crop[id][0:2])
-                    
-                    iw, fw = 0 , self.img_size_crop[id][0]
+
+                    iw, fw = 0, self.img_size_crop[id][0]
                     ih, fh = 0, self.img_size_crop[id][1]
-                    
+
                     if np.shape(im)[0] >= self.img_size[id][0] and np.shape(im)[1] >= self.img_size[id][1]:
                         iw, fw = left[0], right[0]
                         ih, fh = left[1], right[1]
@@ -3351,24 +3345,24 @@ class Dataset(object):
                         iw, fw = left[0], right[0]
                     elif np.shape(im)[1] >= self.img_size[id][1]:
                         ih, fh = left[1], right[1]
-                    
+
                     offset_w = 0
                     offset_h = 0
-                    
+
                     w, h = np.shape(im)[0:2]
-                    delta_w = np.floor((w - fw)*0.5)
-                    delta_h = np.floor((h - fh)*0.5)
-                    
+                    delta_w = np.floor((w - fw) * 0.5)
+                    delta_h = np.floor((h - fh) * 0.5)
+
                     if delta_w > 0:
-                        offset_w = int(random.random()*delta_w)
+                        offset_w = int(random.random() * delta_w)
                     if delta_h > 0:
-                        offset_h = int(random.random()*delta_h)
-                    
+                        offset_h = int(random.random() * delta_h)
+
                     iw += offset_w
                     fw += offset_w
                     ih += offset_h
                     fh += offset_h
-                
+
                     if self.use_RGB[id]:
                         im = im[iw:fw, ih:fh, :]
                     else:
@@ -3379,11 +3373,11 @@ class Dataset(object):
                     im = np.asarray(im, dtype=type_imgs)
                     if not self.use_RGB[id]:
                         im = np.expand_dims(im, 2)
-    
+
                     # Take random crop
                     left = randomParams["left"]
                     right = np.add(left, self.img_size_crop[id][0:2])
-    
+
                     try:
                         im = im[left[0]:right[0], left[1]:right[1], :]
                     except:
@@ -3431,40 +3425,38 @@ class Dataset(object):
 
         return I
 
-    def getResizeImageWODistorsion(self,im,id):
+    def getResizeImageWODistorsion(self, im, id):
         w, h = np.shape(im)[0:2]
         if w < h and (w < self.img_size_crop[id][0] or h > self.img_size[id][1]):
             w_size = self.img_size_crop[id][0]
-            w_ratio = (w_size/float(w))
-            h_size = int(h*w_ratio)
+            w_ratio = (w_size / float(w))
+            h_size = int(h * w_ratio)
 
             if h > self.img_size[id][1]:
-                h_ratio = (self.img_size[id][1]/float(h))
+                h_ratio = (self.img_size[id][1] / float(h))
                 if h_ratio > w_ratio:
-                    w_size = int(w*h_ratio)
+                    w_size = int(w * h_ratio)
                     h_size = self.img_size[id][1]
         elif h < w and (h < self.img_size_crop[id][1] or w > self.img_size[id][0]):
             h_size = self.img_size_crop[id][1]
-            h_ratio = (h_size/float(h))
-            w_size = int(w*h_ratio)
+            h_ratio = (h_size / float(h))
+            w_size = int(w * h_ratio)
 
             if w > self.img_size[id][0]:
-                w_ratio = (self.img_size[id][0]/float(w))
+                w_ratio = (self.img_size[id][0] / float(w))
                 if w_ratio > h_ratio:
-                    h_size = int(h*w_ratio)
+                    h_size = int(h * w_ratio)
                     w_size = self.img_size[id][0]
         else:
             w_size, h_size = self.img_size[id][0], self.img_size[id][1]
-            
+
         # Resize
         img = copy.copy(im)
         img = img.resize((h_size, w_size))
         return img
-    
+
     def getDataAugmentationRandomParams(self, images, id, prob_flip_horizontal=0.5, prob_flip_vertical=0.0):
-
         daRandomParams = dict()
-
         for i in range(len(images)):
             # Random crop
             margin = [self.img_size[id][0] - self.img_size_crop[id][0],
@@ -3562,8 +3554,9 @@ class Dataset(object):
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
-                                        daRandomParams,wo_da_patch_type, da_patch_type, da_enhance_list)
+                    x = self.loadImages(x, id_in, normalization_type, normalization,
+                                        meanSubstraction, dataAugmentation, daRandomParams,
+                                        wo_da_patch_type, da_patch_type, da_enhance_list)
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
@@ -4164,9 +4157,9 @@ class Dataset(object):
 
             if lengths[1:] != lengths[:-1]:
                 raise Exception('Inputs and outputs size '
-                                '(' + str(lengths) + ') for "' + set_name + '" set do not match.\n'
-                                                                            '\t Inputs:' + str(plot_ids_in) + ''
-                                                                                                              '\t Outputs:' + str(self.ids_outputs))
+                                '(' + str(lengths) + ') for "' +
+                                set_name + '" set do not match.\n \t Inputs:' +
+                                str(plot_ids_in) + '\t Outputs:' + str(self.ids_outputs))
 
     def __getNextSamples(self, k, set_name):
         """
