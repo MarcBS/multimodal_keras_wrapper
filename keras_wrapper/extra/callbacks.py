@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-from six import iteritems
+
+import copy
 import warnings
+
 from keras import backend as K
 from keras.callbacks import Callback as KerasCallback
-from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
-    decode_multilabel
+
 from keras_wrapper.extra import evaluation
 from keras_wrapper.extra.read_write import *
-import copy
+from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
+    decode_multilabel
 
 
 def checkDefaultParamsBeamSearch(params):
@@ -66,7 +68,7 @@ class EvalPerformance(KerasCallback):
                  batch_size,
                  model_name='model',
                  inputs_mapping_eval=None,
-                 outputs_mapping_eval = None,
+                 outputs_mapping_eval=None,
                  gt_pos=None,
                  each_n_epochs=1,
                  max_eval_samples=None,
@@ -222,13 +224,13 @@ class EvalPerformance(KerasCallback):
 
         # Single-output model
         if not self.gt_pos or self.gt_pos == 0:
-            #if not type(self.metric_name) == list:
+            # if not type(self.metric_name) == list:
             self.metric_name = [self.metric_name]
-            #if not type(self.write_type) == list:
+            # if not type(self.write_type) == list:
             self.write_type = [self.write_type]
-            #if not type(self.index2word_y) == list:
+            # if not type(self.index2word_y) == list:
             self.index2word_y = [self.index2word_y]
-            #if not type(self.index2word_x) == list:
+            # if not type(self.index2word_x) == list:
             self.index2word_x = [self.index2word_x]
 
             self.min_pred_multilabel = [min_pred_multilabel]
@@ -250,7 +252,7 @@ class EvalPerformance(KerasCallback):
 
         else:
             # Convert min_pred_multilabel to list
-            if type(self.min_pred_multilabel) != type(list()):
+            if isinstance(self.min_pred_multilabel, list):
                 self.min_pred_multilabel = [self.min_pred_multilabel for i in self.gt_pos]
 
         super(EvalPerformance, self).__init__()
@@ -331,7 +333,7 @@ class EvalPerformance(KerasCallback):
 
             # Single-output model
             if not self.gt_pos or self.gt_pos == 0 or len(self.gt_pos) == 1:
-                if len(predictions_all)!=2:
+                if len(predictions_all) != 2:
                     predictions_all = [predictions_all]
                 gt_positions = [0]
 
@@ -414,7 +416,7 @@ class EvalPerformance(KerasCallback):
                 # Postprocess outputs of type 3DLabel
                 elif type == '3DLabel':
                     self.extra_vars[gt_pos][s] = dict()
-                    exec ('ref=self.ds.Y_' + s + '["'+gt_id+'"]')
+                    exec ('ref=self.ds.Y_' + s + '["' + gt_id + '"]')
                     [ref, original_sizes] = self.ds.convert_GT_3DLabels_to_bboxes(ref)
                     self.extra_vars[gt_pos][s]['references'] = ref
                     self.extra_vars[gt_pos][s]['references_orig_sizes'] = original_sizes
@@ -427,7 +429,7 @@ class EvalPerformance(KerasCallback):
                     if self.eval_orig_size:
                         old_crop = copy.deepcopy(self.ds.img_size_crop)
                         self.ds.img_size_crop = copy.deepcopy(self.ds.img_size)
-                        self.extra_vars[gt_pos][s]['eval_orig_size_id'] = np.array([gt_id]*len(ref))
+                        self.extra_vars[gt_pos][s]['eval_orig_size_id'] = np.array([gt_id] * len(ref))
                     ref = self.ds.load_GT_3DSemanticLabels(ref, gt_id)
                     if self.eval_orig_size:
                         self.ds.img_size_crop = copy.deepcopy(old_crop)
@@ -531,7 +533,7 @@ class EvalPerformance(KerasCallback):
     def changeInOutMappings(self):
         self.train_mappings = {'in': self.model_to_eval.inputsMapping,
                                'out': self.model_to_eval.outputsMapping,
-                              }
+                               }
 
         if self.inputs_mapping_eval is not None:
             self.model_to_eval.setInputsMapping(self.inputs_mapping_eval)
@@ -846,7 +848,8 @@ class EarlyStopping(KerasCallback):
 
 
 class LearningRateReducer(KerasCallback):
-    def __init__(self, initial_lr=1., reduce_rate=0.99, reduce_each_epochs=True, reduce_frequency=1, start_reduction_on_epoch=0,
+    def __init__(self, initial_lr=1., reduce_rate=0.99, reduce_each_epochs=True, reduce_frequency=1,
+                 start_reduction_on_epoch=0,
                  exp_base=0.5, half_life=50000, warmup_exp=-1.5, reduction_function='linear', epsilon=1e-11, verbose=1):
         """
         Reduces learning rate during the training.
@@ -887,7 +890,7 @@ class LearningRateReducer(KerasCallback):
         self.epoch = 0
         self.new_lr = None
         assert self.reduction_function in ['linear', 'exponential', 'noam'], 'Reduction function "%s" unimplemented!' % \
-                                                                     str(self.reduction_function)
+                                                                             str(self.reduction_function)
 
     def on_epoch_end(self, epoch, logs={}):
 
@@ -919,8 +922,8 @@ class LearningRateReducer(KerasCallback):
         elif self.reduction_function == 'exponential':
             new_rate = np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
         elif self.reduction_function == 'noam':
-            new_rate = np.float32(min(float(current_nb)** self.exp_base,
-                                  float(current_nb) * self.half_life ** self.warmup_exp))
+            new_rate = np.float32(min(float(current_nb) ** self.exp_base,
+                                      float(current_nb) * self.half_life ** self.warmup_exp))
 
         else:
             raise NotImplementedError('The decay function %s is not implemented.' % str(self.reduction_function))

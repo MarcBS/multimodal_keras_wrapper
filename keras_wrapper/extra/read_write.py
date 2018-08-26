@@ -17,16 +17,17 @@ import codecs
 import numpy as np
 import tables
 import sys
+from io import BytesIO     # for handling byte strings
+
 if sys.version_info.major == 3:
-    import _pickle  as pk
+    import _pickle as pk
     unicode_fn = str
 else:
     import cPickle as pk
     unicode_fn = unicode
 
-from io import BytesIO     # for handling byte strings
-
 # Helpers
+
 
 def _dirac(pred, gt):
     return int(pred == gt)
@@ -129,6 +130,7 @@ def list2file(filepath, mylist, permission='wb'):
     mylist = BytesIO(mylist)
     with open(filepath, permission) as f:
         f.writelines(mylist)
+
 
 def list2stdout(mylist):
     mylist = [unicode_fn(l) for l in mylist]
@@ -361,4 +363,3 @@ def pkl2dict(path):
             return pk.load(f)
         else:
             return pk.load(f, encoding='latin1')
-

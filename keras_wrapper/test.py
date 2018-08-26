@@ -38,7 +38,6 @@ def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, at
             if verbose > 0:
                 print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
     if verbose > 0:
-        print ("===========================")
         print ("Checking model init weights")
 
     if model_init is not None:
@@ -238,7 +237,6 @@ def classifyFood101():
                        'epochs_for_save': 1, 'verbose': 1, 'eval_on_sets': ['val']}
     # net.trainNet(ds, training_params)
 
-
     # Test network on test set
     test_params = {'batch_size': 50}
     # net.testNet(ds, test_params)
@@ -268,7 +266,7 @@ def loadFlickr8k():
     max_text_len = 35
 
     # Let's load the train, val and test splits of the descriptions (outputs)
-    #    the files include a description per line 
+    #    the files include a description per line
     #    and a set of 5 consecutive descriptions correspond to a single input image
 
     ds.setOutput(base_path + 'text/train_descriptions.txt', 'train',
@@ -282,15 +280,12 @@ def loadFlickr8k():
                  tokenization='tokenize_basic', max_text_len=max_text_len)
 
     # Let's load the associated images (inputs)
-    #    we must take into account that in this dataset we have 5 sentences per image, 
+    #    we must take into account that in this dataset we have 5 sentences per image,
     #    for this reason we introduce the parameter 'repeat_set'=5
 
-    ds.setInput(base_path + 'text/Flickr_8k.trainImages.txt', 'train',
-                type='image', id='images', repeat_set=5)
-    ds.setInput(base_path + 'text/Flickr_8k.devImages.txt', 'val',
-                type='image', id='images', repeat_set=5)
-    ds.setInput(base_path + 'text/Flickr_8k.testImages.txt', 'test',
-                type='image', id='images', repeat_set=5)
+    ds.setInput(base_path + 'text/Flickr_8k.trainImages.txt', 'train', type='image', id='images', repeat_set=5)
+    ds.setInput(base_path + 'text/Flickr_8k.devImages.txt', 'val', type='image', id='images', repeat_set=5)
+    ds.setInput(base_path + 'text/Flickr_8k.testImages.txt', 'test', type='image', id='images', repeat_set=5)
 
     # Now let's set the dataset mean image for preprocessing the data
     ds.setTrainMean(mean_image=[122.6795, 116.6690, 104.0067], id='images')
@@ -332,7 +327,7 @@ def loadMSVD():
                  tokenization='tokenize_basic', max_text_len=max_text_len)
 
     # Let's load the associated videos (inputs)
-    #    we must take into account that in this dataset we have a different number of sentences per video, 
+    #    we must take into account that in this dataset we have a different number of sentences per video,
     #    for this reason we introduce the parameter 'repeat_set'=num_captions, where num_captions is a list
     #    containing the number of captions in each video.
 
@@ -362,6 +357,7 @@ def loadMSVD():
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
     logging.info('Sample data loaded correctly.')
+
 
 def loadFood101():
     logging.info('Loading Food101 dataset')
