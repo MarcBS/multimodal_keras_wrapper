@@ -90,7 +90,6 @@ class BPE(object):
             # eliminate double spaces
             if not word:
                 continue
-            print ("word", word)
             new_word = [out for segment in self._isolate_glossaries(word)
                         for out in encode(segment,
                                           self.bpe_codes,
