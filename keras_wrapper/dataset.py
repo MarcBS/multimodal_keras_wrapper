@@ -17,7 +17,7 @@ if sys.version_info.major == 3:
 else:
     import cPickle as pk
     from itertools import izip as zip
-
+import codecs
 from collections import Counter
 from operator import add
 import numpy as np
@@ -1351,7 +1351,7 @@ class Dataset(object):
 
         if isinstance(path_classes, str) and os.path.isfile(path_classes):
             classes = []
-            with open(path_classes, 'r') as list_:
+            with codecs.open(path_classes, 'r', encoding='utf-8') as list_:
                 for line in list_:
                     classes.append(line.rstrip('\n'))
             self.classes[id] = classes
@@ -1382,7 +1382,7 @@ class Dataset(object):
 
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
             labels = []
-            with open(labels_list, 'r') as list_:
+            with codecs.open(labels_list, 'r', encoding='utf-8') as list_:
                 for line in list_:
                     labels.append(int(line.rstrip('\n')))
         elif isinstance(labels_list, list):
@@ -1479,7 +1479,7 @@ class Dataset(object):
         """
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
             labels = []
-            with open(labels_list, 'r') as list_:
+            with codecs.open(labels_list, 'r', encoding='utf-8') as list_:
                 for line in list_:
                     labels.append(int(line.rstrip('\n')))
         elif isinstance(labels_list, list):
@@ -1603,7 +1603,7 @@ class Dataset(object):
         """
         sentences = []
         if isinstance(annotations_list, str) and os.path.isfile(annotations_list):
-            with open(annotations_list, 'r') as list_:
+            with codecs.open(annotations_list, 'r', encoding='utf-8') as list_:
                 for line in list_:
                     sentences.append(line.rstrip('\n'))
         elif isinstance(annotations_list, list):
@@ -1829,7 +1829,7 @@ class Dataset(object):
         :return: None
         """
         from keras_wrapper.extra.external import BPE
-        with open(codes, 'r') as cods:
+        with codecs.open(codes, 'rb', encoding='utf-8') as cods:
             self.BPE = BPE(cods, merges=merges, separator=separator, vocab=vocabulary, glossaries=glossaries)
         self.BPE_separator = separator
         self.BPE_built = True
@@ -2688,7 +2688,7 @@ class Dataset(object):
         logging.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
         if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of IDs
             data = []
-            with open(path_list, 'r') as list_:
+            with codecs.open(path_list, 'r', encoding='utf-8') as list_:
                 for line in list_:
                     data.append(line.rstrip('\n'))
         elif isinstance(path_list, list):
@@ -2745,7 +2745,7 @@ class Dataset(object):
         """
         if isinstance(path_classes, str) and os.path.isfile(path_classes):
             semantic_classes = dict()
-            with open(path_classes, 'r') as list_:
+            with codecs.open(path_classes, 'r', encoding='utf-8') as list_:
                 for line in list_:
                     line = line.rstrip('\n').split(',')
                     if len(line) != 4:
@@ -2885,7 +2885,7 @@ class Dataset(object):
     def preprocess3DLabel(self, path_list, id, associated_id_in, num_poolings):
         if isinstance(path_list, str) and os.path.isfile(path_list):
             path_list_3DLabel = []
-            with open(path_list, 'r') as list_:
+            with codecs.open(path_list, 'r', encoding='utf-8') as list_:
                 for line in list_:
                     path_list_3DLabel.append(line.strip())
         else:
