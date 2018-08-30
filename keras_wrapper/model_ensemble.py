@@ -313,9 +313,11 @@ class BeamSearchEnsemble:
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
-                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                if params['pos_unk']:
+                    raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
@@ -719,9 +721,11 @@ class BeamSearchEnsemble:
 
         for s in params['predict_on_sets']:
             logging.info("<<< Scoring outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
-                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                if params['pos_unk']:
+                    raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             n_samples = eval("self.dataset.len_" + s)
@@ -746,7 +750,7 @@ class BeamSearchEnsemble:
             sampled = 0
             start_time = time.time()
             eta = -1
-            for j in range(num_iterations):
+            for _ in range(num_iterations):
                 data = next(data_gen)
                 X = dict()
                 s_dict = {}
@@ -994,7 +998,7 @@ class PredictEnsemble:
         """
 
         outs_list = []
-        for i, m in list(enumerate(models)):
+        for m in list(models):
             outs_list.append(m.model.predict_on_batch(data_gen, val_samples, max_q_size))
         outs = sum(outs_list[i] for i in range(len(models))) / float(len(models))
         return outs
@@ -1071,8 +1075,8 @@ class PredictEnsemble:
 
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
-
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             # Calculate how many interations are we going to perform
             if params['n_samples'] is None:
                 if params['init_sample'] > -1 and params['final_sample'] > -1:
@@ -1113,15 +1117,13 @@ class PredictEnsemble:
                                                 predict=True,
                                                 random_samples=n_samples).generator()
             # Predict on model
-            """
-            if self.postprocess_fun is None:
-
-                out = self.predict_generator(self.models,
-                                             data_gen,
-                                             val_samples=n_samples,
-                                             max_q_size=params['n_parallel_loaders'])
-                predictions[s] = out
-            """
+            # if self.postprocess_fun is None:
+            #
+            #     out = self.predict_generator(self.models,
+            #                                  data_gen,
+            #                                  val_samples=n_samples,
+            #                                  max_q_size=params['n_parallel_loaders'])
+            #     predictions[s] = out
             processed_samples = 0
             start_time = time.time()
             while processed_samples < n_samples:

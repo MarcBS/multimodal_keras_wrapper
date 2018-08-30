@@ -59,7 +59,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
     final_scores = {}
     for scorer, method in scorers:
         score, _ = scorer.compute_score(refs, hypo)
-        if type(score) == list:
+        if isinstance(score, list):
             for m, s in list(zip(method, score)):
                 final_scores[m] = s
         else:
@@ -219,7 +219,6 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     :return: dictionary of multiclass metrics
     """
     from sklearn import metrics as sklearn_metrics
-    import numpy as np
 
     n_classes = extra_vars['n_classes']
 
@@ -327,7 +326,7 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
     y_pred = np.zeros((n_samples, n_classes))
 
     ind_i = 0
-    for i_s, (gt_class, pred_class) in list(enumerate(zip(values_gt, pred_class_list))):
+    for _, (gt_class, pred_class) in list(enumerate(zip(values_gt, pred_class_list))):
         if not any([d == gt_class for d in discard_classes]):
             y_pred[ind_i, pred_class] = 1
             y_gt[ind_i, gt_class] = 1
@@ -743,8 +742,8 @@ def vqa_store(question_id_list, answer_list, path):
         path - path where the file is saved
     """
     question_answer_pairs = []
-    assert len(question_id_list) == len(answer_list), \
-        'must be the same number of questions and answers'
+    if len(question_id_list) != len(answer_list):
+        raise AssertionError('must be the same number of questions and answers')
     for q, a in list(zip(question_id_list, answer_list)):
         question_answer_pairs.append({'question_id': q, 'answer': str(a)})
     with open(path, 'w') as f:

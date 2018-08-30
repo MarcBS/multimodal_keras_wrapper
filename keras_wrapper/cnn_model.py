@@ -119,7 +119,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile_model=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -147,7 +147,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
     try:
         logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
-        model = load_model(model_name + '.h5', custom_objects=custom_objects, compile=compile)
+        model = load_model(model_name + '.h5', custom_objects=custom_objects, compile=compile_model)
     except Exception as e:
         logging.info(str(e))
         # Load model structure
@@ -209,7 +209,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     return model_wrapper
 
 
-def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile=False):
+def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile_model=False):
     """
     Loads a the weights from files to a Model_Wrapper object.
 
@@ -361,14 +361,14 @@ class Model_Wrapper(object):
             - Easy to use training and test methods.
     """
 
-    def __init__(self, nOutput=1000, type='basic_model', silence=False, input_shape=None,
+    def __init__(self, nOutput=1000, model_type='basic_model', silence=False, input_shape=None,
                  structure_path=None, weights_path=None, seq_to_functional=False,
                  model_name=None, plots_path=None, models_path=None, inheritance=False):
         """
             Model_Wrapper object constructor.
 
             :param nOutput: number of outputs of the network. Only valid if 'structure_path' is None.
-            :param type: network name type (corresponds to any method defined in the section 'MODELS' of this class).
+            :param model_type: network name type (corresponds to any method defined in the section 'MODELS' of this class).
                          Only valid if 'structure_path' is None.
             :param silence: set to True if you don't want the model to output informative messages
             :param input_shape: array with 3 integers which define the images' input shape [height, width, channels].
@@ -393,7 +393,7 @@ class Model_Wrapper(object):
                           'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
 
         self.silence = silence
-        self.net_type = type
+        self.net_type = model_type
         self.lr = 0.01  # insert default learning rate
         self.momentum = 1.0 - self.lr  # insert default momentum
         self.loss = None  # default loss function
@@ -455,12 +455,12 @@ class Model_Wrapper(object):
 
             else:
                 # Build model from scratch
-                if hasattr(self, type):
+                if hasattr(self, model_type):
                     if not self.silence:
-                        logging.info("<<< Building " + type + " Model_Wrapper >>>")
-                    eval('self.' + type + '(nOutput, input_shape)')
+                        logging.info("<<< Building " + model_type + " Model_Wrapper >>>")
+                    eval('self.' + model_type + '(nOutput, input_shape)')
                 else:
-                    raise Exception('Model_Wrapper type "' + type + '" is not implemented.')
+                    raise Exception('Model_Wrapper model_type "' + model_type + '" is not implemented.')
 
             # Load weights from file
             if weights_path:
@@ -971,10 +971,11 @@ class Model_Wrapper(object):
             if params['tensorboard_params']['label_word_embeddings_with_vocab'] \
                     and params['tensorboard_params']['word_embeddings_labels'] is not None:
                 embeddings_metadata = {}
-                assert len(params['tensorboard_params']['embeddings_layer_names']) == len(params['tensorboard_params']['word_embeddings_labels']),\
-                    'The number of "embeddings_layer_names" and "word_embeddings_labels" do not match. Currently, ' \
-                    'we have %d "embeddings_layer_names" and %d "word_embeddings_labels"' % \
-                    (len(params['tensorboard_params']['embeddings_layer_names']), len(params['tensorboard_params']['word_embeddings_labels']))
+                if len(params['tensorboard_params']['embeddings_layer_names']) != len(params['tensorboard_params']['word_embeddings_labels']):
+                    raise AssertionError('The number of "embeddings_layer_names" and "word_embeddings_labels" do not match. Currently, '
+                                         'we have %d "embeddings_layer_names" and %d "word_embeddings_labels"' %
+                                         (len(params['tensorboard_params']['embeddings_layer_names']),
+                                          len(params['tensorboard_params']['word_embeddings_labels'])))
                 # Prepare word embeddings mapping
                 for i, layer_name in list(enumerate(params['tensorboard_params']['embeddings_layer_names'])):
                     layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
@@ -1742,10 +1743,11 @@ class Model_Wrapper(object):
                 data_gen = -1
                 data_gen_instance = -1
             else:
-
-                assert len(params['model_inputs']) > 0, 'We need at least one input!'
+                if len(params['model_inputs']) == 0:
+                    raise AssertionError('We need at least one input!')
                 if not params['optimized_search']:  # use optimized search model if available
-                    assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                    if params['pos_unk']:
+                        raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
 
                 params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
                 if params['temporally_linked']:
@@ -2041,9 +2043,11 @@ class Model_Wrapper(object):
                 data_gen = -1
                 data_gen_instance = -1
             else:
-                assert len(params['model_inputs']) > 0, 'We need at least one input!'
+                if len(params['model_inputs']) == 0:
+                    raise AssertionError('We need at least one input!')
                 if not params['optimized_search']:  # use optimized search model if available
-                    assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                    if params['pos_unk']:
+                        raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
 
                 params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
 
@@ -2125,7 +2129,7 @@ class Model_Wrapper(object):
                 sampled = 0
                 start_time = time.time()
                 eta = -1
-                for j in range(num_iterations):
+                for _ in range(num_iterations):
                     data = next(data_gen)
                     X = dict()
                     if params['n_samples'] > 0:
@@ -2547,9 +2551,12 @@ class Model_Wrapper(object):
 
         for s in params['predict_on_sets']:
             logging.info("<<< Scoring outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
-                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                if params['pos_unk']:
+                    raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
+
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many iterations are we going to perform
             n_samples = eval("self.dataset.len_" + s)
@@ -2590,7 +2597,7 @@ class Model_Wrapper(object):
             sampled = 0
             start_time = time.time()
             eta = -1
-            for j in range(num_iterations):
+            for _ in range(num_iterations):
                 data = next(data_gen)
                 X = dict()
                 s_dict = {}
@@ -2990,7 +2997,7 @@ class Model_Wrapper(object):
     #           nOutput, input
     # ------------------------------------------------------- #
 
-    def basic_model(self, nOutput, input):
+    def basic_model(self, nOutput, model_input):
         """
             Builds a basic CNN model.
         """
@@ -2999,14 +3006,14 @@ class Model_Wrapper(object):
         self.ids_inputs = ['input']
         self.ids_outputs = ['output']
 
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(model_input) == 3:
+            input_shape = tuple([model_input[2]] + model_input[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(model_input)
 
         inp = Input(shape=input_shape, name='input')
 
-        # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
+        # model_input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
         # this applies 32 convolution filters of size 3x3 each.
         x = Conv2D(32, (3, 3), padding='valid')(inp)
         x = Activation('relu')(x)
@@ -3518,8 +3525,6 @@ class Model_Wrapper(object):
 
         self.model = Model(inputs=[img_input], outputs=[x])
 
-    ########################################
-
     def Union_Layer(self, nOutput, input_shape):
         """
         Network with just a dropout and a softmax layers which is intended to serve as the final layer for an ECOC model
@@ -3621,7 +3626,6 @@ class Model_Wrapper(object):
 
         return out_node
 
-
     def add_One_vs_One_Inception_v2(self, input_layer, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model
@@ -3647,12 +3651,12 @@ class Model_Wrapper(object):
 
         return output_name
 
-    def __addInception(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce,
+    def __addInception(self, name, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce,
                        kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
 
-            :param id: string identifier of the inception layer
+            :param name: string identifier of the inception layer
             :param input_layer: identifier of the layer that will serve as an input to the built inception module
             :param kernels_1x1: number of kernels of size 1x1                                      (1st branch)
             :param kernels_3x3_reduce: number of kernels of size 1x1 before the 3x3 layer          (2nd branch)
@@ -3662,43 +3666,43 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        self.model.add_node(Conv2D(kernels_1x1, (1, 1)), name=id + '/1x1', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id + '/relu_1x1', input=id + '/1x1')
+        self.model.add_node(Conv2D(kernels_1x1, (1, 1)), name=name + '/1x1', input=input_layer)
+        self.model.add_node(Activation('relu'), name=name + '/relu_1x1', input=name + '/1x1')
 
         # Branch 2
-        self.model.add_node(Conv2D(kernels_3x3_reduce, (1, 1)), name=id + '/3x3_reduce', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id + '/relu_3x3_reduce', input=id + '/3x3_reduce')
-        self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/3x3_zeropadding', input=id + '/relu_3x3_reduce')
-        self.model.add_node(Conv2D(kernels_3x3, (3, 3)), name=id + '/3x3', input=id + '/3x3_zeropadding')
-        self.model.add_node(Activation('relu'), name=id + '/relu_3x3', input=id + '/3x3')
+        self.model.add_node(Conv2D(kernels_3x3_reduce, (1, 1)), name=name + '/3x3_reduce', input=input_layer)
+        self.model.add_node(Activation('relu'), name=name + '/relu_3x3_reduce', input=name + '/3x3_reduce')
+        self.model.add_node(ZeroPadding2D((1, 1)), name=name + '/3x3_zeropadding', input=name + '/relu_3x3_reduce')
+        self.model.add_node(Conv2D(kernels_3x3, (3, 3)), name=name + '/3x3', input=name + '/3x3_zeropadding')
+        self.model.add_node(Activation('relu'), name=name + '/relu_3x3', input=name + '/3x3')
 
         # Branch 3
-        self.model.add_node(Conv2D(kernels_5x5_reduce, (1, 1)), name=id + '/5x5_reduce', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id + '/relu_5x5_reduce', input=id + '/5x5_reduce')
-        self.model.add_node(ZeroPadding2D((2, 2)), name=id + '/5x5_zeropadding', input=id + '/relu_5x5_reduce')
-        self.model.add_node(Conv2D(kernels_5x5, (5, 5)), name=id + '/5x5', input=id + '/5x5_zeropadding')
-        self.model.add_node(Activation('relu'), name=id + '/relu_5x5', input=id + '/5x5')
+        self.model.add_node(Conv2D(kernels_5x5_reduce, (1, 1)), name=name + '/5x5_reduce', input=input_layer)
+        self.model.add_node(Activation('relu'), name=name + '/relu_5x5_reduce', input=name + '/5x5_reduce')
+        self.model.add_node(ZeroPadding2D((2, 2)), name=name + '/5x5_zeropadding', input=name + '/relu_5x5_reduce')
+        self.model.add_node(Conv2D(kernels_5x5, (5, 5)), name=name + '/5x5', input=name + '/5x5_zeropadding')
+        self.model.add_node(Activation('relu'), name=name + '/relu_5x5', input=name + '/5x5')
 
         # Branch 4
-        self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/pool_zeropadding', input=input_layer)
-        self.model.add_node(MaxPooling2D((3, 3), strides=(1, 1)), name=id + '/pool', input=id + '/pool_zeropadding')
-        self.model.add_node(Conv2D(kernels_pool_projection, (1, 1)), name=id + '/pool_proj', input=id + '/pool')
-        self.model.add_node(Activation('relu'), name=id + '/relu_pool_proj', input=id + '/pool_proj')
+        self.model.add_node(ZeroPadding2D((1, 1)), name=name + '/pool_zeropadding', input=input_layer)
+        self.model.add_node(MaxPooling2D((3, 3), strides=(1, 1)), name=name + '/pool', input=name + '/pool_zeropadding')
+        self.model.add_node(Conv2D(kernels_pool_projection, (1, 1)), name=name + '/pool_proj', input=name + '/pool')
+        self.model.add_node(Activation('relu'), name=name + '/relu_pool_proj', input=name + '/pool_proj')
 
         # Concatenate
-        inputs_list = [id + '/relu_1x1', id + '/relu_3x3', id + '/relu_5x5', id + '/relu_pool_proj']
-        out_name = id + '/concat'
+        inputs_list = [name + '/relu_1x1', name + '/relu_3x3', name + '/relu_5x5', name + '/relu_pool_proj']
+        out_name = name + '/concat'
         self.model.add_node(Activation('linear'), name=out_name, inputs=inputs_list, concat_axis=1)
 
         return out_name
 
     @staticmethod
-    def __addInception_Functional(id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3,
+    def __addInception_Functional(name, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3,
                                   kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
 
-            :param id: string identifier of the inception layer
+            :param name: string identifier of the inception layer
             :param input_layer: identifier of the layer that will serve as an input to the built inception module
             :param kernels_1x1: number of kernels of size 1x1                                      (1st branch)
             :param kernels_3x3_reduce: number of kernels of size 1x1 before the 3x3 layer          (2nd branch)
@@ -3708,25 +3712,25 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        x_b1 = Conv2D(kernels_1x1, (1, 1), name=id + '/1x1', activation='relu')(input_layer)
+        x_b1 = Conv2D(kernels_1x1, (1, 1), name=name + '/1x1', activation='relu')(input_layer)
 
         # Branch 2
-        x_b2 = Conv2D(kernels_3x3_reduce, (1, 1), name=id + '/3x3_reduce', activation='relu')(input_layer)
-        x_b2 = ZeroPadding2D((1, 1), name=id + '/3x3_zeropadding')(x_b2)
-        x_b2 = Conv2D(kernels_3x3, (3, 3), name=id + '/3x3', activation='relu')(x_b2)
+        x_b2 = Conv2D(kernels_3x3_reduce, (1, 1), name=name + '/3x3_reduce', activation='relu')(input_layer)
+        x_b2 = ZeroPadding2D((1, 1), name=name + '/3x3_zeropadding')(x_b2)
+        x_b2 = Conv2D(kernels_3x3, (3, 3), name=name + '/3x3', activation='relu')(x_b2)
 
         # Branch 3
-        x_b3 = Conv2D(kernels_5x5_reduce, (1, 1), name=id + '/5x5_reduce', activation='relu')(input_layer)
-        x_b3 = ZeroPadding2D((2, 2), name=id + '/5x5_zeropadding')(x_b3)
-        x_b3 = Conv2D(kernels_5x5, (5, 5), name=id + '/5x5', activation='relu')(x_b3)
+        x_b3 = Conv2D(kernels_5x5_reduce, (1, 1), name=name + '/5x5_reduce', activation='relu')(input_layer)
+        x_b3 = ZeroPadding2D((2, 2), name=name + '/5x5_zeropadding')(x_b3)
+        x_b3 = Conv2D(kernels_5x5, (5, 5), name=name + '/5x5', activation='relu')(x_b3)
 
         # Branch 4
-        x_b4 = ZeroPadding2D((1, 1), name=id + '/pool_zeropadding')(input_layer)
-        x_b4 = MaxPooling2D((3, 3), strides=(1, 1), name=id + '/pool')(x_b4)
-        x_b4 = Conv2D(kernels_pool_projection, (1, 1), name=id + '/pool_proj', activation='relu')(x_b4)
+        x_b4 = ZeroPadding2D((1, 1), name=name + '/pool_zeropadding')(input_layer)
+        x_b4 = MaxPooling2D((3, 3), strides=(1, 1), name=name + '/pool')(x_b4)
+        x_b4 = Conv2D(kernels_pool_projection, (1, 1), name=name + '/pool_proj', activation='relu')(x_b4)
 
         # Concatenate
-        out_name = id + '/concat'
+        out_name = name + '/concat'
         out_node = concatenate([x_b1, x_b2, x_b3, x_b4], axis=1, name=out_name)
 
         return [out_node, out_name]
@@ -3760,7 +3764,6 @@ class Model_Wrapper(object):
         self.model = Model(inputs=[in_node], outputs=[ecoc_loss, final_loss])
 
         return [ecoc_loss_name, final_loss_name]
-
 
     ##############################
     #       DENSE NETS
@@ -4148,7 +4151,7 @@ class Model_Wrapper(object):
                     try:
                         prev_out[idx_vars] = np.concatenate(prev_out_new[idx_vars])
                     except Exception as e:
-
+                        logging.info(str(e))
                         raise Exception()
 
                 prev_out_next = prev_out
