@@ -20,7 +20,7 @@ def prepareCAM(snet):
 
     # Get weights (position 0 -> no food, positions 1 -> food)
     W = snet.getStage(1).model.get_weights()[-2]
-    b = snet.getStage(1).model.get_weights()[-1]  # recover bias although it will not be used
+    # b = snet.getStage(1).model.get_weights()[-1]  # recover bias although it will not be used
 
     return W
 
@@ -76,7 +76,7 @@ def applyForwardPass(snet, X):
     return [X, predictions]
 
 
-def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
+def computeCAM(snet, X, W, reshape_size=None, n_top_convs=20):
     """
     Applies a forward pass of the pre-processed samples "X" in the GAP net "snet" and generates the resulting
     CAM "maps" using the GAP weights "W" with the defined size "reshape_size".
@@ -84,6 +84,9 @@ def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
     computed considering the weight Wi assigned to the i-th feature map.
     """
     from skimage.transform import resize
+
+    if reshape_size is None:
+        reshape_size = [256, 256]
 
     # Apply forward pass in GAP model
     [X, predictions] = applyForwardPass(snet, X)
@@ -100,8 +103,8 @@ def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
 
     for s in range(X.shape[0]):
         weighted_activation = np.dot(np.transpose(W), np.reshape(X[s], (W.shape[0], X.shape[2] * X.shape[3])))
-        map = np.reshape(weighted_activation, (W.shape[1], X.shape[2], X.shape[3]))
-        maps[s] = resize(map, tuple([W.shape[1]] + reshape_size), order=1, preserve_range=True)
+        mapping = np.reshape(weighted_activation, (W.shape[1], X.shape[2], X.shape[3]))
+        maps[s] = resize(mapping, tuple([W.shape[1]] + reshape_size), order=1, preserve_range=True)
 
         for c in range(W.shape[1]):
             for enum_conv, i_conv in list(enumerate(ind_best[c])):
@@ -110,29 +113,27 @@ def computeCAM(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
     return [maps, predictions, convs]
 
 
-'''
-def getBestConvFeatures(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
-   """
-       Returns the best "n_top_convs" convolutional features for each of the classes. The ranking is
-       computed considering the weight Wi assigned to the i-th feature map.
-   """
-   # Apply forward pass in GAP model
-   [X, predictions] = applyForwardPass(snet, X)
-
-   # Get indices of best convolutional features for each class
-   ind_best = np.zeros((W.shape[1], n_top_convs))
-   for c in range(W.shape[1]):
-       ind_best[c,:] = np.argsort(W[:,c])[::-1][:20]
-
-   # Store top convolutional features
-   convs = np.zeros((X.shape[0], W.shape[1], n_top_convs, reshape_size[0], reshape_size[1]))
-   for s in range(X.shape[0]):
-       for c in range(W.shape[1]):
-           for enum_conv, i_conv in enumerate(ind_best[c]):
-               convs[s,c,enum_conv] = resize(X[s,i_conv], reshape_size, order=1, preserve_range=True)
-
-   return convs
-'''
+# def getBestConvFeatures(snet, X, W, reshape_size=[256, 256], n_top_convs=20):
+#    """
+#        Returns the best "n_top_convs" convolutional features for each of the classes. The ranking is
+#        computed considering the weight Wi assigned to the i-th feature map.
+#    """
+#    # Apply forward pass in GAP model
+#    [X, predictions] = applyForwardPass(snet, X)
+#
+#    # Get indices of best convolutional features for each class
+#    ind_best = np.zeros((W.shape[1], n_top_convs))
+#    for c in range(W.shape[1]):
+#        ind_best[c,:] = np.argsort(W[:,c])[::-1][:20]
+#
+#    # Store top convolutional features
+#    convs = np.zeros((X.shape[0], W.shape[1], n_top_convs, reshape_size[0], reshape_size[1]))
+#    for s in range(X.shape[0]):
+#        for c in range(W.shape[1]):
+#            for enum_conv, i_conv in enumerate(ind_best[c]):
+#                convs[s,c,enum_conv] = resize(X[s,i_conv], reshape_size, order=1, preserve_range=True)
+#
+#    return convs
 
 
 def bbox(img, mode='width_height'):
@@ -162,7 +163,7 @@ def computeIoU(GT, pred):
     return intersection / union
 
 
-def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_restriction=0.1, box_expansion=0.2,
+def getBBoxesFromCAMs(CAMs, reshape_size=None, percentage_heat=0.4, size_restriction=0.1, box_expansion=0.2,
                       use_gpu=True):
     """
     Reference:
@@ -193,6 +194,9 @@ def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_r
             "Cython is required for running this function:\npip install cython\nRun the following command inside "
             "kernel_wrapper/extra/nms after its installation:\npython setup.py build_ext --inplace")
 
+    if reshape_size is None:
+        reshape_size = [256, 256]
+
     predicted_bboxes = []
     predicted_scores = []
 
@@ -217,8 +221,8 @@ def getBBoxesFromCAMs(CAMs, reshape_size=[256, 256], percentage_heat=0.4, size_r
 
         # Get biggest connected component
         min_size = new_reshape_size[0] * new_reshape_size[1] * size_restriction
-        labeled, nr_objects = ndimage.label(binary_heat)  # get connected components
-        [objects, counts] = np.unique(labeled, return_counts=True)  # count occurrences
+        labeled, _ = ndimage.label(binary_heat)  # get connected components
+        [_, counts] = np.unique(labeled, return_counts=True)  # count occurrences
         biggest_components = np.argsort(counts[1:])[::-1]
         selected_components = [1 if counts[i + 1] >= min_size else 0 for i in
                                biggest_components]  # check minimum size restriction

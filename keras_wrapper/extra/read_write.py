@@ -99,7 +99,7 @@ def numpy2file(filepath, mylist, permission='wb', split=False):
 def numpy2imgs(folder_path, mylist, imgs_names, dataset):
     from PIL import Image as pilimage
     create_dir_if_not_exists(folder_path)
-    n_samples, wh, n_classes = mylist.shape
+    n_samples, _, n_classes = mylist.shape
 
     for img, name in zip(mylist, imgs_names):
         name = '_'.join(name.split('/'))
@@ -115,7 +115,7 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
 def listoflists2file(filepath, mylist, permission='wb'):
     mylist = [unicode_fn(sublist) for sublist in mylist]
     mylist = '\n'.join(mylist)
-    if type(mylist[0]) is unicode_fn:
+    if isinstance(mylist[0], unicode_fn):
         mylist = mylist.encode('utf-8')
     mylist = BytesIO(mylist)
     with open(filepath, permission) as f:
@@ -125,7 +125,7 @@ def listoflists2file(filepath, mylist, permission='wb'):
 def list2file(filepath, mylist, permission='wb'):
     mylist = [unicode_fn(l) for l in mylist]
     mylist = u'\n'.join(mylist)
-    if type(mylist[0]) is unicode_fn:
+    if isinstance(mylist[0], unicode_fn):
         mylist = mylist.encode('utf-8')
     mylist = BytesIO(mylist)
     with open(filepath, permission) as f:
@@ -135,9 +135,6 @@ def list2file(filepath, mylist, permission='wb'):
 def list2stdout(mylist):
     mylist = [unicode_fn(l) for l in mylist]
     mylist = '\n'.join(mylist)
-    # if type(mylist[0]) is unicode_fn:
-
-    #     mylist = mylist.encode('utf-8')
     print (mylist)
 
 
@@ -147,13 +144,13 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='wb'):
         for l2 in l:
             a = []
             for l3 in l2:
-                if type(l3) is list:
+                if isinstance(l3, list):
                     l3 = l3[0]
                 a.append(unicode_fn(l3) + ' ' + separator)
             a = ' '.join(a + [' '])
             newlist.append(a.strip()[:-len(separator)].strip())
     mylist = '\n'.join(newlist)
-    if type(mylist[0]) is unicode_fn:
+    if isinstance(mylist[0], unicode_fn):
         mylist = mylist.encode('utf-8')
     mylist = BytesIO(mylist)
     with open(filepath, permission) as f:
@@ -196,7 +193,6 @@ def pickle_model(
         word2index_y,
         index2word_x,
         index2word_y):
-    import sys
     modifier = 10
     tmp = sys.getrecursionlimit()
     sys.setrecursionlimit(tmp * modifier)
@@ -246,7 +242,6 @@ def model_to_json(path, model):
     """
     Saves model as a json file under the path.
     """
-    import json
     json_model = model.to_json()
     with open(path, 'wb') as f:
         json.dump(json_model, f)
@@ -256,7 +251,6 @@ def json_to_model(path):
     """
     Loads a model from the json file.
     """
-    import json
     from keras.models import model_from_json
     with open(path, 'r') as f:
         json_model = json.load(f)
@@ -294,8 +288,11 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
     Out:
         the similarity score
     """
-    assert (len(questions) == len(answers_gt))
-    assert (len(questions) == len(answers_pred))
+    if len(questions) != len(answers_gt):
+        raise AssertionError('Diferent questions and answers_gt lengths.')
+    if len(questions) != len(answers_pred):
+        raise AssertionError('Diferent questions and answers_pred lengths.')
+
     output = ['-' * 50, 'Era {0}'.format(era)]
     score = 0.0
     for k, q in list(enumerate(questions)):
@@ -303,9 +300,8 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
         a_gt_original = answers_gt_original[k]
         a_p = answers_pred[k]
         score += _dirac(a_p, a_gt_original)
-        if type(q[0]) is unicode_fn:
-            tmp = unicode_fn(
-                'question: {0}\nanswer: {1}\nanswer_original: {2}\nprediction: {3}\n')
+        if isinstance(q[0], unicode_fn):
+            tmp = unicode_fn('question: {0}\nanswer: {1}\nanswer_original: {2}\nprediction: {3}\n')
         else:
             tmp = 'question: {0}\nanswer: {1}\nanswer_original: {2}\nprediction: {3}\n'
         output.append(tmp.format(q, a_gt, a_gt_original, a_p))

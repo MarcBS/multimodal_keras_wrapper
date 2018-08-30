@@ -12,18 +12,18 @@ Proceedings of the 54th Annual Meeting of the Association for Computational Ling
 """
 
 from __future__ import division, unicode_literals
-from six import iteritems
+
 import sys
+import os
+import inspect
 import codecs
 import io
 import argparse
-import json
 import re
-from collections import defaultdict
+import warnings
 
 # hack for python2/3 compatibility
 from io import open
-
 argparse.open = open
 
 
@@ -164,7 +164,7 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
                 j = word.index(first, i)
                 new_word.extend(word[i:j])
                 i = j
-            except:
+            except Exception:
                 new_word.extend(word[i:])
                 break
 
