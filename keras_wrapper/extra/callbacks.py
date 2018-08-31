@@ -11,11 +11,13 @@ from keras_wrapper.extra import evaluation
 from keras_wrapper.extra.read_write import *
 from keras_wrapper.utils import decode_predictions_one_hot, \
     decode_predictions_beam_search, decode_predictions, \
-    decode_multilabel
+    decode_multilabel, checkParameters
 
 
 def checkDefaultParamsBeamSearch(params):
-    required_params = ['model_inputs', 'model_outputs', 'dataset_inputs',
+    required_params = ['model_inputs',
+                       'model_outputs',
+                       'dataset_inputs',
                        'dataset_outputs']
     default_params = {'max_batch_size': 50,
                       'beam_size': 5,
@@ -314,8 +316,7 @@ class EvalPerformance(KerasCallback):
                                      'max_eval_samples': self.max_eval_samples
                                      }
 
-                params_prediction.update(
-                    checkDefaultParamsBeamSearch(self.extra_vars))
+                params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
                 predictions_all = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)[s]
             else:
                 orig_size = self.extra_vars.get('eval_orig_size', False)
@@ -696,10 +697,8 @@ class Sample(KerasCallback):
                                      'predict_on_sets': [s],
                                      'n_samples': self.n_samples,
                                      'pos_unk': False}
-                params_prediction.update(
-                    checkDefaultParamsBeamSearch(self.extra_vars))
-                predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(
-                    self.ds, params_prediction)
+                params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
+                predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
             else:
                 params_prediction = {'batch_size': self.batch_size,
                                      'n_parallel_loaders': self.extra_vars[

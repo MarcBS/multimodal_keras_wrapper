@@ -4,11 +4,38 @@ import itertools
 import logging
 import sys
 import time
+from six import iteritems
 
 import numpy as np
 
 if sys.version_info.major == 2:
     from itertools import imap as map
+
+
+def checkParameters(input_params, default_params, hard_check=False):
+    """Validates a set of input parameters and uses the default ones if not specified.
+
+    :param input_params: Input parameters.
+    :param default_params: Default parameters
+    :param hard_check: If True, raise exception if a parameter is not valid.
+    :return:
+    """
+    valid_params = [key for key in default_params]
+    params = dict()
+
+    # Check input parameters' validity
+    for key, val in iteritems(input_params):
+        if key in valid_params:
+            params[key] = val
+        elif hard_check:
+            raise Exception("Parameter '" + key + "' is not a valid parameter.")
+
+    # Use default parameters if not provided
+    for key, default_val in iteritems(default_params):
+        if key not in params:
+            params[key] = default_val
+
+    return params
 
 
 class MultiprocessQueue():
