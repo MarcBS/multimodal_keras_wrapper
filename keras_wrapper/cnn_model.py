@@ -12,7 +12,6 @@ else:
     import cPickle as pk
 import cloudpickle as cloudpk
 import matplotlib as mpl
-
 import keras
 from keras.engine.training import Model
 from keras.layers import concatenate, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Dense, Dropout, Flatten, Input, \
@@ -26,7 +25,7 @@ from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_G
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
-    decode_predictions_beam_search, replace_unknown_words, sample, sampling, categorical_probas_to_classes
+    decode_predictions_beam_search, replace_unknown_words, sample, sampling, categorical_probas_to_classes, checkParameters
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
@@ -442,6 +441,12 @@ class Model_Wrapper(object):
         # Prepare logger
         self.updateLogger()
 
+        self.default_training_params = dict()
+        self.default_predict_with_beam_params = dict()
+        self.default_test_params = dict()
+
+        self.set_default_params()
+
         # Prepare model
         if not inheritance:
             # Set Network name
@@ -488,6 +493,119 @@ class Model_Wrapper(object):
                                  'ipykernel' in sys.modules)
 
         self.__modes = ['train', 'val', 'test']
+
+
+    def set_default_params(self):
+        """
+        Sets the default params for training, decoding and testing a Model.
+
+        :return:
+        """
+        self.default_training_params = {'n_epochs': 1,
+                          'batch_size': 50,
+                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
+                          'homogeneous_batches': False,
+                          'joint_batches': 4,
+                          'epochs_for_save': 1,
+                          'num_iterations_val': None,
+                          'n_parallel_loaders': 1,
+                          'normalize': True,
+                          'normalization_type': '(-1)-1',
+                          'mean_substraction': False,
+                          'data_augmentation': True,
+                          'wo_da_patch_type': 'whole',  # wo_da_patch_type = 'central_crop' or 'whole'.
+                          'da_patch_type': 'resize_and_rndcrop',
+                          # da_patch_type = 'resize_and_rndcrop', 'rndcrop_and_resize' or 'resizekp_and_rndcrop'.
+                          'da_enhance_list': [],  # da_enhance_list = {brightness, color, sharpness, contrast}
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'class_weights': None,
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'patience_check_split': 'val',
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch': 0,  # early stopping parameters
+                          'lr_decay': None,  # LR decay parameters
+                          'initial_lr': 1.,
+                          'reduce_each_epochs': True,
+                          'start_reduction_on_epoch': 0,
+                          'lr_gamma': 0.1,
+                          'lr_reducer_type': 'linear',
+                          'lr_reducer_exp_base': 0.5,
+                          'lr_half_life': 50000,
+                          'lr_warmup_exp': -1.5,
+                          'tensorboard': False,
+                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
+                                                 'histogram_freq': 0,
+                                                 'batch_size': 50,
+                                                 'write_graph': True,
+                                                 'write_grads': False,
+                                                 'write_images': False,
+                                                 'embeddings_freq': 0,
+                                                 'embeddings_layer_names': None,
+                                                 'embeddings_metadata': None,
+                                                 }
+                          }
+        self.defaut_test_params = {'batch_size': 50,
+                          'n_parallel_loaders': 1,
+                          'normalize': True,
+                          'normalization_type': None,
+                          'wo_da_patch_type': 'whole',
+                          'mean_substraction': False}
+        self.default_predict_with_beam_params = {'max_batch_size': 50,
+                          'n_parallel_loaders': 1,
+                          'beam_size': 5,
+                          'beam_batch_size': 50,
+                          'normalize': True,
+                          'normalization_type': None,
+                          'mean_substraction': False,
+                          'predict_on_sets': ['val'],
+                          'maxlen': 20,
+                          'n_samples': -1,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description'],
+                          'sampling_type': 'max_likelihood',
+                          'words_so_far': False,
+                          'optimized_search': False,
+                          'search_pruning': False,
+                          'pos_unk': False,
+                          'temporally_linked': False,
+                          'link_index_id': 'link_index',
+                          'state_below_index': -1,
+                          'state_below_maxlen': -1,
+                          'max_eval_samples': None,
+                          'normalize_probs': False,
+                          'alpha_factor': 0.0,
+                          'coverage_penalty': False,
+                          'length_penalty': False,
+                          'length_norm_factor': 0.0,
+                          'coverage_norm_factor': 0.0,
+                          'output_max_length_depending_on_x': False,
+                          'output_max_length_depending_on_x_factor': 3,
+                          'output_min_length_depending_on_x': False,
+                          'output_min_length_depending_on_x_factor': 2,
+                          'attend_on_output': False
+                          }
+        self.default_predict_params = {'batch_size': 50,
+                          'n_parallel_loaders': 1,
+                          'normalize': True,
+                          'normalization_type': '(-1)-1',
+                          'wo_da_patch_type': 'whole',
+                          'mean_substraction': False,
+                          'n_samples': None,
+                          'init_sample': -1,
+                          'final_sample': -1,
+                          'verbose': 1,
+                          'predict_on_sets': ['val'],
+                          'max_eval_samples': None,
+                          'model_name': 'model',  # name of the attribute where the model for prediction is stored
+                          }
 
     def setInputsMapping(self, inputsMapping):
         """
@@ -655,30 +773,6 @@ class Model_Wrapper(object):
     def setParams(self, params):
         self.params = params
 
-    @staticmethod
-    def checkParameters(input_params, default_params):
-        """
-            Validates a set of input parameters and uses the default ones if not specified.
-        """
-        valid_params = [key for key in default_params]
-        params = dict()
-
-        # Check input parameters' validity
-        for key, val in iteritems(input_params):
-            if key in valid_params:
-                params[key] = val
-            else:
-                raise Exception("Parameter '" + key + "' is not a valid parameter.")
-
-        # Use default parameters if not provided
-        for key, default_val in iteritems(default_params):
-            if key not in params:
-                params[key] = default_val
-
-        # if 'n_parallel_loaders' in params and params['n_parallel_loaders'] > 1:
-        #    logging.info('WARNING: parallel loaders are not implemented')
-
-        return params
 
     # ------------------------------------------------------- #
     #       MODEL MODIFICATION
@@ -772,56 +866,7 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
         if parameters is None:
             parameters = dict()
-        default_params = {'n_epochs': 1,
-                          'batch_size': 50,
-                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
-                          'homogeneous_batches': False,
-                          'joint_batches': 4,
-                          'epochs_for_save': 1,
-                          'num_iterations_val': None,
-                          'n_parallel_loaders': 1,
-                          'normalize': True,
-                          'normalization_type': '(-1)-1',
-                          'mean_substraction': False,
-                          'data_augmentation': True,
-                          'wo_da_patch_type': 'whole',  # wo_da_patch_type = 'central_crop' or 'whole'.
-                          'da_patch_type': 'resize_and_rndcrop',
-                          # da_patch_type = 'resize_and_rndcrop', 'rndcrop_and_resize' or 'resizekp_and_rndcrop'.
-                          'da_enhance_list': [],  # da_enhance_list = {brightness, color, sharpness, contrast}
-                          'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0,
-                          'extra_callbacks': [],
-                          'class_weights': None,
-                          'shuffle': True,
-                          'epoch_offset': 0,
-                          'patience': 0,
-                          'metric_check': None,
-                          'patience_check_split': 'val',
-                          'eval_on_epochs': True,
-                          'each_n_epochs': 1,
-                          'start_eval_on_epoch': 0,  # early stopping parameters
-                          'lr_decay': None,  # LR decay parameters
-                          'initial_lr': 1.,
-                          'reduce_each_epochs': True,
-                          'start_reduction_on_epoch': 0,
-                          'lr_gamma': 0.1,
-                          'lr_reducer_type': 'linear',
-                          'lr_reducer_exp_base': 0.5,
-                          'lr_half_life': 50000,
-                          'lr_warmup_exp': -1.5,
-                          'tensorboard': False,
-                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
-                                                 'histogram_freq': 0,
-                                                 'batch_size': 50,
-                                                 'write_graph': True,
-                                                 'write_grads': False,
-                                                 'write_images': False,
-                                                 'embeddings_freq': 0,
-                                                 'embeddings_layer_names': None,
-                                                 'embeddings_metadata': None,
-                                                 }
-                          }
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_training_params, hard_check=True)
         # Set params['start_reduction_on_epoch'] = params['lr_decay'] by default
         if params['lr_decay'] is not None and 'start_reduction_on_epoch' not in list(parameters):
             params['start_reduction_on_epoch'] = params['lr_decay']
@@ -858,58 +903,7 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
         if parameters is None:
             parameters = dict()
-        default_params = {'n_epochs': 1,
-                          'batch_size': 50,
-                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
-                          'homogeneous_batches': False,
-                          'joint_batches': 4,
-                          'epochs_for_save': 1,
-                          'num_iterations_val': None,
-                          'n_parallel_loaders': 1,
-                          'normalize': False,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'data_augmentation': True,
-                          'wo_da_patch_type': 'whole',  # wo_da_patch_type = 'central_crop' or 'whole'.
-                          'da_patch_type': 'resize_and_rndcrop',
-                          # da_patch_type = 'resize_and_rndcrop', 'rndcrop_and_resize' or 'resizekp_and_rndcrop'.
-                          'da_enhance_list': [],  # da_enhance_list = {brightness, color, sharpness, contrast}
-                          'verbose': 1,
-                          'eval_on_sets': ['val'],
-                          'reload_epoch': 0,
-                          'extra_callbacks': [],
-                          'shuffle': True,
-                          'epoch_offset': 0,
-                          'patience': 0,
-                          'metric_check': None,
-                          'eval_on_epochs': True,
-                          'each_n_epochs': 1,
-                          'start_eval_on_epoch': 0,  # early stopping parameters
-                          'lr_decay': None,  # LR decay parameters
-                          'initial_lr': 1.,
-                          'reduce_each_epochs': True,
-                          'start_reduction_on_epoch': 0,
-                          'lr_gamma': 0.1,
-                          'lr_reducer_type': 'linear',
-                          'lr_reducer_exp_base': 0.5,
-                          'lr_half_life': 50000,
-                          'lr_warmup_exp': -1.5,
-                          'tensorboard': False,
-                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
-                                                 'histogram_freq': 0,
-                                                 'batch_size': 50,
-                                                 'write_graph': True,
-                                                 'write_grads': False,
-                                                 'write_images': False,
-                                                 'embeddings_freq': 0,
-                                                 'embeddings_layer_names': None,
-                                                 'embeddings_metadata': None,
-                                                 'label_word_embeddings_with_vocab': False,
-                                                 'word_embeddings_labels': None
-                                                 }
-
-                          }
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_training_params, hard_check=True)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
         self.training_parameters.append(save_params)
@@ -1174,13 +1168,7 @@ class Model_Wrapper(object):
     def testNet(self, ds, parameters, out_name=None):
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 1,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'wo_da_patch_type': 'whole',
-                          'mean_substraction': False}
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.defaut_test_params)
         self.testing_parameters.append(copy.copy(params))
 
         logging.info("<<< Testing model >>>")
@@ -1650,296 +1638,6 @@ class Model_Wrapper(object):
         logger.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet(ds, parameters)
 
-    def predictBeamSearchNet_NEW(self, ds, parameters=None):
-        """
-        Approximates by beam search the best predictions of the net on the dataset splits chosen.
-
-        The following attributes must be inserted to the model when building an optimized search model:
-
-            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
-            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
-            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
-            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
-                                the number of out variables must match the number of in variables)
-            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
-            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
-
-        The following attributes must be inserted to the model when building a temporally_linked model:
-
-            * matchings_sample_to_next_sample:
-            * ids_temporally_linked_inputs:
-
-        :param ds:
-        :param parameters:
-        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
-        """
-        if parameters is None:
-            parameters = dict()
-        # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 1,
-                          'beam_size': 5,
-                          'beam_batch_size': 50,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'predict_on_sets': ['val'],
-                          'maxlen': 20,
-                          'n_samples': -1,
-                          'model_inputs': ['source_text', 'state_below'],
-                          'model_outputs': ['description'],
-                          'dataset_inputs': ['source_text', 'state_below'],
-                          'dataset_outputs': ['description'],
-                          'alpha_factor': 1.0,
-                          'sampling_type': 'max_likelihood',
-                          'words_so_far': False,
-                          'optimized_search': False,
-                          'search_pruning': False,
-                          'pos_unk': False,
-                          'temporally_linked': False,
-                          'link_index_id': 'link_index',
-                          'state_below_index': -1,
-                          'max_eval_samples': None,
-                          'attend_on_output': False
-                          }
-        params = self.checkParameters(parameters, default_params)
-
-        # Check if the model is ready for applying an optimized search
-        if params['optimized_search']:
-            if 'matchings_init_to_next' not in dir(self) or \
-                    'matchings_next_to_next' not in dir(self) or \
-                    'ids_inputs_init' not in dir(self) or \
-                    'ids_outputs_init' not in dir(self) or \
-                    'ids_inputs_next' not in dir(self) or \
-                    'ids_outputs_next' not in dir(self):
-                raise Exception(
-                    "The following attributes must be inserted to the model when building an optimized search model:\n",
-                    "- matchings_init_to_next\n",
-                    "- matchings_next_to_next\n",
-                    "- ids_inputs_init\n",
-                    "- ids_outputs_init\n",
-                    "- ids_inputs_next\n",
-                    "- ids_outputs_next\n")
-
-        # Check if the model is ready for applying a temporally_linked search
-        if params['temporally_linked']:
-            if 'matchings_sample_to_next_sample' not in dir(self) or \
-                    'ids_temporally_linked_inputs' not in dir(self):
-                raise Exception(
-                    "The following attributes must be inserted to the model when building a temporally_linked model:\n",
-                    "- matchings_sample_to_next_sample\n",
-                    "- ids_temporally_linked_inputs\n")
-
-        predictions = dict()
-        references = []
-        sources_sampling = []
-        for s in params['predict_on_sets']:
-            print ("")
-            logging.info("<<< Predicting outputs of " + s + " set >>>")
-
-            # TODO: enable 'train' sampling on temporally-linked models
-            if params['temporally_linked'] and s == 'train':
-                logging.info('Sampling is currently not implemented on the "train" set for temporally-linked models.')
-                data_gen = -1
-                data_gen_instance = -1
-            else:
-                if len(params['model_inputs']) == 0:
-                    raise AssertionError('We need at least one input!')
-                if not params['optimized_search']:  # use optimized search model if available
-                    if params['pos_unk']:
-                        raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
-
-                params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
-                if params['temporally_linked']:
-                    previous_outputs = {}  # variable for storing previous outputs if using a temporally-linked model
-                    for input_id in self.ids_temporally_linked_inputs:
-                        previous_outputs[input_id] = dict()
-                        previous_outputs[input_id][-1] = [ds.extra_words['<null>']]
-
-                # Calculate how many iterations are we going to perform
-                if params['n_samples'] < 1:
-                    if params['max_eval_samples'] is not None:
-                        n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
-                    else:
-                        n_samples = eval("ds.len_" + s)
-                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
-                    n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
-
-                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    if params['n_parallel_loaders'] > 1:
-                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
-                                                                          batch_size=params['batch_size'],
-                                                                          normalization=params['normalize'],
-                                                                          normalization_type=params[
-                                                                              'normalization_type'],
-                                                                          data_augmentation=False,
-                                                                          mean_substraction=params['mean_substraction'],
-                                                                          predict=True,
-                                                                          n_parallel_loaders=params[
-                                                                              'n_parallel_loaders'])
-                    else:
-                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                                 batch_size=params['batch_size'],
-                                                                 normalization=params['normalize'],
-                                                                 normalization_type=params['normalization_type'],
-                                                                 data_augmentation=False,
-                                                                 mean_substraction=params['mean_substraction'],
-                                                                 predict=True)
-                    data_gen = data_gen_instance.generator()
-                else:
-                    n_samples = params['n_samples']
-                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
-
-                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    if params['n_parallel_loaders'] > 1:
-                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
-                                                                          batch_size=params['batch_size'],
-                                                                          normalization=params['normalize'],
-                                                                          normalization_type=params[
-                                                                              'normalization_type'],
-                                                                          data_augmentation=False,
-                                                                          mean_substraction=params['mean_substraction'],
-                                                                          predict=False,
-                                                                          random_samples=n_samples,
-                                                                          temporally_linked=params['temporally_linked'],
-                                                                          n_parallel_loaders=params[
-                                                                              'n_parallel_loaders'])
-                    else:
-                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                                 batch_size=params['batch_size'],
-                                                                 normalization=params['normalize'],
-                                                                 normalization_type=params['normalization_type'],
-                                                                 data_augmentation=False,
-                                                                 mean_substraction=params['mean_substraction'],
-                                                                 predict=False,
-                                                                 random_samples=n_samples,
-                                                                 temporally_linked=params['temporally_linked'])
-                    data_gen = data_gen_instance.generator()
-
-                if params['n_samples'] > 0:
-                    references = []
-                    sources_sampling = []
-                best_samples = []
-                if params['pos_unk']:
-                    best_alphas = []
-                    sources = []
-
-                total_cost = 0
-                sampled = 0
-                start_time = time.time()
-                eta = -1
-                for _ in range(num_iterations):
-                    data = next(data_gen)
-                    X = dict()
-                    if params['n_samples'] > 0:
-                        s_dict = {}
-                        for input_id in params['model_inputs']:
-                            X[input_id] = data[0][input_id]
-                            s_dict[input_id] = X[input_id]
-                        sources_sampling.append(s_dict)
-
-                        Y = dict()
-                        for output_id in params['model_outputs']:
-                            Y[output_id] = data[1][output_id]
-                    else:
-                        s_dict = {}
-                        for input_id in params['model_inputs']:
-                            X[input_id] = data[input_id]
-                            if params['pos_unk']:
-                                s_dict[input_id] = X[input_id]
-                        if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
-                            sources.append(s_dict)
-
-                    # Count processed samples
-                    n_samples_batch = len(X[params['model_inputs'][0]])
-                    sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled + n_samples_batch, n_samples, int(eta)))
-                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
-                        sys.stdout.write('\r')
-                    else:
-                        sys.stdout.write('\n')
-
-                    sys.stdout.flush()
-                    x = dict()
-
-                    # Prepare data if using temporally-linked input
-                    for input_id in params['model_inputs']:
-                        if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
-                            for i in range(n_samples_batch):
-                                link = int(X[params['link_index_id']][i])
-                                if link not in list(previous_outputs[input_id]):
-                                    # input to current sample was not processed yet
-                                    link = -1
-                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
-                                          previous_outputs[input_id][link]]
-                                in_val = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
-                                                     ds.max_text_len[input_id][s],
-                                                     ds.text_offset[input_id],
-                                                     fill=ds.fill_text[input_id],
-                                                     pad_on_batch=ds.pad_on_batch[input_id],
-                                                     words_so_far=ds.words_so_far[input_id],
-                                                     loading_X=True)[0]
-                                if input_id in list(x):
-                                    x[input_id] = np.concatenate((x[input_id], in_val))
-                                else:
-                                    x[input_id] = in_val
-                        else:
-                            x[input_id] = np.array(X[input_id])
-
-                    # Apply beam search
-                    samples_all, scores_all, alphas_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-
-                    # Recover most probable output for each sample
-                    for i_sample in range(n_samples_batch):
-                        samples = samples_all[i_sample]
-                        scores = scores_all[i_sample]
-                        if params['pos_unk']:
-                            alphas = alphas_all[i_sample]
-
-                        if params['normalize']:
-                            counts = [len(sample) ** params['alpha_factor'] for sample in samples]
-                            scores = [co / cn for co, cn in zip(scores, counts)]
-                        best_score = np.argmin(scores)
-                        best_sample = samples[best_score]
-                        best_samples.append(best_sample)
-                        if params['pos_unk']:
-                            best_alphas.append(np.asarray(alphas[best_score]))
-                        total_cost += scores[best_score]
-                        eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) // (sampled + i_sample + 1)
-                        if params['n_samples'] > 0:
-                            for output_id in params['model_outputs']:
-                                references.append(Y[output_id][i_sample])
-
-                        # store outputs for temporally-linked models
-                        if params['temporally_linked']:
-                            first_idx = max(0, data_gen_instance.first_idx)
-                            # TODO: Make it more general
-                            for (output_id, input_id) in iteritems(self.matchings_sample_to_next_sample):
-                                # Get all words previous to the padding
-                                previous_outputs[input_id][first_idx + sampled + i_sample] = best_sample[:sum(
-                                    [int(elem > 0) for elem in best_sample])]
-
-                    sampled += n_samples_batch
-
-                sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
-                sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (time.time() - start_time) / n_samples))
-
-                sys.stdout.flush()
-
-                if params['pos_unk']:
-                    if eval('ds.loaded_raw_' + s + '[0]'):
-                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
-                                            stripfile=False)
-                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
-                else:
-                    predictions[s] = np.asarray(best_samples)
-        del data_gen
-        del data_gen_instance
-        if params['n_samples'] < 1:
-            return predictions
-        else:
-            return predictions, references, sources_sampling
-
-            #    def predictBeamSearchNet_DEPRECATED(self, ds, parameters={}):
 
     def predictBeamSearchNet(self, ds, parameters=None):
         """
@@ -1967,44 +1665,7 @@ class Model_Wrapper(object):
         if parameters is None:
             parameters = dict()
         # Check input parameters and recover default values if needed
-        default_params = {'max_batch_size': 50,
-                          'n_parallel_loaders': 1,
-                          'beam_size': 5,
-                          'beam_batch_size': 50,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'predict_on_sets': ['val'],
-                          'maxlen': 20,
-                          'n_samples': -1,
-                          'model_inputs': ['source_text', 'state_below'],
-                          'model_outputs': ['description'],
-                          'dataset_inputs': ['source_text', 'state_below'],
-                          'dataset_outputs': ['description'],
-                          'sampling_type': 'max_likelihood',
-                          'words_so_far': False,
-                          'optimized_search': False,
-                          'search_pruning': False,
-                          'pos_unk': False,
-                          'temporally_linked': False,
-                          'link_index_id': 'link_index',
-                          'state_below_index': -1,
-                          'state_below_maxlen': -1,
-                          'max_eval_samples': None,
-                          'normalize_probs': False,
-                          'alpha_factor': 0.0,
-                          'coverage_penalty': False,
-                          'length_penalty': False,
-                          'length_norm_factor': 0.0,
-                          'coverage_norm_factor': 0.0,
-                          'output_max_length_depending_on_x': False,
-                          'output_max_length_depending_on_x_factor': 3,
-                          'output_min_length_depending_on_x': False,
-                          'output_min_length_depending_on_x_factor': 2,
-                          'attend_on_output': False
-                          }
-
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_predict_with_beam_params)
         # Check if the model is ready for applying an optimized search
         if params['optimized_search']:
             if 'matchings_init_to_next' not in dir(self) or \
@@ -2271,21 +1932,7 @@ class Model_Wrapper(object):
         if parameters is None:
             parameters = dict()
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 1,
-                          'normalize': True,
-                          'normalization_type': '(-1)-1',
-                          'wo_da_patch_type': 'whole',
-                          'mean_substraction': False,
-                          'n_samples': None,
-                          'init_sample': -1,
-                          'final_sample': -1,
-                          'verbose': 1,
-                          'predict_on_sets': ['val'],
-                          'max_eval_samples': None,
-                          'model_name': 'model',  # name of the attribute where the model for prediction is stored
-                          }
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_predict_params)
 
         model_predict = getattr(self, params['model_name'])  # recover model for prediction
         predictions = dict()
@@ -2523,30 +2170,7 @@ class Model_Wrapper(object):
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 1,
-                          'beam_size': 5,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'wo_da_patch_type': 'whole',
-                          'mean_substraction': False,
-                          'predict_on_sets': ['val'],
-                          'maxlen': 20,
-                          'n_samples': -1,
-                          'model_inputs': ['source_text', 'state_below'],
-                          'model_outputs': ['description'],
-                          'dataset_inputs': ['source_text', 'state_below'],
-                          'dataset_outputs': ['description'],
-                          'alpha_factor': 1.0,
-                          'sampling_type': 'max_likelihood',
-                          'words_so_far': False,
-                          'optimized_search': False,
-                          'state_below_index': -1,
-                          'output_text_index': 0,
-                          'pos_unk': False
-                          }
-        params = self.checkParameters(self.params, default_params)
-
+        params = checkParameters(self.params, self.default_predict_with_beam_params)
         scores_dict = dict()
 
         for s in params['predict_on_sets']:
@@ -3958,225 +3582,6 @@ class Model_Wrapper(object):
     #       SAVE/LOAD
     #           Auxiliary methods for saving and loading the model.
     # ------------------------------------------------------- #
-
-    def beam_search_NEW(self, X, params, null_sym=2, debug=False):
-        """
-        Beam search method for Cond models.
-        (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
-        The algorithm in a nutshell does the following:
-
-        1. k = beam_size
-        2. open_nodes = [[]] * k
-        3. while k > 0:
-
-            3.1. Given the inputs, get (log) probabilities for the outputs.
-
-            3.2. Expand each open node with all possible output.
-
-            3.3. Prune and keep the k best nodes.
-
-            3.4. If a sample has reached the <eos> symbol:
-
-                3.4.1. Mark it as final sample.
-
-                3.4.2. k -= 1
-
-            3.5. Build new inputs (state_below) and go to 1.
-
-        4. return final_samples, final_scores
-
-        :param debug:
-        :param X: Model inputs
-        :param params: Search parameters
-        :param null_sym: <null> symbol
-        :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
-        """
-        n_samples_batch = len(X[params['model_inputs'][0]])
-        sample_identifier_prediction = [[i] for i in range(n_samples_batch)]
-
-        k = params['beam_size']
-        samples = [[] for _ in range(n_samples_batch)]
-        sample_scores = [[] for _ in range(n_samples_batch)]
-        pad_on_batch = params['pad_on_batch']
-        dead_k = [0] * n_samples_batch  # samples that reached eos
-        live_k = [1] * n_samples_batch  # samples that did not yet reach eos
-        all_live_k = sum(live_k)
-        hyp_samples = [[[]] for _ in range(n_samples_batch)]
-        hyp_scores = [np.zeros(1).astype('float32') for _ in range(n_samples_batch)]
-        if params['pos_unk']:
-            sample_alphas = [[] for _ in range(n_samples_batch)]
-            hyp_alphas = [[[]] for _ in range(n_samples_batch)]
-
-        # Create 'X_next' for initial step
-        X_next = dict()
-        for model_input in params['model_inputs']:
-            X_next[model_input] = []
-            for i_sample, live in list(enumerate(live_k)):
-                if debug:
-                    print('repeating X live', live)
-                X_next[model_input].append(np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), 1, axis=0))
-            X_next[model_input] = np.concatenate(X_next[model_input])
-
-        # Create 'state_below' for initial step
-        # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
-        if params['words_so_far']:
-            if k > params['maxlen']:
-                raise NotImplementedError(
-                    "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
-            state_below = np.asarray([[null_sym]] * all_live_k) if pad_on_batch else np.asarray(
-                [np.zeros((params['maxlen'], params['maxlen']))] * all_live_k)
-        else:
-            state_below = np.asarray([null_sym] * all_live_k) if pad_on_batch else np.asarray(
-                [np.zeros(params['maxlen'])] * all_live_k)
-
-        prev_out_next = None
-        for ii in range(params['maxlen']):
-
-            # for every possible live sample calc prob for every possible label
-            if params['optimized_search']:  # use optimized search model if available
-                [probs_all, prev_out] = self.predict_cond_optimized(X_next, state_below, params, ii, prev_out_next,
-                                                                    debug=debug)
-                if params['pos_unk']:
-                    alphas_all = prev_out[-1][0]  # Shape: (k, n_steps)
-                    prev_out = prev_out[:-1]
-            else:
-                probs_all = self.predict_cond(X_next, state_below, params, ii)
-
-            # SCORE
-            state_below = []
-            if params['optimized_search']:
-                prev_out_new = [[] for _ in prev_out]
-            for pos_sample, sample_identifier in list(
-                    enumerate(sample_identifier_prediction)):  # process one sample at a time
-
-                # Only continue if not all beam subsamples are dead for the current sample
-                if dead_k[pos_sample] < k:
-                    # select information only for the current sample
-                    probs = probs_all[sample_identifier]
-                    if params['pos_unk']:
-                        alphas = alphas_all[sample_identifier]
-
-                    # total score for every sample is sum of -log of word prb
-                    cand_scores = np.array(hyp_scores[pos_sample])[:, None] - np.log(probs)
-                    cand_flat = cand_scores.flatten()
-                    # Find the best options by calling argsort of flatten array
-                    ranks_flat = cand_flat.argsort()[:(k - dead_k[pos_sample])]
-                    # Decypher flatten indices
-                    voc_size = probs.shape[1]
-                    trans_indices = ranks_flat // voc_size  # index of row
-                    word_indices = ranks_flat % voc_size  # index of col
-                    costs = cand_flat[ranks_flat]
-                    # Form a beam for the next iteration
-                    new_hyp_samples = []
-                    new_trans_indices = []
-                    new_hyp_scores = np.zeros(k - dead_k[pos_sample]).astype('float32')
-                    if params['pos_unk']:
-                        new_hyp_alphas = []
-                    for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
-                        new_hyp_samples.append(hyp_samples[pos_sample][ti] + [wi])
-                        new_trans_indices.append(ti)
-                        new_hyp_scores[idx] = copy.copy(costs[idx])
-                        if params['pos_unk']:
-                            new_hyp_alphas.append(hyp_alphas[pos_sample][ti] + [alphas[ti]])
-
-                    # check the finished samples
-                    new_live_k = 0
-                    hyp_samples[pos_sample] = []
-                    hyp_scores[pos_sample] = []
-                    if params['pos_unk']:
-                        hyp_alphas[pos_sample] = []
-                    indices_alive = []
-                    for idx in range(len(new_hyp_samples)):
-                        if new_hyp_samples[idx][-1] == 0:  # finished sample
-                            samples[pos_sample].append(new_hyp_samples[idx])
-                            sample_scores[pos_sample].append(new_hyp_scores[idx])
-                            if params['pos_unk']:
-                                sample_alphas[pos_sample].append(new_hyp_alphas[idx])
-                            dead_k[pos_sample] += 1
-                        else:
-                            indices_alive.append(new_trans_indices[idx])
-                            new_live_k += 1
-                            hyp_samples[pos_sample].append(new_hyp_samples[idx])
-                            hyp_scores[pos_sample].append(new_hyp_scores[idx])
-                            if params['pos_unk']:
-                                hyp_alphas[pos_sample].append(new_hyp_alphas[idx])
-                    hyp_scores[pos_sample] = np.array(hyp_scores[pos_sample])
-                    live_k[pos_sample] = new_live_k
-
-                    if new_live_k > 0 and dead_k[pos_sample] < k:
-                        # convert chosen samples
-                        state_below.append(np.asarray(hyp_samples[pos_sample], dtype='int64'))
-
-                    # keep every remaining one
-                    if live_k[pos_sample] > 0 and params['optimized_search']:
-                        for idx_vars in range(len(prev_out)):
-                            these_indices = np.asarray(sample_identifier_prediction[pos_sample])[indices_alive]
-                            prev_out_new[idx_vars].append(np.asarray(prev_out[idx_vars][these_indices]))
-
-            # Stop when we do not have any more samples alive
-            if sum(live_k) == 0:
-                break
-
-            # Create 'X_next' for next step
-            X_next = dict()
-            for model_input in params['model_inputs']:
-                X_next[model_input] = []
-                for i_sample, live in list(enumerate(live_k)):
-                    X_next[model_input].append(
-                        np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), live, axis=0))
-                X_next[model_input] = np.concatenate(X_next[model_input])
-
-            # Create 'state_below' for next step
-            state_below = np.concatenate(state_below)
-            # we must include an additional dimension if the input for each timestep are all the generated words so far
-            if pad_on_batch:
-                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
-                if params['words_so_far']:
-                    state_below = np.expand_dims(state_below, axis=0)
-            else:
-                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
-                                         np.zeros((state_below.shape[0],
-                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
-                                                  dtype='int64')))
-
-                if params['words_so_far']:
-                    state_below = np.expand_dims(state_below, axis=0)
-                    state_below = np.hstack((state_below,
-                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
-                                                       state_below.shape[2]))))
-
-            # Create 'prev_out_next' for next step
-            if params['optimized_search']:
-                for idx_vars in range(len(prev_out)):
-                    try:
-                        prev_out[idx_vars] = np.concatenate(prev_out_new[idx_vars])
-                    except Exception as e:
-                        logging.info(str(e))
-                        raise Exception()
-
-                prev_out_next = prev_out
-
-            # Update 'sample_identifier_prediction'
-            sample_identifier_prediction = []
-            for i, live in zip(range(n_samples_batch), live_k):
-                num_up_to_here = sum(live_k[:i])
-                sample_identifier_prediction += [range(num_up_to_here, num_up_to_here + live)]
-
-        for pos_sample, sample_identifier in list(
-                enumerate(sample_identifier_prediction)):  # process one sample at a time
-            if live_k[pos_sample] > 0:
-                for idx in range(live_k[pos_sample]):
-                    samples[pos_sample].append(hyp_samples[pos_sample][idx])
-                    sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
-                    if params['pos_unk']:
-                        sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
-
-        if params['pos_unk']:
-            return samples, sample_scores, sample_alphas
-        else:
-            return samples, sample_scores
-
-            #    def beam_search_DEPRECATED(self, X, params, null_sym=2):
 
     def __getstate__(self):
         """

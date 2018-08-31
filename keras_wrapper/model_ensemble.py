@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-from six import iteritems
 import copy
 import logging
 import math
 import sys
 import time
-
 import numpy as np
 
 from keras_wrapper.dataset import Data_Batch_Generator
-from keras_wrapper.utils import one_hot_2_indices
+from keras_wrapper.utils import one_hot_2_indices, checkParameters
 
 
 class BeamSearchEnsemble:
@@ -309,7 +307,7 @@ class BeamSearchEnsemble:
                           'output_min_length_depending_on_x_factor': 2,
                           'attend_on_output': False
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
@@ -511,7 +509,7 @@ class BeamSearchEnsemble:
                           'output_min_length_depending_on_x': False,
                           'output_min_length_depending_on_x_factor': 2
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
         params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
         params['n_samples'] = 1
         if self.n_best:
@@ -715,7 +713,7 @@ class BeamSearchEnsemble:
                           'output_min_length_depending_on_x': False,
                           'output_min_length_depending_on_x_factor': 2
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
 
         scores_dict = dict()
 
@@ -876,7 +874,7 @@ class BeamSearchEnsemble:
                           'output_min_length_depending_on_x': False,
                           'output_min_length_depending_on_x_factor': 2
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
 
         scores = []
         total_cost = 0
@@ -934,26 +932,6 @@ class BeamSearchEnsemble:
         """
         logging.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet()
-
-    @staticmethod
-    def checkParameters(input_params, default_params):
-        """
-            Validates a set of input parameters and uses the default ones if not specified.
-        """
-        valid_params = [key for key in default_params]
-        params = dict()
-
-        # Check input parameters' validity
-        for key, val in iteritems(input_params):
-            if key in valid_params:
-                params[key] = val
-
-        # Use default parameters if not provided
-        for key, default_val in iteritems(default_params):
-            if key not in params:
-                params[key] = default_val
-
-        return params
 
 
 class PredictEnsemble:
@@ -1070,7 +1048,7 @@ class PredictEnsemble:
                           'max_eval_samples': None
                           }
 
-        params = self.checkParameters(self.params, default_params)
+        params = che(self.params, default_params)
         predictions = dict()
 
         for s in params['predict_on_sets']:
@@ -1154,23 +1132,3 @@ class PredictEnsemble:
             predictions[s] = np.concatenate([pred for pred in predictions[s]])
 
         return predictions
-
-    @staticmethod
-    def checkParameters(input_params, default_params):
-        """
-            Validates a set of input parameters and uses the default ones if not specified.
-        """
-        valid_params = [key for key in default_params]
-        params = dict()
-
-        # Check input parameters' validity
-        for key, val in iteritems(input_params):
-            if key in valid_params:
-                params[key] = val
-
-        # Use default parameters if not provided
-        for key, default_val in iteritems(default_params):
-            if key not in params:
-                params[key] = default_val
-
-        return params
