@@ -9,8 +9,6 @@ import os
 import random
 import sys
 from functools import reduce
-
-from dask.array.ufunc import da_frompyfunc
 from six import iteritems
 
 if sys.version_info.major == 3:
@@ -25,6 +23,9 @@ import numpy as np
 from keras_wrapper.extra.read_write import create_dir_if_not_exists
 from keras_wrapper.extra.tokenizers import *
 from .utils import bbox, to_categorical
+
+from .utils import MultiprocessQueue
+import multiprocessing
 
 
 # ------------------------------------------------------- #
@@ -117,6 +118,179 @@ def dataLoad(process_name, net, dataset, max_queue_len, queues):
         out_queue.put(data)
 
 
+class Parallel_Data_Batch_Generator(object):
+    """
+    Batch generator class. Retrieves batches of data.
+    """
+
+    def __init__(self,
+                 set_split,
+                 net,
+                 dataset,
+                 num_iterations,
+                 batch_size=50,
+                 normalization=True,
+                 normalization_type=None,
+                 data_augmentation=True,
+                 wo_da_patch_type='whole',
+                 da_patch_type='resize_and_rndcrop',
+                 da_enhance_list=None,
+                 mean_substraction=False,
+                 predict=False,
+                 random_samples=-1,
+                 shuffle=True,
+                 temporally_linked=False,
+                 init_sample=-1,
+                 final_sample=-1,
+                 n_parallel_loaders=1):
+        """
+        Initializes the Data_Batch_Generator
+        :param set_split: Split (train, val, test) to retrieve data
+        :param net: Net which use the data
+        :param dataset: Dataset instance
+        :param num_iterations: Maximum number of iterations
+        :param batch_size: Size of the minibatch
+        :param normalization: Switches on/off the normalization of images
+        :param data_augmentation: Switches on/off the data augmentation of the input
+        :param mean_substraction: Switches on/off the mean substraction for images
+        :param predict: Whether we are predicting or training
+        :param random_samples: Retrieves this number of training samples
+        :param shuffle: Shuffle the training dataset
+        :param temporally_linked: Indicates if we are using a temporally-linked model
+        :param n_parallel_loaders: Number of parallel loaders that will be used.
+        """
+        if da_enhance_list is None:
+            da_enhance_list = []
+
+        self.set_split = set_split
+        self.dataset = dataset
+        self.net = net
+        self.predict = predict
+        self.temporally_linked = temporally_linked
+        self.first_idx = -1
+        self.init_sample = init_sample
+        self.final_sample = final_sample
+        self.next_idx = None
+        self.thread_list = []
+
+        # Several parameters
+        self.params = {'batch_size': batch_size,
+                       'data_augmentation': data_augmentation,
+                       'wo_da_patch_type': wo_da_patch_type,
+                       'da_patch_type': da_patch_type,
+                       'da_enhance_list': da_enhance_list,
+                       'mean_substraction': mean_substraction,
+                       'normalization': normalization,
+                       'normalization_type': normalization_type,
+                       'num_iterations': num_iterations,
+                       'random_samples': random_samples,
+                       'shuffle': shuffle,
+                       'n_parallel_loaders': n_parallel_loaders}
+
+    def __del__(self):
+        self.terminateThreads()
+
+    def terminateThreads(self):
+        for t in self.thread_list:
+            t.terminate()
+
+    def generator(self):
+        """
+        Gets and processes the data
+        :return: generator with the data
+        """
+
+        self.terminateThreads()
+
+        if self.set_split == 'train' and not self.predict:
+            data_augmentation = self.params['data_augmentation']
+        else:
+            data_augmentation = False
+
+        # Initialize list of parallel data loaders
+        thread_mngr = multiprocessing.Manager()
+        in_queue = MultiprocessQueue(thread_mngr, multiprocess_type='Queue')  # if self.params['n_parallel_loaders'] > 1 else 'Pipe')
+        out_queue = MultiprocessQueue(thread_mngr, multiprocess_type='Queue')  # if self.params['n_parallel_loaders'] > 1 else 'Pipe')
+        # Create a queue per function
+        for i in range(self.params['n_parallel_loaders']):
+            # create process
+            new_process = multiprocessing.Process(target=dataLoad,
+                                                  args=('dataLoad_process_' + str(i),
+                                                        self.net, self.dataset, int(self.params['n_parallel_loaders'] * 1.5), [in_queue, out_queue]))
+            self.thread_list.append(new_process)  # store processes for terminating later
+            new_process.start()
+
+        it = 0
+        while True:
+            if self.set_split == 'train' and it % self.params['num_iterations'] == 0 and \
+                    not self.predict and self.params['random_samples'] == -1 and self.params['shuffle']:
+                silence = self.dataset.silence
+                self.dataset.silence = True
+                self.dataset.shuffleTraining()
+                self.dataset.silence = silence
+            if it % self.params['num_iterations'] == 0 and self.params['random_samples'] == -1:
+                self.dataset.resetCounters(set_name=self.set_split)
+            it += 1
+
+            # Checks if we are finishing processing the data split
+            init_sample = (it - 1) * self.params['batch_size']
+            final_sample = it * self.params['batch_size']
+            # batch_size = self.params['batch_size']
+            # n_samples_split = eval("self.dataset.len_" + self.set_split)
+            n_samples_split = getattr(self.dataset, "len_" + self.set_split)
+            if final_sample >= n_samples_split:
+                final_sample = n_samples_split
+                # batch_size = final_sample - init_sample
+                it = 0
+
+            # Recovers a batch of data
+            # random data selection
+            if self.params['random_samples'] > 0:
+                num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
+                if self.temporally_linked:
+                    if self.first_idx == -1:
+                        self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
+                        self.next_idx = self.first_idx
+                    indices = range(self.next_idx, self.next_idx + num_retrieve)
+                    self.next_idx += num_retrieve
+                else:
+                    indices = np.random.randint(0, n_samples_split, num_retrieve)
+                self.params['random_samples'] -= num_retrieve
+
+                # Prepare query data for parallel data loaders
+                query_data = ['indices', self.predict, self.set_split, [indices],
+                              self.params['normalization'], self.params['normalization_type'],
+                              self.params['mean_substraction'], data_augmentation]
+
+            # specific data selection
+            elif self.init_sample > -1 and self.final_sample > -1:
+                indices = range(self.init_sample, self.final_sample)
+
+                # Prepare query data for parallel data loaders
+                query_data = ['indices', self.predict, self.set_split, [indices],
+                              self.params['normalization'], self.params['normalization_type'],
+                              self.params['mean_substraction'], data_augmentation]
+
+            # consecutive data selection
+            else:
+                if self.predict:
+                    query_data = ['consecutive', self.predict, self.set_split, [init_sample, final_sample],
+                                  self.params['normalization'], self.params['normalization_type'],
+                                  self.params['mean_substraction'], data_augmentation]
+                else:
+                    query_data = ['consecutive', self.predict, self.set_split, [range(init_sample, final_sample)],
+                                  self.params['normalization'], self.params['normalization_type'],
+                                  self.params['mean_substraction'], data_augmentation]
+
+            # Insert data in queue
+            in_queue.put(query_data)
+
+            # Check if there is processed data in queue
+            while out_queue.qsize() > 0:
+                data = out_queue.get()
+                yield (data)
+
+
 class Data_Batch_Generator(object):
     """
     Batch generator class. Retrieves batches of data.
@@ -133,7 +307,7 @@ class Data_Batch_Generator(object):
                  data_augmentation=True,
                  wo_da_patch_type='whole',
                  da_patch_type='resize_and_rndcrop',
-                 da_enhance_list=[],
+                 da_enhance_list=None,
                  mean_substraction=False,
                  predict=False,
                  random_samples=-1,
@@ -156,7 +330,8 @@ class Data_Batch_Generator(object):
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
         """
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
@@ -325,7 +500,7 @@ class Homogeneous_Data_Batch_Generator(object):
                  data_augmentation=True,
                  wo_da_patch_type='whole',
                  da_patch_type='resize_and_rndcrop',
-                 da_enhance_list=[],
+                 da_enhance_list=None,
                  mean_substraction=False,
                  predict=False,
                  random_samples=-1,
@@ -345,6 +520,9 @@ class Homogeneous_Data_Batch_Generator(object):
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
         """
+        if da_enhance_list is None:
+            da_enhance_list = []
+
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
@@ -1271,7 +1449,7 @@ class Dataset(object):
 
         try:
             sparse = self.sparse_binary[data_id]
-        except:  # allows backwards compatibility
+        except Exception:  # allows backwards compatibility
             sparse = False
 
         if sparse:  # convert sparse into numpy array
@@ -1457,7 +1635,6 @@ class Dataset(object):
             tokfun = None
 
         # Build vocabulary
-        error_vocab = False
         if build_vocabulary:
             self.build_vocabulary(sentences, data_id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words,
                                   use_extra_words=(max_text_len != 0))
@@ -1809,7 +1986,7 @@ class Dataset(object):
                 labeled_im = np.asarray(labeled_im)
                 logging.disable(logging.NOTSET)
                 labeled_im = misc.imresize(labeled_im, (h, w))
-            except:
+            except Exception:
                 logging.info(labeled_im)
                 logging.warning("WARNING!")
                 logging.warning("Can't load image " + labeled_im)
@@ -2642,7 +2819,7 @@ class Dataset(object):
                 labeled_im = np.asarray(labeled_im)
                 logging.disable(logging.NOTSET)
                 labeled_im = misc.imresize(labeled_im, (h, w))
-            except:
+            except Exception:
                 logging.warning("WARNING!")
                 logging.warning("Can't load image " + labeled_im)
                 labeled_im = np.zeros((h, w))
@@ -2988,7 +3165,7 @@ class Dataset(object):
     def loadImages(self, images, data_id, normalization_type='(-1)-1',
                    normalization=True, meanSubstraction=False,
                    dataAugmentation=True, daRandomParams=None,
-                   wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+                   wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
                    useBGR=False,
                    external=False, loaded=False):
         """
@@ -3017,7 +3194,8 @@ class Dataset(object):
             raise NotImplementedError(
                 'The chosen normalization type ' + str(normalization_type) +
                 ' is not implemented for the type "raw-image" and "video".')
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         # Prepare the training mean image
         if meanSubstraction:  # remove mean
 
@@ -3082,7 +3260,7 @@ class Dataset(object):
                     im = pilimage.open(im)
                     logging.disable(logging.NOTSET)
 
-                except:
+                except Exception:
                     logging.warning("WARNING!")
                     logging.warning("Can't load image " + im)
                     im = np.zeros(tuple(self.img_size[data_id]))
@@ -3203,7 +3381,7 @@ class Dataset(object):
 
                     try:
                         im = im[left[0]:right[0], left[1]:right[1], :]
-                    except:
+                    except Exception:
                         logging.error('------- ERROR -------')
                         logging.error(left)
                         logging.error(right)
@@ -3323,7 +3501,7 @@ class Dataset(object):
     def getX(self, set_name, init, final, normalization_type='(-1)-1',
              normalization=True, meanSubstraction=False,
              dataAugmentation=True,
-             wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+             wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
              debug=False):
         """
         Gets all the data samples stored between the positions init to final
@@ -3348,7 +3526,8 @@ class Dataset(object):
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         # if final > eval('self.len_' + set_name):
         if final > getattr(self, 'len_' + set_name):
             raise Exception('"final" index must be smaller than the number of samples in the set.')
@@ -3366,7 +3545,7 @@ class Dataset(object):
                     x = getattr(self, 'X_' + set_name)[id_in][init:final]
                     if len(x) != (final - init):
                         raise AssertionError('Retrieved a wrong number of samples.')
-                except:
+                except Exception:
                     x = [[]] * (final - init)
                     ghost_x = True
             else:
@@ -3411,7 +3590,7 @@ class Dataset(object):
     def getXY(self, set_name, k, normalization_type='(-1)-1',
               normalization=True, meanSubstraction=False,
               dataAugmentation=True,
-              wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+              wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
               debug=False):
         """
         Gets the [X,Y] pairs for the next 'k' samples in the desired set.
@@ -3436,6 +3615,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
+        if da_enhance_list is None:
+            da_enhance_list = []
 
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
 
@@ -3450,7 +3631,7 @@ class Dataset(object):
                     else:
                         # x = eval('self.X_' + set_name + '[id_in][last:new_last]')
                         x = getattr(self, 'X_' + set_name)[id_in][last:new_last]
-                except:
+                except Exception:
                     x = []
             else:
                 if surpassed:
@@ -3575,7 +3756,7 @@ class Dataset(object):
     def getXY_FromIndices(self, set_name, k, normalization_type='(-1)-1',
                           normalization=True, meanSubstraction=False,
                           dataAugmentation=True,
-                          wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+                          wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
                           debug=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -3600,6 +3781,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
+        if da_enhance_list is None:
+            da_enhance_list = []
 
         # Recover input samples
         X = []
@@ -3611,7 +3794,7 @@ class Dataset(object):
                     # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
                     x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
 
-                except:
+                except Exception:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
@@ -3724,7 +3907,7 @@ class Dataset(object):
     def getX_FromIndices(self, set_name, k, normalization_type='(-1)-1',
                          normalization=True, meanSubstraction=False,
                          dataAugmentation=True,
-                         wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+                         wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
                          debug=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -3748,7 +3931,8 @@ class Dataset(object):
 
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         # Recover input samples
         X = []
         for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
@@ -3757,7 +3941,7 @@ class Dataset(object):
                 try:
                     # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
                     x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
-                except:
+                except Exception:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
@@ -4017,9 +4201,9 @@ class Dataset(object):
         # del obj_dict['_Dataset__lock_read']
         return obj_dict
 
-    def __setstate__(self, dict):
+    def __setstate__(self, new_state):
         """
             Behaviour applied when unpickling a Dataset instance.
         """
         # dict['_Dataset__lock_read'] = threading.Lock()
-        self.__dict__ = dict
+        self.__dict__ = new_state

@@ -599,7 +599,8 @@ class BeamSearchEnsemble:
 
         4. return final_samples, final_scores
 
-        :param X: Model inputs
+        :param X: Model inputs.
+        :param Y: Outputs to score.
         :param params: Search parameters
         :param null_sym: <null> symbol
         :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
@@ -1002,7 +1003,7 @@ class PredictEnsemble:
         """
 
         outs_list = []
-        for i, m in list(enumerate(models)):
+        for _, m in list(enumerate(models)):
             outs_list.append(m.model.predict_on_batch(X))
         outs = sum(outs_list[i] for i in range(len(models))) / float(len(models))
         return outs

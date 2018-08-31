@@ -14,13 +14,9 @@ Proceedings of the 54th Annual Meeting of the Association for Computational Ling
 from __future__ import division, unicode_literals
 
 import sys
-import os
 import inspect
-import codecs
-import io
 import argparse
 import re
-import warnings
 
 # hack for python2/3 compatibility
 from io import open
@@ -204,7 +200,7 @@ def recursive_split(segment, bpe_codes, vocab, separator, final=False):
             right = right[:-4]
         else:
             left, right = bpe_codes[segment]
-    except:
+    except Exception:
         # sys.stderr.write('cannot split {0} further.\n'.format(segment))
         yield segment
         return

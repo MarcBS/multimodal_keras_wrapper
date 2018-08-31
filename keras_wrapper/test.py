@@ -75,8 +75,8 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
     else:
         logging.info("Not close!")
 
-    model1_names = map(lambda x: str(x), model1.weights)
-    model2_names = map(lambda x: str(x), model2.weights)
+    model1_names = map(str, model1.weights)
+    model2_names = map(str, model2.weights)
 
     if verbose > 0:
         print ("===========================")
@@ -84,7 +84,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
 
     logging.info("Checking model_next 1 is close to model_next 2")
     if model1 is not None:
-        model_next_names = map(lambda x: str(x), model1.weights)
+        model_next_names = map(str, model1.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model2_names.index(name)
             if not np.allclose(model2.weights[index_model].get_value(), model1.weights[index_next].get_value(), rtol=rtol, atol=atol):
@@ -93,7 +93,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
                 print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if model2 is not None:
-        model_next_names = map(lambda x: str(x), model2.weights)
+        model_next_names = map(str, model2.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model1_names.index(name)
             if not np.allclose(model1.weights[index_model].get_value(), model2.weights[index_next].get_value(), rtol=rtol, atol=atol):
@@ -106,7 +106,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
 
     logging.info("Checking model_next 1 is close to model_next 2")
     if model1_next is not None:
-        model_next_names = map(lambda x: str(x), model1_next.weights)
+        model_next_names = map(str, model1_next.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model2_names.index(name)
             if not np.allclose(model2.weights[index_model].get_value(), model1_next.weights[index_next].get_value(), rtol=rtol, atol=atol):
@@ -115,7 +115,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
                 print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if model2_next is not None:
-        model_next_names = map(lambda x: str(x), model2_next.weights)
+        model_next_names = map(str, model2_next.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model1_names.index(name)
             if not np.allclose(model1.weights[index_model].get_value(), model2_next.weights[index_next].get_value(), rtol=rtol, atol=atol):
@@ -128,7 +128,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
 
     logging.info("Checking model_next 1 is close to model_next 2")
     if model1_init is not None:
-        model_next_names = map(lambda x: str(x), model1_init.weights)
+        model_next_names = map(str, model1_init.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model2_names.index(name)
             if not np.allclose(model2.weights[index_model].get_value(), model1_init.weights[index_next].get_value(), rtol=rtol, atol=atol):
@@ -137,7 +137,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
                 print ("Weights", name, "(position ", index_next, "at model_next - position", index_model, "at model are close")
 
     if model2_init is not None:
-        model_next_names = map(lambda x: str(x), model2_init.weights)
+        model_next_names = map(str, model2_init.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
             index_model = model1_names.index(name)
             if not np.allclose(model1.weights[index_model].get_value(), model2_init.weights[index_next].get_value(), rtol=rtol, atol=atol):
@@ -252,22 +252,22 @@ def loadFlickr8k():
     #    and a set of 5 consecutive descriptions correspond to a single input image
 
     ds.setOutput(base_path + 'text/train_descriptions.txt', 'train',
-                 data_type='text', id='descriptions',
+                 type='text', id='descriptions',
                  tokenization='tokenize_basic', build_vocabulary=True, max_text_len=max_text_len)
     ds.setOutput(base_path + 'text/val_descriptions.txt', 'val',
-                 data_type='text', id='descriptions',
+                 type='text', id='descriptions',
                  tokenization='tokenize_basic', max_text_len=max_text_len)
     ds.setOutput(base_path + 'text/test_descriptions.txt', 'test',
-                 data_type='text', id='descriptions',
+                 type='text', id='descriptions',
                  tokenization='tokenize_basic', max_text_len=max_text_len)
 
     # Let's load the associated images (inputs)
     #    we must take into account that in this dataset we have 5 sentences per image,
     #    for this reason we introduce the parameter 'repeat_set'=5
 
-    ds.setInput(base_path + 'text/Flickr_8k.trainImages.txt', 'train', data_type='image', id='images', repeat_set=5)
-    ds.setInput(base_path + 'text/Flickr_8k.devImages.txt', 'val', data_type='image', id='images', repeat_set=5)
-    ds.setInput(base_path + 'text/Flickr_8k.testImages.txt', 'test', data_type='image', id='images', repeat_set=5)
+    ds.setInput(base_path + 'text/Flickr_8k.trainImages.txt', 'train', type='image', id='images', repeat_set=5)
+    ds.setInput(base_path + 'text/Flickr_8k.devImages.txt', 'val', type='image', id='images', repeat_set=5)
+    ds.setInput(base_path + 'text/Flickr_8k.testImages.txt', 'test', type='image', id='images', repeat_set=5)
 
     # Now let's set the dataset mean image for preprocessing the data
     ds.setTrainMean(mean_image=[122.6795, 116.6690, 104.0067], data_id='images')
@@ -280,7 +280,7 @@ def loadFlickr8k():
 
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
-    logging.info('Sample data loaded correctly.')
+    logging.info('Sample data loaded correctly. %d input samples. %d output samples' %(len(X), len(Y)))
 
 
 def loadMSVD():
@@ -299,13 +299,13 @@ def loadMSVD():
     #    of descriptions per video are provided.
 
     ds.setOutput(base_path + 'train_descriptions.txt', 'train',
-                 data_type='text', id='descriptions',
+                 type='text', id='descriptions',
                  tokenization='tokenize_basic', build_vocabulary=True, max_text_len=max_text_len)
     ds.setOutput(base_path + 'val_descriptions.txt', 'val',
-                 data_type='text', id='descriptions',
+                 type='text', id='descriptions',
                  tokenization='tokenize_basic', max_text_len=max_text_len)
     ds.setOutput(base_path + 'test_descriptions.txt', 'test',
-                 data_type='text', id='descriptions',
+                 type='text', id='descriptions',
                  tokenization='tokenize_basic', max_text_len=max_text_len)
 
     # Let's load the associated videos (inputs)
@@ -318,13 +318,13 @@ def loadMSVD():
     num_captions_test = np.load(base_path + 'test_descriptions_counts.npy')
 
     ds.setInput([base_path + 'train_imgs_list.txt', base_path + 'train_imgs_counts.txt'],
-                'train', data_type='video', id='videos',
+                'train', type='video', id='videos',
                 repeat_set=num_captions_train)
     ds.setInput([base_path + 'val_imgs_list.txt', base_path + 'val_imgs_counts.txt'],
-                'val', data_type='video', id='videos',
+                'val', type='video', id='videos',
                 repeat_set=num_captions_val)
     ds.setInput([base_path + 'test_imgs_list.txt', base_path + 'test_imgs_counts.txt'],
-                'test', data_type='video', id='videos',
+                'test', type='video', id='videos',
                 repeat_set=num_captions_test)
 
     # Now let's set the dataset mean image for preprocessing the data
@@ -352,19 +352,19 @@ def loadFood101():
 
     # Insert inputs (images)
     ds.setInput(base_path + 'meta/train_split.txt', 'train',
-                data_type='image', id='images', img_size_crop=[227, 227, 3])
+                type='image', id='images', img_size_crop=[227, 227, 3])
     ds.setInput(base_path + 'meta/val_split.txt', 'val',
-                data_type='image', id='images')
+                type='image', id='images')
     ds.setInput(base_path + 'meta/test.txt', 'test',
-                data_type='image', id='images')
+                type='image', id='images')
 
     # Insert outputs (labels)
     ds.setOutput(base_path + 'meta/train_labels.txt', 'train',
-                 data_type='categorical', id='labels')
+                 type='categorical', id='labels')
     ds.setOutput(base_path + 'meta/val_labels.txt', 'val',
-                 data_type='categorical', id='labels')
+                 type='categorical', id='labels')
     ds.setOutput(base_path + 'meta/test_labels.txt', 'test',
-                 data_type='categorical', id='labels')
+                 type='categorical', id='labels')
 
     # Set list of classes (strings)
     ds.setClasses(base_path + 'meta/classes.txt', 'labels')

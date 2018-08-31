@@ -11,7 +11,7 @@ from keras_wrapper.extra import evaluation
 from keras_wrapper.extra.read_write import *
 from keras_wrapper.utils import decode_predictions_one_hot, \
     decode_predictions_beam_search, decode_predictions, \
-    decode_multilabel, checkParameters
+    decode_multilabel
 
 
 def checkDefaultParamsBeamSearch(params):
@@ -940,9 +940,8 @@ class LearningRateReducer(KerasCallback):
         self.epsilon = epsilon
         self.epoch = 0
         self.new_lr = None
-        assert self.reduction_function in ['linear', 'exponential',
-                                           'noam'], 'Reduction function "%s" unimplemented!' % \
-                                                    str(self.reduction_function)
+        if self.reduction_function not in ['linear', 'exponential', 'noam']:
+            raise AssertionError('Reduction function "%s" unimplemented!' % str(self.reduction_function))
 
     def on_epoch_end(self, epoch, logs=None):
 
