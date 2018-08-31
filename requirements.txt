@@ -1,13 +1,14 @@
 numpy
 six
 toolz
-cloud
+cloudpickle
 matplotlib
+sacremoses
 scipy
-#cpickle
+future
 cython
-
---allow-external keras
---allow-unverified keras
+keras_applications
+keras_preprocessing
+sklearn
 git+https://github.com/MarcBS/keras#egg=keras
 
