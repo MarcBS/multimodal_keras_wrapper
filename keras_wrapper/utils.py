@@ -1,9 +1,85 @@
+# -*- coding: utf-8 -*-
 import copy
 import itertools
 import logging
+import sys
 import time
+from six import iteritems
 
 import numpy as np
+
+if sys.version_info.major == 2:
+    from itertools import imap as map
+
+
+def checkParameters(input_params, default_params, hard_check=False):
+    """Validates a set of input parameters and uses the default ones if not specified.
+
+    :param input_params: Input parameters.
+    :param default_params: Default parameters
+    :param hard_check: If True, raise exception if a parameter is not valid.
+    :return:
+    """
+    valid_params = [key for key in default_params]
+    params = dict()
+
+    # Check input parameters' validity
+    for key, val in iteritems(input_params):
+        if key in valid_params:
+            params[key] = val
+        elif hard_check:
+            raise Exception("Parameter '" + key + "' is not a valid parameter.")
+
+    # Use default parameters if not provided
+    for key, default_val in iteritems(default_params):
+        if key not in params:
+            params[key] = default_val
+
+    return params
+
+
+class MultiprocessQueue():
+    """
+        Wrapper class for encapsulating the behaviour of some multiprocessing
+        communication structures.
+
+        See how Queues and Pipes work in the following link
+        https://docs.python.org/2/library/multiprocessing.html#multiprocessing-examples
+    """
+
+    def __init__(self, manager, multiprocess_type='Queue'):
+        if multiprocess_type != 'Queue' and multiprocess_type != 'Pipe':
+            raise NotImplementedError('Not valid multiprocessing queue of type ' + multiprocess_type)
+
+        self.type = multiprocess_type
+        if multiprocess_type == 'Queue':
+            self.queue = eval('manager.' + multiprocess_type + '()')
+        else:
+            self.queue = eval(multiprocess_type + '()')
+
+    def put(self, elem):
+        if self.type == 'Queue':
+            self.queue.put(elem)
+        elif self.type == 'Pipe':
+            self.queue[1].send(elem)
+
+    def get(self):
+        if self.type == 'Queue':
+            return self.queue.get()
+        elif self.type == 'Pipe':
+            return self.queue[0].recv()
+
+    def qsize(self):
+        if self.type == 'Queue':
+            return self.queue.qsize()
+        elif self.type == 'Pipe':
+            return -1
+
+    def empty(self):
+        if self.type == 'Queue':
+            return self.queue.empty()
+        elif self.type == 'Pipe':
+            return not self.queue[0].poll()
 
 
 def bbox(img, mode='max'):
@@ -72,8 +148,7 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ec
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
-            str(count + 1), str(n_combs), c, str(time.time() - t)))
+        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (str(count + 1), str(n_combs), c, str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -228,12 +303,12 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
     return [stage, outputs_list]
 
 
-def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, ecoc_version=3, pairs=None,
-                                           functional_api=False, activations=['softmax', 'softmax']):
+def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes, ecoc_version=3, pairs=None,
+                                           functional_api=False, activations=None):
     """
 
     :param net:
-    :param input:
+    :param input_net:
     :param input_shape:
     :param classes:
     :param ecoc_version:
@@ -243,7 +318,8 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
     :return:
     """
     from keras.layers.convolutional import ZeroPadding2D
-
+    if activations is None:
+        activations = ['softmax', 'softmax']
     n_classes = len(classes)
     if pairs is None:  # generate any possible combination of two classes
         pairs = tuple(itertools.combinations(range(n_classes), 2))
@@ -254,7 +330,7 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
 
     logging.info("Building " + str(n_pairs) + " OneVsOne structures...")
 
-    for i, c in enumerate(pairs):
+    for i, c in list(enumerate(pairs)):
         # t = time.time()
 
         # Insert 1s in the corresponding positions of the ecoc table
@@ -264,15 +340,15 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
         # Create each one_vs_one classifier of the intermediate stage
         if not functional_api:
             if ecoc_version == 1:
-                output_name = net.add_One_vs_One_Inception(input, input_shape, i, nOutput=2, activation=activations[0])
+                output_name = net.add_One_vs_One_Inception(input_net, input_shape, i, nOutput=2, activation=activations[0])
             elif ecoc_version == 2:
-                output_name = net.add_One_vs_One_Inception_v2(input, input_shape, i, nOutput=2,
+                output_name = net.add_One_vs_One_Inception_v2(input_net, input_shape, i, nOutput=2,
                                                               activation=activations[0])
             else:
                 raise NotImplementedError
         else:
             if ecoc_version == 1:
-                output_name = net.add_One_vs_One_Inception_Functional(input, input_shape, i, nOutput=2,
+                output_name = net.add_One_vs_One_Inception_Functional(input_net, input_shape, i, nOutput=2,
                                                                       activation=activations[0])
             elif ecoc_version == 2:
                 raise NotImplementedError()
@@ -288,13 +364,13 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
                 else:
                     raise NotImplementedError()
                 if i == 0:
-                    in_node = net.model.get_layer(input).output
+                    in_node = net.model.get_layer(input_net).output
                     padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')(in_node)
                 output_name = net.add_One_vs_One_3x3_Functional(padding_node, input_shape, i, nkernels, nOutput=2,
                                                                 activation=activations[0])
             elif ecoc_version == 7:
                 if i == 0:
-                    in_node = net.model.get_layer(input).output
+                    in_node = net.model.get_layer(input_net).output
                     padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')(in_node)
                 output_name = net.add_One_vs_One_3x3_double_Functional(padding_node, input_shape, i, nOutput=2,
                                                                        activation=activations[0])
@@ -317,7 +393,7 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input, input_shape, classes, eco
     return [ecoc_table, output_names]
 
 
-def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits=['train', 'val', 'test']):
+def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits=None):
     """
 
     :param net:
@@ -328,23 +404,27 @@ def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits
     :param splits:
     :return:
     """
+    if splits is None:
+        splits = ['train', 'val', 'test']
     # Insert ecoc_table in net
     if 'additional_data' not in net.__dict__.keys():
         net.additional_data = dict()
     net.additional_data['ecoc_table'] = ecoc_table
 
-    # Retrieve labels' id and images' id in dataset
-    id_labels = ds.ids_outputs[ds.types_outputs.index('categorical')]
+    # Retrieve labels' id and images' id in dataset <- Necessary?
+    # id_labels = ds.ids_outputs[ds.types_outputs.index('categorical')]
     id_labels_ecoc = 'labels_ecoc'
 
     # Insert ecoc-loss labels for each data split
     for s in splits:
         labels_ecoc = []
-        exec ('labels = ds.Y_' + s + '[id_labels]')
+        # exec ('labels = ds.Y_' + s + '[id_labels]')
+        y_split = getattr(ds, 'Y_' + s)
+        labels = y_split[gt_id]
         n = len(labels)
         for i in range(n):
             labels_ecoc.append(ecoc_table[labels[i]])
-        ds.setOutput(labels_ecoc, s, type='binary', id=id_labels_ecoc)
+        ds.setOutput(labels_ecoc, s, data_type='binary', id=id_labels_ecoc)
 
     # Set input and output mappings from dataset to network
     pos_images = ds.types_inputs.index('image')
@@ -559,26 +639,117 @@ def simplifyDataset(ds, id_classes, n_classes=50):
     for s in ['train', 'val', 'test']:
         kept_Y = dict()
         kept_X = dict()
-        exec ('labels_set = ds.Y_' + s + '[id_labels]')
-        for i, y in enumerate(labels_set):
+        labels_set = getattr(ds, 'Y_' + s)[id_labels]
+        for i, y in list(enumerate(labels_set)):
             if y < n_classes:
                 for id_out in ds.ids_outputs:
-                    exec ('sample = ds.Y_' + s + '[id_out][i]')
+                    # exec ('sample = ds.Y_' + s + '[id_out][i]')
+                    y_split = getattr(ds, 'Y_' + s)
+                    sample = y_split[id_out][i]
                     try:
                         kept_Y[id_out].append(sample)
                     except:
                         kept_Y[id_out] = []
                         kept_Y[id_out].append(sample)
                 for id_in in ds.ids_inputs:
-                    exec ('sample = ds.X_' + s + '[id_in][i]')
+                    # exec ('sample = ds.X_' + s + '[id_in][i]')
+                    x_split = getattr(ds, 'X_' + s)
+                    sample = x_split[id_in][i]
                     try:
                         kept_X[id_in].append(sample)
                     except:
                         kept_X[id_in] = []
                         kept_X[id_in].append(sample)
-        exec ('ds.X_' + s + ' = copy.copy(kept_X)')
-        exec ('ds.Y_' + s + ' = copy.copy(kept_Y)')
-        exec ('ds.len_' + s + ' = len(kept_Y[id_labels])')
+        # exec ('ds.X_' + s + ' = copy.copy(kept_X)')
+        # exec ('ds.Y_' + s + ' = copy.copy(kept_Y)')
+        # exec ('ds.len_' + s + ' = len(kept_Y[id_labels])')
+        setattr(ds, 'X_' + s, copy.copy(kept_X))
+        setattr(ds, 'Y_' + s, copy.copy(kept_Y))
+        setattr(ds, 'len_' + s, len(kept_Y[id_labels]))
+
+
+def average_models(models, output_model, weights=None):
+    from keras_wrapper.cnn_model import loadModel, saveModel
+    if not isinstance(models, list):
+        raise AssertionError('You must give a list of models to average.')
+    if len(models) == 0:
+        raise AssertionError('You provided an empty list of models to average!')
+
+    model_weights = np.asarray([1. / len(models)] * len(models), dtype=np.float32) if (weights is None) or (weights == []) else np.asarray(weights, dtype=np.float32)
+    if len(model_weights) != len(models):
+        raise AssertionError('You must give a list of weights of the same size than the list of models.')
+    loaded_models = [loadModel(m, -1, full_path=True) for m in models]
+
+    # Check that all models are compatible
+    if not all([hasattr(loaded_model, 'model') for loaded_model in loaded_models]):
+        raise AssertionError('Not all models have the attribute "model".')
+    if not (all([hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_init') for loaded_model in loaded_models])):
+            raise AssertionError('Not all models have the attribute "model_init".')
+
+    if not (all([hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_next') for loaded_model in loaded_models])):
+            raise AssertionError('Not all models have the attribute "model_next".')
+
+    # Check all layers are the same
+    if not (all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
+                 range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models])):
+            raise AssertionError('Not all models have the same weights!')
+
+    if hasattr(loaded_models[0], 'model_init'):
+        if not all([[str(loaded_models[0].model_init.weights[i]) == str(loaded_model.model_init.weights[i]) for i in
+                     range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models]):
+            raise AssertionError('Not all models have the same weights!')
+
+    if not all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
+                 range(len(loaded_models[0].model_init.weights))] for loaded_model in loaded_models]):
+        raise AssertionError('Not all model_inits have the same weights!')
+
+    if hasattr(loaded_models[0], 'model_next'):
+        if not all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in
+                     range(len(loaded_models[0].model_next.weights))] for loaded_model in loaded_models]):
+            raise AssertionError('Not all model_nexts have the same weights!')
+
+    # Retrieve weights, weigh them and overwrite in model[0].
+    current_weights = loaded_models[0].model.get_weights()
+    loaded_models[0].model.set_weights(
+        [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+    # We have model_init
+    if hasattr(loaded_models[0], 'model_init'):
+        current_weights = loaded_models[0].model_init.get_weights()
+        loaded_models[0].model_init.set_weights(
+            [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+
+    # We have model_next
+    if hasattr(loaded_models[0], 'model_next'):
+        current_weights = loaded_models[0].model_next.get_weights()
+        loaded_models[0].model_next.set_weights(
+            [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+
+    # Weighted sum of all models
+    for m in range(1, len(models)):
+        current_weights = loaded_models[m].model.get_weights()
+        prev_weights = loaded_models[0].model.get_weights()
+        loaded_models[0].model.set_weights(
+            [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+             range(len(current_weights))])
+
+        # We have model_init
+        if hasattr(loaded_models[0], 'model_init'):
+            current_weights = loaded_models[m].model_init.get_weights()
+            prev_weights = loaded_models[0].model_init.get_weights()
+            loaded_models[0].model_init.set_weights(
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                 range(len(current_weights))])
+
+        # We have model_next
+        if hasattr(loaded_models[0], 'model_next'):
+            current_weights = loaded_models[m].model_next.get_weights()
+            prev_weights = loaded_models[0].model_next.get_weights()
+            loaded_models[0].model_next.set_weights(
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                 range(len(current_weights))])
+
+    # Save averaged model
+    saveModel(loaded_models[0], -1, path=output_model, full_path=True, store_iter=False)
 
 
 # Text-related utils
@@ -592,7 +763,7 @@ def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     """
     if verbose > 0:
         logging.info('Converting one hot prediction into indices...')
-    preds = map(lambda x: np.nonzero(x)[1], preds)
+    preds = list(map(lambda x: np.argmax(x, axis=1), preds))
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
     return preds
@@ -606,7 +777,7 @@ def indices_2_one_hot(indices, n):
     :param n: integer. Size of the vocabulary
     :return: numpy array with shape (len(indices), n)
     """
-    one_hot = np.zeros((len(indices), n), dtype=np.int)
+    one_hot = np.zeros((len(indices), n), dtype=np.int8)
     for i in range(len(indices)):
         if indices[i] >= n:
             raise ValueError("Index out of bounds when converting to one hot")
@@ -644,6 +815,10 @@ def to_categorical(y, num_classes=None):
     return categorical
 
 
+def categorical_probas_to_classes(p):
+    return np.argmax(p, axis=1)
+
+
 # ------------------------------------------------------- #
 #       DECODING FUNCTIONS
 #           Functions for decoding predictions
@@ -659,16 +834,17 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
     """
     if verbose > 0:
         logging.info('Decoding one hot prediction ...')
-    preds = map(lambda prediction: np.nonzero(prediction)[1], preds)
+    preds = list(map(lambda prediction: np.argmax(prediction, axis=1), preds))
     PAD = '<pad>'
-    flattened_answer_pred = [map(lambda index: index2word[index], pred) for pred in preds]
+    flattened_answer_pred = [list(map(lambda index: index2word[index], pred)) for pred in preds]
     answer_pred_matrix = np.asarray(flattened_answer_pred)
     answer_pred = []
 
     for a_no in answer_pred_matrix:
-        end_token_pos = [j for j, x in enumerate(a_no) if x == PAD]
+        end_token_pos = [j for j, x in list(enumerate(a_no)) if x == PAD]
         end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        tmp = ' '.join(a_no[:end_token_pos]).decode('utf-8')
+        a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
+        tmp = u' '.join(a_no[:end_token_pos])
         answer_pred.append(tmp)
     return answer_pred
 
@@ -676,7 +852,7 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
 def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0):
     """
     Decodes predictions
-    :param preds: Predictions codified as the output of a softmax activation function. Shape: (batch, timesteps, vocabulary)
+    :param preds: Predictions codified as the output of a softmax activation function.
     :param temperature: Temperature for sampling.
     :param index2word: Mapping from word indices into word characters.
     :param sampling_type: 'max_likelihood' or 'multinomial'.
@@ -686,17 +862,23 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
 
     if verbose > 0:
         logging.info('Decoding prediction ...')
-    pred_matrix = [map(lambda index: index2word[index], sampling(scores=pred, sampling_type=sampling_type, temperature=temperature)) for pred in preds]
+    flattened_preds = preds.reshape(-1, preds.shape[-1])
+    flattened_answer_pred = list(map(lambda index: index2word[index], sampling(scores=flattened_preds,
+                                                                               sampling_type=sampling_type,
+                                                                               temperature=temperature)))
+    answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
+
     answer_pred = []
     EOS = '<eos>'
     PAD = '<pad>'
 
-    for a_no in pred_matrix:
-        if len(a_no) > 1:  # only process word by word if our prediction has more than one output
+    for a_no in answer_pred_matrix:
+        if len(a_no.shape) > 1:  # only process word by word if our prediction has more than one output
             init_token_pos = 0
-            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
+            end_token_pos = [j for j, x in list(enumerate(a_no)) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+            a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
+            tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
             tmp = a_no
         answer_pred.append(tmp)
@@ -722,7 +904,7 @@ def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0
     for pred in preds:
         current_pred = []
         current_probs = []
-        for ind, word in enumerate(pred):
+        for ind, word in list(enumerate(pred)):
             if word >= min_val:
                 current_pred.append(index2word[ind])
                 current_probs.append(word)
@@ -751,13 +933,10 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     """
     trans_words = trg_word_seq
     new_trans_words = []
-    if verbose > 2:
-        print "Input sentence:", src_word_seq
-        print "Hard alignments", hard_alignment
-    for j in xrange(len(trans_words)):
+    for j in range(len(trans_words)):
         if trans_words[j] == unk_symbol:
             UNK_src = src_word_seq[hard_alignment[j]]
-            if type(UNK_src) == str:
+            if isinstance(UNK_src, str):
                 UNK_src = UNK_src.decode('utf-8')
             if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
                 new_trans_words.append(UNK_src)
@@ -789,7 +968,7 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
 
     :param preds: Predictions codified as word indices.
     :param index2word: Mapping from word indices into word characters.
-    :param alphas: Attention model weights
+    :param alphas: Attention model weights: Float matrix with shape (I, J) (I: number of target items; J: number of source items).
     :param heuristic: Replace unknown words heuristic (0, 1 or 2)
     :param x_text: Source text (for unk replacement)
     :param unk_symbol: Unknown words symbol
@@ -802,26 +981,23 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
         logging.info('Decoding beam search prediction ...')
 
     if alphas is not None:
-        assert x_text is not None, 'When using POS_UNK, you must provide the input ' \
-                                   'text to decode_predictions_beam_search!'
+        if x_text is None:
+            raise AssertionError('When using POS_UNK, you must provide the input '
+                                 'text to decode_predictions_beam_search!')
         if verbose > 0:
             logging.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-    flattened_answer_pred = [map(lambda x: index2word[x].decode('utf-8'), pred) for pred in preds]
+    flattened_answer_pred = [list(map(lambda x: index2word[x], pred)) for pred in preds]
     answer_pred = []
 
     if alphas is not None:
-        x_text = map(lambda x: x.split(), x_text)
-        hard_alignments = map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas, x_text)
-        for i, a_no in enumerate(flattened_answer_pred):
+        x_text = list(map(lambda x: x.split(), x_text))
+        hard_alignments = list(
+            map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas,
+                x_text))
+        for i, a_no in list(enumerate(flattened_answer_pred)):
             if unk_symbol in a_no:
-                if verbose > 1:
-                    print unk_symbol, "at sentence number", i
-                    print "hypothesis:", a_no
-                    if verbose > 2:
-                        print "alphas:", alphas[i]
-
                 a_no = replace_unknown_words(x_text[i],
                                              a_no,
                                              hard_alignments[i],
@@ -829,12 +1005,12 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                              heuristic=heuristic,
                                              mapping=mapping,
                                              verbose=verbose)
-                if verbose > 1:
-                    print "After unk_replace:", a_no
+            a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     else:
         for a_no in flattened_answer_pred:
+            a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
             answer_pred.append(tmp)
     return answer_pred
@@ -866,17 +1042,14 @@ def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
         scores = scores['output']
 
     if sampling_type == 'multinomial':
-        preds = np.asarray(scores).astype('float32')
+        preds = np.asarray(scores).astype('float64')
         preds = np.log(preds) / temperature
         exp_preds = np.exp(preds)
         preds = exp_preds / np.sum(exp_preds)
         probas = np.random.multinomial(1, preds, 1)
         return np.argmax(probas)
     elif sampling_type == 'max_likelihood':
-        if scores.ndim == 3:
-            return np.argmax(scores, axis=2)
-        else:
-            return np.argmax(scores, axis=-1)
+        return np.argmax(scores, axis=-1)
     else:
         raise NotImplementedError()
 
@@ -899,4 +1072,12 @@ def flatten(l):
     """
     if not l:
         return l
-    return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if type(l) is list else [l]
+    return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if isinstance(l, list) else [l]
+
+
+def key_with_max_val(d):
+    """ a) create a list of the dict's keys and values;
+        b) return the key with the max value"""
+    v = list(d.values())
+    k = list(d.keys())
+    return k[v.index(max(v))]

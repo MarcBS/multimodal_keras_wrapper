@@ -13,11 +13,9 @@ Some code examples are available in demo.ipynb and test.py. Additionally, in the
 
 The following dependencies are required for using this library:
 
- - [Anaconda](https://www.continuum.io/downloads)
  - Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
- - [cloud](https://pypi.python.org/pypi/cloud/2.8.5) >= 2.8.5
- - [scipy](https://pypi.python.org/pypi/scipy/0.7.0)
- - [coco-caption](https://github.com/lvapeab/coco-caption.git)
+ - [Coco-caption evaluation package](https://github.com/lvapeab/coco-caption/tree/master/pycocoevalcap/) (Only required to perform evaluation). This package requires `java` (version 1.8.0 or newer).
+ - Those specified in the `requirements.txt` file.   
 
 Only when using NMS for certain localization utilities:
  - [cython](https://pypi.python.org/pypi/Cython/0.25.2) >= 0.23.4
@@ -27,17 +25,14 @@ Only when using NMS for certain localization utilities:
 
 In order to install the library you just have to follow these steps:
 
-1) Clone this repository:
-```
-git clone https://github.com/MarcBS/multimodal_keras_wrapper.git
-```
+1) Clone this repository.
 
 2) Include the repository path into your PYTHONPATH:
 ```
 export PYTHONPATH=$PYTHONPATH:/path/to/multimodal_keras_wrapper
 ```
 
-3) If you wish to install the dependencies (it will install our [custom Keras fork](https://github.com/MarcBS/keras)):
+3) Install the dependencies (it will install our [custom Keras fork](https://github.com/MarcBS/keras)):
 ```
 pip install -r requirements.txt
 ```
@@ -60,6 +55,6 @@ You can see more practical examples in projects which use this library:
 
 ## Keras
 
-For additional information on the Deep Learning library, visit the official web page www.keras.io or the GitHub repository https://github.com/fchollet/keras.
+For additional information on the Deep Learning library, visit the official web page www.keras.io or the GitHub repository https://github.com/keras-team/keras.
 
 You can also use our [custom Keras version](https://github.com/MarcBS/keras), which provides several additional layers for Multimodal Learning.

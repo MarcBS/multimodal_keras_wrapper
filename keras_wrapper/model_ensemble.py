@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
-
+from __future__ import print_function
 import copy
 import logging
 import math
 import sys
 import time
-
 import numpy as np
 
 from keras_wrapper.dataset import Data_Batch_Generator
-from keras_wrapper.utils import one_hot_2_indices
+from keras_wrapper.utils import one_hot_2_indices, checkParameters
 
 
 class BeamSearchEnsemble:
-    def __init__(self, models, dataset, params_prediction, n_best=False, verbose=0):
+    def __init__(self, models, dataset, params_prediction, model_weights=None, n_best=False, verbose=0):
         """
 
         :param models:
@@ -27,6 +26,11 @@ class BeamSearchEnsemble:
         self.return_alphas = params_prediction.get('coverage_penalty', False) or params_prediction.get('pos_unk', False)
         self.n_best = n_best
         self.verbose = verbose
+        self.model_weights = np.asarray([1. / len(models)] * len(models), dtype=np.float32) if (model_weights is None) or (model_weights == []) else model_weights
+
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
+                                  sys.stdout.isatty()) or
+                                 'ipykernel' in sys.modules)
         if self.verbose > 0:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
 
@@ -46,7 +50,7 @@ class BeamSearchEnsemble:
         probs_list = []
         prev_outs_list = []
         alphas_list = []
-        for i, model in enumerate(models):
+        for i, model in list(enumerate(models)):
             if self.optimized_search:
                 [model_probs, next_outs] = model.predict_cond_optimized(X, states_below, params,
                                                                         ii, prev_out=prev_outs[i])
@@ -57,10 +61,11 @@ class BeamSearchEnsemble:
                 prev_outs_list.append(next_outs)
             else:
                 probs_list.append(model.predict_cond(X, states_below, params, ii))
-        probs = sum(probs_list[i] for i in xrange(len(models))) / float(len(models))
+
+        probs = sum(probs_list[i] * self.model_weights[i] for i in range(len(models)))
 
         if self.return_alphas:
-            alphas = np.asarray(sum(alphas_list[i] for i in xrange(len(models))))
+            alphas = np.asarray(sum(alphas_list[i] for i in range(len(models))))
         else:
             alphas = None
         if self.optimized_search:
@@ -119,9 +124,8 @@ class BeamSearchEnsemble:
                          params['output_min_length_depending_on_x_factor'] + 1e-7) \
                 if params['output_min_length_depending_on_x'] else 0
         else:
-            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym)
-                         / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
-                params['output_min_length_depending_on_x'] else 0
+            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) /
+                         params['output_min_length_depending_on_x_factor'] + 1e-7) if params['output_min_length_depending_on_x'] else 0
 
             maxlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) * params[
                 'output_max_length_depending_on_x_factor']) if \
@@ -138,7 +142,7 @@ class BeamSearchEnsemble:
             state_below = np.asarray([null_sym] * live_k) if pad_on_batch else \
                 np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
         prev_outs = [None] * len(self.models)
-        for ii in xrange(maxlen):
+        for ii in range(maxlen):
             # for every possible live sample calc prob for every possible label
             if self.optimized_search:  # use optimized search model if available
                 [probs, prev_outs, alphas] = self.predict_cond(self.models, X, state_below, params, ii,
@@ -155,7 +159,7 @@ class BeamSearchEnsemble:
             ranks_flat = cand_flat.argsort()[:(k - dead_k)]
             # Decypher flatten indices
             voc_size = log_probs.shape[1]
-            trans_indices = ranks_flat / voc_size  # index of row
+            trans_indices = ranks_flat // voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
             best_cost = costs[0]
@@ -165,7 +169,7 @@ class BeamSearchEnsemble:
             new_hyp_scores = np.zeros(k - dead_k).astype('float32')
             if self.return_alphas:
                 new_hyp_alphas = []
-            for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
+            for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
                 if params['search_pruning']:
                     if costs[idx] < k * best_cost:
                         new_hyp_samples.append(hyp_samples[ti] + [wi])
@@ -187,7 +191,7 @@ class BeamSearchEnsemble:
             hyp_scores = []
             hyp_alphas = []
             indices_alive = []
-            for idx in xrange(len(new_hyp_samples)):
+            for idx in range(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == eos_sym:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
@@ -235,7 +239,7 @@ class BeamSearchEnsemble:
 
         # dump every remaining one
         if live_k > 0:
-            for idx in xrange(live_k):
+            for idx in range(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
                 if self.return_alphas:
@@ -300,15 +304,18 @@ class BeamSearchEnsemble:
                           'output_max_length_depending_on_x': False,
                           'output_max_length_depending_on_x_factor': 3,
                           'output_min_length_depending_on_x': False,
-                          'output_min_length_depending_on_x_factor': 2
+                          'output_min_length_depending_on_x_factor': 2,
+                          'attend_on_output': False
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
         predictions = dict()
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
-                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                if params['pos_unk']:
+                    raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             if params['n_samples'] < 1:
@@ -358,7 +365,7 @@ class BeamSearchEnsemble:
             if self.n_best:
                 n_best_list = []
             for _ in range(num_iterations):
-                data = data_gen.next()
+                data = next(data_gen)
                 X = dict()
                 if params['n_samples'] > 0:
                     s_dict = {}
@@ -381,8 +388,12 @@ class BeamSearchEnsemble:
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
-                    sys.stdout.write('\r')
+
                     sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
                     sys.stdout.flush()
                     x = dict()
                     for input_id in params['model_inputs']:
@@ -391,8 +402,7 @@ class BeamSearchEnsemble:
 
                     if params['length_penalty'] or params['coverage_penalty']:
                         if params['length_penalty']:
-                            length_penalties = [((5 + len(sample)) ** params['length_norm_factor']
-                                                 / (5 + 1) ** params['length_norm_factor'])
+                            length_penalties = [((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])
                                                 # this 5 is a magic number by Google...
                                                 for sample in samples]
                         else:
@@ -400,7 +410,7 @@ class BeamSearchEnsemble:
 
                         if params['coverage_penalty']:
                             coverage_penalties = []
-                            for k, sample in enumerate(samples):
+                            for k, sample in list(enumerate(samples)):
                                 # We assume that source sentences are at the first position of x
                                 x_sentence = x[params['model_inputs'][0]][0]
                                 alpha = np.asarray(alphas[k])
@@ -499,7 +509,7 @@ class BeamSearchEnsemble:
                           'output_min_length_depending_on_x': False,
                           'output_min_length_depending_on_x_factor': 2
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
         params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
         params['n_samples'] = 1
         if self.n_best:
@@ -516,15 +526,14 @@ class BeamSearchEnsemble:
 
         if params['length_penalty'] or params['coverage_penalty']:
             if params['length_penalty']:
-                length_penalties = [((5 + len(sample)) ** params['length_norm_factor']
-                                     / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
+                length_penalties = [((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
                                     for sample in samples]
             else:
                 length_penalties = [1.0 for _ in samples]
 
             if params['coverage_penalty']:
                 coverage_penalties = []
-                for k, sample in enumerate(samples):
+                for k, sample in list(enumerate(samples)):
                     # We assume that source sentences are at the first position of x
                     x_sentence = x[params['model_inputs'][0]][0]
                     alpha = np.asarray(alphas[k])
@@ -609,9 +618,8 @@ class BeamSearchEnsemble:
             state_below = np.asarray([null_sym]) \
                 if pad_on_batch else np.asarray([np.zeros(params['state_below_maxlen']) + null_sym])
 
-
         prev_outs = [None] * len(self.models)
-        for ii in xrange(len(Y)):
+        for ii in range(len(Y)):
             # for every possible live sample calc prob for every possible label
             if self.optimized_search:  # use optimized search model if available
                 [probs, prev_outs, alphas] = self.predict_cond(self.models, X, state_below, params, ii,
@@ -620,7 +628,7 @@ class BeamSearchEnsemble:
                 probs = self.predict_cond(self.models, X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
             score -= np.log(probs[0, int(Y[ii])])
-            state_below = np.asarray([Y[:ii]], dtype='int64')
+            state_below = np.asarray([Y[:ii + 1]], dtype='int64')
             if self.return_alphas:
                 all_alphas.append(alphas[0])
             # we must include an additional dimension if the input for each timestep are all the generated words so far
@@ -705,15 +713,17 @@ class BeamSearchEnsemble:
                           'output_min_length_depending_on_x': False,
                           'output_min_length_depending_on_x_factor': 2
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
 
         scores_dict = dict()
 
         for s in params['predict_on_sets']:
             logging.info("<<< Scoring outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
-                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                if params['pos_unk']:
+                    raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many interations are we going to perform
             n_samples = eval("self.dataset.len_" + s)
@@ -738,8 +748,8 @@ class BeamSearchEnsemble:
             sampled = 0
             start_time = time.time()
             eta = -1
-            for j in range(num_iterations):
-                data = data_gen.next()
+            for _ in range(num_iterations):
+                data = next(data_gen)
                 X = dict()
                 s_dict = {}
                 for input_id in params['model_inputs']:
@@ -753,7 +763,11 @@ class BeamSearchEnsemble:
 
                 for i in range(len(X[params['model_inputs'][0]])):
                     sampled += 1
-                    sys.stdout.write('\r')
+
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
                     sys.stdout.write("Scored %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
                     sys.stdout.flush()
                     x = dict()
@@ -767,9 +781,7 @@ class BeamSearchEnsemble:
 
                     if params['length_penalty'] or params['coverage_penalty']:
                         if params['length_penalty']:
-                            length_penalty = ((5 + len(sample)) ** params['length_norm_factor']
-                                              / (5 + 1) ** params[
-                                                  'length_norm_factor'])  # this 5 is a magic number by Google...
+                            length_penalty = ((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
                         else:
                             length_penalty = 1.0
 
@@ -862,16 +874,16 @@ class BeamSearchEnsemble:
                           'output_min_length_depending_on_x': False,
                           'output_min_length_depending_on_x_factor': 2
                           }
-        params = self.checkParameters(self.params, default_params)
+        params = checkParameters(self.params, default_params)
 
         scores = []
         total_cost = 0
         sampled = 0
         X = dict()
-        for i, input_id in enumerate(params['model_inputs']):
+        for i, input_id in list(enumerate(params['model_inputs'])):
             X[input_id] = data[0][i]
         Y = dict()
-        for i, output_id in enumerate(params['model_outputs']):
+        for i, output_id in list(enumerate(params['model_outputs'])):
             Y[output_id] = data[1][i]
 
         for i in range(len(X[params['model_inputs'][0]])):
@@ -888,9 +900,7 @@ class BeamSearchEnsemble:
 
             if params['length_penalty'] or params['coverage_penalty']:
                 if params['length_penalty']:
-                    length_penalty = ((5 + len(sample)) ** params['length_norm_factor']
-                                      / (5 + 1) ** params[
-                                          'length_norm_factor'])  # this 5 is a magic number by Google...
+                    length_penalty = ((5 + len(sample)) ** params['length_norm_factor'] / (5 + 1) ** params['length_norm_factor'])  # this 5 is a magic number by Google...
                 else:
                     length_penalty = 1.0
 
@@ -920,28 +930,8 @@ class BeamSearchEnsemble:
         """
         DEPRECATED, use predictBeamSearchNet() instead.
         """
-        print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
+        logging.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet()
-
-    @staticmethod
-    def checkParameters(input_params, default_params):
-        """
-            Validates a set of input parameters and uses the default ones if not specified.
-        """
-        valid_params = [key for key in default_params]
-        params = dict()
-
-        # Check input parameters' validity
-        for key, val in input_params.iteritems():
-            if key in valid_params:
-                params[key] = val
-
-        # Use default parameters if not provided
-        for key, default_val in default_params.iteritems():
-            if key not in params:
-                params[key] = default_val
-
-        return params
 
 
 class PredictEnsemble:
@@ -958,6 +948,9 @@ class PredictEnsemble:
         self.params = params_prediction
         self.verbose = verbose
 
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
+                                  sys.stdout.isatty()) or
+                                 'ipykernel' in sys.modules)
     # PREDICTION FUNCTIONS: Functions for making prediction on input samples
 
     @staticmethod
@@ -983,9 +976,9 @@ class PredictEnsemble:
         """
 
         outs_list = []
-        for i, m in enumerate(models):
+        for m in list(models):
             outs_list.append(m.model.predict_on_batch(data_gen, val_samples, max_q_size))
-        outs = sum(outs_list[i] for i in xrange(len(models))) / float(len(models))
+        outs = sum(outs_list[i] for i in range(len(models))) / float(len(models))
         return outs
 
     @staticmethod
@@ -1009,9 +1002,9 @@ class PredictEnsemble:
         """
 
         outs_list = []
-        for i, m in enumerate(models):
+        for i, m in list(enumerate(models)):
             outs_list.append(m.model.predict_on_batch(X))
-        outs = sum(outs_list[i] for i in xrange(len(models))) / float(len(models))
+        outs = sum(outs_list[i] for i in range(len(models))) / float(len(models))
         return outs
 
     def predictNet(self):
@@ -1055,13 +1048,13 @@ class PredictEnsemble:
                           'max_eval_samples': None
                           }
 
-        params = self.checkParameters(self.params, default_params)
+        params = che(self.params, default_params)
         predictions = dict()
 
         for s in params['predict_on_sets']:
             logging.info("\n <<< Predicting outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
-
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             # Calculate how many interations are we going to perform
             if params['n_samples'] is None:
                 if params['init_sample'] > -1 and params['final_sample'] > -1:
@@ -1102,19 +1095,17 @@ class PredictEnsemble:
                                                 predict=True,
                                                 random_samples=n_samples).generator()
             # Predict on model
-            """
-            if self.postprocess_fun is None:
-
-                out = self.predict_generator(self.models,
-                                             data_gen,
-                                             val_samples=n_samples,
-                                             max_q_size=params['n_parallel_loaders'])
-                predictions[s] = out
-            """
+            # if self.postprocess_fun is None:
+            #
+            #     out = self.predict_generator(self.models,
+            #                                  data_gen,
+            #                                  val_samples=n_samples,
+            #                                  max_q_size=params['n_parallel_loaders'])
+            #     predictions[s] = out
             processed_samples = 0
             start_time = time.time()
             while processed_samples < n_samples:
-                out = self.predict_on_batch(self.models, data_gen.next())
+                out = self.predict_on_batch(self.models, next(data_gen))
                 # Apply post-processing function
                 if self.postprocess_fun is not None:
                     if isinstance(self.postprocess_fun, list):
@@ -1132,29 +1123,12 @@ class PredictEnsemble:
                 if processed_samples > n_samples:
                     processed_samples = n_samples
                 eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
-                sys.stdout.write('\r')
                 sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
+                if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                    sys.stdout.write('\r')
+                else:
+                    sys.stdout.write('\n')
                 sys.stdout.flush()
             predictions[s] = np.concatenate([pred for pred in predictions[s]])
 
         return predictions
-
-    @staticmethod
-    def checkParameters(input_params, default_params):
-        """
-            Validates a set of input parameters and uses the default ones if not specified.
-        """
-        valid_params = [key for key in default_params]
-        params = dict()
-
-        # Check input parameters' validity
-        for key, val in input_params.iteritems():
-            if key in valid_params:
-                params[key] = val
-
-        # Use default parameters if not provided
-        for key, default_val in default_params.iteritems():
-            if key not in params:
-                params[key] = default_val
-
-        return params

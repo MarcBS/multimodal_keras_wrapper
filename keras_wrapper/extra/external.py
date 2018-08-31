@@ -14,12 +14,13 @@ Proceedings of the 54th Annual Meeting of the Association for Computational Ling
 from __future__ import division, unicode_literals
 
 import sys
+import os
+import inspect
 import codecs
 import io
 import argparse
-import json
 import re
-from collections import defaultdict
+import warnings
 
 # hack for python2/3 compatibility
 from io import open
@@ -27,35 +28,70 @@ argparse.open = open
 
 
 class BPE(object):
-    def __init__(self, codes, separator='@@', vocab=None, glossaries=None):
+
+    def __init__(self, codes, merges=-1, separator='@@', vocab=None, glossaries=None):
+
+        codes.seek(0)
+        offset = 1
 
         # check version information
         firstline = codes.readline()
         if firstline.startswith('#version:'):
             self.version = tuple([int(x) for x in re.sub(r'(\.0+)*$', '', firstline.split()[-1]).split(".")])
+            offset += 1
         else:
             self.version = (0, 1)
             codes.seek(0)
 
-        self.bpe_codes = [tuple(item.split()) for item in codes]
+        self.bpe_codes = [tuple(item.strip('\r\n ').split(' ')) for (n, item) in enumerate(codes) if
+                          (n < merges or merges == -1)]
+
+        for i, item in enumerate(self.bpe_codes):
+            if len(item) != 2:
+                sys.stderr.write('Error: invalid line {0} in BPE codes file: {1}\n'.format(i + offset, ' '.join(item)))
+                sys.stderr.write('The line should exist of exactly two subword units, separated by whitespace\n')
+                sys.exit(1)
 
         # some hacking to deal with duplicates (only consider first instance)
         self.bpe_codes = dict([(code, i) for (i, code) in reversed(list(enumerate(self.bpe_codes)))])
 
         self.bpe_codes_reverse = dict([(pair[0] + pair[1], pair) for pair, i in self.bpe_codes.items()])
-
         self.separator = separator
-
         self.vocab = vocab
 
         self.glossaries = glossaries if glossaries else []
 
         self.cache = {}
 
+    def process_line(self, line):
+        """segment line, dealing with leading and trailing whitespace"""
+
+        out = ""
+
+        leading_whitespace = len(line) - len(line.lstrip('\r\n '))
+        if leading_whitespace:
+            out += line[:leading_whitespace]
+
+        out += self.segment(line)
+
+        trailing_whitespace = len(line) - len(line.rstrip('\r\n '))
+        if trailing_whitespace and trailing_whitespace != len(line):
+            out += line[-trailing_whitespace:]
+
+        return out
+
     def segment(self, sentence):
         """segment single sentence (whitespace-tokenized string) with BPE encoding"""
+        segments = self.segment_tokens(sentence.strip('\r\n ').split(' '))
+        return ' '.join(segments)
+
+    def segment_tokens(self, tokens):
+        """segment a sequence of tokens with BPE encoding"""
         output = []
-        for word in sentence.split():
+        for word in tokens:
+            # eliminate double spaces
+            if not word:
+                continue
             new_word = [out for segment in self._isolate_glossaries(word)
                         for out in encode(segment,
                                           self.bpe_codes,
@@ -65,12 +101,11 @@ class BPE(object):
                                           self.version,
                                           self.cache,
                                           self.glossaries)]
-
             for item in new_word[:-1]:
                 output.append(item + self.separator)
             output.append(new_word[-1])
 
-        return ' '.join(output)
+        return output
 
     def _isolate_glossaries(self, word):
         word_segments = [word]
@@ -100,9 +135,10 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
     if orig in cache:
         return cache[orig]
 
-    if orig in glossaries:
-        cache[orig] = (orig,)
-        return orig,
+    for glossary in glossaries:
+        if re.match('^' + glossary + '$', orig):
+            cache[orig] = (orig,)
+            return (orig,)
 
     if version == (0, 1):
         word = tuple(orig) + ('</w>',)
@@ -128,7 +164,7 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
                 j = word.index(first, i)
                 new_word.extend(word[i:j])
                 i = j
-            except:
+            except Exception:
                 new_word.extend(word[i:])
                 break
 
@@ -218,7 +254,7 @@ def read_vocabulary(vocab_file, threshold):
     vocabulary = set()
 
     for line in vocab_file:
-        word, freq = line.split()
+        word, freq = line.strip('\r\n ').split(' ')
         freq = int(freq)
         if threshold is None or freq >= threshold:
             vocabulary.add(word)
@@ -235,9 +271,11 @@ def isolate_glossary(word, glossary):
     For example, if 'USA' is the glossary and '1934USABUSA' the word, the return value is:
         ['1934', 'USA', 'B', 'USA']
     """
-    if word == glossary or glossary not in word:
+    # regex equivalent of (if word == glossary or glossary not in word)
+    if re.match('^' + glossary + '$', word) or not re.search(glossary, word):
         return [word]
     else:
-        splits = word.split(glossary)
-        segments = [segment.strip() for split in splits[:-1] for segment in [split, glossary] if segment != '']
-        return segments + [splits[-1].strip()] if splits[-1] != '' else segments
+        splits = re.split(glossary, word)
+        segments = [segment.strip('\r\n ') for (n_split, split) in enumerate(splits[:-1]) for segment in
+                    [split, re.findall(glossary, word)[n_split]] if segment != '']
+        return segments + [splits[-1].strip('\r\n ')] if splits[-1] != '' else segments

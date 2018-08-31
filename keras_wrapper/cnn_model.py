@@ -1,35 +1,41 @@
-import cPickle as pk
-import copy
+# -*- coding: utf-8 -*-
+from __future__ import print_function
+
 import math
 import shutil
 import sys
 import time
 
-import cloud.serialization.cloudpickle as cloudpk
+if sys.version_info.major == 3:
+    import _pickle as pk
+else:
+    import cPickle as pk
+import cloudpickle as cloudpk
 import matplotlib as mpl
-
 import keras
-from keras import backend as K
-from keras.applications.vgg19 import VGG19
 from keras.engine.training import Model
-from keras.layers import Convolution2D, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Deconvolution2D
-from keras.layers import merge, Dense, Dropout, Flatten, Input, Activation, BatchNormalization
+from keras.layers import concatenate, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Dense, Dropout, Flatten, Input, \
+    Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json, load_model
 from keras.optimizers import *
 from keras.regularizers import l2
-from keras.utils import np_utils
 from keras.utils.layer_utils import print_summary
-from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator
+from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator, Parallel_Data_Batch_Generator
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
-    decode_predictions_beam_search, replace_unknown_words, sample, sampling
+    decode_predictions_beam_search, replace_unknown_words, sample, sampling, categorical_probas_to_classes, checkParameters
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
+    from keras.layers import Convolution2D as Conv2D
+    from keras.layers import Deconvolution2D as Conv2DTranspose
 else:
     from keras.layers import Concatenate
+    from keras.layers import Conv2D
+    from keras.layers import Conv2DTranspose
+
 mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 
@@ -76,11 +82,12 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
 
     # Create models dir
     if not os.path.isdir(path):
-        os.makedirs(os.path.dirname(path))
+        if not os.path.isdir(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
 
     try:  # Try to save model at one time
         model_wrapper.model.save(model_name + '.h5')
-    except Exception as e: # Split saving in model structure / weights
+    except Exception as e:  # Split saving in model structure / weights
         logging.info(str(e))
         # Save model structure
         json_string = model_wrapper.model.to_json()
@@ -111,7 +118,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logging.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile=False):
+def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile_model=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -139,7 +146,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
     try:
         logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
-        model = load_model(model_name + '.h5', compile=compile)
+        model = load_model(model_name + '.h5', custom_objects=custom_objects, compile=compile_model)
     except Exception as e:
         logging.info(str(e))
         # Load model structure
@@ -149,7 +156,9 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         model.load_weights(model_name + '_weights.h5')
 
     # Load auxiliary models for optimized search
-    if os.path.exists(model_name + '_structure_init.json') and os.path.exists(model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and os.path.exists(model_name + '_weights_next.h5'):
+    if os.path.exists(model_name + '_structure_init.json') and os.path.exists(
+            model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and os.path.exists(
+            model_name + '_weights_next.h5'):
         loaded_optimized = True
     else:
         loaded_optimized = False
@@ -170,10 +179,17 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
 
     # Load Model_Wrapper information
     try:
-        model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
-    except:  # backwards compatibility
+        if sys.version_info.major == 3:
+            model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'), encoding='latin1')
+        else:
+            model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
+    except Exception as e:
         # try:
-        model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
+        logging.info(str(e))
+        if sys.version_info.major == 3:
+            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'), encoding='latin1')
+        else:
+            model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
         # except:
         #    raise Exception(ValueError)
 
@@ -192,7 +208,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     return model_wrapper
 
 
-def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile=False):
+def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile_model=False):
     """
     Loads a the weights from files to a Model_Wrapper object.
 
@@ -258,10 +274,10 @@ def transferWeights(old_model, new_model, layers_mapping):
 
     logging.info("<<< Transferring weights from models. >>>")
 
-    old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(old_model.model.layers)])
-    new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in enumerate(new_model.model.layers)])
+    old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in list(enumerate(old_model.model.layers))])
+    new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in list(enumerate(new_model.model.layers))])
 
-    for lold, lnew in layers_mapping.iteritems():
+    for lold, lnew in iteritems(layers_mapping):
         # Check if layers exist in both models
         if lold in old_layer_dict and lnew in new_layer_dict:
 
@@ -272,29 +288,29 @@ def transferWeights(old_model, new_model, layers_mapping):
             # Find weight sizes matchings for each layer (without repetitions)
             new_shapes = [w.shape for w in new]
             mapping_weights = dict()
-            for pos_old, wo in enumerate(old):
+            for pos_old, wo in list(enumerate(old)):
                 old_shape = wo.shape
                 indices = [i for i, shp in enumerate(new_shapes) if shp == old_shape]
                 if indices:
                     for ind in indices:
-                        if ind not in mapping_weights.keys():
+                        if ind not in list(mapping_weights):
                             mapping_weights[ind] = pos_old
                             break
 
             # Alert for any weight matrix not inserted to new model
-            for pos_old, wo in enumerate(old):
-                if pos_old not in mapping_weights.values():
+            for pos_old, wo in list(enumerate(old)):
+                if pos_old not in list(mapping_weights.values()):
                     logging.info('  Pre-trained weight matrix of layer "' + lold +
                                  '" with dimensions ' + str(wo.shape) + ' can not be inserted to new model.')
 
             # Alert for any weight matrix not modified
-            for pos_new, wn in enumerate(new):
-                if pos_new not in mapping_weights.keys():
+            for pos_new, wn in list(enumerate(new)):
+                if pos_new not in list(mapping_weights):
                     logging.info('  New model weight matrix of layer "' + lnew +
                                  '" with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
 
             # Transfer weights for each layer
-            for new_idx, old_idx in mapping_weights.iteritems():
+            for new_idx, old_idx in iteritems(mapping_weights):
                 new[new_idx] = old[old_idx]
             new_model.model.layers[new_layer_dict[lnew][1]].set_weights(new)
 
@@ -344,14 +360,14 @@ class Model_Wrapper(object):
             - Easy to use training and test methods.
     """
 
-    def __init__(self, nOutput=1000, type='basic_model', silence=False, input_shape=None,
+    def __init__(self, nOutput=1000, model_type='basic_model', silence=False, input_shape=None,
                  structure_path=None, weights_path=None, seq_to_functional=False,
                  model_name=None, plots_path=None, models_path=None, inheritance=False):
         """
             Model_Wrapper object constructor.
 
             :param nOutput: number of outputs of the network. Only valid if 'structure_path' is None.
-            :param type: network name type (corresponds to any method defined in the section 'MODELS' of this class).
+            :param model_type: network name type (corresponds to any method defined in the section 'MODELS' of this class).
                          Only valid if 'structure_path' is None.
             :param silence: set to True if you don't want the model to output informative messages
             :param input_shape: array with 3 integers which define the images' input shape [height, width, channels].
@@ -376,13 +392,14 @@ class Model_Wrapper(object):
                           'training_parameters', 'testing_parameters', 'training_state', 'loss', 'silence']
 
         self.silence = silence
-        self.net_type = type
+        self.net_type = model_type
         self.lr = 0.01  # insert default learning rate
         self.momentum = 1.0 - self.lr  # insert default momentum
-        self.loss = 'categorical_crossentropy'  # default loss function
+        self.loss = None  # default loss function
         self.training_parameters = []
         self.testing_parameters = []
         self.training_state = dict()
+        self._dynamic_display = True
 
         # Dictionary for storing any additional data needed
         self.additional_data = dict()
@@ -424,6 +441,12 @@ class Model_Wrapper(object):
         # Prepare logger
         self.updateLogger()
 
+        self.default_training_params = dict()
+        self.default_predict_with_beam_params = dict()
+        self.default_test_params = dict()
+
+        self.set_default_params()
+
         # Prepare model
         if not inheritance:
             # Set Network name
@@ -437,12 +460,12 @@ class Model_Wrapper(object):
 
             else:
                 # Build model from scratch
-                if hasattr(self, type):
+                if hasattr(self, model_type):
                     if not self.silence:
-                        logging.info("<<< Building " + type + " Model_Wrapper >>>")
-                    eval('self.' + type + '(nOutput, input_shape)')
+                        logging.info("<<< Building " + model_type + " Model_Wrapper >>>")
+                    eval('self.' + model_type + '(nOutput, input_shape)')
                 else:
-                    raise Exception('Model_Wrapper type "' + type + '" is not implemented.')
+                    raise Exception('Model_Wrapper model_type "' + model_type + '" is not implemented.')
 
             # Load weights from file
             if weights_path:
@@ -465,7 +488,124 @@ class Model_Wrapper(object):
                 if d not in self.__data_types:
                     self.__data_types.append(d)
 
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
+                                  sys.stdout.isatty()) or
+                                 'ipykernel' in sys.modules)
+
         self.__modes = ['train', 'val', 'test']
+
+
+    def set_default_params(self):
+        """
+        Sets the default params for training, decoding and testing a Model.
+
+        :return:
+        """
+        self.default_training_params = {'n_epochs': 1,
+                          'batch_size': 50,
+                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
+                          'homogeneous_batches': False,
+                          'joint_batches': 4,
+                          'epochs_for_save': 1,
+                          'num_iterations_val': None,
+                          'n_parallel_loaders': 1,
+                          'normalize': True,
+                          'normalization_type': '(-1)-1',
+                          'mean_substraction': False,
+                          'data_augmentation': True,
+                          'wo_da_patch_type': 'whole',  # wo_da_patch_type = 'central_crop' or 'whole'.
+                          'da_patch_type': 'resize_and_rndcrop',
+                          # da_patch_type = 'resize_and_rndcrop', 'rndcrop_and_resize' or 'resizekp_and_rndcrop'.
+                          'da_enhance_list': [],  # da_enhance_list = {brightness, color, sharpness, contrast}
+                          'verbose': 1, 'eval_on_sets': ['val'],
+                          'reload_epoch': 0,
+                          'extra_callbacks': [],
+                          'class_weights': None,
+                          'shuffle': True,
+                          'epoch_offset': 0,
+                          'patience': 0,
+                          'metric_check': None,
+                          'patience_check_split': 'val',
+                          'eval_on_epochs': True,
+                          'each_n_epochs': 1,
+                          'start_eval_on_epoch': 0,  # early stopping parameters
+                          'lr_decay': None,  # LR decay parameters
+                          'initial_lr': 1.,
+                          'reduce_each_epochs': True,
+                          'start_reduction_on_epoch': 0,
+                          'lr_gamma': 0.1,
+                          'lr_reducer_type': 'linear',
+                          'lr_reducer_exp_base': 0.5,
+                          'lr_half_life': 50000,
+                          'lr_warmup_exp': -1.5,
+                          'tensorboard': False,
+                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
+                                                 'histogram_freq': 0,
+                                                 'batch_size': 50,
+                                                 'write_graph': True,
+                                                 'write_grads': False,
+                                                 'write_images': False,
+                                                 'embeddings_freq': 0,
+                                                 'embeddings_layer_names': None,
+                                                 'embeddings_metadata': None,
+                                                 }
+                          }
+        self.defaut_test_params = {'batch_size': 50,
+                          'n_parallel_loaders': 1,
+                          'normalize': True,
+                          'normalization_type': None,
+                          'wo_da_patch_type': 'whole',
+                          'mean_substraction': False}
+        self.default_predict_with_beam_params = {'max_batch_size': 50,
+                          'n_parallel_loaders': 1,
+                          'beam_size': 5,
+                          'beam_batch_size': 50,
+                          'normalize': True,
+                          'normalization_type': None,
+                          'mean_substraction': False,
+                          'predict_on_sets': ['val'],
+                          'maxlen': 20,
+                          'n_samples': -1,
+                          'model_inputs': ['source_text', 'state_below'],
+                          'model_outputs': ['description'],
+                          'dataset_inputs': ['source_text', 'state_below'],
+                          'dataset_outputs': ['description'],
+                          'sampling_type': 'max_likelihood',
+                          'words_so_far': False,
+                          'optimized_search': False,
+                          'search_pruning': False,
+                          'pos_unk': False,
+                          'temporally_linked': False,
+                          'link_index_id': 'link_index',
+                          'state_below_index': -1,
+                          'state_below_maxlen': -1,
+                          'max_eval_samples': None,
+                          'normalize_probs': False,
+                          'alpha_factor': 0.0,
+                          'coverage_penalty': False,
+                          'length_penalty': False,
+                          'length_norm_factor': 0.0,
+                          'coverage_norm_factor': 0.0,
+                          'output_max_length_depending_on_x': False,
+                          'output_max_length_depending_on_x_factor': 3,
+                          'output_min_length_depending_on_x': False,
+                          'output_min_length_depending_on_x_factor': 2,
+                          'attend_on_output': False
+                          }
+        self.default_predict_params = {'batch_size': 50,
+                          'n_parallel_loaders': 1,
+                          'normalize': True,
+                          'normalization_type': '(-1)-1',
+                          'wo_da_patch_type': 'whole',
+                          'mean_substraction': False,
+                          'n_samples': None,
+                          'init_sample': -1,
+                          'final_sample': -1,
+                          'verbose': 1,
+                          'predict_on_sets': ['val'],
+                          'max_eval_samples': None,
+                          'model_name': 'model',  # name of the attribute where the model for prediction is stored
+                          }
 
     def setInputsMapping(self, inputsMapping):
         """
@@ -490,12 +630,13 @@ class Model_Wrapper(object):
             :param acc_output: name of the model's output that will be used for calculating
                               the accuracy of the model (only needed for Graph models)
         """
-        if isinstance(self.model, Sequential) and len(outputsMapping.keys()) > 1:
+        if isinstance(self.model, Sequential) and len(list(outputsMapping)) > 1:
             raise Exception("When using Sequential models only one output can be provided in outputsMapping")
         self.outputsMapping = outputsMapping
         self.acc_output = acc_output
 
-    def setOptimizer(self, lr=None, momentum=None, loss=None, loss_weights=None, metrics=None, epsilon=1e-8,
+    def setOptimizer(self, lr=None, momentum=None, loss='categorical_crossentropy', loss_weights=None, metrics=None,
+                     epsilon=1e-8,
                      nesterov=True, decay=0.0, clipnorm=10., clipvalue=0., optimizer=None, sample_weight_mode=None,
                      tf_optimizer=True):
         """
@@ -524,10 +665,7 @@ class Model_Wrapper(object):
             momentum = self.momentum
         else:
             self.momentum = momentum
-        if loss is None:
-            loss = self.loss
-        else:
-            self.loss = loss
+        self.loss = loss
         if metrics is None:
             metrics = []
         if tf_optimizer and K.backend() == 'tensorflow':
@@ -635,30 +773,6 @@ class Model_Wrapper(object):
     def setParams(self, params):
         self.params = params
 
-    @staticmethod
-    def checkParameters(input_params, default_params):
-        """
-            Validates a set of input parameters and uses the default ones if not specified.
-        """
-        valid_params = [key for key in default_params]
-        params = dict()
-
-        # Check input parameters' validity
-        for key, val in input_params.iteritems():
-            if key in valid_params:
-                params[key] = val
-            else:
-                raise Exception("Parameter '" + key + "' is not a valid parameter.")
-
-        # Use default parameters if not provided
-        for key, default_val in default_params.iteritems():
-            if key not in params:
-                params[key] = default_val
-
-        if 'n_parallel_loaders' in params and params['n_parallel_loaders'] > 1:
-            logging.info('WARNING: parallel loaders are not implemented')
-
-        return params
 
     # ------------------------------------------------------- #
     #       MODEL MODIFICATION
@@ -752,52 +866,9 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
         if parameters is None:
             parameters = dict()
-        default_params = {'n_epochs': 1,
-                          'batch_size': 50,
-                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
-                          'homogeneous_batches': False,
-                          'joint_batches': 4,
-                          'epochs_for_save': 1,
-                          'num_iterations_val': None,
-                          'n_parallel_loaders': 8,
-                          'normalize': True,
-                          'normalization_type': '(-1)-1',
-                          'mean_substraction': False,
-                          'data_augmentation': True,
-                          'verbose': 1, 'eval_on_sets': ['val'],
-                          'reload_epoch': 0,
-                          'extra_callbacks': [],
-                          'class_weights': None,
-                          'shuffle': True,
-                          'epoch_offset': 0,
-                          'patience': 0,
-                          'metric_check': None,
-                          'patience_check_split': 'val',
-                          'eval_on_epochs': True,
-                          'each_n_epochs': 1,
-                          'start_eval_on_epoch': 0,  # early stopping parameters
-                          'lr_decay': None,  # LR decay parameters
-                          'reduce_each_epochs': True,
-                          'start_reduction_on_epoch': 0,
-                          'lr_gamma': 0.1,
-                          'lr_reducer_type': 'linear',
-                          'lr_reducer_exp_base': 0.5,
-                          'lr_half_life': 50000,
-                          'tensorboard': False,
-                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
-                                                 'histogram_freq': 0,
-                                                 'batch_size': 50,
-                                                 'write_graph': True,
-                                                 'write_grads': False,
-                                                 'write_images': False,
-                                                 'embeddings_freq': 0,
-                                                 'embeddings_layer_names': None,
-                                                 'embeddings_metadata': None,
-                                                 }
-                          }
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_training_params, hard_check=True)
         # Set params['start_reduction_on_epoch'] = params['lr_decay'] by default
-        if params['lr_decay'] is not None and 'start_reduction_on_epoch' not in parameters.keys():
+        if params['lr_decay'] is not None and 'start_reduction_on_epoch' not in list(parameters):
             params['start_reduction_on_epoch'] = params['lr_decay']
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
@@ -832,52 +903,7 @@ class Model_Wrapper(object):
         # Check input parameters and recover default values if needed
         if parameters is None:
             parameters = dict()
-        default_params = {'n_epochs': 1,
-                          'batch_size': 50,
-                          'maxlen': 100,  # sequence learning parameters (BeamSearch)
-                          'homogeneous_batches': False,
-                          'joint_batches': 4,
-                          'epochs_for_save': 1,
-                          'num_iterations_val': None,
-                          'n_parallel_loaders': 8,
-                          'normalize': False,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'data_augmentation': True,
-                          'verbose': 1,
-                          'eval_on_sets': ['val'],
-                          'reload_epoch': 0,
-                          'extra_callbacks': [],
-                          'shuffle': True,
-                          'epoch_offset': 0,
-                          'patience': 0,
-                          'metric_check': None,
-                          'eval_on_epochs': True,
-                          'each_n_epochs': 1,
-                          'start_eval_on_epoch': 0,  # early stopping parameters
-                          'lr_decay': None,  # LR decay parameters
-                          'reduce_each_epochs': True,
-                          'start_reduction_on_epoch': 0,
-                          'lr_gamma': 0.1,
-                          'lr_reducer_type': 'linear',
-                          'lr_reducer_exp_base': 0.5,
-                          'lr_half_life': 50000,
-                          'tensorboard': False,
-                          'tensorboard_params': {'log_dir': 'tensorboard_logs',
-                                                 'histogram_freq': 0,
-                                                 'batch_size': 50,
-                                                 'write_graph': True,
-                                                 'write_grads': False,
-                                                 'write_images': False,
-                                                 'embeddings_freq': 0,
-                                                 'embeddings_layer_names': None,
-                                                 'embeddings_metadata': None,
-                                                 'label_word_embeddings_with_vocab': False,
-                                                 'word_embeddings_labels': None
-                                                 }
-
-                          }
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_training_params, hard_check=True)
         save_params = copy.copy(params)
         del save_params['extra_callbacks']
         self.training_parameters.append(save_params)
@@ -904,12 +930,14 @@ class Model_Wrapper(object):
 
         # LR reducer
         if params.get('lr_decay') is not None:
-            callback_lr_reducer = LearningRateReducer(reduce_rate=params['lr_gamma'],
+            callback_lr_reducer = LearningRateReducer(initial_lr=params['initial_lr'],
+                                                      reduce_rate=params['lr_gamma'],
                                                       reduce_frequency=params['lr_decay'],
                                                       reduce_each_epochs=params['reduce_each_epochs'],
                                                       start_reduction_on_epoch=params['start_reduction_on_epoch'],
                                                       exp_base=params['lr_reducer_exp_base'],
                                                       half_life=params['lr_half_life'],
+                                                      warmup_exp=params['lr_warmup_exp'],
                                                       reduction_function=params['lr_reducer_type'],
                                                       verbose=params['verbose'])
             callbacks.append(callback_lr_reducer)
@@ -928,7 +956,7 @@ class Model_Wrapper(object):
         # Store model
         if params['epochs_for_save'] >= 0:
             callback_store_model = StoreModelWeightsOnEpochEnd(self, saveModel, params['epochs_for_save'])
-            callbacks.append(callback_store_model)
+            callbacks.insert(0, callback_store_model)
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
@@ -937,18 +965,13 @@ class Model_Wrapper(object):
             if params['tensorboard_params']['label_word_embeddings_with_vocab'] \
                     and params['tensorboard_params']['word_embeddings_labels'] is not None:
                 embeddings_metadata = {}
-                assert len(params['tensorboard_params']['embeddings_layer_names']) \
-                       == len(params['tensorboard_params'][
-                                  'word_embeddings_labels']), 'The number of "embeddings_layer_names" and ' \
-                                                              '"word_embeddings_labels" do not match. Currently, ' \
-                                                              'we have %d "embeddings_layer_names" and %d' \
-                                                              ' "word_embeddings_labels"' % (
-                                                                  len(params['tensorboard_params'][
-                                                                          'embeddings_layer_names']),
-                                                                  len(params['tensorboard_params'][
-                                                                          'word_embeddings_labels']))
+                if len(params['tensorboard_params']['embeddings_layer_names']) != len(params['tensorboard_params']['word_embeddings_labels']):
+                    raise AssertionError('The number of "embeddings_layer_names" and "word_embeddings_labels" do not match. Currently, '
+                                         'we have %d "embeddings_layer_names" and %d "word_embeddings_labels"' %
+                                         (len(params['tensorboard_params']['embeddings_layer_names']),
+                                          len(params['tensorboard_params']['word_embeddings_labels'])))
                 # Prepare word embeddings mapping
-                for i, layer_name in enumerate(params['tensorboard_params']['embeddings_layer_names']):
+                for i, layer_name in list(enumerate(params['tensorboard_params']['embeddings_layer_names'])):
                     layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
                     mapping_name = layer_label + '.tsv'
                     dict2file(ds.vocabulary[layer_label]['words2idx'],
@@ -980,7 +1003,25 @@ class Model_Wrapper(object):
                                                          normalization=params['normalize'],
                                                          normalization_type=params['normalization_type'],
                                                          data_augmentation=params['data_augmentation'],
+                                                         wo_da_patch_type=params['wo_da_patch_type'],
+                                                         da_patch_type=params['da_patch_type'],
+                                                         da_enhance_list=params['da_enhance_list'],
                                                          mean_substraction=params['mean_substraction']).generator()
+        elif params['n_parallel_loaders'] > 1:
+            train_gen = Parallel_Data_Batch_Generator('train',
+                                                      self,
+                                                      ds,
+                                                      state['n_iterations_per_epoch'],
+                                                      batch_size=params['batch_size'],
+                                                      normalization=params['normalize'],
+                                                      normalization_type=params['normalization_type'],
+                                                      data_augmentation=params['data_augmentation'],
+                                                      wo_da_patch_type=params['wo_da_patch_type'],
+                                                      da_patch_type=params['da_patch_type'],
+                                                      da_enhance_list=params['da_enhance_list'],
+                                                      mean_substraction=params['mean_substraction'],
+                                                      shuffle=params['shuffle'],
+                                                      n_parallel_loaders=params['n_parallel_loaders']).generator()
         else:
             train_gen = Data_Batch_Generator('train',
                                              self,
@@ -990,24 +1031,38 @@ class Model_Wrapper(object):
                                              normalization=params['normalize'],
                                              normalization_type=params['normalization_type'],
                                              data_augmentation=params['data_augmentation'],
+                                             wo_da_patch_type=params['wo_da_patch_type'],
+                                             da_patch_type=params['da_patch_type'],
+                                             da_enhance_list=params['da_enhance_list'],
                                              mean_substraction=params['mean_substraction'],
                                              shuffle=params['shuffle']).generator()
 
         # Are we going to validate on 'val' data?
-        if 'val' in params['eval_on_sets']:
+        if False:  # TODO: loss calculation on val set is deactivated
+            # if 'val' in params['eval_on_sets']:
             # Calculate how many validation iterations are we going to perform per test
             n_valid_samples = ds.len_val
             if params['num_iterations_val'] is None:
                 params['num_iterations_val'] = int(math.ceil(float(n_valid_samples) / params['batch_size']))
 
             # prepare data generator
-            val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
-                                           batch_size=params['batch_size'],
-                                           normalization=params['normalize'],
-                                           normalization_type=params['normalization_type'],
-                                           data_augmentation=False,
-                                           mean_substraction=params['mean_substraction'],
-                                           shuffle=False).generator()
+            if params['n_parallel_loaders'] > 1:
+                val_gen = Parallel_Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+                                                        batch_size=params['batch_size'],
+                                                        normalization=params['normalize'],
+                                                        normalization_type=params['normalization_type'],
+                                                        data_augmentation=False,
+                                                        mean_substraction=params['mean_substraction'],
+                                                        shuffle=False,
+                                                        n_parallel_loaders=params['n_parallel_loaders']).generator()
+            else:
+                val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+                                               batch_size=params['batch_size'],
+                                               normalization=params['normalize'],
+                                               normalization_type=params['normalization_type'],
+                                               data_augmentation=False,
+                                               mean_substraction=params['mean_substraction'],
+                                               shuffle=False).generator()
         else:
             val_gen = None
             n_valid_samples = None
@@ -1054,12 +1109,14 @@ class Model_Wrapper(object):
 
         # LR reducer
         if params.get('lr_decay') is not None:
-            callback_lr_reducer = LearningRateReducer(reduce_rate=params['lr_gamma'],
+            callback_lr_reducer = LearningRateReducer(initial_lr=params['initial_lr'],
+                                                      reduce_rate=params['lr_gamma'],
                                                       reduce_frequency=params['lr_decay'],
                                                       reduce_each_epochs=params['reduce_each_epochs'],
                                                       start_reduction_on_epoch=params['start_reduction_on_epoch'],
                                                       exp_base=params['lr_reducer_exp_base'],
                                                       half_life=params['lr_half_life'],
+                                                      warmup_exp=params['lr_warmup_exp'],
                                                       reduction_function=params['lr_reducer_type'],
                                                       verbose=params['verbose'])
             callbacks.append(callback_lr_reducer)
@@ -1097,7 +1154,7 @@ class Model_Wrapper(object):
         # Train model
         self.model.fit(x,
                        y,
-                       batch_size=min(params['batch_size'], len(x)),
+                       batch_size=min(params['batch_size'], len(x[0])),
                        epochs=params['n_epochs'],
                        verbose=params['verbose'],
                        callbacks=callbacks,
@@ -1111,12 +1168,7 @@ class Model_Wrapper(object):
     def testNet(self, ds, parameters, out_name=None):
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'mean_substraction': False}
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.defaut_test_params)
         self.testing_parameters.append(copy.copy(params))
 
         logging.info("<<< Testing model >>>")
@@ -1127,12 +1179,23 @@ class Model_Wrapper(object):
 
         # Test model
         # We won't use an Homogeneous_Batch_Generator for testing
-        data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
-                                        batch_size=params['batch_size'],
-                                        normalization=params['normalize'],
-                                        normalization_type=params['normalization_type'],
-                                        data_augmentation=False,
-                                        mean_substraction=params['mean_substraction']).generator()
+        if params['n_parallel_loaders'] > 1:
+            data_gen = Parallel_Data_Batch_Generator('test', self, ds, num_iterations,
+                                                     batch_size=params['batch_size'],
+                                                     normalization=params['normalize'],
+                                                     normalization_type=params['normalization_type'],
+                                                     data_augmentation=False,
+                                                     wo_da_patch_type=params['wo_da_patch_type'],
+                                                     mean_substraction=params['mean_substraction'],
+                                                     n_parallel_loaders=params['n_parallel_loaders']).generator()
+        else:
+            data_gen = Data_Batch_Generator('test', self, ds, num_iterations,
+                                            batch_size=params['batch_size'],
+                                            normalization=params['normalize'],
+                                            normalization_type=params['normalization_type'],
+                                            data_augmentation=False,
+                                            wo_da_patch_type=params['wo_da_patch_type'],
+                                            mean_substraction=params['mean_substraction']).generator()
 
         out = self.model.evaluate_generator(data_gen,
                                             val_samples=n_samples,
@@ -1224,6 +1287,7 @@ class Model_Wrapper(object):
                 in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             else:
                 in_data[model_input] = copy.copy(X[model_input])
+
         in_data[params['model_inputs'][params['state_below_index']]] = states_below
         ##########################################
         # Recover output identifiers
@@ -1231,6 +1295,7 @@ class Model_Wrapper(object):
         # in any case, the first output of the models must be the next words' probabilities
         output_ids_list = params['model_outputs']
         pick_idx = ii
+
         ##########################################
         # Apply prediction on current timestep
         ##########################################
@@ -1239,7 +1304,7 @@ class Model_Wrapper(object):
         else:  # It is possible that the model inputs don't fit into one single batch: Make one-sample-sized batches
             for i in range(n_samples):
                 aux_in_data = {}
-                for k, v in in_data.iteritems():
+                for k, v in iteritems(in_data):
                     aux_in_data[k] = np.expand_dims(v[i], axis=0)
                 predicted_out = model.predict_on_batch(aux_in_data)
                 if i == 0:
@@ -1297,45 +1362,54 @@ class Model_Wrapper(object):
         # Get inputs
         ##########################################
         if ii > 1:  # timestep > 1 (model_next to model_next)
-            for idx, next_out_name in enumerate(self.ids_outputs_next):
+            for idx, next_out_name in list(enumerate(self.ids_outputs_next)):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params[
-                        'pad_on_batch'] else states_below
+                    if params.get('attend_on_output', False):
+                        if params.get('pad_on_batch', True):
+                            pass
+                    else:
+                        if params.get('pad_on_batch', True):
+                            states_below = states_below[:, -1].reshape(n_samples, -1)
+                    in_data[self.ids_inputs_next[0]] = states_below
                 if idx > 0:  # first output must be the output probs.
-                    if next_out_name in self.matchings_next_to_next.keys():
+                    if next_out_name in list(self.matchings_next_to_next):
                         next_in_name = self.matchings_next_to_next[next_out_name]
                         if prev_out[idx].shape[0] == 1:
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
         elif ii == 0:  # first timestep
-            for model_input in params['model_inputs']:  # [:-1]:
+            for model_input in params['model_inputs']:
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
                 else:
                     in_data[model_input] = copy.copy(X[model_input])
-            in_data[params['model_inputs'][params['state_below_index']]] = states_below.reshape(n_samples, -1) if \
-                params['pad_on_batch'] else states_below
+                if params.get('pad_on_batch', True):
+                    states_below = states_below.reshape(n_samples, -1)
+            in_data[params['model_inputs'][params['state_below_index']]] = states_below
+
         elif ii == 1:  # timestep == 1 (model_init to model_next)
-            for idx, init_out_name in enumerate(self.ids_outputs_init):
+            for idx, init_out_name in list(enumerate(self.ids_outputs_init)):
                 if idx == 0:
-                    in_data[self.ids_inputs_next[0]] = states_below[:, -1].reshape(n_samples, -1) if params[
-                        'pad_on_batch'] else states_below
+                    if params.get('attend_on_output', False):
+                        if params.get('pad_on_batch', True):
+                            pass
+                    else:
+                        if params.get('pad_on_batch', True):
+                            states_below = states_below[:, -1].reshape(n_samples, -1)
+                    in_data[self.ids_inputs_next[0]] = states_below
+
                 if idx > 0:  # first output must be the output probs.
-                    if init_out_name in self.matchings_init_to_next.keys():
+                    if init_out_name in list(self.matchings_init_to_next):
                         next_in_name = self.matchings_init_to_next[init_out_name]
                         if prev_out[idx].shape[0] == 1:
                             prev_out[idx] = np.repeat(prev_out[idx], n_samples, axis=0)
                         in_data[next_in_name] = prev_out[idx]
 
-        if debug:
-            for kk, v in in_data.iteritems():
-                print 'len ' + kk + '', len(v)
-
         ##########################################
         # Recover output identifiers
         ##########################################
         # in any case, the first output of the models must be the next words' probabilities
-        pick_idx = 0
+        pick_idx = ii if params.get('attend_on_output', False) else 0
         if ii == 0:  # optimized search model (model_init case)
             output_ids_list = self.ids_outputs_init
         else:  # optimized search model (model_next case)
@@ -1349,21 +1423,12 @@ class Model_Wrapper(object):
         else:
             # It is possible that the model inputs don't fit into one single batch:
             #  Make beam_batch_size-sample-sized batches
-            if debug:
-                print 'n_samples', n_samples
-                print 'beam_batch_size', params['beam_batch_size']
             for i in range(0, n_samples, params['beam_batch_size']):
                 aux_in_data = {}
-                for k, v in in_data.iteritems():
+                for k, v in iteritems(in_data):
                     max_pos = min([i + params['beam_batch_size'], n_samples, len(v)])
-                    if debug:
-                        print k
-                        print 'len', len(v)
-                        print 'picked', len(range(i, max_pos))
                     aux_in_data[k] = v[i:max_pos]
                     # aux_in_data[k] = np.expand_dims(v[i], axis=0)
-                if debug:
-                    print 'predicting...'
                 predicted_out = model.predict_on_batch(aux_in_data)
                 if i == 0:
                     out_data = predicted_out
@@ -1377,7 +1442,6 @@ class Model_Wrapper(object):
         ##########################################
         # Get outputs
         ##########################################
-
         if len(output_ids_list) > 1:
             all_data = {}
             for output_id in range(len(output_ids_list)):
@@ -1391,243 +1455,6 @@ class Model_Wrapper(object):
         # Define returned data
         ##########################################
         return [probs, out_data]
-
-        #    def beam_search(self, X, params, null_sym=2, debug=False):
-
-    def beam_search_NEW(self, X, params, null_sym=2, debug=False):
-        """
-        Beam search method for Cond models.
-        (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
-        The algorithm in a nutshell does the following:
-
-        1. k = beam_size
-        2. open_nodes = [[]] * k
-        3. while k > 0:
-
-            3.1. Given the inputs, get (log) probabilities for the outputs.
-
-            3.2. Expand each open node with all possible output.
-
-            3.3. Prune and keep the k best nodes.
-
-            3.4. If a sample has reached the <eos> symbol:
-
-                3.4.1. Mark it as final sample.
-
-                3.4.2. k -= 1
-
-            3.5. Build new inputs (state_below) and go to 1.
-
-        4. return final_samples, final_scores
-
-        :param debug:
-        :param X: Model inputs
-        :param params: Search parameters
-        :param null_sym: <null> symbol
-        :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
-        """
-        n_samples_batch = len(X[params['model_inputs'][0]])
-        sample_identifier_prediction = [[i] for i in range(n_samples_batch)]
-
-        k = params['beam_size']
-        samples = [[] for _ in range(n_samples_batch)]
-        sample_scores = [[] for _ in range(n_samples_batch)]
-        pad_on_batch = params['pad_on_batch']
-        dead_k = [0] * n_samples_batch  # samples that reached eos
-        live_k = [1] * n_samples_batch  # samples that did not yet reach eos
-        all_live_k = sum(live_k)
-        hyp_samples = [[[]] for _ in range(n_samples_batch)]
-        hyp_scores = [np.zeros(1).astype('float32') for _ in range(n_samples_batch)]
-        if params['pos_unk']:
-            sample_alphas = [[] for _ in range(n_samples_batch)]
-            hyp_alphas = [[[]] for _ in range(n_samples_batch)]
-
-        # Create 'X_next' for initial step
-        X_next = dict()
-        for model_input in params['model_inputs']:
-            X_next[model_input] = []
-            for i_sample, live in enumerate(live_k):
-                if debug:
-                    print 'repeating X live', live
-                X_next[model_input].append(np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), 1, axis=0))
-            X_next[model_input] = np.concatenate(X_next[model_input])
-            if debug:
-                print
-
-        # Create 'state_below' for initial step
-        # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
-        if params['words_so_far']:
-            if k > params['maxlen']:
-                raise NotImplementedError(
-                    "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
-            state_below = np.asarray([[null_sym]] * all_live_k) if pad_on_batch else np.asarray(
-                [np.zeros((params['maxlen'], params['maxlen']))] * all_live_k)
-        else:
-            state_below = np.asarray([null_sym] * all_live_k) if pad_on_batch else np.asarray(
-                [np.zeros(params['maxlen'])] * all_live_k)
-
-        prev_out_next = None
-        for ii in xrange(params['maxlen']):
-
-            # PREDICT
-            if debug:
-                print 'predicting step', ii
-                for kk, v in X_next.iteritems():
-                    print 'len ' + kk + '', len(v)
-
-            # for every possible live sample calc prob for every possible label
-            if params['optimized_search']:  # use optimized search model if available
-                [probs_all, prev_out] = self.predict_cond_optimized(X_next, state_below, params, ii, prev_out_next,
-                                                                    debug=debug)
-                if params['pos_unk']:
-                    alphas_all = prev_out[-1][0]  # Shape: (k, n_steps)
-                    prev_out = prev_out[:-1]
-            else:
-                probs_all = self.predict_cond(X_next, state_below, params, ii)
-
-            # SCORE
-            state_below = []
-            if params['optimized_search']:
-                prev_out_new = [[] for _ in prev_out]
-            for pos_sample, sample_identifier in enumerate(
-                    sample_identifier_prediction):  # process one sample at a time
-
-                # Only continue if not all beam subsamples are dead for the current sample
-                if dead_k[pos_sample] < k:
-                    # select information only for the current sample
-                    probs = probs_all[sample_identifier]
-                    if params['pos_unk']:
-                        alphas = alphas_all[sample_identifier]
-
-                    # total score for every sample is sum of -log of word prb
-                    cand_scores = np.array(hyp_scores[pos_sample])[:, None] - np.log(probs)
-                    cand_flat = cand_scores.flatten()
-                    # Find the best options by calling argsort of flatten array
-                    ranks_flat = cand_flat.argsort()[:(k - dead_k[pos_sample])]
-                    # Decypher flatten indices
-                    voc_size = probs.shape[1]
-                    trans_indices = ranks_flat / voc_size  # index of row
-                    word_indices = ranks_flat % voc_size  # index of col
-                    costs = cand_flat[ranks_flat]
-                    # Form a beam for the next iteration
-                    new_hyp_samples = []
-                    new_trans_indices = []
-                    new_hyp_scores = np.zeros(k - dead_k[pos_sample]).astype('float32')
-                    if params['pos_unk']:
-                        new_hyp_alphas = []
-                    for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
-                        new_hyp_samples.append(hyp_samples[pos_sample][ti] + [wi])
-                        new_trans_indices.append(ti)
-                        new_hyp_scores[idx] = copy.copy(costs[idx])
-                        if params['pos_unk']:
-                            new_hyp_alphas.append(hyp_alphas[pos_sample][ti] + [alphas[ti]])
-
-                    # check the finished samples
-                    new_live_k = 0
-                    hyp_samples[pos_sample] = []
-                    hyp_scores[pos_sample] = []
-                    if params['pos_unk']:
-                        hyp_alphas[pos_sample] = []
-                    indices_alive = []
-                    for idx in xrange(len(new_hyp_samples)):
-                        if new_hyp_samples[idx][-1] == 0:  # finished sample
-                            samples[pos_sample].append(new_hyp_samples[idx])
-                            sample_scores[pos_sample].append(new_hyp_scores[idx])
-                            if params['pos_unk']:
-                                sample_alphas[pos_sample].append(new_hyp_alphas[idx])
-                            dead_k[pos_sample] += 1
-                        else:
-                            indices_alive.append(new_trans_indices[idx])
-                            new_live_k += 1
-                            hyp_samples[pos_sample].append(new_hyp_samples[idx])
-                            hyp_scores[pos_sample].append(new_hyp_scores[idx])
-                            if params['pos_unk']:
-                                hyp_alphas[pos_sample].append(new_hyp_alphas[idx])
-                    hyp_scores[pos_sample] = np.array(hyp_scores[pos_sample])
-                    live_k[pos_sample] = new_live_k
-
-                    if new_live_k > 0 and dead_k[pos_sample] < k:
-                        # convert chosen samples
-                        state_below.append(np.asarray(hyp_samples[pos_sample], dtype='int64'))
-
-                    # keep every remaining one
-                    if live_k[pos_sample] > 0 and params['optimized_search']:
-                        for idx_vars in range(len(prev_out)):
-                            these_indices = np.asarray(sample_identifier_prediction[pos_sample])[indices_alive]
-                            prev_out_new[idx_vars].append(np.asarray(prev_out[idx_vars][these_indices]))
-
-            # Stop when we do not have any more samples alive
-            if sum(live_k) == 0:
-                break
-
-            # Create 'X_next' for next step
-            X_next = dict()
-            for model_input in params['model_inputs']:
-                X_next[model_input] = []
-                for i_sample, live in enumerate(live_k):
-                    if debug:
-                        print 'repeating X live', live
-                    X_next[model_input].append(
-                        np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), live, axis=0))
-                X_next[model_input] = np.concatenate(X_next[model_input])
-                if debug:
-                    print
-
-            # Create 'state_below' for next step
-            state_below = np.concatenate(state_below)
-            # we must include an additional dimension if the input for each timestep are all the generated words so far
-            if pad_on_batch:
-                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
-                if params['words_so_far']:
-                    state_below = np.expand_dims(state_below, axis=0)
-            else:
-                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
-                                         np.zeros((state_below.shape[0],
-                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
-                                                  dtype='int64')))
-
-                if params['words_so_far']:
-                    state_below = np.expand_dims(state_below, axis=0)
-                    state_below = np.hstack((state_below,
-                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
-                                                       state_below.shape[2]))))
-
-            # Create 'prev_out_next' for next step
-            if params['optimized_search']:
-                for idx_vars in range(len(prev_out)):
-                    try:
-                        prev_out[idx_vars] = np.concatenate(prev_out_new[idx_vars])
-                    except Exception, e:
-                        print len(prev_out_new[idx_vars])
-                        print prev_out_new[idx_vars][0].shape
-                        print prev_out_new[idx_vars][1].shape
-                        print prev_out_new[idx_vars][2].shape
-                        print prev_out_new[idx_vars][-2].shape
-                        print prev_out_new[idx_vars][-1].shape
-                        print e
-                        raise Exception()
-
-                prev_out_next = prev_out
-
-            # Update 'sample_identifier_prediction'
-            sample_identifier_prediction = []
-            for i, live in zip(range(n_samples_batch), live_k):
-                num_up_to_here = sum(live_k[:i])
-                sample_identifier_prediction += [range(num_up_to_here, num_up_to_here + live)]
-
-        for pos_sample, sample_identifier in enumerate(sample_identifier_prediction):  # process one sample at a time
-            if live_k[pos_sample] > 0:
-                for idx in xrange(live_k[pos_sample]):
-                    samples[pos_sample].append(hyp_samples[pos_sample][idx])
-                    sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
-                    if params['pos_unk']:
-                        sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
-        if params['pos_unk']:
-            return samples, sample_scores, sample_alphas
-        else:
-            return samples, sample_scores
-
-            #    def beam_search_DEPRECATED(self, X, params, null_sym=2):
 
     def beam_search(self, X, params, return_alphas=False, eos_sym=0, null_sym=2):
         """
@@ -1681,8 +1508,8 @@ class Model_Wrapper(object):
                 len(X[params['dataset_inputs'][0]][0]) / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
                 params['output_min_length_depending_on_x'] else 0
         else:
-            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym)
-                         / params['output_min_length_depending_on_x_factor'] + 1e-7) if \
+            minlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) /
+                         params['output_min_length_depending_on_x_factor'] + 1e-7) if \
                 params['output_min_length_depending_on_x'] else 0
 
             maxlen = int(np.argmax(X[params['dataset_inputs'][0]][0] == eos_sym) * params[
@@ -1702,7 +1529,7 @@ class Model_Wrapper(object):
                 np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
         prev_out = None
 
-        for ii in xrange(maxlen):
+        for ii in range(maxlen):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
@@ -1721,7 +1548,7 @@ class Model_Wrapper(object):
             ranks_flat = cand_flat.argsort()[:(k - dead_k)]
             # Decypher flatten indices
             voc_size = log_probs.shape[1]
-            trans_indices = ranks_flat / voc_size  # index of row
+            trans_indices = ranks_flat // voc_size  # index of row
             word_indices = ranks_flat % voc_size  # index of col
             costs = cand_flat[ranks_flat]
             best_cost = costs[0]
@@ -1731,7 +1558,7 @@ class Model_Wrapper(object):
             new_hyp_scores = np.zeros(k - dead_k).astype('float32')
             if ret_alphas:
                 new_hyp_alphas = []
-            for idx, [ti, wi] in enumerate(zip(trans_indices, word_indices)):
+            for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
                 if params['search_pruning']:
                     if costs[idx] < k * best_cost:
                         new_hyp_samples.append(hyp_samples[ti] + [wi])
@@ -1753,7 +1580,7 @@ class Model_Wrapper(object):
             hyp_scores = []
             hyp_alphas = []
             indices_alive = []
-            for idx in xrange(len(new_hyp_samples)):
+            for idx in range(len(new_hyp_samples)):
                 if new_hyp_samples[idx][-1] == eos_sym:  # finished sample
                     samples.append(new_hyp_samples[idx])
                     sample_scores.append(new_hyp_scores[idx])
@@ -1794,7 +1621,7 @@ class Model_Wrapper(object):
 
         # dump every remaining one
         if live_k > 0:
-            for idx in xrange(live_k):
+            for idx in range(live_k):
                 samples.append(hyp_samples[idx])
                 sample_scores.append(hyp_scores[idx])
                 if ret_alphas:
@@ -1808,270 +1635,9 @@ class Model_Wrapper(object):
         """
         DEPRECATED, use predictBeamSearchNet() instead.
         """
-        print "WARNING!: deprecated function, use predictBeamSearchNet() instead"
+        logger.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet(ds, parameters)
 
-    def predictBeamSearchNet_NEW(self, ds, parameters=None):
-        """
-        Approximates by beam search the best predictions of the net on the dataset splits chosen.
-
-        The following attributes must be inserted to the model when building an optimized search model:
-
-            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
-            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
-            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
-            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
-                                the number of out variables must match the number of in variables)
-            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
-            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
-
-        The following attributes must be inserted to the model when building a temporally_linked model:
-
-            * matchings_sample_to_next_sample:
-            * ids_temporally_linked_inputs:
-
-        :param ds:
-        :param parameters:
-        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
-        """
-        if parameters is None:
-            parameters = dict()
-        # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
-                          'beam_size': 5,
-                          'beam_batch_size': 50,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'predict_on_sets': ['val'],
-                          'maxlen': 20,
-                          'n_samples': -1,
-                          'model_inputs': ['source_text', 'state_below'],
-                          'model_outputs': ['description'],
-                          'dataset_inputs': ['source_text', 'state_below'],
-                          'dataset_outputs': ['description'],
-                          'alpha_factor': 1.0,
-                          'sampling_type': 'max_likelihood',
-                          'words_so_far': False,
-                          'optimized_search': False,
-                          'search_pruning': False,
-                          'pos_unk': False,
-                          'temporally_linked': False,
-                          'link_index_id': 'link_index',
-                          'state_below_index': -1,
-                          'max_eval_samples': None,
-                          }
-        params = self.checkParameters(parameters, default_params)
-
-        # Check if the model is ready for applying an optimized search
-        if params['optimized_search']:
-            if 'matchings_init_to_next' not in dir(self) or \
-                            'matchings_next_to_next' not in dir(self) or \
-                            'ids_inputs_init' not in dir(self) or \
-                            'ids_outputs_init' not in dir(self) or \
-                            'ids_inputs_next' not in dir(self) or \
-                            'ids_outputs_next' not in dir(self):
-                raise Exception(
-                    "The following attributes must be inserted to the model when building an optimized search model:\n",
-                    "- matchings_init_to_next\n",
-                    "- matchings_next_to_next\n",
-                    "- ids_inputs_init\n",
-                    "- ids_outputs_init\n",
-                    "- ids_inputs_next\n",
-                    "- ids_outputs_next\n")
-
-        # Check if the model is ready for applying a temporally_linked search
-        if params['temporally_linked']:
-            if 'matchings_sample_to_next_sample' not in dir(self) or \
-                            'ids_temporally_linked_inputs' not in dir(self):
-                raise Exception(
-                    "The following attributes must be inserted to the model when building a temporally_linked model:\n",
-                    "- matchings_sample_to_next_sample\n",
-                    "- ids_temporally_linked_inputs\n")
-
-        predictions = dict()
-        references = []
-        sources_sampling = []
-        for s in params['predict_on_sets']:
-            print
-            logging.info("<<< Predicting outputs of " + s + " set >>>")
-
-            # TODO: enable 'train' sampling on temporally-linked models
-            if params['temporally_linked'] and s == 'train':
-                logging.info('Sampling is currently not implemented on the "train" set for temporally-linked models.')
-                data_gen = -1
-                data_gen_instance = -1
-            else:
-
-                assert len(params['model_inputs']) > 0, 'We need at least one input!'
-                if not params['optimized_search']:  # use optimized search model if available
-                    assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
-
-                params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
-                if params['temporally_linked']:
-                    previous_outputs = {}  # variable for storing previous outputs if using a temporally-linked model
-                    for input_id in self.ids_temporally_linked_inputs:
-                        previous_outputs[input_id] = dict()
-                        previous_outputs[input_id][-1] = [ds.extra_words['<null>']]
-
-                # Calculate how many iterations are we going to perform
-                if params['n_samples'] < 1:
-                    if params['max_eval_samples'] is not None:
-                        n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
-                    else:
-                        n_samples = eval("ds.len_" + s)
-                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
-                    n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
-
-                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                             batch_size=params['batch_size'],
-                                                             normalization=params['normalize'],
-                                                             normalization_type=params['normalization_type'],
-                                                             data_augmentation=False,
-                                                             mean_substraction=params['mean_substraction'],
-                                                             predict=True)
-                    data_gen = data_gen_instance.generator()
-                else:
-                    n_samples = params['n_samples']
-                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
-
-                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                             batch_size=params['batch_size'],
-                                                             normalization=params['normalize'],
-                                                             normalization_type=params['normalization_type'],
-                                                             data_augmentation=False,
-                                                             mean_substraction=params['mean_substraction'],
-                                                             predict=False,
-                                                             random_samples=n_samples,
-                                                             temporally_linked=params['temporally_linked'])
-                    data_gen = data_gen_instance.generator()
-
-                if params['n_samples'] > 0:
-                    references = []
-                    sources_sampling = []
-                best_samples = []
-                if params['pos_unk']:
-                    best_alphas = []
-                    sources = []
-
-                total_cost = 0
-                sampled = 0
-                start_time = time.time()
-                eta = -1
-                for _ in range(num_iterations):
-                    data = data_gen.next()
-                    X = dict()
-                    if params['n_samples'] > 0:
-                        s_dict = {}
-                        for input_id in params['model_inputs']:
-                            X[input_id] = data[0][input_id]
-                            s_dict[input_id] = X[input_id]
-                        sources_sampling.append(s_dict)
-
-                        Y = dict()
-                        for output_id in params['model_outputs']:
-                            Y[output_id] = data[1][output_id]
-                    else:
-                        s_dict = {}
-                        for input_id in params['model_inputs']:
-                            X[input_id] = data[input_id]
-                            if params['pos_unk']:
-                                s_dict[input_id] = X[input_id]
-                        if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
-                            sources.append(s_dict)
-
-                    # Count processed samples
-                    n_samples_batch = len(X[params['model_inputs'][0]])
-                    sys.stdout.write('\r')
-                    sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled + n_samples_batch, n_samples, int(eta)))
-                    sys.stdout.flush()
-                    x = dict()
-
-                    # Prepare data if using temporally-linked input
-                    for input_id in params['model_inputs']:
-                        if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
-                            for i in range(n_samples_batch):
-                                link = int(X[params['link_index_id']][i])
-                                if link not in previous_outputs[input_id].keys():
-                                    # input to current sample was not processed yet
-                                    link = -1
-                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
-                                          previous_outputs[input_id][link]]
-                                in_val = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
-                                                     ds.max_text_len[input_id][s],
-                                                     ds.text_offset[input_id],
-                                                     fill=ds.fill_text[input_id],
-                                                     pad_on_batch=ds.pad_on_batch[input_id],
-                                                     words_so_far=ds.words_so_far[input_id],
-                                                     loading_X=True)[0]
-                                if input_id in x.keys():
-                                    x[input_id] = np.concatenate((x[input_id], in_val))
-                                else:
-                                    x[input_id] = in_val
-                        else:
-                            x[input_id] = np.array(X[input_id])
-
-                    # Apply beam search
-                    samples_all, scores_all, alphas_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
-
-                    # Recover most probable output for each sample
-                    for i_sample in range(n_samples_batch):
-                        samples = samples_all[i_sample]
-                        scores = scores_all[i_sample]
-                        if params['pos_unk']:
-                            alphas = alphas_all[i_sample]
-
-                        if params['normalize']:
-                            counts = [len(sample) ** params['alpha_factor'] for sample in samples]
-                            scores = [co / cn for co, cn in zip(scores, counts)]
-                        best_score = np.argmin(scores)
-                        best_sample = samples[best_score]
-                        best_samples.append(best_sample)
-                        if params['pos_unk']:
-                            best_alphas.append(np.asarray(alphas[best_score]))
-                        total_cost += scores[best_score]
-                        eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) / (
-                            sampled + i_sample + 1)
-                        if params['n_samples'] > 0:
-                            for output_id in params['model_outputs']:
-                                references.append(Y[output_id][i_sample])
-
-                        # store outputs for temporally-linked models
-                        if params['temporally_linked']:
-                            first_idx = max(0, data_gen_instance.first_idx)
-                            # TODO: Make it more general
-                            for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
-                                # Get all words previous to the padding
-                                previous_outputs[input_id][first_idx + sampled + i_sample] = best_sample[:sum(
-                                    [int(elem > 0) for elem in best_sample])]
-
-                    sampled += n_samples_batch
-
-                sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
-                    total_cost, total_cost / n_samples))
-                sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
-                    time.time() - start_time) / n_samples))
-
-                sys.stdout.flush()
-
-                if params['pos_unk']:
-                    if eval('ds.loaded_raw_' + s + '[0]'):
-                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
-                                            stripfile=False)
-                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
-                else:
-                    predictions[s] = np.asarray(best_samples)
-        del data_gen
-        del data_gen_instance
-        if params['n_samples'] < 1:
-            return predictions
-        else:
-            return predictions, references, sources_sampling
-
-            #    def predictBeamSearchNet_DEPRECATED(self, ds, parameters={}):
 
     def predictBeamSearchNet(self, ds, parameters=None):
         """
@@ -2099,51 +1665,15 @@ class Model_Wrapper(object):
         if parameters is None:
             parameters = dict()
         # Check input parameters and recover default values if needed
-        default_params = {'max_batch_size': 50,
-                          'n_parallel_loaders': 8,
-                          'beam_size': 5,
-                          'beam_batch_size': 50,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'predict_on_sets': ['val'],
-                          'maxlen': 20,
-                          'n_samples': -1,
-                          'model_inputs': ['source_text', 'state_below'],
-                          'model_outputs': ['description'],
-                          'dataset_inputs': ['source_text', 'state_below'],
-                          'dataset_outputs': ['description'],
-                          'sampling_type': 'max_likelihood',
-                          'words_so_far': False,
-                          'optimized_search': False,
-                          'search_pruning': False,
-                          'pos_unk': False,
-                          'temporally_linked': False,
-                          'link_index_id': 'link_index',
-                          'state_below_index': -1,
-                          'state_below_maxlen': -1,
-                          'max_eval_samples': None,
-                          'normalize_probs': False,
-                          'alpha_factor': 0.0,
-                          'coverage_penalty': False,
-                          'length_penalty': False,
-                          'length_norm_factor': 0.0,
-                          'coverage_norm_factor': 0.0,
-                          'output_max_length_depending_on_x': False,
-                          'output_max_length_depending_on_x_factor': 3,
-                          'output_min_length_depending_on_x': False,
-                          'output_min_length_depending_on_x_factor': 2
-                          }
-
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_predict_with_beam_params)
         # Check if the model is ready for applying an optimized search
         if params['optimized_search']:
             if 'matchings_init_to_next' not in dir(self) or \
-                            'matchings_next_to_next' not in dir(self) or \
-                            'ids_inputs_init' not in dir(self) or \
-                            'ids_outputs_init' not in dir(self) or \
-                            'ids_inputs_next' not in dir(self) or \
-                            'ids_outputs_next' not in dir(self):
+                    'matchings_next_to_next' not in dir(self) or \
+                    'ids_inputs_init' not in dir(self) or \
+                    'ids_outputs_init' not in dir(self) or \
+                    'ids_inputs_next' not in dir(self) or \
+                    'ids_outputs_next' not in dir(self):
                 raise Exception(
                     "The following attributes must be inserted to the model when building an optimized search model:\n",
                     "- matchings_init_to_next\n",
@@ -2156,7 +1686,7 @@ class Model_Wrapper(object):
         # Check if the model is ready for applying a temporally_linked search
         if params['temporally_linked']:
             if 'matchings_sample_to_next_sample' not in dir(self) or \
-                            'ids_temporally_linked_inputs' not in dir(self):
+                    'ids_temporally_linked_inputs' not in dir(self):
                 raise Exception(
                     "The following attributes must be inserted to the model when building a temporally_linked model:\n",
                     "- matchings_sample_to_next_sample\n",
@@ -2165,7 +1695,7 @@ class Model_Wrapper(object):
         references = []
         sources_sampling = []
         for s in params['predict_on_sets']:
-            print
+            print ("")
             logging.info("<<< Predicting outputs of " + s + " set >>>")
 
             # TODO: enable 'train' sampling on temporally-linked models
@@ -2174,9 +1704,11 @@ class Model_Wrapper(object):
                 data_gen = -1
                 data_gen_instance = -1
             else:
-                assert len(params['model_inputs']) > 0, 'We need at least one input!'
+                if len(params['model_inputs']) == 0:
+                    raise AssertionError('We need at least one input!')
                 if not params['optimized_search']:  # use optimized search model if available
-                    assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                    if params['pos_unk']:
+                        raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
 
                 params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
 
@@ -2196,28 +1728,54 @@ class Model_Wrapper(object):
                     num_iterations = int(math.ceil(float(n_samples)))  # / params['max_batch_size']))
                     n_samples = min(eval("ds.len_" + s), num_iterations)  # * params['batch_size'])
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                             batch_size=1,
-                                                             normalization=params['normalize'],
-                                                             normalization_type=params['normalization_type'],
-                                                             data_augmentation=False,
-                                                             mean_substraction=params['mean_substraction'],
-                                                             predict=True)
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                          batch_size=1,
+                                                                          normalization=params['normalize'],
+                                                                          normalization_type=params[
+                                                                              'normalization_type'],
+                                                                          data_augmentation=False,
+                                                                          mean_substraction=params['mean_substraction'],
+                                                                          predict=True,
+                                                                          n_parallel_loaders=params[
+                                                                              'n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                 batch_size=1,
+                                                                 normalization=params['normalize'],
+                                                                 normalization_type=params['normalization_type'],
+                                                                 data_augmentation=False,
+                                                                 mean_substraction=params['mean_substraction'],
+                                                                 predict=True)
                     data_gen = data_gen_instance.generator()
                 else:
                     n_samples = params['n_samples']
                     num_iterations = int(math.ceil(float(n_samples)))  # / params['batch_size']))
 
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
-                    data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
-                                                             batch_size=1,
-                                                             normalization=params['normalize'],
-                                                             normalization_type=params['normalization_type'],
-                                                             data_augmentation=False,
-                                                             mean_substraction=params['mean_substraction'],
-                                                             predict=False,
-                                                             random_samples=n_samples,
-                                                             temporally_linked=params['temporally_linked'])
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                          batch_size=1,
+                                                                          normalization=params['normalize'],
+                                                                          normalization_type=params[
+                                                                              'normalization_type'],
+                                                                          data_augmentation=False,
+                                                                          mean_substraction=params['mean_substraction'],
+                                                                          predict=False,
+                                                                          random_samples=n_samples,
+                                                                          temporally_linked=params['temporally_linked'],
+                                                                          n_parallel_loaders=params[
+                                                                              'n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                 batch_size=1,
+                                                                 normalization=params['normalize'],
+                                                                 normalization_type=params['normalization_type'],
+                                                                 data_augmentation=False,
+                                                                 mean_substraction=params['mean_substraction'],
+                                                                 predict=False,
+                                                                 random_samples=n_samples,
+                                                                 temporally_linked=params['temporally_linked'])
                     data_gen = data_gen_instance.generator()
 
                 if params['n_samples'] > 0:
@@ -2232,8 +1790,8 @@ class Model_Wrapper(object):
                 sampled = 0
                 start_time = time.time()
                 eta = -1
-                for j in range(num_iterations):
-                    data = data_gen.next()
+                for _ in range(num_iterations):
+                    data = next(data_gen)
                     X = dict()
                     if params['n_samples'] > 0:
                         s_dict = {}
@@ -2256,15 +1814,20 @@ class Model_Wrapper(object):
 
                     for i in range(len(X[params['model_inputs'][0]])):  # process one sample at a time
                         sampled += 1
-                        sys.stdout.write('\r')
+
                         sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled, n_samples, int(eta)))
+                        if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                            sys.stdout.write('\r')
+                        else:
+                            sys.stdout.write('\n')
+
                         sys.stdout.flush()
                         x = dict()
 
                         for input_id in params['model_inputs']:
                             if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
                                 link = int(X[params['link_index_id']][i])
-                                if link not in previous_outputs[input_id].keys():
+                                if link not in list(previous_outputs[input_id]):
                                     # input to current sample was not processed yet
                                     link = -1
                                 prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
@@ -2286,16 +1849,15 @@ class Model_Wrapper(object):
 
                         if params['length_penalty'] or params['coverage_penalty']:
                             if params['length_penalty']:
-                                length_penalties = [((5 + len(sample)) ** params['length_norm_factor']
-                                                     / (5 + 1) ** params['length_norm_factor'])
-                                                    # this 5 is a magic number by Google...
-                                                    for sample in samples]
+                                # this 5 is a magic number by Google...
+                                length_penalties = [((5 + len(sample)) ** params['length_norm_factor'] /
+                                                     (5 + 1) ** params['length_norm_factor']) for sample in samples]
                             else:
                                 length_penalties = [1.0 for _ in samples]
 
                             if params['coverage_penalty']:
                                 coverage_penalties = []
-                                for k, sample in enumerate(samples):
+                                for k, sample in list(enumerate(samples)):
                                     # We assume that source sentences are at the first position of x
                                     x_sentence = x[params['model_inputs'][0]][0]
                                     alpha = np.asarray(alphas[k])
@@ -2329,15 +1891,13 @@ class Model_Wrapper(object):
                         if params['temporally_linked']:
                             first_idx = max(0, data_gen_instance.first_idx)
                             # TODO: Make it more general
-                            for (output_id, input_id) in self.matchings_sample_to_next_sample.iteritems():
+                            for (output_id, input_id) in iteritems(self.matchings_sample_to_next_sample):
                                 # Get all words previous to the padding
                                 previous_outputs[input_id][first_idx + sampled - 1] = best_sample[:sum(
                                     [int(elem > 0) for elem in best_sample])]
 
-                sys.stdout.write('\n Total cost of the translations: %f \t Average cost of the translations: %f\n' % (
-                    total_cost, total_cost / n_samples))
-                sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (
-                    time.time() - start_time) / n_samples))
+                sys.stdout.write('\n Total cost of the translations: %f \t Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
+                sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (time.time() - start_time) / n_samples))
 
                 sys.stdout.flush()
 
@@ -2372,24 +1932,13 @@ class Model_Wrapper(object):
         if parameters is None:
             parameters = dict()
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'n_samples': None,
-                          'init_sample': -1,
-                          'final_sample': -1,
-                          'verbose': 1,
-                          'predict_on_sets': ['val'],
-                          'max_eval_samples': None
-                          }
-        params = self.checkParameters(parameters, default_params)
+        params = checkParameters(parameters, self.default_predict_params)
+
+        model_predict = getattr(self, params['model_name'])  # recover model for prediction
         predictions = dict()
         for s in params['predict_on_sets']:
             predictions[s] = []
             if params['verbose'] > 0:
-                print
                 logging.info("<<< Predicting outputs of " + s + " set >>>")
             # Calculate how many iterations are we going to perform
             if params['n_samples'] is None:
@@ -2401,56 +1950,91 @@ class Model_Wrapper(object):
                 n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
 
                 # Prepare data generator
-                data_gen = Data_Batch_Generator(s,
-                                                self,
-                                                ds,
-                                                num_iterations,
-                                                batch_size=params['batch_size'],
-                                                normalization=params['normalize'],
-                                                normalization_type=params['normalization_type'],
-                                                data_augmentation=False,
-                                                mean_substraction=params['mean_substraction'],
-                                                init_sample=params['init_sample'],
-                                                final_sample=params['final_sample'],
-                                                predict=True).generator()
+                if params['n_parallel_loaders'] > 1:
+                    data_gen = Parallel_Data_Batch_Generator(s,
+                                                             self,
+                                                             ds,
+                                                             num_iterations,
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             normalization_type=params['normalization_type'],
+                                                             data_augmentation=False,
+                                                             wo_da_patch_type=params['wo_da_patch_type'],
+                                                             mean_substraction=params['mean_substraction'],
+                                                             init_sample=params['init_sample'],
+                                                             final_sample=params['final_sample'],
+                                                             predict=True,
+                                                             n_parallel_loaders=params[
+                                                                 'n_parallel_loaders']).generator()
+                else:
+                    data_gen = Data_Batch_Generator(s,
+                                                    self,
+                                                    ds,
+                                                    num_iterations,
+                                                    batch_size=params['batch_size'],
+                                                    normalization=params['normalize'],
+                                                    normalization_type=params['normalization_type'],
+                                                    data_augmentation=False,
+                                                    wo_da_patch_type=params['wo_da_patch_type'],
+                                                    mean_substraction=params['mean_substraction'],
+                                                    init_sample=params['init_sample'],
+                                                    final_sample=params['final_sample'],
+                                                    predict=True).generator()
 
             else:
                 n_samples = params['n_samples']
                 num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
                 # Prepare data generator
-                data_gen = Data_Batch_Generator(s,
-                                                self,
-                                                ds,
-                                                num_iterations,
-                                                batch_size=params['batch_size'],
-                                                normalization=params['normalize'],
-                                                normalization_type=params['normalization_type'],
-                                                data_augmentation=False,
-                                                mean_substraction=params['mean_substraction'],
-                                                predict=True,
-                                                random_samples=n_samples).generator()
+                if params['n_parallel_loaders'] > 1:
+                    data_gen = Parallel_Data_Batch_Generator(s,
+                                                             self,
+                                                             ds,
+                                                             num_iterations,
+                                                             batch_size=params['batch_size'],
+                                                             normalization=params['normalize'],
+                                                             normalization_type=params['normalization_type'],
+                                                             data_augmentation=False,
+                                                             wo_da_patch_type=params['wo_da_patch_type'],
+                                                             mean_substraction=params['mean_substraction'],
+                                                             predict=True,
+                                                             random_samples=n_samples,
+                                                             n_parallel_loaders=params[
+                                                                 'n_parallel_loaders']).generator()
+                else:
+                    data_gen = Data_Batch_Generator(s,
+                                                    self,
+                                                    ds,
+                                                    num_iterations,
+                                                    batch_size=params['batch_size'],
+                                                    normalization=params['normalize'],
+                                                    normalization_type=params['normalization_type'],
+                                                    data_augmentation=False,
+                                                    wo_da_patch_type=params['wo_da_patch_type'],
+                                                    mean_substraction=params['mean_substraction'],
+                                                    predict=True,
+                                                    random_samples=n_samples).generator()
             # Predict on model
             if postprocess_fun is None:
                 if int(keras.__version__.split('.')[0]) == 1:
                     # Keras version 1.x
-                    out = self.model.predict_generator(data_gen,
-                                                       val_samples=n_samples,
-                                                       max_q_size=params['n_parallel_loaders'],
-                                                       nb_worker=1,  # params['n_parallel_loaders'],
-                                                       pickle_safe=False)
+                    out = model_predict.predict_generator(data_gen,
+                                                          val_samples=n_samples,
+                                                          max_q_size=params['n_parallel_loaders'],
+                                                          nb_worker=1,  # params['n_parallel_loaders'],
+                                                          pickle_safe=False)
                 else:
                     # Keras version 2.x
-                    out = self.model.predict_generator(data_gen,
-                                                       num_iterations,
-                                                       max_queue_size=params['n_parallel_loaders'],
-                                                       workers=1,  # params['n_parallel_loaders'],
-                                                       verbose=params['verbose'])
+                    out = model_predict.predict_generator(data_gen,
+                                                          num_iterations,
+                                                          max_queue_size=params['n_parallel_loaders'],
+                                                          workers=1,  # params['n_parallel_loaders'],
+                                                          verbose=params['verbose'])
                 predictions[s] = out
             else:
                 processed_samples = 0
                 start_time = time.time()
                 while processed_samples < n_samples:
-                    out = self.model.predict_on_batch(data_gen.next())
+                    out = model_predict.predict_on_batch(next(data_gen))
 
                     # Apply post-processing function
                     if isinstance(postprocess_fun, list):
@@ -2464,9 +2048,13 @@ class Model_Wrapper(object):
                     processed_samples += params['batch_size']
                     if processed_samples > n_samples:
                         processed_samples = n_samples
+
                     eta = (n_samples - processed_samples) * (time.time() - start_time) / processed_samples
-                    sys.stdout.write('\r')
                     sys.stdout.write("Predicting %d/%d  -  ETA: %ds " % (processed_samples, n_samples, int(eta)))
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
                     sys.stdout.flush()
 
         return predictions
@@ -2523,7 +2111,7 @@ class Model_Wrapper(object):
                 if pad_on_batch else np.asarray([np.zeros(params['maxlen'])])
 
         prev_out = None
-        for ii in xrange(len(Y)):
+        for ii in range(len(Y)):
             # for every possible live sample calc prob for every possible label
             if params['optimized_search']:  # use optimized search model if available
                 [probs, prev_out, _] = self.predict_cond_optimized(X, state_below, params, ii, prev_out)
@@ -2582,36 +2170,17 @@ class Model_Wrapper(object):
         """
 
         # Check input parameters and recover default values if needed
-        default_params = {'batch_size': 50,
-                          'n_parallel_loaders': 8,
-                          'beam_size': 5,
-                          'normalize': True,
-                          'normalization_type': None,
-                          'mean_substraction': False,
-                          'predict_on_sets': ['val'],
-                          'maxlen': 20,
-                          'n_samples': -1,
-                          'model_inputs': ['source_text', 'state_below'],
-                          'model_outputs': ['description'],
-                          'dataset_inputs': ['source_text', 'state_below'],
-                          'dataset_outputs': ['description'],
-                          'alpha_factor': 1.0,
-                          'sampling_type': 'max_likelihood',
-                          'words_so_far': False,
-                          'optimized_search': False,
-                          'state_below_index': -1,
-                          'output_text_index': 0,
-                          'pos_unk': False
-                          }
-        params = self.checkParameters(self.params, default_params)
-
+        params = checkParameters(self.params, self.default_predict_with_beam_params)
         scores_dict = dict()
 
         for s in params['predict_on_sets']:
             logging.info("<<< Scoring outputs of " + s + " set >>>")
-            assert len(params['model_inputs']) > 0, 'We need at least one input!'
+            if len(params['model_inputs']) == 0:
+                raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
-                assert not params['pos_unk'], 'PosUnk is not supported with non-optimized beam search methods'
+                if params['pos_unk']:
+                    raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
+
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many iterations are we going to perform
             n_samples = eval("self.dataset.len_" + s)
@@ -2619,25 +2188,41 @@ class Model_Wrapper(object):
 
             # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
             # TODO: We prepare data as model 0... Different data preparators for each model?
-            data_gen = Data_Batch_Generator(s,
-                                            self.models[0],
-                                            self.dataset,
-                                            num_iterations,
-                                            shuffle=False,
-                                            batch_size=params['batch_size'],
-                                            normalization=params['normalize'],
-                                            normalization_type=params['normalization_type'],
-                                            data_augmentation=False,
-                                            mean_substraction=params['mean_substraction'],
-                                            predict=False).generator()
+            if params['n_parallel_loaders'] > 1:
+                data_gen = Parallel_Data_Batch_Generator(s,
+                                                         self.models[0],
+                                                         self.dataset,
+                                                         num_iterations,
+                                                         shuffle=False,
+                                                         batch_size=params['batch_size'],
+                                                         normalization=params['normalize'],
+                                                         normalization_type=params['normalization_type'],
+                                                         data_augmentation=False,
+                                                         wo_da_patch_type=params['wo_da_patch_type'],
+                                                         mean_substraction=params['mean_substraction'],
+                                                         predict=False,
+                                                         n_parallel_loaders=params['n_parallel_loaders']).generator()
+            else:
+                data_gen = Data_Batch_Generator(s,
+                                                self.models[0],
+                                                self.dataset,
+                                                num_iterations,
+                                                shuffle=False,
+                                                batch_size=params['batch_size'],
+                                                normalization=params['normalize'],
+                                                normalization_type=params['normalization_type'],
+                                                data_augmentation=False,
+                                                wo_da_patch_type=params['wo_da_patch_type'],
+                                                mean_substraction=params['mean_substraction'],
+                                                predict=False).generator()
             sources_sampling = []
             scores = []
             total_cost = 0
             sampled = 0
             start_time = time.time()
             eta = -1
-            for j in range(num_iterations):
-                data = data_gen.next()
+            for _ in range(num_iterations):
+                data = next(data_gen)
                 X = dict()
                 s_dict = {}
                 for input_id in params['model_inputs']:
@@ -2691,7 +2276,7 @@ class Model_Wrapper(object):
         :return:
         """
 
-        print "WARNING!: deprecated function, use utils.sample() instead"
+        logger.warning("Deprecated function, use utils.sample() instead.")
         return sample(a, temperature=temperature)
 
     @staticmethod
@@ -2706,7 +2291,7 @@ class Model_Wrapper(object):
                             Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples
         """
-        print "WARNING!: deprecated function, use utils.sampling() instead"
+        logger.warning("Deprecated function, use utils.sampling() instead")
         return sampling(scores, sampling_type=sampling_type, temperature=temperature)
 
     @staticmethod
@@ -2720,7 +2305,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions.
         """
-        print "WARNING!: deprecated function, use utils.decode_predictions() instead"
+        logger.warning("Deprecated function, use utils.decode_predictions() instead.")
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
     @staticmethod
@@ -2738,7 +2323,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level
         :return: trg_word_seq with replaced unknown words
         """
-        print "WARNING!: deprecated function, use utils.replace_unknown_words() instead"
+        logger.warning("Deprecated function, use utils.replace_unknown_words() instead.")
         return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                                      heuristic=heuristic, mapping=mapping, verbose=verbose)
 
@@ -2759,7 +2344,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        print "WARNING!: deprecated function, use utils.decode_predictions_beam_search() instead"
+        logger.warning("Deprecated function, use utils.decode_predictions_beam_search() instead.")
         return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
                                               x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
                                               mapping=mapping, verbose=verbose)
@@ -2773,7 +2358,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of converted predictions
         """
-        print "WARNING!: deprecated function, use utils.one_hot_2_indices() instead"
+        logger.warning("Deprecated function, use utils.one_hot_2_indices() instead.")
         return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
 
     @staticmethod
@@ -2785,7 +2370,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        print "WARNING!: deprecated function, use utils.decode_predictions_one_hot() instead"
+        logger.warning("Deprecated function, use utils.decode_predictions_one_hot() instead.")
         return decode_predictions_one_hot(preds, index2word, verbose=verbose)
 
     def prepareData(self, X_batch, Y_batch=None):
@@ -2806,27 +2391,27 @@ class Model_Wrapper(object):
     def _prepareSequentialData(self, X, Y=None, sample_weights=False):
 
         # Format input data
-        if len(self.inputsMapping.keys()) == 1:  # single input
+        if len(list(self.inputsMapping)) == 1:  # single input
             X = X[self.inputsMapping[0]]
         else:
-            X_new = [0 for _ in range(len(self.inputsMapping.keys()))]  # multiple inputs
-            for in_model, in_ds in self.inputsMapping.iteritems():
+            X_new = [0 for _ in range(len(list(self.inputsMapping)))]  # multiple inputs
+            for in_model, in_ds in iteritems(self.inputsMapping):
                 X_new[in_model] = X[in_ds]
             X = X_new
 
         # Format output data (only one output possible for Sequential models)
         Y_sample_weights = None
         if Y is not None:
-            if len(self.outputsMapping.keys()) == 1:  # single output
+            if len(list(self.outputsMapping)) == 1:  # single output
                 if isinstance(Y[self.outputsMapping[0]], tuple):
                     Y = Y[self.outputsMapping[0]][0]
                     Y_sample_weights = Y[self.outputsMapping[0]][1]
                 else:
                     Y = Y[self.outputsMapping[0]]
             else:
-                Y_new = [0 for _ in range(len(self.outputsMapping.keys()))]  # multiple outputs
-                Y_sample_weights = [None for _ in range(len(self.outputsMapping.keys()))]
-                for out_model, out_ds in self.outputsMapping.iteritems():
+                Y_new = [0 for _ in range(len(list(self.outputsMapping)))]  # multiple outputs
+                Y_sample_weights = [None for _ in range(len(list(self.outputsMapping)))]
+                for out_model, out_ds in iteritems(self.outputsMapping):
                     if isinstance(Y[out_ds], tuple):
                         Y_new[out_model] = Y[out_ds][0]
                         Y_sample_weights[out_model] = Y[out_ds][1]
@@ -2842,12 +2427,12 @@ class Model_Wrapper(object):
         Y_sample_weights = dict()
 
         # Format input data
-        for in_model, in_ds in self.inputsMapping.iteritems():
+        for in_model, in_ds in iteritems(self.inputsMapping):
             X_new[in_model] = X[in_ds]
 
         # Format output data
         if Y is not None:
-            for out_model, out_ds in self.outputsMapping.iteritems():
+            for out_model, out_ds in iteritems(self.outputsMapping):
                 if isinstance(Y[out_ds], tuple):
                     Y_new[out_model] = Y[out_ds][0]
                     Y_sample_weights[out_model] = Y[out_ds][1]
@@ -2864,10 +2449,10 @@ class Model_Wrapper(object):
 
         accuracies = dict()
         top_accuracies = dict()
-        for key, val in prediction.iteritems():
-            pred = np_utils.categorical_probas_to_classes(val)
+        for key, val in iteritems(prediction):
+            pred = categorical_probas_to_classes(val)
             top_pred = np.argsort(val, axis=1)[:, ::-1][:, :np.min([topN, val.shape[1]])]
-            GT = np_utils.categorical_probas_to_classes(data[key])
+            GT = categorical_probas_to_classes(data[key])
 
             # Top1 accuracy
             correct = [1 if pred[i] == GT[i] else 0 for i in range(len(pred))]
@@ -2885,7 +2470,7 @@ class Model_Wrapper(object):
             Calculates the topN accuracy obtained from a set of samples on a Sequential model.
         """
         top_pred = np.argsort(pred, axis=1)[:, ::-1][:, :np.min([topN, pred.shape[1]])]
-        pred = np_utils.categorical_probas_to_classes(pred)
+        pred = categorical_probas_to_classes(pred)
         GT = np_utils.categorical_probas_to_classes(GT)
 
         # Top1 accuracy
@@ -2911,42 +2496,6 @@ class Model_Wrapper(object):
         # if(isinstance(self.model, Model)):
         print_summary(self.model.layers)
         return ''
-
-        obj_str = '-----------------------------------------------------------------------------------\n'
-        class_name = self.__class__.__name__
-        obj_str += '\t\t' + class_name + ' instance\n'
-        obj_str += '-----------------------------------------------------------------------------------\n'
-
-        # Print pickled attributes
-        for att in self.__toprint:
-            obj_str += att + ': ' + str(self.__dict__[att])
-            obj_str += '\n'
-
-        # Print layers structure
-        obj_str += "\n::: Layers structure:\n\n"
-        obj_str += 'MODEL TYPE: ' + self.model.__class__.__name__ + '\n'
-        if isinstance(self.model, Sequential):
-            obj_str += "INPUT: " + str(tuple(self.model.layers[0].input_shape)) + "\n"
-            for i, layer in enumerate(self.model.layers):
-                obj_str += str(layer.name) + ' ' + str(layer.output_shape) + '\n'
-            obj_str += "OUTPUT: " + str(self.model.layers[-1].output_shape) + "\n"
-        else:
-            for i, inputs in enumerate(self.model.input_config):
-                obj_str += "INPUT (" + str(i) + "): " + str(inputs['name']) + ' ' + str(
-                    tuple(inputs['input_shape'])) + "\n"
-            for node in self.model.node_config:
-                obj_str += str(node['name']) + ', in [' + str(node['input']) + ']' + ', out_shape: ' + str(
-                    self.model.nodes[node['name']].output_shape) + '\n'
-            for i, outputs in enumerate(self.model.output_config):
-                obj_str += "OUTPUT (" + str(i) + "): " + str(outputs['name']) + ', in [' + str(
-                    outputs['input']) + ']' + ', out_shape: ' + str(
-                    self.model.outputs[outputs['name']].output_shape) + "\n"
-
-        obj_str += '-----------------------------------------------------------------------------------\n'
-
-        print_summary(self.model.layers)
-
-        return obj_str
 
     def log(self, mode, data_type, value):
         """
@@ -3072,7 +2621,7 @@ class Model_Wrapper(object):
     #           nOutput, input
     # ------------------------------------------------------- #
 
-    def basic_model(self, nOutput, input):
+    def basic_model(self, nOutput, model_input):
         """
             Builds a basic CNN model.
         """
@@ -3081,46 +2630,46 @@ class Model_Wrapper(object):
         self.ids_inputs = ['input']
         self.ids_outputs = ['output']
 
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(model_input) == 3:
+            input_shape = tuple([model_input[2]] + model_input[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(model_input)
 
         inp = Input(shape=input_shape, name='input')
 
-        # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
+        # model_input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
         # this applies 32 convolution filters of size 3x3 each.
-        x = Convolution2D(32, 3, 3, border_mode='valid')(inp)
+        x = Conv2D(32, (3, 3), padding='valid')(inp)
         x = Activation('relu')(x)
-        x = Convolution2D(32, 3, 3)(x)
-        x = Activation('relu')(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
-        x = Dropout(0.25)(x)
-
-        x = Convolution2D(64, 3, 3, border_mode='valid')(x)
-        x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
+        x = Conv2D(32, (3, 3))(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
         x = Dropout(0.25)(x)
 
-        x = Convolution2D(128, 3, 3, border_mode='valid')(x)
+        x = Conv2D(64, (3, 3), padding='valid')(x)
         x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
-        x = Activation('relu')(x)
-        x = MaxPooling2D(pool_size=(2, 2))(x)
-        x = Dropout(0.25)(x)
-
-        x = Convolution2D(256, 3, 3, border_mode='valid')(x)
-        x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
+        x = Conv2D(64, (3, 3))(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
         x = Dropout(0.25)(x)
 
-        x = Convolution2D(256, 3, 3, border_mode='valid')(x)
+        x = Conv2D(128, (3, 3), padding='valid')(x)
         x = Activation('relu')(x)
-        x = Convolution2D(64, 3, 3)(x)
+        x = Conv2D(64, (3, 3))(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Conv2D(256, (3, 3), padding='valid')(x)
+        x = Activation('relu')(x)
+        x = Conv2D(64, (3, 3))(x)
+        x = Activation('relu')(x)
+        x = MaxPooling2D(pool_size=(2, 2))(x)
+        x = Dropout(0.25)(x)
+
+        x = Conv2D(256, (3, 3), padding='valid')(x)
+        x = Activation('relu')(x)
+        x = Conv2D(64, (3, 3))(x)
         x = Activation('relu')(x)
         x = MaxPooling2D(pool_size=(2, 2))(x)
         x = Dropout(0.25)(x)
@@ -3134,52 +2683,52 @@ class Model_Wrapper(object):
         x = Dense(nOutput)(x)
         out = Activation('softmax', name='output')(x)
 
-        self.model = Model(input=inp, output=out)
+        self.model = Model(inputs=[inp], outputs=[out])
 
-    def basic_model_seq(self, nOutput, input):
+    def basic_model_seq(self, nOutput, input_shape):
         """
             Builds a basic CNN model.
         """
 
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(input_shape) == 3:
+            input_shape = tuple([input_shape[2]] + input_shape[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(input_shape)
 
         self.model = Sequential()
         # input: 100x100 images with 3 channels -> (3, 100, 100) tensors.
         # this applies 32 convolution filters of size 3x3 each.
-        self.model.add(Convolution2D(32, 3, 3, border_mode='valid', input_shape=input_shape))
+        self.model.add(Conv2D(32, (3, 3), padding='valid', input_shape=input_shape))
         self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(32, 3, 3))
-        self.model.add(Activation('relu'))
-        self.model.add(MaxPooling2D(pool_size=(2, 2)))
-        self.model.add(Dropout(0.25))
-
-        self.model.add(Convolution2D(64, 3, 3, border_mode='valid'))
-        self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(32, (3, 3)))
         self.model.add(Activation('relu'))
         self.model.add(MaxPooling2D(pool_size=(2, 2)))
         self.model.add(Dropout(0.25))
 
-        self.model.add(Convolution2D(128, 3, 3, border_mode='valid'))
+        self.model.add(Conv2D(64, (3, 3), padding='valid'))
         self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
-        self.model.add(Activation('relu'))
-        self.model.add(MaxPooling2D(pool_size=(2, 2)))
-        self.model.add(Dropout(0.25))
-
-        self.model.add(Convolution2D(256, 3, 3, border_mode='valid'))
-        self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(Activation('relu'))
         self.model.add(MaxPooling2D(pool_size=(2, 2)))
         self.model.add(Dropout(0.25))
 
-        self.model.add(Convolution2D(256, 3, 3, border_mode='valid'))
+        self.model.add(Conv2D(128, (3, 3), padding='valid'))
         self.model.add(Activation('relu'))
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
+        self.model.add(Activation('relu'))
+        self.model.add(MaxPooling2D(pool_size=(2, 2)))
+        self.model.add(Dropout(0.25))
+
+        self.model.add(Conv2D(256, (3, 3), padding='valid'))
+        self.model.add(Activation('relu'))
+        self.model.add(Conv2D(64, (3, 3)))
+        self.model.add(Activation('relu'))
+        self.model.add(MaxPooling2D(pool_size=(2, 2)))
+        self.model.add(Dropout(0.25))
+
+        self.model.add(Conv2D(256, (3, 3), padding='valid'))
+        self.model.add(Activation('relu'))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(Activation('relu'))
         self.model.add(MaxPooling2D(pool_size=(2, 2)))
         self.model.add(Dropout(0.25))
@@ -3193,74 +2742,74 @@ class Model_Wrapper(object):
         self.model.add(Dense(nOutput))
         self.model.add(Activation('softmax'))
 
-    def One_vs_One(self, nOutput, input):
+    def One_vs_One(self, nOutput, input_shape):
         """
             Builds a simple One_vs_One network with 3 convolutional layers (useful for ECOC models).
         """
         # default lr=0.1, momentum=0.
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(input_shape) == 3:
+            input_shape = tuple([input_shape[2]] + input_shape[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(input_shape)
 
         self.model = Sequential()
         self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
-        self.model.add(Convolution2D(32, 1, 1, activation='relu'))
+        self.model.add(Conv2D(32, (1, 1), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(16, 3, 3, activation='relu'))
+        self.model.add(Conv2D(16, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(8, 3, 3, activation='relu'))
+        self.model.add(Conv2D(8, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(1, 1)))
 
         self.model.add(Flatten())
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax'))  # default nOutput=1000
 
-    def VGG_16(self, nOutput, input):
+    def VGG_16(self, nOutput, input_shape):
         """
             Builds a VGG model with 16 layers.
         """
         # default lr=0.1, momentum=0.
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(input_shape) == 3:
+            input_shape = tuple([input_shape[2]] + input_shape[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(input_shape)
 
         self.model = Sequential()
         self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
-        self.model.add(Convolution2D(64, 3, 3, activation='relu'))
+        self.model.add(Conv2D(64, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(64, 3, 3, activation='relu'))
+        self.model.add(Conv2D(64, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3, activation='relu'))
+        self.model.add(Conv2D(128, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3, activation='relu'))
+        self.model.add(Conv2D(128, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3, activation='relu'))
+        self.model.add(Conv2D(256, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3, activation='relu'))
+        self.model.add(Conv2D(256, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3, activation='relu'))
+        self.model.add(Conv2D(256, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3, activation='relu'))
+        self.model.add(Conv2D(512, (3, 3), activation='relu'))
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(Flatten())
@@ -3270,63 +2819,63 @@ class Model_Wrapper(object):
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax'))  # default nOutput=1000
 
-    def VGG_16_PReLU(self, nOutput, input):
+    def VGG_16_PReLU(self, nOutput, input_shape):
         """
             Builds a VGG model with 16 layers and with PReLU activations.
         """
 
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(input_shape) == 3:
+            input_shape = tuple([input_shape[2]] + input_shape[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(input_shape)
 
         self.model = Sequential()
         self.model.add(ZeroPadding2D((1, 1), input_shape=input_shape))  # default input_shape=(3,224,224)
-        self.model.add(Convolution2D(64, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(64, 3, 3))
-        self.model.add(PReLU())
-        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
-
-        self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3))
-        self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(128, 3, 3))
+        self.model.add(Conv2D(64, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3))
+        self.model.add(Conv2D(128, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3))
-        self.model.add(PReLU())
-        self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(256, 3, 3))
+        self.model.add(Conv2D(128, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(256, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(256, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(256, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(512, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(512, (3, 3)))
         self.model.add(PReLU())
         self.model.add(ZeroPadding2D((1, 1)))
-        self.model.add(Convolution2D(512, 3, 3))
+        self.model.add(Conv2D(512, (3, 3)))
+        self.model.add(PReLU())
+        self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
+
+        self.model.add(ZeroPadding2D((1, 1)))
+        self.model.add(Conv2D(512, (3, 3)))
+        self.model.add(PReLU())
+        self.model.add(ZeroPadding2D((1, 1)))
+        self.model.add(Conv2D(512, (3, 3)))
+        self.model.add(PReLU())
+        self.model.add(ZeroPadding2D((1, 1)))
+        self.model.add(Conv2D(512, (3, 3)))
         self.model.add(PReLU())
         self.model.add(MaxPooling2D((2, 2), strides=(2, 2)))
 
@@ -3339,51 +2888,51 @@ class Model_Wrapper(object):
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax'))  # default nOutput=1000
 
-    def VGG_16_FunctionalAPI(self, nOutput, input):
+    def VGG_16_FunctionalAPI(self, nOutput, input_shape):
         """
             16-layered VGG model implemented in Keras' Functional API
         """
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(input_shape) == 3:
+            input_shape = tuple([input_shape[2]] + input_shape[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(input_shape)
 
         vis_input = Input(shape=input_shape, name="vis_input")
 
         x = ZeroPadding2D((1, 1))(vis_input)
-        x = Convolution2D(64, 3, 3, activation='relu')(x)
+        x = Conv2D(64, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(64, 3, 3, activation='relu')(x)
+        x = Conv2D(64, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(128, 3, 3, activation='relu')(x)
+        x = Conv2D(128, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(128, 3, 3, activation='relu')(x)
+        x = Conv2D(128, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = Conv2D(256, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = Conv2D(256, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(256, 3, 3, activation='relu')(x)
+        x = Conv2D(256, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2))(x)
 
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = ZeroPadding2D((1, 1))(x)
-        x = Convolution2D(512, 3, 3, activation='relu')(x)
+        x = Conv2D(512, (3, 3), activation='relu')(x)
         x = MaxPooling2D((2, 2), strides=(2, 2),
                          name='last_max_pool')(x)
 
@@ -3394,13 +2943,14 @@ class Model_Wrapper(object):
         x = Dropout(0.5, name='last_dropout')(x)
         x = Dense(nOutput, activation='softmax', name='output')(x)  # nOutput=1000 by default
 
-        self.model = Model(input=vis_input, output=x)
+        self.model = Model(inputs=[vis_input], outputs=[x])
 
-    def VGG_19(self, nOutput, input):
+    def VGG_19(self, nOutput, input_shape):
 
         # Define inputs and outputs IDs
         self.ids_inputs = ['input_1']
         self.ids_outputs = ['predictions']
+        from keras.applications.vgg19 import VGG19
 
         # Load VGG19 model pre-trained on ImageNet
         self.model = VGG19()
@@ -3412,13 +2962,14 @@ class Model_Wrapper(object):
         out = self.model.get_layer('fc2').output
         out = Dense(nOutput, name=self.ids_outputs[0], activation='softmax')(out)
 
-        self.model = Model(input=image, output=out)
+        self.model = Model(inputs=[image], outputs=[out])
 
-    def VGG_19_ImageNet(self, nOutput, input):
+    def VGG_19_ImageNet(self, nOutput, input_shape):
 
         # Define inputs and outputs IDs
         self.ids_inputs = ['input_1']
         self.ids_outputs = ['predictions']
+        from keras.applications.vgg19 import VGG19
 
         # Load VGG19 model pre-trained on ImageNet
         self.model = VGG19(weights='imagenet', layers_lr=0.001)
@@ -3430,7 +2981,7 @@ class Model_Wrapper(object):
         out = self.model.get_layer('fc2').output
         out = Dense(nOutput, name=self.ids_outputs[0], activation='softmax')(out)
 
-        self.model = Model(input=image, output=out)
+        self.model = Model(inputs=[image], outputs=[out])
 
     ########################################
     # GoogLeNet implementation from http://dandxy89.github.io/ImageModels/googlenet/
@@ -3453,61 +3004,60 @@ class Model_Wrapper(object):
             W_regularizer = None
             b_regularizer = None
 
-        pathway1 = Convolution2D(branch1[0], 1, 1,
-                                 subsample=subsample,
-                                 activation=activation,
-                                 border_mode=border_mode,
-                                 W_regularizer=W_regularizer,
-                                 b_regularizer=b_regularizer,
-                                 bias=False,
-                                 dim_ordering=dim_ordering)(x)
+        pathway1 = Conv2D(branch1[0], (1, 1),
+                          subsample=subsample,
+                          activation=activation,
+                          padding=border_mode,
+                          W_regularizer=W_regularizer,
+                          b_regularizer=b_regularizer,
+                          bias=False,
+                          dim_ordering=dim_ordering)(x)
 
-        pathway2 = Convolution2D(branch2[0], 1, 1,
-                                 subsample=subsample,
-                                 activation=activation,
-                                 border_mode=border_mode,
-                                 W_regularizer=W_regularizer,
-                                 b_regularizer=b_regularizer,
-                                 bias=False,
-                                 dim_ordering=dim_ordering)(x)
-        pathway2 = Convolution2D(branch2[1], 3, 3,
-                                 subsample=subsample,
-                                 activation=activation,
-                                 border_mode=border_mode,
-                                 W_regularizer=W_regularizer,
-                                 b_regularizer=b_regularizer,
-                                 bias=False,
-                                 dim_ordering=dim_ordering)(pathway2)
+        pathway2 = Conv2D(branch2[0], (1, 1),
+                          subsample=subsample,
+                          activation=activation,
+                          padding=border_mode,
+                          W_regularizer=W_regularizer,
+                          b_regularizer=b_regularizer,
+                          bias=False,
+                          dim_ordering=dim_ordering)(x)
+        pathway2 = Conv2D(branch2[1], (3, 3),
+                          subsample=subsample,
+                          activation=activation,
+                          padding=border_mode,
+                          W_regularizer=W_regularizer,
+                          b_regularizer=b_regularizer,
+                          bias=False,
+                          dim_ordering=dim_ordering)(pathway2)
 
-        pathway3 = Convolution2D(branch3[0], 1, 1,
-                                 subsample=subsample,
-                                 activation=activation,
-                                 border_mode=border_mode,
-                                 W_regularizer=W_regularizer,
-                                 b_regularizer=b_regularizer,
-                                 bias=False,
-                                 dim_ordering=dim_ordering)(x)
-        pathway3 = Convolution2D(branch3[1], 5, 5,
-                                 subsample=subsample,
-                                 activation=activation,
-                                 border_mode=border_mode,
-                                 W_regularizer=W_regularizer,
-                                 b_regularizer=b_regularizer,
-                                 bias=False,
-                                 dim_ordering=dim_ordering)(pathway3)
+        pathway3 = Conv2D(branch3[0], (1, 1),
+                          subsample=subsample,
+                          activation=activation,
+                          padding=border_mode,
+                          W_regularizer=W_regularizer,
+                          b_regularizer=b_regularizer,
+                          bias=False,
+                          dim_ordering=dim_ordering)(x)
+        pathway3 = Conv2D(branch3[1], (5, 5),
+                          subsample=subsample,
+                          activation=activation,
+                          padding=border_mode,
+                          W_regularizer=W_regularizer,
+                          b_regularizer=b_regularizer,
+                          bias=False,
+                          dim_ordering=dim_ordering)(pathway3)
 
         pathway4 = MaxPooling2D(pool_size=(1, 1), dim_ordering=dim_ordering)(x)
-        pathway4 = Convolution2D(branch4[0], 1, 1,
-                                 subsample=subsample,
-                                 activation=activation,
-                                 border_mode=border_mode,
-                                 W_regularizer=W_regularizer,
-                                 b_regularizer=b_regularizer,
-                                 bias=False,
-                                 dim_ordering=dim_ordering)(pathway4)
+        pathway4 = Conv2D(branch4[0], (1, 1),
+                          subsample=subsample,
+                          activation=activation,
+                          padding=border_mode,
+                          W_regularizer=W_regularizer,
+                          b_regularizer=b_regularizer,
+                          bias=False,
+                          dim_ordering=dim_ordering)(pathway4)
 
-        return merge([pathway1, pathway2, pathway3, pathway4],
-                     mode='concat', concat_axis=concat_axis)
+        return concatenate([pathway1, pathway2, pathway3, pathway4], axis=concat_axis)
 
     @staticmethod
     def conv_layer(x, nb_filter, nb_row, nb_col, dim_ordering,
@@ -3521,14 +3071,14 @@ class Model_Wrapper(object):
             W_regularizer = None
             b_regularizer = None
 
-        x = Convolution2D(nb_filter, nb_row, nb_col,
-                          subsample=subsample,
-                          activation=activation,
-                          border_mode=border_mode,
-                          W_regularizer=W_regularizer,
-                          b_regularizer=b_regularizer,
-                          bias=False,
-                          dim_ordering=dim_ordering)(x)
+        x = Conv2D(nb_filter, (nb_row, nb_col),
+                   subsample=subsample,
+                   activation=activation,
+                   padding=border_mode,
+                   W_regularizer=W_regularizer,
+                   b_regularizer=b_regularizer,
+                   bias=False,
+                   dim_ordering=dim_ordering)(x)
 
         if padding:
             for _ in range(padding):
@@ -3536,12 +3086,12 @@ class Model_Wrapper(object):
 
         return x
 
-    def GoogLeNet_FunctionalAPI(self, nOutput, input):
+    def GoogLeNet_FunctionalAPI(self, nOutput, input_shape):
 
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(input_shape) == 3:
+            input_shape = tuple([input_shape[2]] + input_shape[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(input_shape)
 
         # Define image input layer
         img_input = Input(shape=input_shape, name='input_data')
@@ -3597,76 +3147,30 @@ class Model_Wrapper(object):
         x = Dense(output_dim=NB_CLASS,
                   activation='softmax', name='output')(x)
 
-        self.model = Model(input=img_input, output=[x])
+        self.model = Model(inputs=[img_input], outputs=[x])
 
-    ########################################
-
-    def Identity_Layer(self, nOutput, input):
-        """
-            Builds an dummy Identity_Layer, which should give as output the same as the input.
-            Only used for passing the output from a previous stage to the next (see Staged_Network).
-        """
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
-        else:
-            input_shape = tuple(input)
-
-        self.model = Graph()
-        # Input
-        self.model.add_input(name='input', input_shape=input_shape)
-        # Output
-        self.model.add_output(name='output', input='input')
-
-    def Union_Layer(self, nOutput, input):
+    def Union_Layer(self, nOutput, input_shape):
         """
         Network with just a dropout and a softmax layers which is intended to serve as the final layer for an ECOC model
         """
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
+        if len(input_shape) == 3:
+            input_shape = tuple([input_shape[2]] + input_shape[0:2])
         else:
-            input_shape = tuple(input)
+            input_shape = tuple(input_shape)
 
         self.model = Sequential()
         self.model.add(Flatten(input_shape=input_shape))
         self.model.add(Dropout(0.5))
         self.model.add(Dense(nOutput, activation='softmax'))
 
-    def One_vs_One_Inception(self, nOutput=2, input=None):
-        """
-        Builds a simple One_vs_One_Inception network with 2 inception layers (useful for ECOC models).
-        """
-        if input is None:
-            input = [224, 224, 3]
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
-        else:
-            input_shape = tuple(input)
-
-        self.model = Graph()
-        # Input
-        self.model.add_input(name='input', input_shape=input_shape)
-        # Inception Ea
-        out_Ea = self.__addInception('inceptionEa', 'input', 4, 2, 8, 2, 2, 2)
-        # Inception Eb
-        out_Eb = self.__addInception('inceptionEb', out_Ea, 2, 2, 4, 2, 1, 1)
-        # Average Pooling    pool_size=(7,7)
-        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1, 1)), name='ave_pool/ECOC',
-                            input=out_Eb)
-        # Softmax
-        self.model.add_node(Flatten(), name='loss_OnevsOne/classifier_flatten', input='ave_pool/ECOC')
-        self.model.add_node(Dropout(0.5), name='loss_OnevsOne/drop', input='loss_OnevsOne/classifier_flatten')
-        self.model.add_node(Dense(nOutput, activation='softmax'), name='loss_OnevsOne', input='loss_OnevsOne/drop')
-        # Output
-        self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
-
-    def add_One_vs_One_Inception(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
+    def add_One_vs_One_Inception(self, input_layer, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
         Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model
         (useful for ECOC_loss models).
         """
 
         # Inception Ea
-        out_Ea = self.__addInception('inceptionEa_' + str(id_branch), input, 4, 2, 8, 2, 2, 2)
+        out_Ea = self.__addInception('inceptionEa_' + str(id_branch), input_layer, 4, 2, 8, 2, 2, 2)
         # Inception Eb
         out_Eb = self.__addInception('inceptionEb_' + str(id_branch), out_Ea, 2, 2, 4, 2, 1, 1)
         # Average Pooling    pool_size=(7,7)
@@ -3684,13 +3188,13 @@ class Model_Wrapper(object):
 
         return output_name
 
-    def add_One_vs_One_Inception_Functional(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
+    def add_One_vs_One_Inception_Functional(self, input_layer, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
         Builds a simple One_vs_One_Inception network with 2 inception layers on the top of the current model
          (useful for ECOC_loss models).
         """
 
-        in_node = self.model.get_layer(input).output
+        in_node = self.model.get_layer(input_layer).output
 
         # Inception Ea
         [out_Ea, out_Ea_name] = self.__addInception_Functional('inceptionEa_' + str(id_branch), in_node, 4, 2, 8, 2, 2,
@@ -3710,10 +3214,10 @@ class Model_Wrapper(object):
         return out_node
 
     @staticmethod
-    def add_One_vs_One_3x3_Functional(input, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
+    def add_One_vs_One_3x3_Functional(input_layer, input_shape, id_branch, nkernels, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
-        out_3x3 = Convolution2D(nkernels, 3, 3, name='3x3/ecoc_' + str(id_branch), activation='relu')(input)
+        out_3x3 = Conv2D(nkernels, (3, 3), name='3x3/ecoc_' + str(id_branch), activation='relu')(input_layer)
 
         # Average Pooling    pool_size=(7,7)
         x = AveragePooling2D(pool_size=input_shape, strides=(1, 1), name='ave_pool/ecoc_' + str(id_branch))(out_3x3)
@@ -3727,16 +3231,16 @@ class Model_Wrapper(object):
         return out_node
 
     @staticmethod
-    def add_One_vs_One_3x3_double_Functional(input, input_shape, id_branch, nOutput=2, activation='softmax'):
+    def add_One_vs_One_3x3_double_Functional(input_layer, input_shape, id_branch, nOutput=2, activation='softmax'):
 
         # 3x3 convolution
-        out_3x3 = Convolution2D(64, 3, 3, name='3x3_1/ecoc_' + str(id_branch), activation='relu')(input)
+        out_3x3 = Conv2D(64, (3, 3), name='3x3_1/ecoc_' + str(id_branch), activation='relu')(input_layer)
 
         # Max Pooling
         x = MaxPooling2D(strides=(2, 2), pool_size=(2, 2), name='max_pool/ecoc_' + str(id_branch))(out_3x3)
 
         # 3x3 convolution
-        x = Convolution2D(32, 3, 3, name='3x3_2/ecoc_' + str(id_branch), activation='relu')(x)
+        x = Conv2D(32, (3, 3), name='3x3_2/ecoc_' + str(id_branch), activation='relu')(x)
 
         # Softmax
         output_name = 'fc_OnevsOne_' + str(id_branch) + '/out'
@@ -3746,42 +3250,14 @@ class Model_Wrapper(object):
 
         return out_node
 
-    def One_vs_One_Inception_v2(self, nOutput=2, input=None):
-        """
-            Builds a simple One_vs_One_Inception_v2 network with 2 inception layers (useful for ECOC models).
-        """
-        if input is None:
-            input = [224, 224, 3]
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
-        else:
-            input_shape = tuple(input)
-
-        self.model = Graph()
-        # Input
-        self.model.add_input(name='input', input_shape=input_shape)
-        # Inception Ea
-        out_Ea = self.__addInception('inceptionEa', 'input', 16, 8, 32, 8, 8, 8)
-        # Inception Eb
-        out_Eb = self.__addInception('inceptionEb', out_Ea, 8, 8, 16, 8, 4, 4)
-        # Average Pooling    pool_size=(7,7)
-        self.model.add_node(AveragePooling2D(pool_size=input_shape[1:], strides=(1, 1)), name='ave_pool/ECOC',
-                            input=out_Eb)
-        # Softmax
-        self.model.add_node(Flatten(), name='loss_OnevsOne/classifier_flatten', input='ave_pool/ECOC')
-        self.model.add_node(Dropout(0.5), name='loss_OnevsOne/drop', input='loss_OnevsOne/classifier_flatten')
-        self.model.add_node(Dense(nOutput, activation='softmax'), name='loss_OnevsOne', input='loss_OnevsOne/drop')
-        # Output
-        self.model.add_output(name='loss_OnevsOne/output', input='loss_OnevsOne')
-
-    def add_One_vs_One_Inception_v2(self, input, input_shape, id_branch, nOutput=2, activation='softmax'):
+    def add_One_vs_One_Inception_v2(self, input_layer, input_shape, id_branch, nOutput=2, activation='softmax'):
         """
             Builds a simple One_vs_One_Inception_v2 network with 2 inception layers on the top of the current model
             (useful for ECOC_loss models).
         """
 
         # Inception Ea
-        out_Ea = self.__addInception('inceptionEa_' + str(id_branch), input, 16, 8, 32, 8, 8, 8)
+        out_Ea = self.__addInception('inceptionEa_' + str(id_branch), input_layer, 16, 8, 32, 8, 8, 8)
         # Inception Eb
         out_Eb = self.__addInception('inceptionEb_' + str(id_branch), out_Ea, 8, 8, 16, 8, 4, 4)
         # Average Pooling    pool_size=(7,7)
@@ -3799,12 +3275,12 @@ class Model_Wrapper(object):
 
         return output_name
 
-    def __addInception(self, id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce,
+    def __addInception(self, name, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3, kernels_5x5_reduce,
                        kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
 
-            :param id: string identifier of the inception layer
+            :param name: string identifier of the inception layer
             :param input_layer: identifier of the layer that will serve as an input to the built inception module
             :param kernels_1x1: number of kernels of size 1x1                                      (1st branch)
             :param kernels_3x3_reduce: number of kernels of size 1x1 before the 3x3 layer          (2nd branch)
@@ -3814,43 +3290,43 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        self.model.add_node(Convolution2D(kernels_1x1, 1, 1), name=id + '/1x1', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id + '/relu_1x1', input=id + '/1x1')
+        self.model.add_node(Conv2D(kernels_1x1, (1, 1)), name=name + '/1x1', input=input_layer)
+        self.model.add_node(Activation('relu'), name=name + '/relu_1x1', input=name + '/1x1')
 
         # Branch 2
-        self.model.add_node(Convolution2D(kernels_3x3_reduce, 1, 1), name=id + '/3x3_reduce', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id + '/relu_3x3_reduce', input=id + '/3x3_reduce')
-        self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/3x3_zeropadding', input=id + '/relu_3x3_reduce')
-        self.model.add_node(Convolution2D(kernels_3x3, 3, 3), name=id + '/3x3', input=id + '/3x3_zeropadding')
-        self.model.add_node(Activation('relu'), name=id + '/relu_3x3', input=id + '/3x3')
+        self.model.add_node(Conv2D(kernels_3x3_reduce, (1, 1)), name=name + '/3x3_reduce', input=input_layer)
+        self.model.add_node(Activation('relu'), name=name + '/relu_3x3_reduce', input=name + '/3x3_reduce')
+        self.model.add_node(ZeroPadding2D((1, 1)), name=name + '/3x3_zeropadding', input=name + '/relu_3x3_reduce')
+        self.model.add_node(Conv2D(kernels_3x3, (3, 3)), name=name + '/3x3', input=name + '/3x3_zeropadding')
+        self.model.add_node(Activation('relu'), name=name + '/relu_3x3', input=name + '/3x3')
 
         # Branch 3
-        self.model.add_node(Convolution2D(kernels_5x5_reduce, 1, 1), name=id + '/5x5_reduce', input=input_layer)
-        self.model.add_node(Activation('relu'), name=id + '/relu_5x5_reduce', input=id + '/5x5_reduce')
-        self.model.add_node(ZeroPadding2D((2, 2)), name=id + '/5x5_zeropadding', input=id + '/relu_5x5_reduce')
-        self.model.add_node(Convolution2D(kernels_5x5, 5, 5), name=id + '/5x5', input=id + '/5x5_zeropadding')
-        self.model.add_node(Activation('relu'), name=id + '/relu_5x5', input=id + '/5x5')
+        self.model.add_node(Conv2D(kernels_5x5_reduce, (1, 1)), name=name + '/5x5_reduce', input=input_layer)
+        self.model.add_node(Activation('relu'), name=name + '/relu_5x5_reduce', input=name + '/5x5_reduce')
+        self.model.add_node(ZeroPadding2D((2, 2)), name=name + '/5x5_zeropadding', input=name + '/relu_5x5_reduce')
+        self.model.add_node(Conv2D(kernels_5x5, (5, 5)), name=name + '/5x5', input=name + '/5x5_zeropadding')
+        self.model.add_node(Activation('relu'), name=name + '/relu_5x5', input=name + '/5x5')
 
         # Branch 4
-        self.model.add_node(ZeroPadding2D((1, 1)), name=id + '/pool_zeropadding', input=input_layer)
-        self.model.add_node(MaxPooling2D((3, 3), strides=(1, 1)), name=id + '/pool', input=id + '/pool_zeropadding')
-        self.model.add_node(Convolution2D(kernels_pool_projection, 1, 1), name=id + '/pool_proj', input=id + '/pool')
-        self.model.add_node(Activation('relu'), name=id + '/relu_pool_proj', input=id + '/pool_proj')
+        self.model.add_node(ZeroPadding2D((1, 1)), name=name + '/pool_zeropadding', input=input_layer)
+        self.model.add_node(MaxPooling2D((3, 3), strides=(1, 1)), name=name + '/pool', input=name + '/pool_zeropadding')
+        self.model.add_node(Conv2D(kernels_pool_projection, (1, 1)), name=name + '/pool_proj', input=name + '/pool')
+        self.model.add_node(Activation('relu'), name=name + '/relu_pool_proj', input=name + '/pool_proj')
 
         # Concatenate
-        inputs_list = [id + '/relu_1x1', id + '/relu_3x3', id + '/relu_5x5', id + '/relu_pool_proj']
-        out_name = id + '/concat'
+        inputs_list = [name + '/relu_1x1', name + '/relu_3x3', name + '/relu_5x5', name + '/relu_pool_proj']
+        out_name = name + '/concat'
         self.model.add_node(Activation('linear'), name=out_name, inputs=inputs_list, concat_axis=1)
 
         return out_name
 
     @staticmethod
-    def __addInception_Functional(id, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3,
+    def __addInception_Functional(name, input_layer, kernels_1x1, kernels_3x3_reduce, kernels_3x3,
                                   kernels_5x5_reduce, kernels_5x5, kernels_pool_projection):
         """
             Adds an inception module to the model.
 
-            :param id: string identifier of the inception layer
+            :param name: string identifier of the inception layer
             :param input_layer: identifier of the layer that will serve as an input to the built inception module
             :param kernels_1x1: number of kernels of size 1x1                                      (1st branch)
             :param kernels_3x3_reduce: number of kernels of size 1x1 before the 3x3 layer          (2nd branch)
@@ -3860,26 +3336,26 @@ class Model_Wrapper(object):
             :param kernels_pool_projection: number of kernels of size 1x1 after the 3x3 pooling    (4th branch)
         """
         # Branch 1
-        x_b1 = Convolution2D(kernels_1x1, 1, 1, name=id + '/1x1', activation='relu')(input_layer)
+        x_b1 = Conv2D(kernels_1x1, (1, 1), name=name + '/1x1', activation='relu')(input_layer)
 
         # Branch 2
-        x_b2 = Convolution2D(kernels_3x3_reduce, 1, 1, name=id + '/3x3_reduce', activation='relu')(input_layer)
-        x_b2 = ZeroPadding2D((1, 1), name=id + '/3x3_zeropadding')(x_b2)
-        x_b2 = Convolution2D(kernels_3x3, 3, 3, name=id + '/3x3', activation='relu')(x_b2)
+        x_b2 = Conv2D(kernels_3x3_reduce, (1, 1), name=name + '/3x3_reduce', activation='relu')(input_layer)
+        x_b2 = ZeroPadding2D((1, 1), name=name + '/3x3_zeropadding')(x_b2)
+        x_b2 = Conv2D(kernels_3x3, (3, 3), name=name + '/3x3', activation='relu')(x_b2)
 
         # Branch 3
-        x_b3 = Convolution2D(kernels_5x5_reduce, 1, 1, name=id + '/5x5_reduce', activation='relu')(input_layer)
-        x_b3 = ZeroPadding2D((2, 2), name=id + '/5x5_zeropadding')(x_b3)
-        x_b3 = Convolution2D(kernels_5x5, 5, 5, name=id + '/5x5', activation='relu')(x_b3)
+        x_b3 = Conv2D(kernels_5x5_reduce, (1, 1), name=name + '/5x5_reduce', activation='relu')(input_layer)
+        x_b3 = ZeroPadding2D((2, 2), name=name + '/5x5_zeropadding')(x_b3)
+        x_b3 = Conv2D(kernels_5x5, (5, 5), name=name + '/5x5', activation='relu')(x_b3)
 
         # Branch 4
-        x_b4 = ZeroPadding2D((1, 1), name=id + '/pool_zeropadding')(input_layer)
-        x_b4 = MaxPooling2D((3, 3), strides=(1, 1), name=id + '/pool')(x_b4)
-        x_b4 = Convolution2D(kernels_pool_projection, 1, 1, name=id + '/pool_proj', activation='relu')(x_b4)
+        x_b4 = ZeroPadding2D((1, 1), name=name + '/pool_zeropadding')(input_layer)
+        x_b4 = MaxPooling2D((3, 3), strides=(1, 1), name=name + '/pool')(x_b4)
+        x_b4 = Conv2D(kernels_pool_projection, (1, 1), name=name + '/pool_proj', activation='relu')(x_b4)
 
         # Concatenate
-        out_name = id + '/concat'
-        out_node = merge([x_b1, x_b2, x_b3, x_b4], mode='concat', concat_axis=1, name=out_name)
+        out_name = name + '/concat'
+        out_node = concatenate([x_b1, x_b2, x_b3, x_b4], axis=1, name=out_name)
 
         return [out_node, out_name]
 
@@ -3902,56 +3378,22 @@ class Model_Wrapper(object):
         # join outputs from OneVsOne classifiers
         ecoc_loss_name = 'ecoc_loss'
         final_loss_name = 'final_loss/out'
-        ecoc_loss = merge(inputs_list, name=ecoc_loss_name, mode='concat', concat_axis=1)
+        ecoc_loss = concatenate(inputs_list, name=ecoc_loss_name, axis=1)
         drop = Dropout(0.5, name='final_loss/drop')(ecoc_loss)
         # apply final joint prediction
         final_loss = Dense(nOutput, activation=activation, name=final_loss_name)(drop)
 
         in_node = self.model.layers[0].name
         in_node = self.model.get_layer(in_node).output
-        self.model = Model(input=in_node, output=[ecoc_loss, final_loss])
-        # self.model = Model(input=in_node, output=['ecoc_loss', 'final_loss'])
+        self.model = Model(inputs=[in_node], outputs=[ecoc_loss, final_loss])
 
         return [ecoc_loss_name, final_loss_name]
-
-    def GAP(self, nOutput, input):
-        """
-            Creates a GAP network for object localization as described in the paper
-                Zhou B, Khosla A, Lapedriza A, Oliva A, Torralba A.
-                Learning Deep Features for Discriminative Localization.
-                arXiv preprint arXiv:1512.04150. 2015 Dec 14.
-            Outputs:
-                'GAP/softmax' output of the final softmax classification
-                'GAP/conv' output of the generated convolutional maps.
-        """
-
-        if len(input) == 3:
-            input_shape = tuple([input[2]] + input[0:2])
-        else:
-            input_shape = tuple(input)
-
-        self.model = Graph()
-
-        # Input
-        self.model.add_input(name='input', input_shape=input_shape)
-
-        # Layers
-        self.model.add_node(ZeroPadding2D((1, 1)), name='CAM_conv/zeropadding', input='input')
-        self.model.add_node(Convolution2D(1024, 3, 3), name='CAM_conv', input='CAM_conv/zeropadding')
-        self.model.add_node(Activation('relu'), name='CAM_conv/relu', input='CAM_conv')
-        self.model.add_node(AveragePooling2D(pool_size=(14, 14)), name='GAP', input='CAM_conv/relu')
-        self.model.add_node(Flatten(), name='GAP/flatten', input='GAP')
-        self.model.add_node(Dense(nOutput, activation='softmax'), name='GAP/classifier_food_vs_nofood',
-                            input='GAP/flatten')
-
-        # Output
-        self.model.add_output(name='GAP/softmax', input='GAP/classifier_food_vs_nofood')
 
     ##############################
     #       DENSE NETS
     ##############################
 
-    def add_dense_block(self, in_layer, nb_layers, k, drop, init_weights, name=None):
+    def add_dense_block(self, input_layer, nb_layers, k, drop, init_weights, name=None):
         """
         Adds a Dense Block for the transition down path.
 
@@ -3961,7 +3403,7 @@ class Model_Wrapper(object):
             arXiv preprint arXiv:1611.09326. 2016 Nov 28.
 
         :param name:
-        :param in_layer: input layer to the dense block.
+        :param input_layer: input layer to the dense block.
         :param nb_layers: number of dense layers included in the dense block (see self.add_dense_layer()
                           for information about the internal layers).
         :param k: growth rate. Number of additional feature maps learned at each layer.
@@ -3977,7 +3419,7 @@ class Model_Wrapper(object):
             raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
         list_outputs = []
-        prev_layer = in_layer
+        prev_layer = input_layer
         for n in range(nb_layers):
             if name is not None:
                 name_dense = name + '_' + str(n)
@@ -3990,12 +3432,12 @@ class Model_Wrapper(object):
             new_layer = self.add_dense_layer(prev_layer, k, drop, init_weights, name=name_dense)
             list_outputs.append(new_layer)
             # Merge with previous layer
-            prev_layer = merge([new_layer, prev_layer], mode='concat', concat_axis=axis, name=name_merge)
+            prev_layer = concatenate([new_layer, prev_layer], axis=axis, name=name_merge)
 
-        return merge(list_outputs, mode='concat', concat_axis=axis, name=name_merge)
+        return concatenate(list_outputs, axis=axis, name=name_merge)
 
     @staticmethod
-    def add_dense_layer(in_layer, k, drop, init_weights, name=None):
+    def add_dense_layer(input_layer, k, drop, init_weights, name=None):
         """
         Adds a Dense Layer inside a Dense Block, which is composed of BN, ReLU, Conv and Dropout
 
@@ -4005,7 +3447,7 @@ class Model_Wrapper(object):
             arXiv preprint arXiv:1611.09326. 2016 Nov 28.
 
         :param name:
-        :param in_layer: input layer to the dense block.
+        :param input_layer: input layer to the dense block.
         :param k: growth rate. Number of additional feature maps learned at each layer.
         :param drop: dropout rate.
         :param init_weights: weights initialization function
@@ -4023,14 +3465,14 @@ class Model_Wrapper(object):
             name_conv = None
             name_drop = None
 
-        out_layer = BatchNormalization(mode=2, axis=1, name=name_batch)(in_layer)
+        out_layer = BatchNormalization(mode=2, axis=1, name=name_batch)(input_layer)
         out_layer = Activation('relu', name=name_activ)(out_layer)
-        out_layer = Convolution2D(k, 3, 3, init=init_weights, border_mode='same', name=name_conv)(out_layer)
+        out_layer = Conv2D(k, (3, 3), kernel_initializer=init_weights, padding='same', name=name_conv)(out_layer)
         if drop > 0.0:
             out_layer = Dropout(drop, name=name_drop)(out_layer)
         return out_layer
 
-    def add_transitiondown_block(self, x,
+    def add_transitiondown_block(self, input_layer,
                                  nb_filters_conv, pool_size, init_weights,
                                  nb_layers, growth, drop):
         """
@@ -4042,7 +3484,7 @@ class Model_Wrapper(object):
             arXiv preprint arXiv:1611.09326. 2016 Nov 28.
 
         # Input layers parameters
-        :param x: input layer.
+        :param input_layer: input layer.
 
         # Convolutional layer parameters
         :param nb_filters_conv: number of convolutional filters to learn.
@@ -4065,23 +3507,23 @@ class Model_Wrapper(object):
             raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
 
         # Dense Block
-        x_dense = self.add_dense_block(x, nb_layers, growth, drop,
+        x_dense = self.add_dense_block(input_layer, nb_layers, growth, drop,
                                        init_weights)  # (growth*nb_layers) feature maps added
 
         # Concatenate and skip connection recovery for upsampling path
-        skip = merge([x, x_dense], mode='concat', concat_axis=axis)
+        skip = concatenate([input_layer, x_dense], axis=axis)
 
         # Transition Down
         x_out = BatchNormalization(mode=2, axis=1)(skip)
         x_out = Activation('relu')(x_out)
-        x_out = Convolution2D(nb_filters_conv, 1, 1, init=init_weights, border_mode='same')(x_out)
+        x_out = Conv2D(nb_filters_conv, (1, 1), kernel_initializer=init_weights, padding='same')(x_out)
         if drop > 0.0:
             x_out = Dropout(drop)(x_out)
         x_out = MaxPooling2D(pool_size=(pool_size, pool_size))(x_out)
 
         return [x_out, skip]
 
-    def add_transitionup_block(self, x, skip_conn,
+    def add_transitionup_block(self, input_layer, skip_conn,
                                nb_filters_deconv, init_weights,
                                nb_layers, growth, drop, name=None):
         """
@@ -4094,7 +3536,7 @@ class Model_Wrapper(object):
 
         # Input layers parameters
         :param name:
-        :param x: input layer.
+        :param input_layer: input layer.
         :param skip_conn: list of layers to be used as skip connections.
 
         # Deconvolutional layer parameters
@@ -4109,20 +3551,28 @@ class Model_Wrapper(object):
 
         :return: output layer
         """
-        x = Deconvolution2D(nb_filters_deconv, 3, 3,
-                            subsample=(2, 2),
-                            init=init_weights, border_mode='valid')(x)
+
+        if K.image_dim_ordering() == 'th':
+            axis = 1
+        elif K.image_dim_ordering() == 'tf':
+            axis = -1
+        else:
+            raise ValueError('Invalid dim_ordering:', K.image_dim_ordering)
+
+        input_layer = Conv2DTranspose(nb_filters_deconv, (3, 3),
+                                      strides=(2, 2),
+                                      kernel_initializer=init_weights, padding='valid')(input_layer)
 
         # Skip connection concatenation
-        x = Concatenate(cropping=[None, None, 'center', 'center'])([skip_conn, x])
+        input_layer = Concatenate(axis=axis, cropping=[None, None, 'center', 'center'])([skip_conn, input_layer])
 
         # Dense Block
-        x = self.add_dense_block(x, nb_layers, growth, drop, init_weights,
-                                 name=name)  # (growth*nb_layers) feature maps added
-        return x
+        input_layer = self.add_dense_block(input_layer, nb_layers, growth, drop, init_weights,
+                                           name=name)  # (growth*nb_layers) feature maps added
+        return input_layer
 
     @staticmethod
-    def Empty(nOutput, input):
+    def Empty(nOutput, input_layer):
         """
             Creates an empty Model_Wrapper (can be externally defined)
         """
@@ -4132,6 +3582,490 @@ class Model_Wrapper(object):
     #       SAVE/LOAD
     #           Auxiliary methods for saving and loading the model.
     # ------------------------------------------------------- #
+
+    def predictBeamSearchNet_NEW(self, ds, parameters=None):
+        """
+        Approximates by beam search the best predictions of the net on the dataset splits chosen.
+
+        The following attributes must be inserted to the model when building an optimized search model:
+
+            * ids_inputs_init: list of input variables to model_init (must match inputs to conventional model)
+            * ids_outputs_init: list of output variables of model_init (model probs must be the first output)
+            * ids_inputs_next: list of input variables to model_next (previous word must be the first input)
+            * ids_outputs_next: list of output variables of model_next (model probs must be the first output and
+                                the number of out variables must match the number of in variables)
+            * matchings_init_to_next: dictionary from 'ids_outputs_init' to 'ids_inputs_next'
+            * matchings_next_to_next: dictionary from 'ids_outputs_next' to 'ids_inputs_next'
+
+        The following attributes must be inserted to the model when building a temporally_linked model:
+
+            * matchings_sample_to_next_sample:
+            * ids_temporally_linked_inputs:
+
+        :param ds:
+        :param parameters:
+        :returns predictions: dictionary with set splits as keys and matrices of predictions as values.
+        """
+        if parameters is None:
+            parameters = dict()
+        # Check input parameters and recover default values if needed
+        params = checkParameters(parameters, self.default_predict_with_beam_params)
+
+        # Check if the model is ready for applying an optimized search
+        if params['optimized_search']:
+            if 'matchings_init_to_next' not in dir(self) or \
+                    'matchings_next_to_next' not in dir(self) or \
+                    'ids_inputs_init' not in dir(self) or \
+                    'ids_outputs_init' not in dir(self) or \
+                    'ids_inputs_next' not in dir(self) or \
+                    'ids_outputs_next' not in dir(self):
+                raise Exception(
+                    "The following attributes must be inserted to the model when building an optimized search model:\n",
+                    "- matchings_init_to_next\n",
+                    "- matchings_next_to_next\n",
+                    "- ids_inputs_init\n",
+                    "- ids_outputs_init\n",
+                    "- ids_inputs_next\n",
+                    "- ids_outputs_next\n")
+
+        # Check if the model is ready for applying a temporally_linked search
+        if params['temporally_linked']:
+            if 'matchings_sample_to_next_sample' not in dir(self) or \
+                    'ids_temporally_linked_inputs' not in dir(self):
+                raise Exception(
+                    "The following attributes must be inserted to the model when building a temporally_linked model:\n",
+                    "- matchings_sample_to_next_sample\n",
+                    "- ids_temporally_linked_inputs\n")
+
+        predictions = dict()
+        references = []
+        sources_sampling = []
+        for s in params['predict_on_sets']:
+            print ("")
+            logging.info("<<< Predicting outputs of " + s + " set >>>")
+
+            # TODO: enable 'train' sampling on temporally-linked models
+            if params['temporally_linked'] and s == 'train':
+                logging.info('Sampling is currently not implemented on the "train" set for temporally-linked models.')
+                data_gen = -1
+                data_gen_instance = -1
+            else:
+                if len(params['model_inputs']) == 0:
+                    raise AssertionError('We need at least one input!')
+                if not params['optimized_search']:  # use optimized search model if available
+                    if params['pos_unk']:
+                        raise AssertionError('PosUnk is not supported with non-optimized beam search methods')
+
+                params['pad_on_batch'] = ds.pad_on_batch[params['dataset_inputs'][params['state_below_index']]]
+                if params['temporally_linked']:
+                    previous_outputs = {}  # variable for storing previous outputs if using a temporally-linked model
+                    for input_id in self.ids_temporally_linked_inputs:
+                        previous_outputs[input_id] = dict()
+                        previous_outputs[input_id][-1] = [ds.extra_words['<null>']]
+
+                # Calculate how many iterations are we going to perform
+                if params['n_samples'] < 1:
+                    if params['max_eval_samples'] is not None:
+                        n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
+                    else:
+                        n_samples = eval("ds.len_" + s)
+                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+                    n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
+
+                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                          batch_size=params['batch_size'],
+                                                                          normalization=params['normalize'],
+                                                                          normalization_type=params[
+                                                                              'normalization_type'],
+                                                                          data_augmentation=False,
+                                                                          mean_substraction=params['mean_substraction'],
+                                                                          predict=True,
+                                                                          n_parallel_loaders=params[
+                                                                              'n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                 batch_size=params['batch_size'],
+                                                                 normalization=params['normalize'],
+                                                                 normalization_type=params['normalization_type'],
+                                                                 data_augmentation=False,
+                                                                 mean_substraction=params['mean_substraction'],
+                                                                 predict=True)
+                    data_gen = data_gen_instance.generator()
+                else:
+                    n_samples = params['n_samples']
+                    num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
+
+                    # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
+                    if params['n_parallel_loaders'] > 1:
+                        data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                          batch_size=params['batch_size'],
+                                                                          normalization=params['normalize'],
+                                                                          normalization_type=params[
+                                                                              'normalization_type'],
+                                                                          data_augmentation=False,
+                                                                          mean_substraction=params['mean_substraction'],
+                                                                          predict=False,
+                                                                          random_samples=n_samples,
+                                                                          temporally_linked=params['temporally_linked'],
+                                                                          n_parallel_loaders=params[
+                                                                              'n_parallel_loaders'])
+                    else:
+                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                                                                 batch_size=params['batch_size'],
+                                                                 normalization=params['normalize'],
+                                                                 normalization_type=params['normalization_type'],
+                                                                 data_augmentation=False,
+                                                                 mean_substraction=params['mean_substraction'],
+                                                                 predict=False,
+                                                                 random_samples=n_samples,
+                                                                 temporally_linked=params['temporally_linked'])
+                    data_gen = data_gen_instance.generator()
+
+                if params['n_samples'] > 0:
+                    references = []
+                    sources_sampling = []
+                best_samples = []
+                if params['pos_unk']:
+                    best_alphas = []
+                    sources = []
+
+                total_cost = 0
+                sampled = 0
+                start_time = time.time()
+                eta = -1
+                for _ in range(num_iterations):
+                    data = next(data_gen)
+                    X = dict()
+                    if params['n_samples'] > 0:
+                        s_dict = {}
+                        for input_id in params['model_inputs']:
+                            X[input_id] = data[0][input_id]
+                            s_dict[input_id] = X[input_id]
+                        sources_sampling.append(s_dict)
+
+                        Y = dict()
+                        for output_id in params['model_outputs']:
+                            Y[output_id] = data[1][output_id]
+                    else:
+                        s_dict = {}
+                        for input_id in params['model_inputs']:
+                            X[input_id] = data[input_id]
+                            if params['pos_unk']:
+                                s_dict[input_id] = X[input_id]
+                        if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
+                            sources.append(s_dict)
+
+                    # Count processed samples
+                    n_samples_batch = len(X[params['model_inputs'][0]])
+                    sys.stdout.write("Sampling %d/%d  -  ETA: %ds " % (sampled + n_samples_batch, n_samples, int(eta)))
+                    if not hasattr(self, '_dynamic_display') or self._dynamic_display:
+                        sys.stdout.write('\r')
+                    else:
+                        sys.stdout.write('\n')
+
+                    sys.stdout.flush()
+                    x = dict()
+
+                    # Prepare data if using temporally-linked input
+                    for input_id in params['model_inputs']:
+                        if params['temporally_linked'] and input_id in self.ids_temporally_linked_inputs:
+                            for i in range(n_samples_batch):
+                                link = int(X[params['link_index_id']][i])
+                                if link not in list(previous_outputs[input_id]):
+                                    # input to current sample was not processed yet
+                                    link = -1
+                                prev_x = [ds.vocabulary[input_id]['idx2words'][w] for w in
+                                          previous_outputs[input_id][link]]
+                                in_val = ds.loadText([' '.join(prev_x)], ds.vocabulary[input_id],
+                                                     ds.max_text_len[input_id][s],
+                                                     ds.text_offset[input_id],
+                                                     fill=ds.fill_text[input_id],
+                                                     pad_on_batch=ds.pad_on_batch[input_id],
+                                                     words_so_far=ds.words_so_far[input_id],
+                                                     loading_X=True)[0]
+                                if input_id in list(x):
+                                    x[input_id] = np.concatenate((x[input_id], in_val))
+                                else:
+                                    x[input_id] = in_val
+                        else:
+                            x[input_id] = np.array(X[input_id])
+
+                    # Apply beam search
+                    samples_all, scores_all, alphas_all = self.beam_search(x, params, null_sym=ds.extra_words['<null>'])
+
+                    # Recover most probable output for each sample
+                    for i_sample in range(n_samples_batch):
+                        samples = samples_all[i_sample]
+                        scores = scores_all[i_sample]
+                        if params['pos_unk']:
+                            alphas = alphas_all[i_sample]
+
+                        if params['normalize']:
+                            counts = [len(sample) ** params['alpha_factor'] for sample in samples]
+                            scores = [co / cn for co, cn in zip(scores, counts)]
+                        best_score = np.argmin(scores)
+                        best_sample = samples[best_score]
+                        best_samples.append(best_sample)
+                        if params['pos_unk']:
+                            best_alphas.append(np.asarray(alphas[best_score]))
+                        total_cost += scores[best_score]
+                        eta = (n_samples - sampled + i_sample + 1) * (time.time() - start_time) // (sampled + i_sample + 1)
+                        if params['n_samples'] > 0:
+                            for output_id in params['model_outputs']:
+                                references.append(Y[output_id][i_sample])
+
+                        # store outputs for temporally-linked models
+                        if params['temporally_linked']:
+                            first_idx = max(0, data_gen_instance.first_idx)
+                            # TODO: Make it more general
+                            for (output_id, input_id) in iteritems(self.matchings_sample_to_next_sample):
+                                # Get all words previous to the padding
+                                previous_outputs[input_id][first_idx + sampled + i_sample] = best_sample[:sum(
+                                    [int(elem > 0) for elem in best_sample])]
+
+                    sampled += n_samples_batch
+
+                sys.stdout.write('Total cost of the translations: %f \t Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
+                sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (time.time() - start_time) / n_samples))
+
+                sys.stdout.flush()
+
+                if params['pos_unk']:
+                    if eval('ds.loaded_raw_' + s + '[0]'):
+                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
+                                            stripfile=False)
+                    predictions[s] = (np.asarray(best_samples), np.asarray(best_alphas), sources)
+                else:
+                    predictions[s] = np.asarray(best_samples)
+        del data_gen
+        del data_gen_instance
+        if params['n_samples'] < 1:
+            return predictions
+        else:
+            return predictions, references, sources_sampling
+
+            #    def predictBeamSearchNet_DEPRECATED(self, ds, parameters={}):
+
+    def beam_search_NEW(self, X, params, null_sym=2, debug=False):
+        """
+        Beam search method for Cond models.
+        (https://en.wikibooks.org/wiki/Artificial_Intelligence/Search/Heuristic_search/Beam_search)
+        The algorithm in a nutshell does the following:
+
+        1. k = beam_size
+        2. open_nodes = [[]] * k
+        3. while k > 0:
+
+            3.1. Given the inputs, get (log) probabilities for the outputs.
+
+            3.2. Expand each open node with all possible output.
+
+            3.3. Prune and keep the k best nodes.
+
+            3.4. If a sample has reached the <eos> symbol:
+
+                3.4.1. Mark it as final sample.
+
+                3.4.2. k -= 1
+
+            3.5. Build new inputs (state_below) and go to 1.
+
+        4. return final_samples, final_scores
+
+        :param debug:
+        :param X: Model inputs
+        :param params: Search parameters
+        :param null_sym: <null> symbol
+        :return: UNSORTED list of [k_best_samples, k_best_scores] (k: beam size)
+        """
+        n_samples_batch = len(X[params['model_inputs'][0]])
+        sample_identifier_prediction = [[i] for i in range(n_samples_batch)]
+
+        k = params['beam_size']
+        samples = [[] for _ in range(n_samples_batch)]
+        sample_scores = [[] for _ in range(n_samples_batch)]
+        pad_on_batch = params['pad_on_batch']
+        dead_k = [0] * n_samples_batch  # samples that reached eos
+        live_k = [1] * n_samples_batch  # samples that did not yet reach eos
+        all_live_k = sum(live_k)
+        hyp_samples = [[[]] for _ in range(n_samples_batch)]
+        hyp_scores = [np.zeros(1).astype('float32') for _ in range(n_samples_batch)]
+        if params['pos_unk']:
+            sample_alphas = [[] for _ in range(n_samples_batch)]
+            hyp_alphas = [[[]] for _ in range(n_samples_batch)]
+
+        # Create 'X_next' for initial step
+        X_next = dict()
+        for model_input in params['model_inputs']:
+            X_next[model_input] = []
+            for i_sample, live in list(enumerate(live_k)):
+                if debug:
+                    print('repeating X live', live)
+                X_next[model_input].append(np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), 1, axis=0))
+            X_next[model_input] = np.concatenate(X_next[model_input])
+
+        # Create 'state_below' for initial step
+        # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
+        if params['words_so_far']:
+            if k > params['maxlen']:
+                raise NotImplementedError(
+                    "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
+            state_below = np.asarray([[null_sym]] * all_live_k) if pad_on_batch else np.asarray(
+                [np.zeros((params['maxlen'], params['maxlen']))] * all_live_k)
+        else:
+            state_below = np.asarray([null_sym] * all_live_k) if pad_on_batch else np.asarray(
+                [np.zeros(params['maxlen'])] * all_live_k)
+
+        prev_out_next = None
+        for ii in range(params['maxlen']):
+
+            # for every possible live sample calc prob for every possible label
+            if params['optimized_search']:  # use optimized search model if available
+                [probs_all, prev_out] = self.predict_cond_optimized(X_next, state_below, params, ii, prev_out_next,
+                                                                    debug=debug)
+                if params['pos_unk']:
+                    alphas_all = prev_out[-1][0]  # Shape: (k, n_steps)
+                    prev_out = prev_out[:-1]
+            else:
+                probs_all = self.predict_cond(X_next, state_below, params, ii)
+
+            # SCORE
+            state_below = []
+            if params['optimized_search']:
+                prev_out_new = [[] for _ in prev_out]
+            for pos_sample, sample_identifier in list(
+                    enumerate(sample_identifier_prediction)):  # process one sample at a time
+
+                # Only continue if not all beam subsamples are dead for the current sample
+                if dead_k[pos_sample] < k:
+                    # select information only for the current sample
+                    probs = probs_all[sample_identifier]
+                    if params['pos_unk']:
+                        alphas = alphas_all[sample_identifier]
+
+                    # total score for every sample is sum of -log of word prb
+                    cand_scores = np.array(hyp_scores[pos_sample])[:, None] - np.log(probs)
+                    cand_flat = cand_scores.flatten()
+                    # Find the best options by calling argsort of flatten array
+                    ranks_flat = cand_flat.argsort()[:(k - dead_k[pos_sample])]
+                    # Decypher flatten indices
+                    voc_size = probs.shape[1]
+                    trans_indices = ranks_flat // voc_size  # index of row
+                    word_indices = ranks_flat % voc_size  # index of col
+                    costs = cand_flat[ranks_flat]
+                    # Form a beam for the next iteration
+                    new_hyp_samples = []
+                    new_trans_indices = []
+                    new_hyp_scores = np.zeros(k - dead_k[pos_sample]).astype('float32')
+                    if params['pos_unk']:
+                        new_hyp_alphas = []
+                    for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
+                        new_hyp_samples.append(hyp_samples[pos_sample][ti] + [wi])
+                        new_trans_indices.append(ti)
+                        new_hyp_scores[idx] = copy.copy(costs[idx])
+                        if params['pos_unk']:
+                            new_hyp_alphas.append(hyp_alphas[pos_sample][ti] + [alphas[ti]])
+
+                    # check the finished samples
+                    new_live_k = 0
+                    hyp_samples[pos_sample] = []
+                    hyp_scores[pos_sample] = []
+                    if params['pos_unk']:
+                        hyp_alphas[pos_sample] = []
+                    indices_alive = []
+                    for idx in range(len(new_hyp_samples)):
+                        if new_hyp_samples[idx][-1] == 0:  # finished sample
+                            samples[pos_sample].append(new_hyp_samples[idx])
+                            sample_scores[pos_sample].append(new_hyp_scores[idx])
+                            if params['pos_unk']:
+                                sample_alphas[pos_sample].append(new_hyp_alphas[idx])
+                            dead_k[pos_sample] += 1
+                        else:
+                            indices_alive.append(new_trans_indices[idx])
+                            new_live_k += 1
+                            hyp_samples[pos_sample].append(new_hyp_samples[idx])
+                            hyp_scores[pos_sample].append(new_hyp_scores[idx])
+                            if params['pos_unk']:
+                                hyp_alphas[pos_sample].append(new_hyp_alphas[idx])
+                    hyp_scores[pos_sample] = np.array(hyp_scores[pos_sample])
+                    live_k[pos_sample] = new_live_k
+
+                    if new_live_k > 0 and dead_k[pos_sample] < k:
+                        # convert chosen samples
+                        state_below.append(np.asarray(hyp_samples[pos_sample], dtype='int64'))
+
+                    # keep every remaining one
+                    if live_k[pos_sample] > 0 and params['optimized_search']:
+                        for idx_vars in range(len(prev_out)):
+                            these_indices = np.asarray(sample_identifier_prediction[pos_sample])[indices_alive]
+                            prev_out_new[idx_vars].append(np.asarray(prev_out[idx_vars][these_indices]))
+
+            # Stop when we do not have any more samples alive
+            if sum(live_k) == 0:
+                break
+
+            # Create 'X_next' for next step
+            X_next = dict()
+            for model_input in params['model_inputs']:
+                X_next[model_input] = []
+                for i_sample, live in list(enumerate(live_k)):
+                    X_next[model_input].append(
+                        np.repeat(np.expand_dims(X[model_input][i_sample], axis=0), live, axis=0))
+                X_next[model_input] = np.concatenate(X_next[model_input])
+
+            # Create 'state_below' for next step
+            state_below = np.concatenate(state_below)
+            # we must include an additional dimension if the input for each timestep are all the generated words so far
+            if pad_on_batch:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64') + null_sym, state_below))
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+            else:
+                state_below = np.hstack((np.zeros((state_below.shape[0], 1), dtype='int64'), state_below,
+                                         np.zeros((state_below.shape[0],
+                                                   max(params['maxlen'] - state_below.shape[1] - 1, 0)),
+                                                  dtype='int64')))
+
+                if params['words_so_far']:
+                    state_below = np.expand_dims(state_below, axis=0)
+                    state_below = np.hstack((state_below,
+                                             np.zeros((state_below.shape[0], params['maxlen'] - state_below.shape[1],
+                                                       state_below.shape[2]))))
+
+            # Create 'prev_out_next' for next step
+            if params['optimized_search']:
+                for idx_vars in range(len(prev_out)):
+                    try:
+                        prev_out[idx_vars] = np.concatenate(prev_out_new[idx_vars])
+                    except Exception as e:
+                        logging.info(str(e))
+                        raise Exception()
+
+                prev_out_next = prev_out
+
+            # Update 'sample_identifier_prediction'
+            sample_identifier_prediction = []
+            for i, live in zip(range(n_samples_batch), live_k):
+                num_up_to_here = sum(live_k[:i])
+                sample_identifier_prediction += [range(num_up_to_here, num_up_to_here + live)]
+
+        for pos_sample, sample_identifier in list(
+                enumerate(sample_identifier_prediction)):  # process one sample at a time
+            if live_k[pos_sample] > 0:
+                for idx in range(live_k[pos_sample]):
+                    samples[pos_sample].append(hyp_samples[pos_sample][idx])
+                    sample_scores[pos_sample].append(hyp_scores[pos_sample][idx])
+                    if params['pos_unk']:
+                        sample_alphas[pos_sample].append(hyp_alphas[pos_sample][idx])
+
+        if params['pos_unk']:
+            return samples, sample_scores, sample_alphas
+        else:
+            return samples, sample_scores
+
+            #    def beam_search_DEPRECATED(self, X, params, null_sym=2):
 
     def __getstate__(self):
         """
