@@ -30,7 +30,7 @@ def retrieveXY(dataset, set_name, batchSize, normalization, meanSubstraction, da
         X_batch, Y_batch = dataset.getXY(set_name, batchSize, normalization=normalization,
                                          meanSubstraction=meanSubstraction, dataAugmentation=dataAugmentation)
         return [True, '', X_batch, Y_batch]
-    except:
+    except Exception:
         return [False, sys.exc_info(), None, None]
 
 

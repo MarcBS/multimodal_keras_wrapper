@@ -9,8 +9,6 @@ import os
 import random
 import sys
 from functools import reduce
-
-from dask.array.ufunc import da_frompyfunc
 from six import iteritems
 
 if sys.version_info.major == 3:
@@ -133,7 +131,7 @@ class Data_Batch_Generator(object):
                  data_augmentation=True,
                  wo_da_patch_type='whole',
                  da_patch_type='resize_and_rndcrop',
-                 da_enhance_list=[],
+                 da_enhance_list=None,
                  mean_substraction=False,
                  predict=False,
                  random_samples=-1,
@@ -156,7 +154,8 @@ class Data_Batch_Generator(object):
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
         """
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
@@ -325,7 +324,7 @@ class Homogeneous_Data_Batch_Generator(object):
                  data_augmentation=True,
                  wo_da_patch_type='whole',
                  da_patch_type='resize_and_rndcrop',
-                 da_enhance_list=[],
+                 da_enhance_list=None,
                  mean_substraction=False,
                  predict=False,
                  random_samples=-1,
@@ -345,6 +344,9 @@ class Homogeneous_Data_Batch_Generator(object):
         :param shuffle: Shuffle the training dataset
         :param temporally_linked: Indicates if we are using a temporally-linked model
         """
+        if da_enhance_list is None:
+            da_enhance_list = []
+
         self.set_split = set_split
         self.dataset = dataset
         self.net = net
@@ -1271,7 +1273,7 @@ class Dataset(object):
 
         try:
             sparse = self.sparse_binary[data_id]
-        except:  # allows backwards compatibility
+        except Exception:  # allows backwards compatibility
             sparse = False
 
         if sparse:  # convert sparse into numpy array
@@ -1457,7 +1459,6 @@ class Dataset(object):
             tokfun = None
 
         # Build vocabulary
-        error_vocab = False
         if build_vocabulary:
             self.build_vocabulary(sentences, data_id, tokfun, max_text_len != 0, min_occ=min_occ, n_words=max_words,
                                   use_extra_words=(max_text_len != 0))
@@ -1809,7 +1810,7 @@ class Dataset(object):
                 labeled_im = np.asarray(labeled_im)
                 logging.disable(logging.NOTSET)
                 labeled_im = misc.imresize(labeled_im, (h, w))
-            except:
+            except Exception:
                 logging.info(labeled_im)
                 logging.warning("WARNING!")
                 logging.warning("Can't load image " + labeled_im)
@@ -2642,7 +2643,7 @@ class Dataset(object):
                 labeled_im = np.asarray(labeled_im)
                 logging.disable(logging.NOTSET)
                 labeled_im = misc.imresize(labeled_im, (h, w))
-            except:
+            except Exception:
                 logging.warning("WARNING!")
                 logging.warning("Can't load image " + labeled_im)
                 labeled_im = np.zeros((h, w))
@@ -2988,7 +2989,7 @@ class Dataset(object):
     def loadImages(self, images, data_id, normalization_type='(-1)-1',
                    normalization=True, meanSubstraction=False,
                    dataAugmentation=True, daRandomParams=None,
-                   wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+                   wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
                    useBGR=False,
                    external=False, loaded=False):
         """
@@ -3017,7 +3018,8 @@ class Dataset(object):
             raise NotImplementedError(
                 'The chosen normalization type ' + str(normalization_type) +
                 ' is not implemented for the type "raw-image" and "video".')
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         # Prepare the training mean image
         if meanSubstraction:  # remove mean
 
@@ -3082,7 +3084,7 @@ class Dataset(object):
                     im = pilimage.open(im)
                     logging.disable(logging.NOTSET)
 
-                except:
+                except Exception:
                     logging.warning("WARNING!")
                     logging.warning("Can't load image " + im)
                     im = np.zeros(tuple(self.img_size[data_id]))
@@ -3203,7 +3205,7 @@ class Dataset(object):
 
                     try:
                         im = im[left[0]:right[0], left[1]:right[1], :]
-                    except:
+                    except Exception:
                         logging.error('------- ERROR -------')
                         logging.error(left)
                         logging.error(right)
@@ -3323,7 +3325,7 @@ class Dataset(object):
     def getX(self, set_name, init, final, normalization_type='(-1)-1',
              normalization=True, meanSubstraction=False,
              dataAugmentation=True,
-             wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+             wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
              debug=False):
         """
         Gets all the data samples stored between the positions init to final
@@ -3348,7 +3350,8 @@ class Dataset(object):
         """
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         # if final > eval('self.len_' + set_name):
         if final > getattr(self, 'len_' + set_name):
             raise Exception('"final" index must be smaller than the number of samples in the set.')
@@ -3366,7 +3369,7 @@ class Dataset(object):
                     x = getattr(self, 'X_' + set_name)[id_in][init:final]
                     if len(x) != (final - init):
                         raise AssertionError('Retrieved a wrong number of samples.')
-                except:
+                except Exception:
                     x = [[]] * (final - init)
                     ghost_x = True
             else:
@@ -3411,7 +3414,7 @@ class Dataset(object):
     def getXY(self, set_name, k, normalization_type='(-1)-1',
               normalization=True, meanSubstraction=False,
               dataAugmentation=True,
-              wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+              wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
               debug=False):
         """
         Gets the [X,Y] pairs for the next 'k' samples in the desired set.
@@ -3436,6 +3439,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
+        if da_enhance_list is None:
+            da_enhance_list = []
 
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
 
@@ -3450,7 +3455,7 @@ class Dataset(object):
                     else:
                         # x = eval('self.X_' + set_name + '[id_in][last:new_last]')
                         x = getattr(self, 'X_' + set_name)[id_in][last:new_last]
-                except:
+                except Exception:
                     x = []
             else:
                 if surpassed:
@@ -3575,7 +3580,7 @@ class Dataset(object):
     def getXY_FromIndices(self, set_name, k, normalization_type='(-1)-1',
                           normalization=True, meanSubstraction=False,
                           dataAugmentation=True,
-                          wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+                          wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
                           debug=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -3600,6 +3605,8 @@ class Dataset(object):
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
+        if da_enhance_list is None:
+            da_enhance_list = []
 
         # Recover input samples
         X = []
@@ -3611,7 +3618,7 @@ class Dataset(object):
                     # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
                     x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
 
-                except:
+                except Exception:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
@@ -3724,7 +3731,7 @@ class Dataset(object):
     def getX_FromIndices(self, set_name, k, normalization_type='(-1)-1',
                          normalization=True, meanSubstraction=False,
                          dataAugmentation=True,
-                         wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=[],
+                         wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
                          debug=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -3748,7 +3755,8 @@ class Dataset(object):
 
         self.__checkSetName(set_name)
         self.__isLoaded(set_name, 0)
-
+        if da_enhance_list is None:
+            da_enhance_list = []
         # Recover input samples
         X = []
         for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
@@ -3757,7 +3765,7 @@ class Dataset(object):
                 try:
                     # x = [eval('self.X_' + set_name + '[id_in][index]') for index in k]
                     x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
-                except:
+                except Exception:
                     x = [[]] * len(k)
                     ghost_x = True
             else:
@@ -4017,9 +4025,9 @@ class Dataset(object):
         # del obj_dict['_Dataset__lock_read']
         return obj_dict
 
-    def __setstate__(self, dict):
+    def __setstate__(self, new_state):
         """
             Behaviour applied when unpickling a Dataset instance.
         """
         # dict['_Dataset__lock_read'] = threading.Lock()
-        self.__dict__ = dict
+        self.__dict__ = new_state

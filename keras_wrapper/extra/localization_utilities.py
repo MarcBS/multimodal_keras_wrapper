@@ -203,20 +203,20 @@ def getBBoxesFromCAMs(CAMs, reshape_size=None, percentage_heat=0.4, size_restric
     # Get all computed maps (if we are also using convolutional features)
     all_maps = CAMs
 
-    for map in all_maps:
+    for mapping in all_maps:
 
         # map = misc.imread(maps_dir[dataset]+'/'+samples_detection[dataset]['all_ids'][s]+'_CAM.jpg') # CAM only
         # map = misc.imread(map_path)  # CAM and convolutional features
         new_reshape_size = reshape_size
 
         # Resize map to original size
-        map = resize(map, tuple(new_reshape_size), order=1, preserve_range=True)
+        mapping = resize(mapping, tuple(new_reshape_size), order=1, preserve_range=True)
 
         # Detect regions above a certain percentage of the max heat
-        bb_thres = np.max(map) * percentage_heat
+        bb_thres = np.max(mapping) * percentage_heat
 
         # Compute binary selected region
-        binary_heat = map
+        binary_heat = mapping
         binary_heat = np.where(binary_heat > bb_thres, 255, 0)
 
         # Get biggest connected component
@@ -229,7 +229,7 @@ def getBBoxesFromCAMs(CAMs, reshape_size=None, percentage_heat=0.4, size_restric
         biggest_components = biggest_components[:min([np.sum(selected_components), 9999])]  # get all bboxes
 
         # Extract each component (which will become a bbox prediction)
-        map = map / 255.0  # normalize map
+        mapping = mapping / 255.0  # normalize map
 
         # Get bboxes
         for selected, comp in zip(selected_components, biggest_components):
@@ -253,7 +253,7 @@ def getBBoxesFromCAMs(CAMs, reshape_size=None, percentage_heat=0.4, size_restric
                 predicted_bboxes.append(box)
 
                 # Get score for current bbox
-                score = np.mean(map[box[1]:box[3], box[0]:box[2]])  # use mean CAM value of the bbox as a score
+                score = np.mean(mapping[box[1]:box[3], box[0]:box[2]])  # use mean CAM value of the bbox as a score
                 predicted_scores.append(score)
 
     # Now apply NMS on all the obtained bboxes

@@ -99,7 +99,7 @@ def numpy2file(filepath, mylist, permission='wb', split=False):
 def numpy2imgs(folder_path, mylist, imgs_names, dataset):
     from PIL import Image as pilimage
     create_dir_if_not_exists(folder_path)
-    n_samples, _, n_classes = mylist.shape
+    n_classes = mylist.shape[-1]
 
     for img, name in zip(mylist, imgs_names):
         name = '_'.join(name.split('/'))
@@ -272,8 +272,7 @@ def text_to_model(filepath):
     pass
 
 
-def print_qa(questions, answers_gt, answers_gt_original, answers_pred,
-             era, similarity=_dirac, path=''):
+def print_qa(questions, answers_gt, answers_gt_original, answers_pred, era, similarity=_dirac, path=''):
     """
     In:
         questions - list of questions

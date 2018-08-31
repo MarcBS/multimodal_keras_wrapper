@@ -648,7 +648,7 @@ def simplifyDataset(ds, id_classes, n_classes=50):
                     sample = y_split[id_out][i]
                     try:
                         kept_Y[id_out].append(sample)
-                    except:
+                    except Exception:
                         kept_Y[id_out] = []
                         kept_Y[id_out].append(sample)
                 for id_in in ds.ids_inputs:
@@ -657,7 +657,7 @@ def simplifyDataset(ds, id_classes, n_classes=50):
                     sample = x_split[id_in][i]
                     try:
                         kept_X[id_in].append(sample)
-                    except:
+                    except Exception:
                         kept_X[id_in] = []
                         kept_X[id_in].append(sample)
         # exec ('ds.X_' + s + ' = copy.copy(kept_X)')
