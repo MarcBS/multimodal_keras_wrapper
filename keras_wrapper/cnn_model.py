@@ -539,6 +539,7 @@ class Model_Wrapper(object):
                           'lr_half_life': 50000,
                           'lr_warmup_exp': -1.5,
                           'tensorboard': False,
+                          'n_gpus': 1,
                           'tensorboard_params': {'log_dir': 'tensorboard_logs',
                                                  'histogram_freq': 0,
                                                  'batch_size': 50,
@@ -1072,9 +1073,14 @@ class Model_Wrapper(object):
         if params['class_weights'] is not None:
             class_weight = ds.extra_variables['class_weights_' + params['class_weights']]
         # Train model
+        if params.get('n_gpus', 1) > 1 and hasattr(self, 'model_to_train'):
+            model_to_train = self.model_to_train
+        else:
+            model_to_train = self.model
+
         if int(keras.__version__.split('.')[0]) == 1:
             # Keras 1.x version
-            self.model.fit_generator(train_gen,
+            model_to_train.fit_generator(train_gen,
                                      validation_data=val_gen,
                                      nb_val_samples=n_valid_samples,
                                      class_weight=class_weight,
@@ -1086,7 +1092,7 @@ class Model_Wrapper(object):
                                      initial_epoch=params['epoch_offset'])
         else:
             # Keras 2.x version
-            self.model.fit_generator(train_gen,
+            model_to_train.fit_generator(train_gen,
                                      steps_per_epoch=state['n_iterations_per_epoch'],
                                      epochs=params['n_epochs'],
                                      verbose=params['verbose'],
@@ -1152,7 +1158,13 @@ class Model_Wrapper(object):
             callbacks.append(callback_tensorboard)
 
         # Train model
-        self.model.fit(x,
+        if params.get('n_gpus', 1) > 1 and hasattr(self, 'model_to_train'):
+            model_to_train = self.model_to_train
+        else:
+            model_to_train = self.model
+
+        # Train model
+        model_to_train.fit(x,
                        y,
                        batch_size=min(params['batch_size'], len(x[0])),
                        epochs=params['n_epochs'],
