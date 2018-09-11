@@ -70,7 +70,7 @@ def file2list(filepath, stripfile=True):
         return lines
 
 
-def numpy2hdf5(filepath, mylist, data_name='data', permission='wb'):
+def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
     if 'w' in permission:
         f = tables.open_file(filepath, mode=permission)
         atom = tables.Float32Atom()
@@ -84,7 +84,7 @@ def numpy2hdf5(filepath, mylist, data_name='data', permission='wb'):
         f.close()
 
 
-def numpy2file(filepath, mylist, permission='wb', split=False):
+def numpy2file(filepath, mylist, permission='w', split=False):
     mylist = np.asarray(mylist)
     if split:
         for i, filepath_ in list(enumerate(filepath)):
@@ -118,6 +118,7 @@ def listoflists2file(filepath, mylist, permission='w'):
         mylist = mylist.encode('utf-8')
     with open(filepath, permission) as f:
         f.writelines(mylist)
+        f.write('\n')
 
 
 def list2file(filepath, mylist, permission='w'):
@@ -127,7 +128,7 @@ def list2file(filepath, mylist, permission='w'):
         mylist = mylist.encode('utf-8')
     with open(filepath, permission) as f:
         f.writelines(mylist)
-
+        f.write('\n')
 
 def list2stdout(mylist):
     mylist = [unicode_fn(l) for l in mylist]
@@ -153,7 +154,7 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
         f.writelines(mylist)
 
 
-def list2vqa(filepath, mylist, qids, permission='wb', extra=None):
+def list2vqa(filepath, mylist, qids, permission='w', extra=None):
     res = []
     for i, (ans, qst) in list(enumerate(zip(mylist, qids))):
         line = {'answer': ans, 'question_id': int(qst)}
@@ -169,7 +170,7 @@ def list2vqa(filepath, mylist, qids, permission='wb', extra=None):
 
 def dump_hdf5_simple(filepath, dataset_name, data):
     import h5py
-    h5f = h5py.File(filepath, 'wb')
+    h5f = h5py.File(filepath, 'w')
     h5f.create_dataset(dataset_name, data=data)
     h5f.close()
 
@@ -192,7 +193,7 @@ def pickle_model(
     modifier = 10
     tmp = sys.getrecursionlimit()
     sys.setrecursionlimit(tmp * modifier)
-    with open(path, 'wb') as f:
+    with open(path, 'w') as f:
         p_dict = {'model': model,
                   'word2index_x': word2index_x,
                   'word2index_y': word2index_y,
@@ -203,7 +204,7 @@ def pickle_model(
 
 
 def unpickle_model(path):
-    with open(path, 'rb') as f:
+    with open(path, 'r') as f:
         if sys.version_info.major == 3:
             model = pk.load(f, encoding='latin1')['model']
         else:
@@ -213,7 +214,7 @@ def unpickle_model(path):
 
 def unpickle_vocabulary(path):
     p_dict = {}
-    with open(path, 'rb') as f:
+    with open(path, 'r') as f:
         if sys.version_info.major == 3:
             pickle_load = pk.load(f, encoding='latin1')
         else:
@@ -226,7 +227,7 @@ def unpickle_vocabulary(path):
 
 
 def unpickle_data_provider(path):
-    with open(path, 'rb') as f:
+    with open(path, 'r') as f:
         if sys.version_info.major == 3:
             dp = pk.load(f, encoding='latin1')['data_provider']
         else:
@@ -239,7 +240,7 @@ def model_to_json(path, model):
     Saves model as a json file under the path.
     """
     json_model = model.to_json()
-    with open(path, 'wb') as f:
+    with open(path, 'w') as f:
         json.dump(json_model, f)
 
 
@@ -324,7 +325,7 @@ def dict2file(mydict, path, title=None, separator=':'):
         output_list.extend(tmp)
     else:
         output_list = tmp
-    list2file(path, output_list, 'ab')
+    list2file(path, output_list, 'a')
 
 
 def dict2pkl(mydict, path):
@@ -338,7 +339,7 @@ def dict2pkl(mydict, path):
         extension = ''
     else:
         extension = '.pkl'
-    with open(path + extension, 'wb') as f:
+    with open(path + extension, 'w') as f:
         pk.dump(mydict, f, protocol=-1)
 
 
@@ -349,7 +350,7 @@ def pkl2dict(path):
     :param path: Path to the pkl file to load
     :return: Dict() containing the loaded pkl
     """
-    with open(path, 'rb') as f:
+    with open(path, 'r') as f:
         if sys.version_info.major == 2:
             return pk.load(f)
         else:
