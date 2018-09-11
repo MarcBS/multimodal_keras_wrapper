@@ -252,8 +252,7 @@ class EvalPerformance(KerasCallback):
         else:
             # Convert min_pred_multilabel to list
             if isinstance(self.min_pred_multilabel, list):
-                self.min_pred_multilabel = [self.min_pred_multilabel for i in
-                                            self.gt_pos]
+                self.min_pred_multilabel = [self.min_pred_multilabel for _ in self.gt_pos]
 
         super(EvalPerformance, self).__init__()
 
@@ -441,8 +440,7 @@ class EvalPerformance(KerasCallback):
                     [ref, original_sizes] = self.ds.convert_GT_3DLabels_to_bboxes(
                         ref)
                     self.extra_vars[gt_pos][s]['references'] = ref
-                    self.extra_vars[gt_pos][s][
-                        'references_orig_sizes'] = original_sizes
+                    self.extra_vars[gt_pos][s]['references_orig_sizes'] = original_sizes
 
                 # Postprocess outputs of type 3DSemanticLabel
                 elif type == '3DSemanticLabel':
@@ -454,8 +452,7 @@ class EvalPerformance(KerasCallback):
                     if self.eval_orig_size:
                         old_crop = copy.deepcopy(self.ds.img_size_crop)
                         self.ds.img_size_crop = copy.deepcopy(self.ds.img_size)
-                        self.extra_vars[gt_pos][s]['eval_orig_size_id'] = np.array(
-                            [gt_id] * len(ref))
+                        self.extra_vars[gt_pos][s]['eval_orig_size_id'] = np.array([gt_id] * len(ref))
                     ref = self.ds.load_GT_3DSemanticLabels(ref, gt_id)
                     if self.eval_orig_size:
                         self.ds.img_size_crop = copy.deepcopy(old_crop)
@@ -469,9 +466,7 @@ class EvalPerformance(KerasCallback):
                 # Store predictions
                 if self.write_samples:
                     # Store result
-                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(
-                        epoch) + '_output_' + str(
-                        gt_pos) + '.pred'  # results file
+                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '_output_' + str(gt_pos) + '.pred'  # results file
                     if write_type == 'list':
                         list2file(filepath, predictions)
                     elif write_type == 'vqa':
@@ -744,9 +739,7 @@ class Sample(KerasCallback):
                                                                      alphas=alphas,
                                                                      x_text=sources,
                                                                      heuristic=heuristic,
-                                                                     mapping=self.extra_vars.get(
-                                                                         'mapping',
-                                                                         None),
+                                                                     mapping=self.extra_vars.get('mapping',None),
                                                                      verbose=self.verbose)
                     else:
                         predictions = decode_predictions(samples,
@@ -768,22 +761,22 @@ class Sample(KerasCallback):
                 # Write samples
                 if self.print_sources:
                     # Write samples
-                    for i, (source, sample, truth) in list(
-                            enumerate(zip(sources, predictions, truths))):
-                        print(
-                            "Source     (%d): %s" % (i, str(source.encode('utf-8'))))
-                        print(
-                            "Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
-                        print(
-                            "Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
+                    for i, (source, sample, truth) in list(enumerate(zip(sources, predictions, truths))):
+                        if sys.version_info.major == 2:
+                            source = str(source.encode('utf-8'))
+                            sample = str(sample.encode('utf-8'))
+                            truth = str(truth.encode('utf-8'))
+                        print("Source     (%d): %s" % (i, source))
+                        print("Hypothesis (%d): %s" % (i, sample))
+                        print("Reference  (%d): %s" % (i, truth))
                         print("")
                 else:
-                    for i, (sample, truth) in list(
-                            enumerate(zip(predictions, truths))):
-                        print(
-                            "Hypothesis (%d): %s" % (i, str(sample.encode('utf-8'))))
-                        print(
-                            "Reference  (%d): %s" % (i, str(truth.encode('utf-8'))))
+                    for i, (sample, truth) in list(enumerate(zip(predictions, truths))):
+                        if sys.version_info.major == 2:
+                            sample = str(sample.encode('utf-8'))
+                            truth = str(truth.encode('utf-8'))
+                        print("Hypothesis (%d): %s" % (i, sample))
+                        print("Reference  (%d): %s" % (i, truth))
                         print("")
 
 

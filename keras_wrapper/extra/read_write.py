@@ -17,7 +17,6 @@ import codecs
 import numpy as np
 import tables
 import sys
-from io import BytesIO     # for handling byte strings
 
 if sys.version_info.major == 3:
     import _pickle as pk
@@ -112,22 +111,20 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
         out_img.save(file_path)
 
 
-def listoflists2file(filepath, mylist, permission='wb'):
+def listoflists2file(filepath, mylist, permission='w'):
     mylist = [unicode_fn(sublist) for sublist in mylist]
     mylist = '\n'.join(mylist)
-    if isinstance(mylist[0], unicode_fn):
+    if isinstance(mylist[0], str) and sys.version_info.major == 2:
         mylist = mylist.encode('utf-8')
-    mylist = BytesIO(mylist)
     with open(filepath, permission) as f:
         f.writelines(mylist)
 
 
-def list2file(filepath, mylist, permission='wb'):
+def list2file(filepath, mylist, permission='w'):
     mylist = [unicode_fn(l) for l in mylist]
     mylist = u'\n'.join(mylist)
-    if isinstance(mylist[0], unicode_fn):
+    if isinstance(mylist[0], str) and sys.version_info.major == 2:
         mylist = mylist.encode('utf-8')
-    mylist = BytesIO(mylist)
     with open(filepath, permission) as f:
         f.writelines(mylist)
 
@@ -138,7 +135,7 @@ def list2stdout(mylist):
     print (mylist)
 
 
-def nbest2file(filepath, mylist, separator=u'|||', permission='wb'):
+def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
     newlist = []
     for l in mylist:
         for l2 in l:
@@ -150,9 +147,8 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='wb'):
             a = ' '.join(a + [' '])
             newlist.append(a.strip()[:-len(separator)].strip())
     mylist = '\n'.join(newlist)
-    if isinstance(mylist[0], unicode_fn):
+    if isinstance(mylist[0], str) and sys.version_info.major == 2:
         mylist = mylist.encode('utf-8')
-    mylist = BytesIO(mylist)
     with open(filepath, permission) as f:
         f.writelines(mylist)
 

@@ -1714,6 +1714,7 @@ class Model_Wrapper(object):
         sources_sampling = []
         for s in params['predict_on_sets']:
             print ("")
+            print("", file=sys.stderr)
             logging.info("<<< Predicting outputs of " + s + " set >>>")
 
             # TODO: enable 'train' sampling on temporally-linked models
@@ -1957,6 +1958,7 @@ class Model_Wrapper(object):
         for s in params['predict_on_sets']:
             predictions[s] = []
             if params['verbose'] > 0:
+                print("", file=sys.stderr)
                 logging.info("<<< Predicting outputs of " + s + " set >>>")
             # Calculate how many iterations are we going to perform
             if params['n_samples'] is None:
@@ -2192,6 +2194,7 @@ class Model_Wrapper(object):
         scores_dict = dict()
 
         for s in params['predict_on_sets']:
+            print("", file=sys.stderr)
             logging.info("<<< Scoring outputs of " + s + " set >>>")
             if len(params['model_inputs']) == 0:
                 raise AssertionError('We need at least one input!')
@@ -2627,6 +2630,7 @@ class Model_Wrapper(object):
         plot_file = self.model_path + '/' + time_measure + '_' + str(max_iter) + '.jpg'
         plt.savefig(plot_file)
         if not self.silence:
+            print("", file=sys.stderr)
             logging.info("<<< Progress plot saved in " + plot_file + ' >>>')
 
         # Close plot window
