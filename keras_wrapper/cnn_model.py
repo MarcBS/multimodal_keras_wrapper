@@ -112,7 +112,12 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         model_wrapper.model_next.save_weights(model_name + '_weights_next.h5', overwrite=True)
 
     # Save additional information
+    if hasattr(model_wrapper, 'multi_gpu_model'):
+        backup_multi_gpu_model = model_wrapper.multi_gpu_model
+        setattr(model_wrapper, 'multi_gpu_model', None)
+
     cloudpk.dump(model_wrapper, open(model_name + '_Model_Wrapper.pkl', 'wb'))
+    setattr(model_wrapper, 'multi_gpu_model', backup_multi_gpu_model)
 
     if not model_wrapper.silence:
         logging.info("<<< Model saved >>>")
@@ -408,6 +413,7 @@ class Model_Wrapper(object):
         self.model = None
         self.model_init = None
         self.model_next = None
+        # self.model_to_train = None
 
         # Inputs and outputs names for models of class Model
         self.ids_inputs = list()
@@ -539,6 +545,7 @@ class Model_Wrapper(object):
                           'lr_half_life': 50000,
                           'lr_warmup_exp': -1.5,
                           'tensorboard': False,
+                          'n_gpus': 1,
                           'tensorboard_params': {'log_dir': 'tensorboard_logs',
                                                  'histogram_freq': 0,
                                                  'batch_size': 50,
@@ -1072,31 +1079,36 @@ class Model_Wrapper(object):
         if params['class_weights'] is not None:
             class_weight = ds.extra_variables['class_weights_' + params['class_weights']]
         # Train model
+        if params.get('n_gpus', 1) > 1 and hasattr(self, 'multi_gpu_model') and self.multi_gpu_model is not None:
+            model_to_train = self.multi_gpu_model
+        else:
+            model_to_train = self.model
+
         if int(keras.__version__.split('.')[0]) == 1:
             # Keras 1.x version
-            self.model.fit_generator(train_gen,
-                                     validation_data=val_gen,
-                                     nb_val_samples=n_valid_samples,
-                                     class_weight=class_weight,
-                                     samples_per_epoch=state['samples_per_epoch'],
-                                     nb_epoch=params['n_epochs'],
-                                     max_q_size=params['n_parallel_loaders'],
-                                     verbose=params['verbose'],
-                                     callbacks=callbacks,
-                                     initial_epoch=params['epoch_offset'])
+            model_to_train.fit_generator(train_gen,
+                                         validation_data=val_gen,
+                                         nb_val_samples=n_valid_samples,
+                                         class_weight=class_weight,
+                                         samples_per_epoch=state['samples_per_epoch'],
+                                         nb_epoch=params['n_epochs'],
+                                         max_q_size=params['n_parallel_loaders'],
+                                         verbose=params['verbose'],
+                                         callbacks=callbacks,
+                                         initial_epoch=params['epoch_offset'])
         else:
             # Keras 2.x version
-            self.model.fit_generator(train_gen,
-                                     steps_per_epoch=state['n_iterations_per_epoch'],
-                                     epochs=params['n_epochs'],
-                                     verbose=params['verbose'],
-                                     callbacks=callbacks,
-                                     validation_data=val_gen,
-                                     validation_steps=n_valid_samples,
-                                     class_weight=class_weight,
-                                     max_queue_size=params['n_parallel_loaders'],
-                                     workers=1,  # params['n_parallel_loaders'],
-                                     initial_epoch=params['epoch_offset'])
+            model_to_train.fit_generator(train_gen,
+                                         steps_per_epoch=state['n_iterations_per_epoch'],
+                                         epochs=params['n_epochs'],
+                                         verbose=params['verbose'],
+                                         callbacks=callbacks,
+                                         validation_data=val_gen,
+                                         validation_steps=n_valid_samples,
+                                         class_weight=class_weight,
+                                         max_queue_size=params['n_parallel_loaders'],
+                                         workers=1,
+                                         initial_epoch=params['epoch_offset'])
 
     def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None):
 
@@ -1152,7 +1164,13 @@ class Model_Wrapper(object):
             callbacks.append(callback_tensorboard)
 
         # Train model
-        self.model.fit(x,
+        if params.get('n_gpus', 1) > 1 and hasattr(self, 'model_to_train'):
+            model_to_train = self.model_to_train
+        else:
+            model_to_train = self.model
+
+        # Train model
+        model_to_train.fit(x,
                        y,
                        batch_size=min(params['batch_size'], len(x[0])),
                        epochs=params['n_epochs'],
