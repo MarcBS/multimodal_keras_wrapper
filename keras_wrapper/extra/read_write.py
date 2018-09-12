@@ -112,26 +112,22 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
 
 
 def listoflists2file(filepath, mylist, permission='w'):
-    mylist = [unicode_fn(sublist) for sublist in mylist]
-    mylist = '\n'.join(mylist)
-    if isinstance(mylist[0], str) and sys.version_info.major == 2:
-        mylist = mylist.encode('utf-8')
-    with open(filepath, permission) as f:
+    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    mylist = u'\n'.join(mylist)
+    with codecs.open(filepath, permission, encoding='utf-8') as f:
         f.write(mylist)
         f.write('\n')
 
 
 def list2file(filepath, mylist, permission='w'):
-    mylist = [unicode_fn(l) for l in mylist]
+    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
     mylist = u'\n'.join(mylist)
-    if isinstance(mylist[0], str) and sys.version_info.major == 2:
-        mylist = mylist.encode('utf-8')
-    with open(filepath, permission) as f:
+    with codecs.open(filepath, permission, encoding='utf-8') as f:
         f.write(mylist)
         f.write('\n')
 
 def list2stdout(mylist):
-    mylist = [unicode_fn(l) for l in mylist]
+    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
     mylist = '\n'.join(mylist)
     print (mylist)
 
@@ -150,8 +146,8 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
     mylist = '\n'.join(newlist)
     if isinstance(mylist[0], str) and sys.version_info.major == 2:
         mylist = mylist.encode('utf-8')
-    with open(filepath, permission) as f:
-        f.writelines(mylist)
+    with codecs.open(filepath, permission, encoding='utf-8') as f:
+        f.write(mylist)
 
 
 def list2vqa(filepath, mylist, qids, permission='w', extra=None):
@@ -164,7 +160,7 @@ def list2vqa(filepath, mylist, qids, permission='w', extra=None):
                 [[extra['vocab'][p], extra['probs'][i][p]] for p in np.argsort(extra['probs'][i])[::-1][:5]])
             line['max_prob'] = str(max(extra['probs'][i]))
         res.append(line)
-    with open(filepath, permission) as f:
+    with codecs.open(filepath, permission, encoding='utf-8') as f:
         json.dump(res, f)
 
 
