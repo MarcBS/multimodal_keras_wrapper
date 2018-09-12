@@ -117,7 +117,7 @@ def listoflists2file(filepath, mylist, permission='w'):
     if isinstance(mylist[0], str) and sys.version_info.major == 2:
         mylist = mylist.encode('utf-8')
     with open(filepath, permission) as f:
-        f.writelines(mylist)
+        f.write(mylist)
         f.write('\n')
 
 
@@ -127,7 +127,7 @@ def list2file(filepath, mylist, permission='w'):
     if isinstance(mylist[0], str) and sys.version_info.major == 2:
         mylist = mylist.encode('utf-8')
     with open(filepath, permission) as f:
-        f.writelines(mylist)
+        f.write(mylist)
         f.write('\n')
 
 def list2stdout(mylist):
