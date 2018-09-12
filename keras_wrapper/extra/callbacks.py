@@ -739,7 +739,7 @@ class Sample(KerasCallback):
                                                                      alphas=alphas,
                                                                      x_text=sources,
                                                                      heuristic=heuristic,
-                                                                     mapping=self.extra_vars.get('mapping',None),
+                                                                     mapping=self.extra_vars.get('mapping', None),
                                                                      verbose=self.verbose)
                     else:
                         predictions = decode_predictions(samples,

@@ -28,7 +28,11 @@ else:
 # Helpers
 
 
-def _dirac(pred, gt):
+def encode_list(mylist):
+    return [l.decode('utf-8') if isinstance(l, str) else unicode(l) for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+
+
+def dirac(pred, gt):
     return int(pred == gt)
 
 
@@ -60,13 +64,10 @@ def clean_dir(directory):
         os.makedirs(directory)
 
 
-###
 # Main functions
-###
 def file2list(filepath, stripfile=True):
     with codecs.open(filepath, 'r', encoding='utf-8') as f:
-        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in
-                                                                                                 f.readlines()]
+        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in f.readlines()]
         return lines
 
 
@@ -84,7 +85,7 @@ def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
         f.close()
 
 
-def numpy2file(filepath, mylist, permission='w', split=False):
+def numpy2file(filepath, mylist, permission='wb', split=False):
     mylist = np.asarray(mylist)
     if split:
         for i, filepath_ in list(enumerate(filepath)):
@@ -112,7 +113,8 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
 
 
 def listoflists2file(filepath, mylist, permission='w'):
-    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    mylist = [encode_list(sublist) for sublist in mylist]
+    mylist = [item for sublist in mylist for item in sublist]
     mylist = u'\n'.join(mylist)
     with codecs.open(filepath, permission, encoding='utf-8') as f:
         f.write(mylist)
@@ -120,14 +122,15 @@ def listoflists2file(filepath, mylist, permission='w'):
 
 
 def list2file(filepath, mylist, permission='w'):
-    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    mylist = encode_list(mylist)
     mylist = u'\n'.join(mylist)
     with codecs.open(filepath, permission, encoding='utf-8') as f:
         f.write(mylist)
         f.write('\n')
 
+
 def list2stdout(mylist):
-    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    mylist = encode_list(mylist)
     mylist = '\n'.join(mylist)
     print (mylist)
 
@@ -140,7 +143,13 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
             for l3 in l2:
                 if isinstance(l3, list):
                     l3 = l3[0]
-                a.append(unicode_fn(l3) + ' ' + separator)
+                if sys.version_info.major == 2:
+                    if isinstance(l3, str):
+                        a.append(l3.decode('utf-8') + u' ' + separator)
+                    else:
+                        a.append(unicode(l3) + u' ' + separator)
+                else:
+                    a.append(str(l3) + ' ' + separator)
             a = ' '.join(a + [' '])
             newlist.append(a.strip()[:-len(separator)].strip())
     mylist = '\n'.join(newlist)
@@ -179,13 +188,7 @@ def load_hdf5_simple(filepath, dataset_name='data'):
     return tmp
 
 
-def pickle_model(
-        path,
-        model,
-        word2index_x,
-        word2index_y,
-        index2word_x,
-        index2word_y):
+def pickle_model(path, model, word2index_x, word2index_y, index2word_x, index2word_y):
     modifier = 10
     tmp = sys.getrecursionlimit()
     sys.setrecursionlimit(tmp * modifier)
@@ -265,7 +268,7 @@ def text_to_model(filepath):
     pass
 
 
-def print_qa(questions, answers_gt, answers_gt_original, answers_pred, era, similarity=_dirac, path=''):
+def print_qa(questions, answers_gt, answers_gt_original, answers_pred, era, similarity=dirac, path=''):
     """
     In:
         questions - list of questions
@@ -291,7 +294,7 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred, era, simi
         a_gt = answers_gt[k]
         a_gt_original = answers_gt_original[k]
         a_p = answers_pred[k]
-        score += _dirac(a_p, a_gt_original)
+        score += dirac(a_p, a_gt_original)
         if isinstance(q[0], unicode_fn):
             tmp = unicode_fn('question: {0}\nanswer: {1}\nanswer_original: {2}\nprediction: {3}\n')
         else:
@@ -306,22 +309,22 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred, era, simi
     return score
 
 
-def dict2file(mydict, path, title=None, separator=':'):
+def dict2file(mydict, path, title=None, separator=':', permission='a'):
     """
     In:
         mydict - dictionary to save in a file
-        path - path where acc_dict is stored
+        path - path where mydict is stored
         title - the first sentence in the file;
             useful if we write many dictionaries
             into the same file
     """
-    tmp = [unicode_fn(x[0]) + separator + unicode_fn(x[1]) for x in list(iteritems(mydict))]
+    tmp = [encode_list([x[0]])[0] + separator + encode_list([x[1]])[0] for x in list(iteritems(mydict))]
     if title is not None:
         output_list = [title]
         output_list.extend(tmp)
     else:
         output_list = tmp
-    list2file(path, output_list, 'a')
+    list2file(path, output_list, permission=permission)
 
 
 def dict2pkl(mydict, path):
@@ -335,7 +338,7 @@ def dict2pkl(mydict, path):
         extension = ''
     else:
         extension = '.pkl'
-    with open(path + extension, 'w') as f:
+    with open(path + extension, 'wb') as f:
         pk.dump(mydict, f, protocol=-1)
 
 
@@ -346,7 +349,7 @@ def pkl2dict(path):
     :param path: Path to the pkl file to load
     :return: Dict() containing the loaded pkl
     """
-    with open(path, 'r') as f:
+    with open(path, 'rb') as f:
         if sys.version_info.major == 2:
             return pk.load(f)
         else:

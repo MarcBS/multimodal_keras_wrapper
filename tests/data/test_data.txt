@@ -1,0 +1,3 @@
+This is a text file. Containing characters of different encodings.
+ẁñ á é í ó ú à è ì ò ù ä ë ï ö ü ^
+首先 ，

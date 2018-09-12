@@ -54,7 +54,7 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
         (Cider(), "CIDEr")
     ]
     if extra_vars.get('language', 'en') in accepted_langs:
-        scorers.append((Meteor(language=extra_vars['language']), "METEOR"))
+        scorers.append((Meteor(language=extra_vars.get('language', 'en')), "METEOR"))
 
     final_scores = {}
     for scorer, method in scorers:
@@ -712,7 +712,7 @@ def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
 
     if mask is not None:
         y_pred /= np.sum(y_pred, axis=-1, keepdims=True)
-        mask = np.reshape(mask, y_true.shape[:-1])[:, :, None]
+        mask = np.reshape(np.asarray(mask), np.asarray(y_true).shape[:-1])[:, :, None]
         truth_mask = (y_true * mask).flatten().nonzero()[0]
         predictions = y_pred.flatten()[truth_mask]
         ppl = np.power(2, np.mean(-np.log2(predictions)))
