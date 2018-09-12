@@ -49,5 +49,4 @@ script:
       PYTHONPATH=$PWD:$PYTHONPATH pytest --pep8 -m pep8 -n0;
     elif [[ "$TEST_MODE" == "EXTRA" ]]; then
       PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/extra/2>&1 ;
-      fi
     fi
