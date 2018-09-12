@@ -14,20 +14,43 @@ def tokenize_basic(caption, lowercase=True):
     :return: Tokenized version of caption
     """
 
-    punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')', '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',',
-             '?', '!']
+    punct = [u'.',
+             u';',
+             u',',
+             u'，',
+             ur"/",
+             u'[',
+             u']',
+             u'"',
+             u'{',
+             u'}',
+             u'(',
+             u')',
+             u'=',
+             u'+',
+             u'\\',
+             u'_',
+             u'-',
+             u'>',
+             u'<',
+             u'@',
+             u'`',
+             u'¿',
+             u'?',
+             u'¡',
+             u'!']
 
     def processPunctuation(inText):
         outText = inText
         for p in punct:
-            outText = outText.replace(p, ' ' + p + ' ')
+            outText = outText.replace(p, u' ' + p + u' ')
         return outText
 
     resAns = caption.lower() if lowercase else caption
-    resAns = resAns.replace('\n', ' ')
-    resAns = resAns.replace('\t', ' ')
+    resAns = resAns.replace(u'\n', u' ')
+    resAns = resAns.replace(u'\t', u' ')
     resAns = processPunctuation(resAns)
-    resAns = resAns.replace('  ', ' ')
+    resAns = re.sub(u'[ ]+', u' ', resAns)
     return resAns
 
 
@@ -41,9 +64,31 @@ def tokenize_aggressive(caption, lowercase=True):
     :param lowercase: Whether to lowercase the caption or not
     :return: Tokenized version of caption
     """
-    punct = ['.', ';', r"/", '[', ']', '"', '{', '}', '(', ')',
-             '=', '+', '\\', '_', '-', '>', '<', '@', '`', ',', '?', '!',
-             '¿', '¡', '\n', '\t', '\r']
+    punct = [u'.',
+             u';',
+             u',',
+             u'，',
+             ur"/",
+             u'[',
+             u']',
+             u'"',
+             u'{',
+             u'}',
+             u'(',
+             u')',
+             u'=',
+             u'+',
+             u'\\',
+             u'_',
+             u'-',
+             u'>',
+             u'<',
+             u'@',
+             u'`',
+             u'¿',
+             u'?',
+             u'¡',
+             u'!']
 
     def processPunctuation(inText):
         outText = inText
@@ -53,7 +98,7 @@ def tokenize_aggressive(caption, lowercase=True):
 
     resAns = caption.lower() if lowercase else caption
     resAns = processPunctuation(resAns)
-    resAns = re.sub('[  ]+', ' ', resAns)
+    resAns = re.sub('[ ]+', ' ', resAns)
     resAns = resAns.strip()
     return resAns
 
@@ -67,11 +112,7 @@ def tokenize_icann(caption):
     :param caption: String to tokenize
     :return: Tokenized version of caption
     """
-    tokenized = re.sub('[.,"\n\t]+', '', caption)
-    tokenized = re.sub('[  ]+', ' ', tokenized)
-    tokenized = map(lambda x: x.lower(), tokenized.split())
-    tokenized = " ".join(tokenized)
-    return tokenized
+    return tokenize_soft(caption)
 
 
 def tokenize_montreal(caption):
@@ -85,7 +126,7 @@ def tokenize_montreal(caption):
     """
     tokenized = re.sub('[.,"\n\t]+', '', caption.strip())
     tokenized = re.sub('[\']+', " '", tokenized)
-    tokenized = re.sub('[  ]+', ' ', tokenized)
+    tokenized = re.sub('[ ]+', ' ', tokenized)
     tokenized = map(lambda x: x.lower(), tokenized.split())
     tokenized = " ".join(tokenized)
     return tokenized
@@ -100,23 +141,22 @@ def tokenize_soft(caption, lowercase=True):
     :param lowercase: Whether to lowercase the caption or not
     :return: Tokenized version of caption
     """
-    tokenized = re.sub('[\n\t]+', '', caption.strip())
-    tokenized = re.sub('[\.]+', ' . ', tokenized)
-    tokenized = re.sub('[,]+', ' , ', tokenized)
-    tokenized = re.sub('[!]+', ' ! ', tokenized)
-    tokenized = re.sub('[?]+', ' ? ', tokenized)
-    tokenized = re.sub('[\{]+', ' { ', tokenized)
-    tokenized = re.sub('[\}]+', ' } ', tokenized)
-    tokenized = re.sub('[\(]+', ' ( ', tokenized)
-    tokenized = re.sub('[\)]+', ' ) ', tokenized)
-    tokenized = re.sub('[\[]+', ' [ ', tokenized)
-    tokenized = re.sub('[\]]+', ' ] ', tokenized)
-    tokenized = re.sub('["]+', ' " ', tokenized)
-    tokenized = re.sub('[\']+', " ' ", tokenized)
-    tokenized = re.sub('[  ]+', ' ', tokenized)
-    tokenized = map(lambda x: x.lower(), tokenized.split())
-    tokenized = " ".join(tokenized)
-    return tokenized
+    tokenized = re.sub(u'[\n\t]+', u'', caption.strip())
+    tokenized = re.sub(u'[\.]+', u' . ', tokenized)
+    tokenized = re.sub(u'[,]+', u' , ', tokenized)
+    tokenized = re.sub(u'[!]+', u' ! ', tokenized)
+    tokenized = re.sub(u'[?]+', u' ? ', tokenized)
+    tokenized = re.sub(u'[\{]+', u' { ', tokenized)
+    tokenized = re.sub(u'[\}]+', u' } ', tokenized)
+    tokenized = re.sub(u'[\(]+', u' ( ', tokenized)
+    tokenized = re.sub(u'[\)]+', u' ) ', tokenized)
+    tokenized = re.sub(u'[\[]+', u' [ ', tokenized)
+    tokenized = re.sub(u'[\]]+', u' ] ', tokenized)
+    tokenized = re.sub(u'["]+', u' " ', tokenized)
+    tokenized = re.sub(u'[\']+', u" ' ", tokenized)
+    tokenized = re.sub(u'[ ]+', u' ', tokenized)
+    # tokenized = u" ".join(tokenized)
+    return tokenized if not lowercase else tokenized.lower()
 
 
 def tokenize_none(caption):
@@ -149,24 +189,14 @@ def tokenize_none_char(caption):
 
     def convert_chars(x):
         if x == ' ':
-            return '<space>'
+            return u'<space>'
         else:
-            return x.encode('utf-8')
+            return x
 
-    tokenized = re.sub('[\n\t]+', '', caption.strip())
-    tokenized = re.sub('&amp;', ' & ', tokenized)
-    tokenized = re.sub('&#124;', ' | ', tokenized)
-    tokenized = re.sub('&gt;', ' > ', tokenized)
-    tokenized = re.sub('&lt;', ' < ', tokenized)
-    tokenized = re.sub('&apos;', " ' ", tokenized)
-    tokenized = re.sub('&quot;', ' " ', tokenized)
-    tokenized = re.sub('&#91;', ' [ ', tokenized)
-    tokenized = re.sub('&#93;', ' ] ', tokenized)
-    tokenized = re.sub('[  ]+', ' ', tokenized)
-    if isinstance(tokenized, str) and sys.version_info < (3, 0):
-        tokenized = tokenized.decode("utf-8")
+    tokenized = re.sub(u'[\n\t]+', u'', caption.strip())
+    tokenized = re.sub(u'[ ]+', u' ', tokenized)
     tokenized = [convert_chars(char) for char in tokenized]
-    tokenized = " ".join(tokenized)
+    tokenized = u" ".join(tokenized)
     return tokenized
 
 
@@ -347,14 +377,6 @@ def detokenize_none_char(caption):
         :return: Detokenized version of caption.
     """
 
-    detokenized = re.sub(' & ', ' &amp; ', str(caption).strip())
-    detokenized = re.sub(' \| ', ' &#124; ', detokenized)
-    detokenized = re.sub(' > ', ' &gt; ', detokenized)
-    detokenized = re.sub(' < ', ' &lt; ', detokenized)
-    detokenized = re.sub("' ", ' &apos; ', detokenized)
-    detokenized = re.sub('" ', ' &quot; ', detokenized)
-    detokenized = re.sub('\[ ', ' &#91; ', detokenized)
-    detokenized = re.sub('\] ', ' &#93; ', detokenized)
-    detokenized = re.sub(' ', '', detokenized)
-    detokenized = re.sub('<space>', ' ', detokenized)
+    detokenized = re.sub(u' ', u'', caption)
+    detokenized = re.sub(u'<space>', u' ', detokenized)
     return detokenized

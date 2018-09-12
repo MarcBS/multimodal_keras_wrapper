@@ -280,7 +280,7 @@ def loadFlickr8k():
 
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
-    logging.info('Sample data loaded correctly. %d input samples. %d output samples' %(len(X), len(Y)))
+    logging.info('Sample data loaded correctly. %d input samples. %d output samples' % (len(X), len(Y)))
 
 
 def loadMSVD():

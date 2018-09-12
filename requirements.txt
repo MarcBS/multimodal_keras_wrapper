@@ -11,4 +11,9 @@ keras_applications
 keras_preprocessing
 sklearn
 git+https://github.com/MarcBS/keras#egg=keras
-
+pytest
+pytest-cache
+pytest-cov
+pytest-forked
+pytest-pep8
+pytest-xdist

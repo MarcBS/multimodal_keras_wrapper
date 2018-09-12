@@ -27,6 +27,7 @@ else:
 
 # Helpers
 
+
 def encode_list(mylist):
     return [l.decode('utf-8') if isinstance(l, str) else unicode(l) for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
 
@@ -126,6 +127,7 @@ def list2file(filepath, mylist, permission='w'):
     with codecs.open(filepath, permission, encoding='utf-8') as f:
         f.write(mylist)
         f.write('\n')
+
 
 def list2stdout(mylist):
     mylist = encode_list(mylist)
