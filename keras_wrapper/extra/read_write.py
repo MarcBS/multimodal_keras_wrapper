@@ -27,6 +27,8 @@ else:
 
 # Helpers
 
+def encode_list(mylist):
+    return [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
 
 def _dirac(pred, gt):
     return int(pred == gt)
@@ -60,13 +62,10 @@ def clean_dir(directory):
         os.makedirs(directory)
 
 
-###
 # Main functions
-###
 def file2list(filepath, stripfile=True):
     with codecs.open(filepath, 'r', encoding='utf-8') as f:
-        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in
-                                                                                                 f.readlines()]
+        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in f.readlines()]
         return lines
 
 
@@ -112,7 +111,8 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
 
 
 def listoflists2file(filepath, mylist, permission='w'):
-    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    mylist = [encode_list(sublist) for sublist in mylist]
+    mylist = [item for sublist in mylist for item in sublist]
     mylist = u'\n'.join(mylist)
     with codecs.open(filepath, permission, encoding='utf-8') as f:
         f.write(mylist)
@@ -120,14 +120,14 @@ def listoflists2file(filepath, mylist, permission='w'):
 
 
 def list2file(filepath, mylist, permission='w'):
-    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    mylist = encode_list(mylist)
     mylist = u'\n'.join(mylist)
     with codecs.open(filepath, permission, encoding='utf-8') as f:
         f.write(mylist)
         f.write('\n')
 
 def list2stdout(mylist):
-    mylist = [l.decode('utf-8') for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    mylist = encode_list(mylist)
     mylist = '\n'.join(mylist)
     print (mylist)
 
@@ -140,7 +140,10 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
             for l3 in l2:
                 if isinstance(l3, list):
                     l3 = l3[0]
-                a.append(unicode_fn(l3) + ' ' + separator)
+                if sys.version_info.major == 2:
+                    a.append(str(l3).decode('utf-8') + u' ' + separator)
+                else:
+                    a.append(str(l3) + ' ' + separator)
             a = ' '.join(a + [' '])
             newlist.append(a.strip()[:-len(separator)].strip())
     mylist = '\n'.join(newlist)
@@ -179,13 +182,7 @@ def load_hdf5_simple(filepath, dataset_name='data'):
     return tmp
 
 
-def pickle_model(
-        path,
-        model,
-        word2index_x,
-        word2index_y,
-        index2word_x,
-        index2word_y):
+def pickle_model(path,model,word2index_x,word2index_y,index2word_x,index2word_y):
     modifier = 10
     tmp = sys.getrecursionlimit()
     sys.setrecursionlimit(tmp * modifier)
