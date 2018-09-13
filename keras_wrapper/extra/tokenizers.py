@@ -18,7 +18,7 @@ def tokenize_basic(caption, lowercase=True):
              u';',
              u',',
              u'，',
-             r"/",
+             u"/",
              u'[',
              u']',
              u'"',
