@@ -11,6 +11,7 @@ keras_applications
 keras_preprocessing
 sklearn
 git+https://github.com/MarcBS/keras#egg=keras
+-e git+https://github.com/lvapeab/coco-caption.git#egg=coco-caption
 pytest
 pytest-cache
 pytest-cov
