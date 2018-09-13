@@ -1,6 +1,7 @@
 # Multimodal Keras Wrapper
 Wrapper for Keras with support to easy multimodal data and models loading and handling.
 
+[![Build Status](https://travis-ci.org/lvapeab/multimodal_keras_wrapper.svg?branch=master)](https://travis-ci.org/lvapeab/multimodal_keras_wrapper)
 
 ## Documentation
 

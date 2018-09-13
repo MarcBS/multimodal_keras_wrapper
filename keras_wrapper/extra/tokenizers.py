@@ -68,7 +68,7 @@ def tokenize_aggressive(caption, lowercase=True):
              u';',
              u',',
              u'，',
-             r"/",
+             u"/",
              u'[',
              u']',
              u'"',

@@ -6,6 +6,10 @@ matrix:
         - python: 2.7
           env: TEST_MODE=PEP8
         - python: 2.7
+          env: TEST_MODE=GENERAL
+        - python: 3.6
+          env: TEST_MODE=GENERAL
+        - python: 2.7
           env: TEST_MODE=EXTRA
         - python: 3.6
           env: TEST_MODE=EXTRA
@@ -47,6 +51,8 @@ script:
   - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
   - if [[ "$TEST_MODE" == "PEP8" ]]; then
       PYTHONPATH=$PWD:$PYTHONPATH pytest --pep8 -m pep8 -n0;
+    elif [[ "$TEST_MODE" == "GENERAL" ]]; then
+      PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/*py 2>&1 ;
     elif [[ "$TEST_MODE" == "EXTRA" ]]; then
-      PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/extra/2>&1 ;
+      PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/extra/ 2>&1 ;
     fi
