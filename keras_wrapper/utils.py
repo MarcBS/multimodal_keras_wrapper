@@ -1066,6 +1066,11 @@ def flatten(l):
 def key_with_max_val(d):
     """ a) create a list of the dict's keys and values;
         b) return the key with the max value"""
+
+    d = dict((k, v) for k, v in iteritems(d) if isinstance(v, (int, float, complex)))
     v = list(d.values())
     k = list(d.keys())
-    return k[v.index(max(v))]
+    if d == {}:
+        return -1
+    else:
+        return k[v.index(max(v))]

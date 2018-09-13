@@ -428,7 +428,7 @@ def test_key_with_max_val():
 
     test_dict = {1: 'a', 2: 'b', 3: 'z', 4: 1, 5: 4444}
     key = key_with_max_val(test_dict)
-    assert key == 3
+    assert key == 5
 
 
 if __name__ == '__main__':
