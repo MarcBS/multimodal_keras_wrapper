@@ -25,7 +25,7 @@ from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_G
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
-    decode_predictions_beam_search, replace_unknown_words, sample, sampling, categorical_probas_to_classes, checkParameters
+    decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
@@ -2286,18 +2286,6 @@ class Model_Wrapper(object):
     #       DECODING FUNCTIONS
     #           Functions for decoding predictions
     # ------------------------------------------------------- #
-
-    @staticmethod
-    def sample(a, temperature=1.0):
-        """
-        Helper function to sample an index from a probability array
-        :param a: Probability array
-        :param temperature: The higher, the flatter probabilities. Hence more random outputs.
-        :return:
-        """
-
-        logger.warning("Deprecated function, use utils.sample() instead.")
-        return sample(a, temperature=temperature)
 
     @staticmethod
     def sampling(scores, sampling_type='max_likelihood', temperature=1.0):

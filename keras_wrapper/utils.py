@@ -1016,18 +1016,6 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
     return answer_pred
 
 
-def sample(a, temperature=1.0):
-    """
-    Helper function to sample an index from a probability array
-    :param a: Probability array
-    :param temperature: The higher, the flatter probabilities. Hence more random outputs.
-    :return:
-    """
-    a = np.log(a) / temperature
-    a = np.exp(a) / np.sum(np.exp(a))
-    return np.argmax(np.random.multinomial(1, a, 1))
-
-
 def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
     """
     Sampling words (each sample is drawn from a categorical distribution).

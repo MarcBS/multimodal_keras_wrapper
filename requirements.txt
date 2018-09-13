@@ -17,3 +17,4 @@ pytest-cov
 pytest-forked
 pytest-pep8
 pytest-xdist
+tables
