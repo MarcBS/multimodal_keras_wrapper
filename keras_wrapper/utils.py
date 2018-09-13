@@ -28,7 +28,7 @@ def checkParameters(input_params, default_params, hard_check=False):
         if key in valid_params:
             params[key] = val
         elif hard_check:
-            raise Exception("Parameter '" + key + "' is not a valid parameter.")
+            raise ValueError("Parameter '" + key + "' is not a valid parameter.")
 
     # Use default parameters if not provided
     for key, default_val in iteritems(default_params):
