@@ -112,6 +112,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         model_wrapper.model_next.save_weights(model_name + '_weights_next.h5', overwrite=True)
 
     # Save additional information
+    backup_multi_gpu_model = None
     if hasattr(model_wrapper, 'multi_gpu_model'):
         backup_multi_gpu_model = model_wrapper.multi_gpu_model
         setattr(model_wrapper, 'multi_gpu_model', None)
