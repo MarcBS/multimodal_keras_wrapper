@@ -97,21 +97,31 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
 
     # Save auxiliary models for optimized search
     if model_wrapper.model_init is not None:
-        # Save model structure
-        logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
-        json_string = model_wrapper.model_init.to_json()
-        open(model_name + '_structure_init.json', 'w').write(json_string)
-        # Save model weights
-        model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
+        try:  # Try to save model at one time
+            model_wrapper.model_init.save(model_name + '_init.h5')
+        except Exception as e:  # Split saving in model structure / weights
+            logging.info(str(e))
+            # Save model structure
+            logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
+            json_string = model_wrapper.model_init.to_json()
+            open(model_name + '_structure_init.json', 'w').write(json_string)
+            # Save model weights
+            model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
+
     if model_wrapper.model_next is not None:
-        # Save model structure
-        logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
-        json_string = model_wrapper.model_next.to_json()
-        open(model_name + '_structure_next.json', 'w').write(json_string)
-        # Save model weights
-        model_wrapper.model_next.save_weights(model_name + '_weights_next.h5', overwrite=True)
+        try:  # Try to save model at one time
+            model_wrapper.model_next.save(model_name + '_next.h5')
+        except Exception as e:  # Split saving in model structure / weights
+            logging.info(str(e))
+            # Save model structure
+            logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
+            json_string = model_wrapper.model_next.to_json()
+            open(model_name + '_structure_next.json', 'w').write(json_string)
+            # Save model weights
+            model_wrapper.model_next.save_weights(model_name + '_weights_next.h5', overwrite=True)
 
     # Save additional information
+    backup_multi_gpu_model = None
     if hasattr(model_wrapper, 'multi_gpu_model'):
         backup_multi_gpu_model = model_wrapper.multi_gpu_model
         setattr(model_wrapper, 'multi_gpu_model', None)
@@ -161,16 +171,22 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         model.load_weights(model_name + '_weights.h5')
 
     # Load auxiliary models for optimized search
-    if os.path.exists(model_name + '_structure_init.json') and os.path.exists(
+    if os.path.exists(model_name + '_init.h5') and os.path.exists(model_name + '_next.h5'):
+        loading_optimized = 1
+    elif os.path.exists(model_name + '_structure_init.json') and os.path.exists(
             model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and os.path.exists(
             model_name + '_weights_next.h5'):
-        loaded_optimized = True
+        loading_optimized = 2
     else:
-        loaded_optimized = False
+        loading_optimized = 0
 
-    if loaded_optimized:
-        # Load model structure
+    if loading_optimized == 1:
         logging.info("<<< Loading optimized model... >>>")
+        model_init = load_model(model_name + '_init.h5', custom_objects=custom_objects, compile=False)
+        model_next = load_model(model_name + '_next.h5', custom_objects=custom_objects, compile=False)
+
+    elif loading_optimized == 2:
+        # Load model structure
         logging.info("\t <<< Loading model_init from " + model_name + "_structure_init.json ... >>>")
         model_init = model_from_json(open(model_name + '_structure_init.json').read(),
                                      custom_objects=custom_objects)
@@ -202,7 +218,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     model_wrapper.updateLogger()
 
     model_wrapper.model = model
-    if loaded_optimized:
+    if loading_optimized != 0:
         model_wrapper.model_init = model_init
         model_wrapper.model_next = model_next
         logging.info("<<< Optimized model loaded. >>>")
@@ -237,7 +253,7 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
     logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
     try:
-        logging.info("<<< Loading model from " + model_path + ".h5 ... >>>")
+        logging.info("<<< Updating model from " + model_path + ".h5 ... >>>")
         model.model.set_weights(load_model(model_path + '.h5', compile=False).get_weights())
 
     except Exception as e:
@@ -248,20 +264,27 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
         model.model.load_weights(model_path + '_weights.h5')
 
     # Load auxiliary models for optimized search
-    if os.path.exists(model_path + '_weights_init.h5') and os.path.exists(model_path + '_weights_next.h5'):
-        loaded_optimized = True
+    if os.path.exists(model_name + '_init.h5') and os.path.exists(model_name + '_next.h5'):
+        loading_optimized = 1
+    elif os.path.exists(model_name + '_weights_init.h5') and os.path.exists(model_name + '_weights_next.h5'):
+        loading_optimized = 2
     else:
-        loaded_optimized = False
+        loading_optimized = 0
 
-    if loaded_optimized:
-        # Load model structure
+    if loading_optimized != 0:
         logging.info("<<< Updating optimized model... >>>")
-        logging.info("\t <<< Updating model_init from " + model_path + "_structure_init.json ... >>>")
-        model.model_init.load_weights(model_path + '_weights_init.h5')
-        # Load model structure
-        logging.info("\t <<< Updating model_next from " + model_path + "_structure_next.json ... >>>")
-        # Load model weights
-        model.model_next.load_weights(model_path + '_weights_next.h5')
+        if loading_optimized == 1:
+            logging.info("\t <<< Updating model_init from " + model_path + "_init.h5 ... >>>")
+            model.model_init.set_weights(load_model(model_path + '_init.h5', compile=False).get_weights())
+            logging.info("\t <<< Updating model_next from " + model_path + "_next.h5 ... >>>")
+            model.model_next.set_weights(load_model(model_path + '_next.h5', compile=False).get_weights())
+        elif loading_optimized == 2:
+            logging.info("\t <<< Updating model_init from " + model_path + "_structure_init.json ... >>>")
+            model.model_init.load_weights(model_path + '_weights_init.h5')
+            # Load model structure
+            logging.info("\t <<< Updating model_next from " + model_path + "_structure_next.json ... >>>")
+            # Load model weights
+            model.model_next.load_weights(model_path + '_weights_next.h5')
 
     logging.info("<<< Model updated in %0.6s seconds. >>>" % str(time.time() - t))
     return model
