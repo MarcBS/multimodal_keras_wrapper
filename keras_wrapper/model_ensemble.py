@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-import copy
 import logging
 import math
 import sys
@@ -10,6 +9,12 @@ import numpy as np
 from keras_wrapper.dataset import Data_Batch_Generator
 from keras_wrapper.utils import one_hot_2_indices, checkParameters
 from search import beam_search
+try:
+    import cupy as cp
+    cupy = True
+except:
+    import numpy as cp
+    cupy = False
 
 
 class BeamSearchEnsemble:
@@ -27,7 +32,7 @@ class BeamSearchEnsemble:
         self.return_alphas = params_prediction.get('coverage_penalty', False) or params_prediction.get('pos_unk', False)
         self.n_best = n_best
         self.verbose = verbose
-        self.model_weights = np.asarray([1. / len(models)] * len(models), dtype=np.float32) if (model_weights is None) or (model_weights == []) else model_weights
+        self.model_weights = cp.asarray([1. / len(models)] * len(models), dtype='float32') if (model_weights is None) or (model_weights == []) else model_weights
 
         self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
                                   sys.stdout.isatty()) or
@@ -60,10 +65,11 @@ class BeamSearchEnsemble:
                 alphas_list.append(next_outs[-1][0])  # Shape: (k, n_steps)
                 next_outs = next_outs[:-1]
             prev_outs_list.append(next_outs)
-
-        probs = sum(probs_list[i] * self.model_weights[i] for i in range(len(self.models)))
+        probs_list = cp.asarray(probs_list)
+        alphas_list = cp.asarray(alphas_list)
+        probs = cp.sum(self.model_weights[:, None, None] * probs_list, axis=0)
         if self.return_alphas:
-            alphas = np.asarray(sum(alphas_list[i] for i in range(len(self.models))))
+            alphas = cp.sum(self.model_weights[:, None, None] * alphas_list, axis=0)
         else:
             alphas = None
 
