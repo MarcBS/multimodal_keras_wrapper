@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
 import copy
 import numpy as np
+import logging
 
+try:
+    import cupy as cp
+    cupy = True
+except:
+    import numpy as cp
+    logging.info('<<< Cupy not available. Using numpy. >>>')
+    cupy = False
 
 def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, model_ensemble=False, n_models=0):
     """
@@ -45,7 +53,7 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
     dead_k = 0  # samples that reached eos
     live_k = 1  # samples that did not yet reach eos
     hyp_samples = [[]] * live_k
-    hyp_scores = np.zeros(live_k).astype('float32')
+    hyp_scores = cp.zeros(live_k).astype('float32')
     ret_alphas = return_alphas or params['pos_unk']
     if ret_alphas:
         sample_alphas = []
@@ -90,24 +98,27 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
                     prev_out = prev_out[:-1]
         else:
             probs = model.predict_cond(X, state_below, params, ii)
-        log_probs = np.log(probs)
+        log_probs = cp.log(probs)
         if minlen > 0 and ii < minlen:
-            log_probs[:, eos_sym] = -np.inf
+            log_probs[:, eos_sym] = -cp.inf
         # total score for every sample is sum of -log of word prb
-        cand_scores = np.array(hyp_scores)[:, None] - log_probs
+        cand_scores = hyp_scores[:, None] - log_probs
         cand_flat = cand_scores.flatten()
         # Find the best options by calling argsort of flatten array
-        ranks_flat = cand_flat.argsort()[:(k - dead_k)]
+        ranks_flat = cp.argsort(cand_flat)[:(k - dead_k)]
         # Decypher flatten indices
         voc_size = log_probs.shape[1]
         trans_indices = ranks_flat // voc_size  # index of row
         word_indices = ranks_flat % voc_size  # index of col
         costs = cand_flat[ranks_flat]
         best_cost = costs[0]
+        if cupy:
+            trans_indices = cp.asnumpy(trans_indices)
+            word_indices = cp.asnumpy(word_indices)
         # Form a beam for the next iteration
         new_hyp_samples = []
         new_trans_indices = []
-        new_hyp_scores = np.zeros(k - dead_k).astype('float32')
+        new_hyp_scores = cp.zeros(k - dead_k).astype('float32')
         if ret_alphas:
             new_hyp_alphas = []
         for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):
@@ -146,7 +157,7 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
                 hyp_scores.append(new_hyp_scores[idx])
                 if ret_alphas:
                     hyp_alphas.append(new_hyp_alphas[idx])
-        hyp_scores = np.array(hyp_scores)
+        hyp_scores = cp.array(np.asarray(hyp_scores, dtype='float32'), dtype='float32')
         live_k = new_live_k
 
         if new_live_k < 1:
