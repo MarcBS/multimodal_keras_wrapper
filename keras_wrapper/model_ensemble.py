@@ -8,7 +8,7 @@ import numpy as np
 
 from keras_wrapper.dataset import Data_Batch_Generator
 from keras_wrapper.utils import one_hot_2_indices, checkParameters
-from search import beam_search
+from keras_wrapper.search import beam_search
 try:
     import cupy as cp
     cupy = True
