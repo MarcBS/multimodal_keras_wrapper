@@ -18,6 +18,7 @@ The following dependencies are required for using this library:
  - [Coco-caption evaluation package](https://github.com/lvapeab/coco-caption/tree/master/pycocoevalcap/) (Only required to perform evaluation). This package requires `java` (version 1.8.0 or newer).
  - Those specified in the `requirements.txt` file.   
  - The `cupy` package can be used for performing numpy-like operations in the GPU. If not available, the package will fall back to numpy.
+ 
 Only when using NMS for certain localization utilities:
  - [cython](https://pypi.python.org/pypi/Cython/0.25.2) >= 0.23.4
 
