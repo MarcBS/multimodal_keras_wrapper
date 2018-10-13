@@ -11,6 +11,7 @@ except:
     logging.info('<<< Cupy not available. Using numpy. >>>')
     cupy = False
 
+
 def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, model_ensemble=False, n_models=0):
     """
     Beam search method for Cond models.
