@@ -1744,7 +1744,7 @@ class Model_Wrapper(object):
                                     coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
                             else:
                                 coverage_penalties = [0.0 for _ in samples]
-                            scores = [co / lp + cp for co, lp, cp in zip(scores, length_penalties, coverage_penalties)]
+                            scores = [co / lp + cov_p for co, lp, cov_p in zip(scores, length_penalties, coverage_penalties)]
 
                         elif params['normalize_probs']:
                             counts = [len(sample) ** params['alpha_factor'] for sample in samples]

@@ -249,7 +249,7 @@ class BeamSearchEnsemble:
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
                     samples, scores, alphas = beam_search(self, x, params, null_sym=self.dataset.extra_words['<null>'],
-                                                          model_ensemble=True, n_models=len(self.models))
+                                                          return_alphas=self.return_alphas, model_ensemble=True, n_models=len(self.models))
 
                     if params['length_penalty'] or params['coverage_penalty']:
                         if params['length_penalty']:
@@ -274,7 +274,7 @@ class BeamSearchEnsemble:
                                 coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
                         else:
                             coverage_penalties = [0.0 for _ in samples]
-                        scores = [co / lp + cp for co, lp, cp in zip(scores, length_penalties, coverage_penalties)]
+                        scores = [co / lp + cov_p for co, lp, cov_p in zip(scores, length_penalties, coverage_penalties)]
 
                     elif params['normalize_probs']:
                         counts = [len(sample) ** params['alpha_factor'] for sample in samples]
@@ -371,7 +371,8 @@ class BeamSearchEnsemble:
         x = dict()
         for input_id in params['model_inputs']:
             x[input_id] = np.asarray([X[input_id]])
-        samples, scores, alphas = beam_search(x, params, null_sym=self.dataset.extra_words['<null>'])
+        samples, scores, alphas = beam_search(self, x, params, null_sym=self.dataset.extra_words['<null>'], return_alphas=self.return_alphas,
+                                              model_ensemble=True, n_models=len(self.models))
 
         if params['length_penalty'] or params['coverage_penalty']:
             if params['length_penalty']:
@@ -395,7 +396,7 @@ class BeamSearchEnsemble:
                     coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
             else:
                 coverage_penalties = [0.0 for _ in samples]
-            scores = [co / lp + cp for co, lp, cp in zip(scores, length_penalties, coverage_penalties)]
+            scores = [co / lp + cov_p for co, lp, cov_p in zip(scores, length_penalties, coverage_penalties)]
 
         elif params['normalize_probs']:
             counts = [len(sample) ** params['alpha_factor'] for sample in samples]
@@ -897,7 +898,7 @@ class PredictEnsemble:
                           'max_eval_samples': None
                           }
 
-        params = che(self.params, default_params)
+        params = checkParameters(self.params, default_params)
         predictions = dict()
 
         for s in params['predict_on_sets']:
