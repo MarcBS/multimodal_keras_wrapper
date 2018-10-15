@@ -54,7 +54,7 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
     dead_k = 0  # samples that reached eos
     live_k = 1  # samples that did not yet reach eos
     hyp_samples = [[]] * live_k
-    hyp_scores = cp.zeros(live_k).astype('float32')
+    hyp_scores = cp.zeros(live_k, dtype='float32')
     ret_alphas = return_alphas or params['pos_unk']
     if ret_alphas:
         sample_alphas = []
@@ -80,11 +80,9 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
         if k > maxlen:
             raise NotImplementedError(
                 "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
-        state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray(
-            [np.zeros((maxlen, maxlen))] * live_k)
+        state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray([np.zeros((maxlen, maxlen))] * live_k)
     else:
-        state_below = np.asarray([null_sym] * live_k) if pad_on_batch else \
-            np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
+        state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
     prev_out = [None] * n_models if model_ensemble else None
 
     for ii in range(maxlen):
@@ -122,7 +120,7 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
         # Form a beam for the next iteration
         new_hyp_samples = []
         new_trans_indices = []
-        new_hyp_scores = cp.zeros(k - dead_k).astype('float32')
+        new_hyp_scores = cp.zeros(k - dead_k, dtype='float32')
         if ret_alphas:
             new_hyp_alphas = []
         for idx, [ti, wi] in list(enumerate(zip(trans_indices, word_indices))):

@@ -1328,7 +1328,7 @@ class Model_Wrapper(object):
             if X[model_input].shape[0] == 1:
                 in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             else:
-                in_data[model_input] = copy.copy(X[model_input])
+                in_data[model_input] = X[model_input]
 
         in_data[params['model_inputs'][params['state_below_index']]] = states_below
         ##########################################
@@ -1366,9 +1366,9 @@ class Model_Wrapper(object):
             all_data = {}
             for output_id in range(len(output_ids_list)):
                 all_data[output_ids_list[output_id]] = out_data[output_id]
-            all_data[output_ids_list[0]] = np.array(all_data[output_ids_list[0]])[:, pick_idx, :]
+            all_data[output_ids_list[0]] = all_data[output_ids_list[0]][:, pick_idx, :]
         else:
-            all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
+            all_data = {output_ids_list[0]: out_data[:, pick_idx, :]}
         probs = all_data[output_ids_list[0]]
 
         ##########################################
@@ -1423,7 +1423,7 @@ class Model_Wrapper(object):
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
                 else:
-                    in_data[model_input] = copy.copy(X[model_input])
+                    in_data[model_input] = X[model_input]
                 if params.get('pad_on_batch', True):
                     states_below = states_below.reshape(n_samples, -1)
             in_data[params['model_inputs'][params['state_below_index']]] = states_below
@@ -1487,9 +1487,9 @@ class Model_Wrapper(object):
             all_data = {}
             for output_id in range(len(output_ids_list)):
                 all_data[output_ids_list[output_id]] = out_data[output_id]
-            all_data[output_ids_list[0]] = np.array(all_data[output_ids_list[0]])[:, pick_idx, :]
+            all_data[output_ids_list[0]] = all_data[output_ids_list[0]][:, pick_idx, :]
         else:
-            all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
+            all_data = {output_ids_list[0]: out_data[:, pick_idx, :]}
         probs = all_data[output_ids_list[0]]
 
         ##########################################

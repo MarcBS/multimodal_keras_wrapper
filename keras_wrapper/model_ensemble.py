@@ -32,11 +32,8 @@ class BeamSearchEnsemble:
         self.return_alphas = params_prediction.get('coverage_penalty', False) or params_prediction.get('pos_unk', False)
         self.n_best = n_best
         self.verbose = verbose
-        self.model_weights = cp.asarray([1. / len(models)] * len(models), dtype='float32') if (model_weights is None) or (model_weights == []) else model_weights
-
-        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
-                                  sys.stdout.isatty()) or
-                                 'ipykernel' in sys.modules)
+        self.model_weights = cp.asarray([1. / len(models)] * len(models), dtype='float32') if (model_weights is None) or (model_weights == []) else cp.asarray(model_weights, dtype='float32')
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()) or 'ipykernel' in sys.modules)
         if self.verbose > 0:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
 
@@ -65,14 +62,10 @@ class BeamSearchEnsemble:
                 alphas_list.append(next_outs[-1][0])  # Shape: (k, n_steps)
                 next_outs = next_outs[:-1]
             prev_outs_list.append(next_outs)
-        probs_list = cp.asarray(probs_list)
-        alphas_list = cp.asarray(alphas_list)
+        probs_list = cp.asarray(probs_list, dtype='float32')
+        alphas_list = cp.asarray(alphas_list, dtype='float32')
         probs = cp.sum(self.model_weights[:, None, None] * probs_list, axis=0)
-        if self.return_alphas:
-            alphas = cp.sum(self.model_weights[:, None, None] * alphas_list, axis=0)
-        else:
-            alphas = None
-
+        alphas = cp.sum(self.model_weights[:, None, None] * alphas_list, axis=0) if self.return_alphas else None
         return probs, prev_outs_list, alphas
 
     def predict_cond(self, X, states_below, params, ii):
