@@ -116,6 +116,9 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
         if cupy:
             trans_indices = cp.asnumpy(trans_indices)
             word_indices = cp.asnumpy(word_indices)
+            if ret_alphas:
+                alphas = cp.asnumpy(alphas)
+
         # Form a beam for the next iteration
         new_hyp_samples = []
         new_trans_indices = []
