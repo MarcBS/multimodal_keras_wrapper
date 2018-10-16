@@ -27,6 +27,11 @@ from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
     decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters
 from keras_wrapper.search import beam_search
+try:
+    import cupy as cp
+except:
+    import numpy as cp
+    logging.info('<<< Cupy not available. Using numpy. >>>')
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
@@ -1486,11 +1491,11 @@ class Model_Wrapper(object):
         if len(output_ids_list) > 1:
             all_data = {}
             for output_id in range(len(output_ids_list)):
-                all_data[output_ids_list[output_id]] = out_data[output_id]
-            all_data[output_ids_list[0]] = all_data[output_ids_list[0]][:, pick_idx, :]
+                all_data[output_ids_list[output_id]] = cp.asarray(out_data[output_id])
+            all_data[output_ids_list[0]] = cp.asarray(all_data[output_ids_list[0]][:, pick_idx, :])
         else:
-            all_data = {output_ids_list[0]: out_data[:, pick_idx, :]}
-        probs = all_data[output_ids_list[0]]
+            all_data = {output_ids_list[0]: cp.asarray(out_data[:, pick_idx, :])}
+        probs = cp.asarray(all_data[output_ids_list[0]])
 
         ##########################################
         # Define returned data
