@@ -63,13 +63,13 @@ class BeamSearchEnsemble:
                 probs_list = cp.vstack((probs_list, model_probs[None]))
             if self.return_alphas:
                 if alphas_list is None:
-                    alphas_list = next_outs[-1][0]
+                    alphas_list = next_outs[-1][0][None]
                 else:
-                    alphas_list = np.vstack((alphas_list, next_outs[-1][0]))
+                    alphas_list = np.vstack((alphas_list, next_outs[-1][0][None]))
                 next_outs = next_outs[:-1]
             prev_outs_list.append(next_outs)
         probs = cp.sum(cp.asarray(self.model_weights[:, None, None]) * probs_list, axis=0)
-        alphas = np.sum(self.model_weights[:, None] * alphas_list, axis=0) if self.return_alphas else None
+        alphas = np.sum(self.model_weights[:, None, None] * alphas_list, axis=0) if self.return_alphas else None
         return probs, prev_outs_list, alphas
 
     def predict_cond(self, X, states_below, params, ii):
