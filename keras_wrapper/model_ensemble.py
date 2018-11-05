@@ -11,10 +11,9 @@ from keras_wrapper.utils import one_hot_2_indices, checkParameters
 from keras_wrapper.search import beam_search
 try:
     import cupy as cp
-    cupy = True
 except:
     import numpy as cp
-    cupy = False
+    logging.info('<<< Cupy not available. Using numpy. >>>')
 
 
 class BeamSearchEnsemble:
@@ -32,11 +31,8 @@ class BeamSearchEnsemble:
         self.return_alphas = params_prediction.get('coverage_penalty', False) or params_prediction.get('pos_unk', False)
         self.n_best = n_best
         self.verbose = verbose
-        self.model_weights = cp.asarray([1. / len(models)] * len(models), dtype='float32') if (model_weights is None) or (model_weights == []) else model_weights
-
-        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and
-                                  sys.stdout.isatty()) or
-                                 'ipykernel' in sys.modules)
+        self.model_weights = np.asarray([1. / len(models)] * len(models), dtype='float32') if (model_weights is None) or (model_weights == []) else np.asarray(model_weights, dtype='float32')
+        self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()) or 'ipykernel' in sys.modules)
         if self.verbose > 0:
             logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
 
@@ -51,28 +47,29 @@ class BeamSearchEnsemble:
         :param prev_outs: Only for optimized models. Outputs from the previous time-step.
         :return: Combined outputs from the ensemble
         """
-        probs_list = []
+        probs_list = None
+        alphas_list = None
         prev_outs_list = []
-        alphas_list = []
         for i, model in list(enumerate(self.models)):
             [model_probs, next_outs] = model.predict_cond_optimized(X,
                                                                     states_below,
                                                                     params,
                                                                     ii,
                                                                     prev_out=prev_outs[i])
-            probs_list.append(model_probs)
+            # We introduce an additional dimension to the output of each model for stacking probs
+            if probs_list is None:
+                probs_list = model_probs[None]
+            else:
+                probs_list = cp.vstack((probs_list, model_probs[None]))
             if self.return_alphas:
-                alphas_list.append(next_outs[-1][0])  # Shape: (k, n_steps)
+                if alphas_list is None:
+                    alphas_list = next_outs[-1][0][None]
+                else:
+                    alphas_list = np.vstack((alphas_list, next_outs[-1][0][None]))
                 next_outs = next_outs[:-1]
             prev_outs_list.append(next_outs)
-        probs_list = cp.asarray(probs_list)
-        alphas_list = cp.asarray(alphas_list)
-        probs = cp.sum(self.model_weights[:, None, None] * probs_list, axis=0)
-        if self.return_alphas:
-            alphas = cp.sum(self.model_weights[:, None, None] * alphas_list, axis=0)
-        else:
-            alphas = None
-
+        probs = cp.sum(cp.asarray(self.model_weights[:, None, None]) * probs_list, axis=0)
+        alphas = np.sum(self.model_weights[:, None, None] * alphas_list, axis=0) if self.return_alphas else None
         return probs, prev_outs_list, alphas
 
     def predict_cond(self, X, states_below, params, ii):
@@ -248,8 +245,11 @@ class BeamSearchEnsemble:
                     x = dict()
                     for input_id in params['model_inputs']:
                         x[input_id] = np.asarray([X[input_id][i]])
-                    samples, scores, alphas = beam_search(self, x, params, null_sym=self.dataset.extra_words['<null>'],
-                                                          return_alphas=self.return_alphas, model_ensemble=True, n_models=len(self.models))
+                    samples, scores, alphas = beam_search(self, x, params,
+                                                          null_sym=self.dataset.extra_words['<null>'],
+                                                          return_alphas=self.return_alphas,
+                                                          model_ensemble=True,
+                                                          n_models=len(self.models))
 
                     if params['length_penalty'] or params['coverage_penalty']:
                         if params['length_penalty']:
@@ -371,8 +371,11 @@ class BeamSearchEnsemble:
         x = dict()
         for input_id in params['model_inputs']:
             x[input_id] = np.asarray([X[input_id]])
-        samples, scores, alphas = beam_search(self, x, params, null_sym=self.dataset.extra_words['<null>'], return_alphas=self.return_alphas,
-                                              model_ensemble=True, n_models=len(self.models))
+        samples, scores, alphas = beam_search(self, x, params,
+                                              null_sym=self.dataset.extra_words['<null>'],
+                                              return_alphas=self.return_alphas,
+                                              model_ensemble=True,
+                                              n_models=len(self.models))
 
         if params['length_penalty'] or params['coverage_penalty']:
             if params['length_penalty']:

@@ -27,6 +27,11 @@ from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
     decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters
 from keras_wrapper.search import beam_search
+try:
+    import cupy as cp
+except:
+    import numpy as cp
+    logging.info('<<< Cupy not available. Using numpy. >>>')
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
@@ -1328,7 +1333,7 @@ class Model_Wrapper(object):
             if X[model_input].shape[0] == 1:
                 in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
             else:
-                in_data[model_input] = copy.copy(X[model_input])
+                in_data[model_input] = X[model_input]
 
         in_data[params['model_inputs'][params['state_below_index']]] = states_below
         ##########################################
@@ -1366,9 +1371,9 @@ class Model_Wrapper(object):
             all_data = {}
             for output_id in range(len(output_ids_list)):
                 all_data[output_ids_list[output_id]] = out_data[output_id]
-            all_data[output_ids_list[0]] = np.array(all_data[output_ids_list[0]])[:, pick_idx, :]
+            all_data[output_ids_list[0]] = all_data[output_ids_list[0]][:, pick_idx, :]
         else:
-            all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
+            all_data = {output_ids_list[0]: out_data[:, pick_idx, :]}
         probs = all_data[output_ids_list[0]]
 
         ##########################################
@@ -1423,7 +1428,7 @@ class Model_Wrapper(object):
                 if X[model_input].shape[0] == 1:
                     in_data[model_input] = np.repeat(X[model_input], n_samples, axis=0)
                 else:
-                    in_data[model_input] = copy.copy(X[model_input])
+                    in_data[model_input] = X[model_input]
                 if params.get('pad_on_batch', True):
                     states_below = states_below.reshape(n_samples, -1)
             in_data[params['model_inputs'][params['state_below_index']]] = states_below
@@ -1486,11 +1491,11 @@ class Model_Wrapper(object):
         if len(output_ids_list) > 1:
             all_data = {}
             for output_id in range(len(output_ids_list)):
-                all_data[output_ids_list[output_id]] = out_data[output_id]
-            all_data[output_ids_list[0]] = np.array(all_data[output_ids_list[0]])[:, pick_idx, :]
+                all_data[output_ids_list[output_id]] = cp.asarray(out_data[output_id])
+            all_data[output_ids_list[0]] = cp.asarray(all_data[output_ids_list[0]][:, pick_idx, :])
         else:
-            all_data = {output_ids_list[0]: np.array(out_data)[:, pick_idx, :]}
-        probs = all_data[output_ids_list[0]]
+            all_data = {output_ids_list[0]: cp.asarray(out_data[:, pick_idx, :])}
+        probs = cp.asarray(all_data[output_ids_list[0]])
 
         ##########################################
         # Define returned data
