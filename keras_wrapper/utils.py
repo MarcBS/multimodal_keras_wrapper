@@ -918,13 +918,14 @@ def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0
 
 
 def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
-                          heuristic=0, mapping=None, verbose=0):
+                          glossary=None, heuristic=0, mapping=None, verbose=0):
     """
     Replaces unknown words from the target sentence according to some heuristic.
     Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
     :param src_word_seq: Source sentence words
     :param trg_word_seq: Hypothesis words
     :param hard_alignment: Target-Source alignments
+    :param glossary: Hard-coded substitutions.
     :param unk_symbol: Symbol in trg_word_seq to replace
     :param heuristic: Heuristic (0, 1, 2)
     :param mapping: External alignment dictionary
@@ -934,33 +935,36 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     trans_words = trg_word_seq
     new_trans_words = []
     for j in range(len(trans_words)):
-        if trans_words[j] == unk_symbol:
-            UNK_src = src_word_seq[hard_alignment[j]]
-            if isinstance(UNK_src, str) and sys.version_info.major == 2:
-                UNK_src = UNK_src.decode('utf-8')
+        current_word = trans_words[j]
+        current_src = src_word_seq[hard_alignment[j]]
+        if glossary is not None and glossary.get(current_src) is not None:
+            current_word = glossary.get(current_src)
+            new_trans_words.append(current_word)
+        elif current_word == unk_symbol:
+            if isinstance(current_src, str) and sys.version_info.major == 2:
+                current_src = current_src.decode('utf-8')
             if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
-                new_trans_words.append(UNK_src)
+                new_trans_words.append(current_src)
             elif heuristic == 1:
                 # Use the most likely translation (with t-table). If not found, copy the source word.
                 # Ok for small vocabulary (~30k) models
-                if mapping.get(UNK_src) is not None:
-                    new_trans_words.append(mapping[UNK_src])
+                if mapping.get(current_src) is not None:
+                    new_trans_words.append(mapping[current_src])
                 else:
-                    new_trans_words.append(UNK_src)
+                    new_trans_words.append(current_src)
             elif heuristic == 2:
                 # Use t-table if the source word starts with a lowercase letter. Otherwise copy
                 # Sometimes works better than other heuristics
-                if mapping.get(UNK_src) is not None and UNK_src[0].islower():
-                    new_trans_words.append(mapping[UNK_src])
+                if mapping.get(current_src) is not None and current_src[0].islower():
+                    new_trans_words.append(mapping[current_src])
                 else:
-                    new_trans_words.append(UNK_src)
+                    new_trans_words.append(current_src)
         else:
-            new_trans_words.append(trans_words[j])
-
+            new_trans_words.append(current_word)
     return new_trans_words
 
 
-def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
+def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None, heuristic=0,
                                    x_text=None, unk_symbol='<unk>', pad_sequences=False,
                                    mapping=None, verbose=0):
     """
@@ -988,32 +992,34 @@ def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
             logging.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-    flattened_answer_pred = [list(map(lambda x: index2word[x], pred)) for pred in preds]
-    answer_pred = []
+    flattened_predictions = [list(map(lambda x: index2word[x], pred)) for pred in preds]
+    final_predictions = []
 
     if alphas is not None:
         x_text = list(map(lambda x: x.split(), x_text))
         hard_alignments = list(
             map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas,
                 x_text))
-        for i, a_no in list(enumerate(flattened_answer_pred)):
-            if unk_symbol in a_no:
+
+        for i, a_no in list(enumerate(flattened_predictions)):
+            if unk_symbol in a_no or glossary is not None:
                 a_no = replace_unknown_words(x_text[i],
                                              a_no,
                                              hard_alignments[i],
                                              unk_symbol,
+                                             glossary=glossary,
                                              heuristic=heuristic,
                                              mapping=mapping,
                                              verbose=verbose)
             a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
-            answer_pred.append(tmp)
+            final_predictions.append(tmp)
     else:
-        for a_no in flattened_answer_pred:
+        for a_no in flattened_predictions:
             a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
             tmp = u' '.join(a_no[:-1])
-            answer_pred.append(tmp)
-    return answer_pred
+            final_predictions.append(tmp)
+    return final_predictions
 
 
 def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
