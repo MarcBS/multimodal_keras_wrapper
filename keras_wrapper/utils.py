@@ -936,11 +936,11 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     new_trans_words = []
     for j in range(len(trans_words)):
         current_word = trans_words[j]
-        current_src = src_word_seq[hard_alignment[j]]
-        if glossary is not None and glossary.get(current_src) is not None:
-            current_word = glossary.get(current_src)
+        if glossary is not None and glossary.get(src_word_seq[hard_alignment[j]]) is not None:
+            current_word = glossary.get(src_word_seq[hard_alignment[j]])
             new_trans_words.append(current_word)
         elif current_word == unk_symbol:
+            current_src = src_word_seq[hard_alignment[j]]
             if isinstance(current_src, str) and sys.version_info.major == 2:
                 current_src = current_src.decode('utf-8')
             if heuristic == 0:  # Copy (ok when training with large vocabularies on en->fr, en->de)
