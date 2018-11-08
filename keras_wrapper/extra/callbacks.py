@@ -396,12 +396,11 @@ class EvalPerformance(KerasCallback):
                     if self.beam_search:
                         predictions = decode_predictions_beam_search(samples,
                                                                      index2word_y,
+                                                                     glossary=self.extra_vars.get('glossary', None),
                                                                      alphas=alphas,
                                                                      x_text=sources,
                                                                      heuristic=heuristic,
-                                                                     mapping=self.extra_vars.get(
-                                                                         'mapping',
-                                                                         None),
+                                                                     mapping=self.extra_vars.get('mapping', None),
                                                                      verbose=self.verbose)
                     else:
                         probs = predictions
@@ -736,6 +735,7 @@ class Sample(KerasCallback):
                     if self.beam_search:
                         predictions = decode_predictions_beam_search(samples,
                                                                      self.index2word_y,
+                                                                     glossary=self.extra_vars.get('glossary', None),
                                                                      alphas=alphas,
                                                                      x_text=sources,
                                                                      heuristic=heuristic,
