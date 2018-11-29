@@ -2208,8 +2208,7 @@ class Dataset(object):
                 X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
                 X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
 
-            if max_len_batch == max_len:
-                max_len_batch -= 1  # always leave space for <eos> symbol
+            max_len_batch -= 1  # always leave space for <eos> symbol
 
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
@@ -2314,7 +2313,7 @@ class Dataset(object):
         :return: Text as sequence of numbers. Mask for each sentence.
         """
         X_out = np.asarray(X)
-        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)) + 1, max_len) - offset if pad_on_batch else maxlen
+        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)), max_len + 1)  - offset if pad_on_batch else maxlen
         X_out = X_out[:, :max_len_batch].astype('int64')
         # Mask all zero-values
         X_mask = (np.ma.make_mask(X_out, dtype='int') * 1).astype('int8')
