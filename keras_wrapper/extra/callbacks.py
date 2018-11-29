@@ -686,17 +686,16 @@ class Sample(KerasCallback):
         for s in self.set_name:
             if self.beam_search:
                 params_prediction = {'max_batch_size': self.batch_size,
-                                     'n_parallel_loaders': self.extra_vars[
-                                         'n_parallel_loaders'],
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
                                      'n_samples': self.n_samples,
                                      'pos_unk': False}
                 params_prediction.update(checkDefaultParamsBeamSearch(self.extra_vars))
-                predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds, params_prediction)
+                predictions, truths, sources = self.model_to_eval.predictBeamSearchNet(self.ds,
+                                                                                       params_prediction)
             else:
                 params_prediction = {'batch_size': self.batch_size,
-                                     'n_parallel_loaders': self.extra_vars[
-                                         'n_parallel_loaders'],
+                                     'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
                                      'n_samples': self.n_samples,
                                      }
