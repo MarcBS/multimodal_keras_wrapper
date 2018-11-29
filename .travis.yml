@@ -52,7 +52,7 @@ script:
   - if [[ "$TEST_MODE" == "PEP8" ]]; then
       PYTHONPATH=$PWD:$PYTHONPATH pytest --pep8 -m pep8 -n0;
     elif [[ "$TEST_MODE" == "GENERAL" ]]; then
-      PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/*py 2>&1 ;
+      PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/general/ 2>&1 ;
     elif [[ "$TEST_MODE" == "EXTRA" ]]; then
       PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/extra/ 2>&1 ;
     fi
