@@ -1618,7 +1618,10 @@ class Model_Wrapper(object):
                                                                           n_parallel_loaders=params[
                                                                               'n_parallel_loaders'])
                     else:
-                        data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
+                        data_gen_instance = Data_Batch_Generator(s,
+                                                                 self,
+                                                                 ds,
+                                                                 num_iterations,
                                                                  batch_size=1,
                                                                  normalization=params['normalize'],
                                                                  normalization_type=params['normalization_type'],
@@ -2294,7 +2297,6 @@ class Model_Wrapper(object):
         X_new = dict()
         Y_new = dict()
         Y_sample_weights = dict()
-
         # Format input data
         for in_model, in_ds in iteritems(self.inputsMapping):
             X_new[in_model] = X[in_ds]
