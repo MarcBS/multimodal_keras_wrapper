@@ -705,7 +705,7 @@ class Dataset(object):
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
-                                         'text', 'dense_text', 'text-features', # TODO: Document dense_text type!
+                                         'text', 'dense_text', 'text-features',  # TODO: Document dense_text type!
                                          '3DLabel', '3DSemanticLabel',
                                          'id', 'file-name']
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
@@ -869,22 +869,6 @@ class Dataset(object):
         """
         self.silence = silence
 
-    def setListGeneral(self, path_list, split=None, shuffle=True, type='raw-image', id='image'):
-        """
-        Deprecated
-        """
-        if split is None:
-            split = [0.8, 0.1, 0.1]
-        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
-        self.setInput(path_list, split, type=type, id=id)
-
-    def setList(self, path_list, set_name, type='raw-image', id='image'):
-        """
-        DEPRECATED
-        """
-        logging.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
-        self.setInput(path_list, set_name, type, id)
-
     def setRawInput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
         """
         Loads a list which can contain all samples from either the 'train', 'val', or
@@ -1045,8 +1029,8 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessTextFeatures(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                       bpe_codes=bpe_codes, separator=separator)
+                                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
+                                               bpe_codes=bpe_codes, separator=separator)
         elif type == 'image-features':
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif type == 'video-features':
@@ -1058,8 +1042,7 @@ class Dataset(object):
                             'The chosen data augmentation type ' + da +
                             ' is not implemented for the type "video-features".')
             self.inputs_data_augmentation_types[id] = data_augmentation_types
-            data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop,
-                                                feat_len)
+            data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len)
         elif type == 'categorical':
             self.setClasses(path_list, id)
             data = self.preprocessCategorical(path_list, id)
@@ -1103,9 +1086,9 @@ class Dataset(object):
                 'Loaded "' + set_name + '" set inputs of data_type "' + data_type + '" with data_id "' + data_id + '" and length ' + str(getattr(self, 'len_' + set_name)) + '.')
 
     def replaceInput(self, data, set_name, data_type, data_id):
-        '''
+        """
             Replaces the data in a certain set_name and for a given data_id
-        '''
+        """
         self.__setInput(data, set_name, data_type, data_id, True, False)
 
     def removeInput(self, set_name, id='label', type='categorical'):
@@ -1124,13 +1107,6 @@ class Dataset(object):
             raise Exception('An input with id "' + id + '" does not exist in the Database.')
         if not self.silence:
             logging.info('Removed "' + set_name + '" set input of type "' + type + '" with id "' + id + '.')
-
-    def setLabels(self, labels_list, set_name, type='categorical', id='label'):
-        """
-            DEPRECATED
-        """
-        logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
-        self.setOutput(labels_list, set_name, type=type, id=id)
 
     def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False,
                      add_additional=False):
@@ -1279,8 +1255,8 @@ class Dataset(object):
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessTextFeatures(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                       bpe_codes=bpe_codes, separator=separator)
+                                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
+                                               bpe_codes=bpe_codes, separator=separator)
         elif type == 'binary':
             data = self.preprocessBinary(path_list, id, sparse)
         elif type == 'real':
@@ -1670,9 +1646,8 @@ class Dataset(object):
 
         return sentences
 
-
     def preprocessTextFeatures(self, annotations_list, data_id, set_name, tokenization, build_vocabulary, max_text_len,
-                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None, separator='@@'):
+                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None, separator='@@'):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
@@ -1757,6 +1732,7 @@ class Dataset(object):
         self.fill_text[data_id] = fill
         self.pad_on_batch[data_id] = pad_on_batch
         self.words_so_far[data_id] = words_so_far
+
         # Max values per uint type:
         # uint8.max: 255
         # uint16.max: 65535
@@ -1768,11 +1744,12 @@ class Dataset(object):
         else:
             dtype_text = 'uint32'
         vocab = self.vocabulary[data_id]['words2idx']
-        sentence_features = np.ones((len(sentences), max_text_len)).astype(dtype_text) * self.extra_words['<pad>']
-        max_text_len -= 1  # always leave space for <eos> symbol
+        sentence_features = np.ones((len(sentences),
+                                     max_text_len + 1)  # always leave space for <eos> symbol
+                                    ).astype(dtype_text) * self.extra_words['<pad>']
 
         for i in range(len(sentences)):
-            words = sentences[i].split()
+            words = sentences[i].strip().split()
             len_j = len(words)
             if fill == 'start':
                 offset_j = max_text_len - len_j - 1
@@ -1785,6 +1762,7 @@ class Dataset(object):
             if offset_j < 0:
                 len_j += offset_j
                 offset_j = 0
+
             for j, w in list(zip(range(len_j), words[:len_j])):
                 sentence_features[i, j + offset_j] = vocab.get(w, vocab['<unk>'])
             if offset > 0:  # Move the text to the right -> null symbol
@@ -2215,7 +2193,7 @@ class Dataset(object):
                 X_out = (X_out, None)  # This None simulates a mask
         else:  # process text as a sequence of words
             if pad_on_batch:
-                max_len_batch = min(max([len(x.split(' ')) for x in X]) + 1, max_len)
+                max_len_batch = min(max([len(words.split(' ')) for words in X]) + 1, max_len)
             else:
                 max_len_batch = max_len
 
@@ -2235,8 +2213,8 @@ class Dataset(object):
 
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
             for i in range(n_batch):
-                x = X[i].strip().split(' ')
-                len_j = len(x)
+                words = X[i].strip().split(' ')
+                len_j = len(words)
                 if fill == 'start':
                     offset_j = max_len_batch - len_j - 1
                 elif fill == 'center':
@@ -2250,7 +2228,7 @@ class Dataset(object):
                     offset_j = 0
 
                 if words_so_far:
-                    for j, w in list(zip(range(len_j), x[:len_j])):
+                    for j, w in list(zip(range(len_j), words[:len_j])):
                         next_w = vocab.get(w, next_w=vocab['<unk>'])
                         for k in range(j, len_j):
                             X_out[i, k + offset_j, j + offset_j] = next_w
@@ -2258,7 +2236,7 @@ class Dataset(object):
                         X_mask[i, j + offset_j, j + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
 
                 else:
-                    for j, w in list(zip(range(len_j), x[:len_j])):
+                    for j, w in list(zip(range(len_j), words[:len_j])):
                         X_out[i, j + offset_j] = vocab.get(w, vocab['<unk>'])
                         X_mask[i, j + offset_j] = 1  # fill mask
                     X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
@@ -2272,7 +2250,7 @@ class Dataset(object):
                         X_mask[i] = np.append(zero_row, X_mask[i, :-offset], axis=0)
                     else:
                         X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
-                        X_mask[i] = np.append([0] * offset, X_mask[i, :-offset])
+                        X_mask[i] = np.append([1] * offset, X_mask[i, :-offset])
             X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
 
         return X_out
@@ -2306,7 +2284,7 @@ class Dataset(object):
                              the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
-        :return: Text as sequence of number. Mask for each sentence.
+        :return: Text as sequence of one-hot vectors. Mask for each sentence.
         """
 
         y = self.loadText(X, vocabularies, max_len, offset, fill, pad_on_batch,
@@ -2336,14 +2314,22 @@ class Dataset(object):
         :return: Text as sequence of numbers. Mask for each sentence.
         """
         X_out = np.asarray(X)
-        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)) - offset, max_len) if pad_on_batch else maxlen
+        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)) + 1, max_len) - offset if pad_on_batch else maxlen
         X_out = X_out[:, :max_len_batch].astype('int64')
+        # Mask all zero-values
         X_mask = (np.ma.make_mask(X_out, dtype='int') * 1).astype('int8')
+        # But we keep with the first one, as it indicates the <pad> symbol
+        X_mask = np.hstack((np.ones((X_mask.shape[0], 1)), X_mask[:, :-1]))
         X_out = (X_out, X_mask)
         return X_out
 
-    def loadTextFeaturesOneHot(self, X, vocabulary_len, max_len, pad_on_batch, offset,
-                       sample_weights=False, label_smoothing=0.):
+    def loadTextFeaturesOneHot(self, X,
+                               vocabulary_len,
+                               max_len,
+                               pad_on_batch,
+                               offset,
+                               sample_weights=False,
+                               label_smoothing=0.):
 
         """
         Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
@@ -2360,9 +2346,8 @@ class Dataset(object):
                              the minibatch or sentences with a fixed (max_text_length) length.
         :param words_so_far: Experimental feature. Use with caution.
         :param loading_X: Whether we are loading an input or an output of the model
-        :return: Text as sequence of number. Mask for each sentence.
+        :return: Text as sequence of one-hot vectors. Mask for each sentence.
         """
-
         y = self.loadTextFeatures(X, max_len, pad_on_batch, offset)
 
         # Use whole sentence as class (classifier model)
@@ -2378,7 +2363,6 @@ class Dataset(object):
             if sample_weights:
                 y_aux = (y_aux, y[1])  # join data and mask
         return y_aux
-
 
     def loadMapping(self, path_list):
         """
@@ -3421,7 +3405,7 @@ class Dataset(object):
         else:
             I = np.zeros([nImages] + self.img_size_crop[data_id], dtype=type_imgs)
 
-        ''' Process each image separately '''
+        # Process each image separately
         for i in range(nImages):
             im = images[i]
 
@@ -3795,7 +3779,6 @@ class Dataset(object):
                                       loading_X=True)[0]
                 elif type_in == 'categorical':
                     nClasses = len(self.dic_classes[id_in])
-                    # load_sample_weights = self.sample_weights[id_out][set_name]
                     x = self.loadCategorical(x,
                                              nClasses)
                 elif type_in == 'categorical_raw':
@@ -3920,8 +3903,7 @@ class Dataset(object):
             elif type_in == 'categorical_raw':
                 x = np.array(x)
             elif type_in == 'binary':
-                x = self.loadBinary(x,
-                                    id_in)
+                x = self.loadBinary(x, id_in)
             X.append(x)
 
         # Recover output samples
@@ -4495,3 +4477,28 @@ class Dataset(object):
         """
         # dict['_Dataset__lock_read'] = threading.Lock()
         self.__dict__ = new_state
+
+    # Deprecated methods. Maintained for backwards compatibility
+
+    def setListGeneral(self, path_list, split=None, shuffle=True, type='raw-image', id='image'):
+        """
+        Deprecated
+        """
+        if split is None:
+            split = [0.8, 0.1, 0.1]
+        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
+        self.setInput(path_list, split, type=type, id=id)
+
+    def setList(self, path_list, set_name, type='raw-image', id='image'):
+        """
+        DEPRECATED
+        """
+        logging.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
+        self.setInput(path_list, set_name, type, id)
+
+    def setLabels(self, labels_list, set_name, type='categorical', id='label'):
+        """
+            DEPRECATED
+        """
+        logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
+        self.setOutput(labels_list, set_name, type=type, id=id)
