@@ -17,7 +17,7 @@ else:
     import cPickle as pk
     from itertools import izip as zip
 import codecs
-from collections import Counter
+from collections import Counter, defaultdict
 from operator import add
 import numpy as np
 from keras_wrapper.extra.read_write import create_dir_if_not_exists
@@ -689,12 +689,12 @@ class Dataset(object):
         # List of identifiers for the inputs and outputs and their respective types
         # (which will define the preprocessing applied)
         self.ids_inputs = []
-        self.types_inputs = []  # see accepted types in self.__accepted_types_inputs
+        self.types_inputs = defaultdict()  # see accepted types in self.__accepted_types_inputs
         self.inputs_data_augmentation_types = dict()  # see accepted types in self._available_augm_<input_type>
         self.optional_inputs = []
 
         self.ids_outputs = []
-        self.types_outputs = []  # see accepted types in self.__accepted_types_outputs
+        self.types_outputs = defaultdict()  # see accepted types in self.__accepted_types_outputs
         self.sample_weights = dict()  # Choose whether we should compute output masks or not
 
         # List of implemented input and output data types
@@ -904,7 +904,6 @@ class Dataset(object):
         keys_X_set = list(getattr(self, 'X_raw_' + set_name))
         if id not in self.ids_inputs or overwrite_split:
             self.ids_inputs.append(id)
-            self.types_inputs.append(type)
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
         elif id in keys_X_set and not overwrite_split:
@@ -915,6 +914,10 @@ class Dataset(object):
                 'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
                     self.__accepted_types_inputs))
 
+        if self.types_inputs.get(set_name) is None:
+            self.types_inputs[set_name] = [type]
+        else:
+            self.types_inputs[set_name].append(type)
         aux_dict = getattr(self, 'X_raw_' + set_name)
         aux_dict[id] = path_list
         setattr(self, 'X_raw_' + set_name, aux_dict)
@@ -1012,7 +1015,6 @@ class Dataset(object):
         keys_X_set = list(getattr(self, 'X_' + set_name))
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
-            self.types_inputs.append(type)
         elif id in keys_X_set and not overwrite_split and not add_additional:
             raise Exception('An input with id "' + id + '" is already loaded into the Database.')
 
@@ -1020,9 +1022,13 @@ class Dataset(object):
             self.optional_inputs.append(id)
 
         if type not in self.__accepted_types_inputs:
-            raise NotImplementedError(
-                'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
-                    self.__accepted_types_inputs))
+            raise NotImplementedError('The input type "' + type +
+                                      '" is not implemented. '
+                                      'The list of valid types are the following: ' + str(self.__accepted_types_inputs))
+        if self.types_inputs.get(set_name) is None:
+            self.types_inputs[set_name] = [type]
+        else:
+            self.types_inputs[set_name].append(type)
 
         # Preprocess the input data depending on its type
         if type == 'raw-image':
@@ -1108,7 +1114,7 @@ class Dataset(object):
         if id in self.ids_inputs:
             ind_remove = self.ids_inputs.index(id)
             del self.ids_inputs[ind_remove]
-            del self.types_inputs[ind_remove]
+            del self.types_inputs[set_name][ind_remove]
             aux_dict = getattr(self, 'X_' + set_name)
             del aux_dict[id]
             setattr(self, 'X_' + set_name, aux_dict)
@@ -1148,7 +1154,6 @@ class Dataset(object):
         keys_Y_set = list(getattr(self, 'Y_raw_' + set_name))
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
-            self.types_inputs.append(type)
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
 
@@ -1159,6 +1164,11 @@ class Dataset(object):
             raise NotImplementedError(
                 'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
                     self.__accepted_types_inputs))
+
+        if self.types_inputs.get(set_name) is None:
+            self.types_inputs[set_name] = [type]
+        else:
+            self.types_inputs[set_name].append(type)
 
         aux_dict = getattr(self, 'Y_raw_' + set_name)
         aux_dict[id] = path_list
@@ -1182,7 +1192,7 @@ class Dataset(object):
                   sparse=False,  # 'binary'
                   ):
         """
-        Loads a set of output data, usually (type=='categorical') referencing values in self.classes (starting from 0)
+        Loads a set of output data.
 
         # General parameters
 
@@ -1237,14 +1247,18 @@ class Dataset(object):
         keys_Y_set = list(getattr(self, 'Y_' + set_name))
         if id not in self.ids_outputs:
             self.ids_outputs.append(id)
-            self.types_outputs.append(type)
         elif id in keys_Y_set and not overwrite_split and not add_additional:
             raise Exception('An output with id "' + id + '" is already loaded into the Database.')
 
         if type not in self.__accepted_types_outputs:
-            raise NotImplementedError(
-                'The output type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
-                    self.__accepted_types_outputs))
+            raise NotImplementedError('The output type "' + type +
+                                      '" is not implemented. '
+                                      'The list of valid types are the following: ' + str(self.__accepted_types_outputs))
+        if self.types_outputs.get(set_name) is None:
+            self.types_outputs[set_name] = [type]
+        else:
+            self.types_outputs[set_name].append(type)
+
         if hasattr(self, 'label_smoothing'):
             if self.label_smoothing.get(id) is None:
                 self.label_smoothing[id] = dict()
@@ -1313,7 +1327,7 @@ class Dataset(object):
         if id in self.ids_outputs:
             ind_remove = self.ids_outputs.index(id)
             del self.ids_outputs[ind_remove]
-            del self.types_outputs[ind_remove]
+            del self.types_outputs[set_name][ind_remove]
             aux_dict = getattr(self, 'Y_' + set_name)
             del aux_dict[id]
             setattr(self, 'Y_' + set_name, aux_dict)
@@ -2322,14 +2336,14 @@ class Dataset(object):
         :return: Text as sequence of numbers. Mask for each sentence.
         """
         X_out = np.asarray(X)
-        max_len_batch = min(max(np.sum(X_out != 0, axis=1)) - offset, max_len) if pad_on_batch else maxlen
+        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)) - offset, max_len) if pad_on_batch else maxlen
         X_out = X_out[:, :max_len_batch].astype('int64')
         X_mask = (np.ma.make_mask(X_out, dtype='int') * 1).astype('int8')
         X_out = (X_out, X_mask)
         return X_out
 
     def loadTextFeaturesOneHot(self, X, vocabulary_len, max_len, pad_on_batch, offset,
-                       sample_weights=False, loading_X=False, label_smoothing=0.):
+                       sample_weights=False, label_smoothing=0.):
 
         """
         Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
@@ -3708,7 +3722,9 @@ class Dataset(object):
             raise Exception('"init" index must be smaller than "final" index.')
 
         X = []
-        for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
+        for id_in in list(self.ids_inputs):
+            types_index = self.ids_inputs.index(id_in)
+            type_in = self.types_inputs[set_name][types_index]
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
@@ -3723,39 +3739,70 @@ class Dataset(object):
 
             if not ghost_x:
                 if type_in == 'text-features':
-                    x = self.loadTextFeatures(x, self.max_text_len[id_in][set_name], self.pad_on_batch[id_in], self.text_offset[id_in])[0]
+                    x = self.loadTextFeatures(x,
+                                              self.max_text_len[id_in][set_name],
+                                              self.pad_on_batch[id_in],
+                                              self.text_offset.get(id_in, 0))[0]
 
                 elif type_in == 'image-features':
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                    x = self.loadFeatures(x,
+                                          self.features_lengths[id_in],
+                                          normalization_type,
+                                          normalization,
                                           data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
-                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
-                                               normalization_type, normalization, self.features_lengths[id_in],
+                    x = self.loadVideoFeatures(x,
+                                               id_in,
+                                               set_name,
+                                               self.max_video_len[id_in],
+                                               normalization_type,
+                                               normalization,
+                                               self.features_lengths[id_in],
                                                data_augmentation=dataAugmentation)
 
                 elif type_in == 'raw-image':
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization,
-                                        meanSubstraction, dataAugmentation, daRandomParams,
-                                        wo_da_patch_type, da_patch_type, da_enhance_list)
+                    x = self.loadImages(x,
+                                        id_in,
+                                        normalization_type,
+                                        normalization,
+                                        meanSubstraction,
+                                        dataAugmentation,
+                                        daRandomParams,
+                                        wo_da_patch_type,
+                                        da_patch_type,
+                                        da_enhance_list)
                 elif type_in == 'video':
-                    x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
-                                        normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    x = self.loadVideos(x,
+                                        id_in,
+                                        final,
+                                        set_name,
+                                        self.max_video_len[id_in],
+                                        normalization_type,
+                                        normalization,
+                                        meanSubstraction,
+                                        dataAugmentation)
                 elif type_in == 'text' or type_in == 'dense_text':
-                    x = self.loadText(x, self.vocabulary[id_in],
-                                      self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
+                    x = self.loadText(x,
+                                      self.vocabulary[id_in],
+                                      self.max_text_len[id_in][set_name],
+                                      self.text_offset[id_in],
+                                      fill=self.fill_text[id_in],
+                                      pad_on_batch=self.pad_on_batch[id_in],
+                                      words_so_far=self.words_so_far[id_in],
+                                      loading_X=True)[0]
                 elif type_in == 'categorical':
                     nClasses = len(self.dic_classes[id_in])
                     # load_sample_weights = self.sample_weights[id_out][set_name]
-                    x = self.loadCategorical(x, nClasses)
+                    x = self.loadCategorical(x,
+                                             nClasses)
                 elif type_in == 'categorical_raw':
                     x = np.array(x)
                 elif type_in == 'binary':
-                    x = self.loadBinary(x, id_in)
+                    x = self.loadBinary(x,
+                                        id_in)
             X.append(x)
 
         return X
@@ -3792,7 +3839,10 @@ class Dataset(object):
 
         # Recover input samples
         X = []
-        for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
+
+        for id_in in list(self.ids_inputs):
+            types_index = self.ids_inputs.index(id_in)
+            type_in = self.types_inputs[set_name][types_index]
             if id_in in self.optional_inputs:
                 try:
                     if surpassed:
@@ -3809,42 +3859,76 @@ class Dataset(object):
 
             # Pre-process inputs
             if type_in == 'text-features':
-                x = self.loadTextFeatures(x, self.max_text_len[id_in][set_name], self.pad_on_batch[id_in], self.text_offset[id_in])[0]
+                x = self.loadTextFeatures(x,
+                                          self.max_text_len[id_in][set_name],
+                                          self.pad_on_batch[id_in],
+                                          self.text_offset.get(id_in, 0))[0]
 
             elif type_in == 'image-features':
-                x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                x = self.loadFeatures(x,
+                                      self.features_lengths[id_in],
+                                      normalization_type,
+                                      normalization,
                                       data_augmentation=dataAugmentation)
             elif type_in == 'video-features':
-                x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in], normalization_type,
-                                           normalization, self.features_lengths[id_in],
+                x = self.loadVideoFeatures(x,
+                                           id_in,
+                                           set_name,
+                                           self.max_video_len[id_in],
+                                           normalization_type,
+                                           normalization,
+                                           self.features_lengths[id_in],
                                            data_augmentation=dataAugmentation)
             elif type_in == 'text' or type_in == 'dense_text':
-                x = self.loadText(x, self.vocabulary[id_in],
-                                  self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                  fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                  words_so_far=self.words_so_far[id_in], loading_X=True)[0]
+                x = self.loadText(x,
+                                  self.vocabulary[id_in],
+                                  self.max_text_len[id_in][set_name],
+                                  self.text_offset[id_in],
+                                  fill=self.fill_text[id_in],
+                                  pad_on_batch=self.pad_on_batch[id_in],
+                                  words_so_far=self.words_so_far[id_in],
+                                  loading_X=True)[0]
             elif type_in == 'raw-image':
                 daRandomParams = None
                 if dataAugmentation:
                     daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
-                                    daRandomParams, wo_da_patch_type, da_patch_type, da_enhance_list)
+                x = self.loadImages(x,
+                                    id_in,
+                                    normalization_type,
+                                    normalization,
+                                    meanSubstraction,
+                                    dataAugmentation,
+                                    daRandomParams,
+                                    wo_da_patch_type,
+                                    da_patch_type,
+                                    da_enhance_list)
             elif type_in == 'video':
-                x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in],
-                                    normalization_type, normalization, meanSubstraction, dataAugmentation)
+                x = self.loadVideos(x,
+                                    id_in,
+                                    last,
+                                    set_name,
+                                    self.max_video_len[id_in],
+                                    normalization_type,
+                                    normalization,
+                                    meanSubstraction,
+                                    dataAugmentation)
             elif type_in == 'categorical':
                 nClasses = len(self.dic_classes[id_in])
                 # load_sample_weights = self.sample_weights[id_out][set_name]
-                x = self.loadCategorical(x, nClasses)
+                x = self.loadCategorical(x,
+                                         nClasses)
             elif type_in == 'categorical_raw':
                 x = np.array(x)
             elif type_in == 'binary':
-                x = self.loadBinary(x, id_in)
+                x = self.loadBinary(x,
+                                    id_in)
             X.append(x)
 
         # Recover output samples
         Y = []
-        for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
+        for id_out in list(self.ids_outputs):
+            types_index = self.ids_outputs.index(id_out)
+            type_out = self.types_outputs[set_name][types_index]
             if surpassed:
                 y = getattr(self, 'Y_' + set_name)[id_out][last:] + getattr(self, 'Y_' + set_name)[id_out][0:new_last]
 
@@ -3855,9 +3939,11 @@ class Dataset(object):
             if type_out == 'categorical':
                 nClasses = len(self.dic_classes[id_out])
                 # load_sample_weights = self.sample_weights[id_out][set_name]
-                y = self.loadCategorical(y, nClasses)
+                y = self.loadCategorical(y,
+                                         nClasses)
             elif type_out == 'binary':
-                y = self.loadBinary(y, id_out)
+                y = self.loadBinary(y,
+                                    id_out)
             elif type_out == 'real':
                 y = np.array(y).astype(np.float32)
             elif type_out == '3DLabel':
@@ -3869,8 +3955,12 @@ class Dataset(object):
                 else:
                     imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:new_last]
 
-                y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
-                                      self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
+                y = self.load3DLabels(y,
+                                      nClasses,
+                                      dataAugmentation,
+                                      daRandomParams,
+                                      self.img_size[assoc_id_in],
+                                      self.img_size_crop[assoc_id_in],
                                       imlist)
             elif type_out == '3DSemanticLabel':
                 nClasses = len(self.classes[id_out])
@@ -3881,17 +3971,22 @@ class Dataset(object):
                 else:
                     imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:new_last]
 
-                y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
-                                              self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in], imlist)
+                y = self.load3DSemanticLabels(y,
+                                              nClasses,
+                                              classes_to_colour,
+                                              dataAugmentation,
+                                              daRandomParams,
+                                              self.img_size[assoc_id_in],
+                                              self.img_size_crop[assoc_id_in],
+                                              imlist)
 
             elif type_out == 'text-features':
                 y = self.loadTextFeaturesOneHot(y,
                                                 self.vocabulary_len[id_out],
                                                 self.max_text_len[id_out][set_name],
                                                 self.pad_on_batch[id_out],
-                                                self.text_offset[id_out],
+                                                self.text_offset.get(id_out, 0),
                                                 sample_weights=self.sample_weights[id_out][set_name],
-                                                loading_X=False,
                                                 label_smoothing=self.label_smoothing[id_out][set_name])
 
             elif type_out == 'text' or type_out == 'dense_text':
@@ -3946,7 +4041,9 @@ class Dataset(object):
         # Recover input samples
         X = []
         k = list(k)
-        for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
+        for id_in in list(self.ids_inputs):
+            types_index = self.ids_inputs.index(id_in)
+            type_in = self.types_inputs[set_name][types_index]
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
@@ -3958,51 +4055,80 @@ class Dataset(object):
             else:
                 x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
 
-            # if(set_name=='val'):
-            #    logging.info(x)
-
             # Pre-process inputs
             if not ghost_x:
                 if type_in == 'text-features':
-                    x = self.loadTextFeatures(x, self.max_text_len[id_in][set_name], self.pad_on_batch[id_in], self.text_offset[id_in])[0]
+                    x = self.loadTextFeatures(x,
+                                              self.max_text_len[id_in][set_name],
+                                              self.pad_on_batch[id_in],
+                                              self.text_offset.get(id_in, 0))[0]
                 elif type_in == 'image-features':
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                    x = self.loadFeatures(x,
+                                          self.features_lengths[id_in],
+                                          normalization_type,
+                                          normalization,
                                           data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
-                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
-                                               normalization_type, normalization, self.features_lengths[id_in],
+                    x = self.loadVideoFeatures(x,
+                                               id_in,
+                                               set_name,
+                                               self.max_video_len[id_in],
+                                               normalization_type,
+                                               normalization,
+                                               self.features_lengths[id_in],
                                                data_augmentation=dataAugmentation)
                 if type_in == 'raw-image':
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
-                                        daRandomParams, wo_da_patch_type, da_patch_type, da_enhance_list)
+                    x = self.loadImages(x,
+                                        id_in,
+                                        normalization_type,
+                                        normalization,
+                                        meanSubstraction,
+                                        dataAugmentation,
+                                        daRandomParams,
+                                        wo_da_patch_type,
+                                        da_patch_type,
+                                        da_enhance_list)
                 elif type_in == 'video':
-                    x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
-                                               normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    x = self.loadVideosByIndex(x,
+                                               id_in,
+                                               k,
+                                               set_name,
+                                               self.max_video_len[id_in],
+                                               normalization_type,
+                                               normalization,
+                                               meanSubstraction,
+                                               dataAugmentation)
                 elif type_in == 'text':
-                    x = self.loadText(x, self.vocabulary[id_in],
-                                      self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
+                    x = self.loadText(x,
+                                      self.vocabulary[id_in],
+                                      self.max_text_len[id_in][set_name],
+                                      self.text_offset[id_in],
+                                      fill=self.fill_text[id_in],
+                                      pad_on_batch=self.pad_on_batch[id_in],
+                                      words_so_far=self.words_so_far[id_in],
+                                      loading_X=True)[0]
                 elif type_in == 'categorical':
                     nClasses = len(self.dic_classes[id_in])
                     # load_sample_weights = self.sample_weights[id_out][set_name]
-                    x = self.loadCategorical(x, nClasses)
+                    x = self.loadCategorical(x,
+                                             nClasses)
                 elif type_in == 'categorical_raw':
                     x = np.array(x)
                 elif type_in == 'binary':
-                    x = self.loadBinary(x, id_in)
+                    x = self.loadBinary(x,
+                                        id_in)
             X.append(x)
 
         # Recover output samples
         Y = []
-        for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
-            y = [getattr(self, 'Y_' + set_name)[id_out][index] for index in k]
+        for id_out in list(self.ids_outputs):
+            types_index = self.ids_outputs.index(id_out)
+            type_out = self.types_outputs[set_name][types_index]
 
-            # if(set_name=='val'):
-            #    logging.info(y)
+            y = [getattr(self, 'Y_' + set_name)[id_out][index] for index in k]
 
             # Pre-process outputs
             if type_out == 'categorical':
@@ -4034,9 +4160,8 @@ class Dataset(object):
                                                 self.vocabulary_len[id_out],
                                                 self.max_text_len[id_out][set_name],
                                                 self.pad_on_batch[id_out],
-                                                self.text_offset[id_in],
+                                                self.text_offset.get(id_out, 0),
                                                 sample_weights=self.sample_weights[id_out][set_name],
-                                                loading_X=False,
                                                 label_smoothing=self.label_smoothing[id_out][set_name])
 
             elif type_out == 'text' or type_out == 'dense_text':
@@ -4088,7 +4213,9 @@ class Dataset(object):
             da_enhance_list = []
         # Recover input samples
         X = []
-        for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
+        for id_in in list(self.ids_inputs):
+            types_index = self.ids_inputs.index(id_in)
+            type_in = self.types_inputs[set_name][types_index]
             ghost_x = False
             if id_in in self.optional_inputs:
                 try:
@@ -4102,58 +4229,78 @@ class Dataset(object):
             # Pre-process inputs
             if not ghost_x:
                 if type_in == 'text-features':
-                    x = self.loadTextFeatures(x, self.max_text_len[id_in][set_name], self.pad_on_batch[id_in], self.text_offset[id_in])[0]
+                    x = self.loadTextFeatures(x,
+                                              self.max_text_len[id_in][set_name],
+                                              self.pad_on_batch[id_in],
+                                              self.text_offset[id_in])[0]
                 elif type_in == 'image-features':
-                    x = self.loadFeatures(x, self.features_lengths[id_in], normalization_type, normalization,
+                    x = self.loadFeatures(x,
+                                          self.features_lengths[id_in],
+                                          normalization_type,
+                                          normalization,
                                           data_augmentation=dataAugmentation)
                 elif type_in == 'video-features':
-                    x = self.loadVideoFeatures(x, id_in, set_name, self.max_video_len[id_in],
-                                               normalization_type, normalization, self.features_lengths[id_in],
+                    x = self.loadVideoFeatures(x,
+                                               id_in,
+                                               set_name,
+                                               self.max_video_len[id_in],
+                                               normalization_type,
+                                               normalization,
+                                               self.features_lengths[id_in],
                                                data_augmentation=dataAugmentation)
                 elif type_in == 'raw-image':
                     daRandomParams = None
                     if dataAugmentation:
                         daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
-                    x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
-                                        daRandomParams, wo_da_patch_type, da_patch_type, da_enhance_list)
+                    x = self.loadImages(x,
+                                        id_in,
+                                        normalization_type,
+                                        normalization,
+                                        meanSubstraction,
+                                        dataAugmentation,
+                                        daRandomParams,
+                                        wo_da_patch_type,
+                                        da_patch_type,
+                                        da_enhance_list)
                 elif type_in == 'video':
-                    x = self.loadVideosByIndex(x, id_in, k, set_name, self.max_video_len[id_in],
-                                               normalization_type, normalization, meanSubstraction, dataAugmentation)
+                    x = self.loadVideosByIndex(x,
+                                               id_in,
+                                               k,
+                                               set_name,
+                                               self.max_video_len[id_in],
+                                               normalization_type,
+                                               normalization,
+                                               meanSubstraction,
+                                               dataAugmentation)
                 elif type_in == 'text':
-                    x = self.loadText(x, self.vocabulary[id_in],
-                                      self.max_text_len[id_in][set_name], self.text_offset[id_in],
-                                      fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
-                                      words_so_far=self.words_so_far[id_in], loading_X=True)[0]
+                    x = self.loadText(x,
+                                      self.vocabulary[id_in],
+                                      self.max_text_len[id_in][set_name],
+                                      self.text_offset[id_in],
+                                      fill=self.fill_text[id_in],
+                                      pad_on_batch=self.pad_on_batch[id_in],
+                                      words_so_far=self.words_so_far[id_in],
+                                      loading_X=True)[0]
                 elif type_in == 'categorical':
                     nClasses = len(self.dic_classes[id_in])
-                    # load_sample_weights = self.sample_weights[id_out][set_name]
-                    x = self.loadCategorical(x, nClasses)
+                    x = self.loadCategorical(x,
+                                             nClasses)
                 elif type_in == 'categorical_raw':
                     x = np.array(x)
                 elif type_in == 'binary':
-                    x = self.loadBinary(x, id_in)
+                    x = self.loadBinary(x,
+                                        id_in)
             X.append(x)
 
         return X
 
-    def getY(self, set_name, init, final, normalization_type='0-1', normalization=False, meanSubstraction=True,
-             dataAugmentation=True):
+    def getY(self, set_name, init, final, dataAugmentation=True):
         """
         Gets the [Y] samples for the FULL dataset
         :param set_name: 'train', 'val' or 'test' set
         :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than
                      final.
         :param final: final position in the corresponding set split.
-        # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
-        :param normalization: indicates if we want to normalize the data.
-        :param normalization_type: indicates the type of normalization applied. See available types in
-                                   self.__available_norm_im_vid for 'raw-image' and 'video' and
-                                   self.__available_norm_feat for 'image-features' and 'video-features'.
-        # 'raw-image' and 'video'-related parameters
-        :param meanSubstraction: indicates if we want to substract the training mean from the returned images
-                                 (only applicable if normalization=True)
-        :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images
-                                 (random flip and cropping)
         :return: Y, list of output data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
         """
         self.__checkSetName(set_name)
@@ -4168,7 +4315,9 @@ class Dataset(object):
 
         # Recover output samples
         Y = []
-        for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
+        for id_out in list(self.ids_outputs):
+            types_index = self.ids_outputs.index(id_out)
+            type_out = self.types_outputs[set_name][types_index]
             y = getattr(self, 'Y_' + set_name)[id_out][init:final]
             # Pre-process outputs
             if type_out == 'categorical':
@@ -4183,25 +4332,33 @@ class Dataset(object):
                 assoc_id_in = self.id_in_3DLabel[id_out]
                 imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
 
-                y = self.load3DLabels(y, nClasses, dataAugmentation, None,
-                                      self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
+                y = self.load3DLabels(y,
+                                      nClasses,
+                                      dataAugmentation,
+                                      None,
+                                      self.img_size[assoc_id_in],
+                                      self.img_size_crop[assoc_id_in],
                                       imlist)
             elif type_out == '3DSemanticLabel':
                 nClasses = len(self.classes[id_out])
                 classes_to_colour = self.semantic_classes[id_out]
                 assoc_id_in = self.id_in_3DLabel[id_out]
                 imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
-                y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, None,
-                                              self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
+                y = self.load3DSemanticLabels(y,
+                                              nClasses,
+                                              classes_to_colour,
+                                              dataAugmentation,
+                                              None,
+                                              self.img_size[assoc_id_in],
+                                              self.img_size_crop[assoc_id_in],
                                               imlist)
             elif type_out == 'text-features':
                 y = self.loadTextFeaturesOneHot(y,
                                                 self.vocabulary_len[id_out],
                                                 self.max_text_len[id_out][set_name],
                                                 self.pad_on_batch[id_out],
-                                                self.text_offset[id_in],
+                                                self.text_offset.get(id_out, 0),
                                                 sample_weights=self.sample_weights[id_out][set_name],
-                                                loading_X=False,
                                                 label_smoothing=self.label_smoothing[id_out][set_name])
 
             elif type_out == 'text' or type_out == 'dense_text':
@@ -4254,7 +4411,6 @@ class Dataset(object):
         str_ += '[ OUTPUTS ]\n'
         for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
             str_ += type_out + ': ' + id_out + '\n'
-
         str_ += '---------------------------------------------\n'
         return str_
 
