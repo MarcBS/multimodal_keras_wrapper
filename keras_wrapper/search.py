@@ -76,8 +76,7 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
     # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
     if params['words_so_far']:
         if k > maxlen:
-            raise NotImplementedError(
-                "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
+            raise NotImplementedError("BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
         state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray([np.zeros((maxlen, maxlen))] * live_k)
     else:
         state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
