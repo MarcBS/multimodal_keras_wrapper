@@ -2313,7 +2313,7 @@ class Dataset(object):
         :return: Text as sequence of numbers. Mask for each sentence.
         """
         X_out = np.asarray(X)
-        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)), max_len + 1)  - offset if pad_on_batch else maxlen
+        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)), max_len + 1) - offset if pad_on_batch else maxlen
         X_out = X_out[:, :max_len_batch].astype('int64')
         # Mask all zero-values
         X_mask = (np.ma.make_mask(X_out, dtype='int') * 1).astype('int8')
