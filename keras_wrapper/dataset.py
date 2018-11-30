@@ -2293,9 +2293,13 @@ class Dataset(object):
             y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
         # Use words separately (generator model)
         else:
-            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(np.uint8)
+            if self.label_smoothing > 0.:
+                y_aux_type = np.float32
+            else:
+                y_aux_type = np.uint8
+            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
             for idx in range(y[0].shape[0]):
-                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(np.uint8)
+                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(y_aux_type)
                 if label_smoothing > 0.:
                     y_aux[idx] = ((1 - label_smoothing) * y_aux[idx] + (label_smoothing / vocabulary_len)).astype(np.float32)
             if sample_weights:
@@ -2354,9 +2358,13 @@ class Dataset(object):
             y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
         # Use words separately (generator model)
         else:
-            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(np.uint8)
+            if self.label_smoothing > 0.:
+                y_aux_type = np.float32
+            else:
+                y_aux_type = np.uint8
+            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
             for idx in range(y[0].shape[0]):
-                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(np.uint8)
+                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(y_aux_type)
                 if label_smoothing > 0.:
                     y_aux[idx] = ((1 - label_smoothing) * y_aux[idx] + (label_smoothing / vocabulary_len)).astype(np.float32)
             if sample_weights:
