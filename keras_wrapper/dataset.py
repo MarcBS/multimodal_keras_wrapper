@@ -2293,7 +2293,7 @@ class Dataset(object):
             y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
         # Use words separately (generator model)
         else:
-            if self.label_smoothing > 0.:
+            if label_smoothing > 0.:
                 y_aux_type = np.float32
             else:
                 y_aux_type = np.uint8
@@ -2358,7 +2358,7 @@ class Dataset(object):
             y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
         # Use words separately (generator model)
         else:
-            if self.label_smoothing > 0.:
+            if label_smoothing > 0.:
                 y_aux_type = np.float32
             else:
                 y_aux_type = np.uint8
