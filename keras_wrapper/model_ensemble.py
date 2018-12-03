@@ -11,9 +11,11 @@ from keras_wrapper.utils import one_hot_2_indices, checkParameters
 from keras_wrapper.search import beam_search
 try:
     import cupy as cp
+    cupy = True
 except:
     import numpy as cp
     logging.info('<<< Cupy not available. Using numpy. >>>')
+    cupy = False
 
 
 class BeamSearchEnsemble:
@@ -480,7 +482,7 @@ class BeamSearchEnsemble:
             else:
                 probs = self.predict_cond(X, state_below, params, ii)
             # total score for every sample is sum of -log of word prb
-            score -= np.log(probs[0, int(Y[ii])])
+            score -= cp.log(probs[0, int(Y[ii])])
             state_below = np.asarray([Y[:ii + 1]], dtype='int64')
             if self.return_alphas:
                 all_alphas.append(alphas[0])
@@ -506,6 +508,8 @@ class BeamSearchEnsemble:
                     # filter next search inputs w.r.t. remaining samples
                     for idx_vars in range(len(prev_outs[n_model])):
                         prev_outs[n_model][idx_vars] = prev_outs[n_model][idx_vars]
+        if cupy:
+            score = cp.asnumpy(score)
 
         return score, all_alphas
 
