@@ -2332,13 +2332,15 @@ class Dataset(object):
         :return: Text as sequence of numbers. Mask for each sentence.
         """
         X_out = np.asarray(X)
-        max_len_batch = min(max(np.sum(X_out != 0, axis=-1)), max_len + 1) - offset if pad_on_batch else maxlen
-        X_out = X_out[:, :max_len_batch].astype('int64')
+        max_len_X = max(np.sum(X_out != 0, axis=-1))
+        max_len_out = min(max_len_X + 1, max_len) - offset if pad_on_batch else maxlen
+        X_out_aux = np.zeros((X_out.shape[0], max_len_out), dtype='int64')
+        X_out_aux[:, :max_len_X] = X_out[:, :max_len_X].astype('int64')
         # Mask all zero-values
-        X_mask = (np.ma.make_mask(X_out, dtype='int') * 1).astype('int8')
+        X_mask = (np.ma.make_mask(X_out_aux, dtype='int') * 1).astype('int8')
         # But we keep with the first one, as it indicates the <pad> symbol
         X_mask = np.hstack((np.ones((X_mask.shape[0], 1)), X_mask[:, :-1]))
-        X_out = (X_out, X_mask)
+        X_out = (X_out_aux, X_mask)
         return X_out
 
     def loadTextFeaturesOneHot(self, X,
@@ -4413,7 +4415,6 @@ class Dataset(object):
                                   loading_X=False)
 
                 y = (y[0][:, :, None], y[1])
-
 
             Y.append(y)
 
