@@ -476,6 +476,7 @@ class Data_Batch_Generator(object):
                                                           da_patch_type=self.params['da_patch_type'],
                                                           da_enhance_list=self.params['da_enhance_list'])
                     data = self.net.prepareData(X_batch, Y_batch)
+
             yield (data)
 
 
@@ -705,7 +706,7 @@ class Dataset(object):
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
-                                         'text', 'dense_text', 'text-features',  # TODO: Document dense_text type!
+                                         'text', 'dense-text', 'text-features',  # TODO: Document dense-text type!
                                          '3DLabel', '3DSemanticLabel',
                                          'id', 'file-name']
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
@@ -1019,7 +1020,7 @@ class Dataset(object):
             data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop, use_RGB)
         elif type == 'video':
             data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
-        elif type == 'text' or type == 'dense_text':
+        elif type == 'text' or type == 'dense-text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
@@ -1245,7 +1246,7 @@ class Dataset(object):
             self.setClasses(path_list, id)
             data = self.preprocessCategorical(path_list, id,
                                               sample_weights=True if sample_weights and set_name == 'train' else False)
-        elif type == 'text' or type == 'dense_text':
+        elif type == 'text' or type == 'dense-text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
@@ -1960,6 +1961,20 @@ class Dataset(object):
         self.moses_detokenizer = MosesDetokenizer(lang=language)
         self.moses_detokenizer_built = True
 
+    def apply_label_smoothing(self, y, discount, vocabulary_len, discount_type='uniform'):
+        """
+        Applies label smoothing to a one-hot codified vector.
+        :param y_text: Input to smooth
+        :param discount: Discount to apply
+        :param vocabulary_len: Length of the one-hot vectors
+        :param discount_type: Type of smoothing. Types supported:
+            'uniform': Subtract a 'label_smoothing_discount' from the label and distribute it uniformly among all labels.
+        :return:
+        """
+        # if discount_type == 'uniform': # Currently, only 'uniform' discount_type is implemented.
+        y = ((1 - discount) * y + (discount / vocabulary_len))
+        return y
+
     @staticmethod
     def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
         """
@@ -2300,8 +2315,8 @@ class Dataset(object):
             y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
             for idx in range(y[0].shape[0]):
                 y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(y_aux_type)
-                if label_smoothing > 0.:
-                    y_aux[idx] = ((1 - label_smoothing) * y_aux[idx] + (label_smoothing / vocabulary_len)).astype(np.float32)
+            if label_smoothing > 0.:
+                y_aux = self.apply_label_smoothing(y_aux, label_smoothing, vocabulary_len)
             if sample_weights:
                 y_aux = (y_aux, y[1])  # join data and mask
         return y_aux
@@ -2365,8 +2380,8 @@ class Dataset(object):
             y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
             for idx in range(y[0].shape[0]):
                 y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(y_aux_type)
-                if label_smoothing > 0.:
-                    y_aux[idx] = ((1 - label_smoothing) * y_aux[idx] + (label_smoothing / vocabulary_len)).astype(np.float32)
+            if label_smoothing > 0.:
+                y_aux = self.apply_label_smoothing(y_aux, label_smoothing, vocabulary_len)
             if sample_weights:
                 y_aux = (y_aux, y[1])  # join data and mask
         return y_aux
@@ -3775,7 +3790,7 @@ class Dataset(object):
                                         normalization,
                                         meanSubstraction,
                                         dataAugmentation)
-                elif type_in == 'text' or type_in == 'dense_text':
+                elif type_in == 'text' or type_in == 'dense-text':
                     x = self.loadText(x,
                                       self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name],
@@ -3791,8 +3806,7 @@ class Dataset(object):
                 elif type_in == 'categorical_raw':
                     x = np.array(x)
                 elif type_in == 'binary':
-                    x = self.loadBinary(x,
-                                        id_in)
+                    x = self.loadBinary(x, id_in)
             X.append(x)
 
         return X
@@ -3869,7 +3883,7 @@ class Dataset(object):
                                            normalization,
                                            self.features_lengths[id_in],
                                            data_augmentation=dataAugmentation)
-            elif type_in == 'text' or type_in == 'dense_text':
+            elif type_in == 'text' or type_in == 'dense-text':
                 x = self.loadText(x,
                                   self.vocabulary[id_in],
                                   self.max_text_len[id_in][set_name],
@@ -3978,7 +3992,7 @@ class Dataset(object):
                                                 sample_weights=self.sample_weights[id_out][set_name],
                                                 label_smoothing=self.label_smoothing[id_out][set_name])
 
-            elif type_out == 'text' or type_out == 'dense_text':
+            elif type_out == 'text':
                 y = self.loadTextOneHot(y,
                                         self.vocabulary[id_out],
                                         self.vocabulary_len[id_out],
@@ -3991,7 +4005,20 @@ class Dataset(object):
                                         loading_X=False,
                                         label_smoothing=self.label_smoothing[id_out][set_name])
 
-            if type_out == 'dense_text':
+            elif type_out == 'dense-text':
+                y = self.loadText(y,
+                                  self.vocabulary[id_out],
+                                  self.max_text_len[id_out][set_name],
+                                  self.text_offset[id_out],
+                                  self.fill_text[id_out],
+                                  self.pad_on_batch[id_out],
+                                  self.words_so_far[id_out],
+                                  loading_X=False)
+
+                if self.label_smoothing[id_out][set_name] > 0.:
+                    y[0] = self.apply_label_smoothing(y[0],
+                                                      self.label_smoothing[id_out][set_name],
+                                                      self.vocabulary_len[id_out])
                 y = (y[0][:, :, None], y[1])
 
             Y.append(y)
@@ -4153,7 +4180,7 @@ class Dataset(object):
                                                 sample_weights=self.sample_weights[id_out][set_name],
                                                 label_smoothing=self.label_smoothing[id_out][set_name])
 
-            elif type_out == 'text' or type_out == 'dense_text':
+            elif type_out == 'text':
                 y = self.loadTextOneHot(y,
                                         self.vocabulary[id_out],
                                         self.vocabulary_len[id_out],
@@ -4166,7 +4193,20 @@ class Dataset(object):
                                         loading_X=False,
                                         label_smoothing=self.label_smoothing[id_out][set_name])
 
-            if type_out == 'dense_text':
+            elif type_out == 'dense-text':
+                y = self.loadText(y,
+                                  self.vocabulary[id_out],
+                                  self.max_text_len[id_out][set_name],
+                                  self.text_offset[id_out],
+                                  self.fill_text[id_out],
+                                  self.pad_on_batch[id_out],
+                                  self.words_so_far[id_out],
+                                  loading_X=False)
+
+                if self.label_smoothing[id_out][set_name] > 0.:
+                    y[0] = self.apply_label_smoothing(y[0],
+                                                      self.label_smoothing[id_out][set_name],
+                                                      self.vocabulary_len[id_out])
                 y = (y[0][:, :, None], y[1])
 
             Y.append(y)
@@ -4350,7 +4390,7 @@ class Dataset(object):
                                                 sample_weights=self.sample_weights[id_out][set_name],
                                                 label_smoothing=self.label_smoothing[id_out][set_name])
 
-            elif type_out == 'text' or type_out == 'dense_text':
+            elif type_out == 'text':
                 y = self.loadTextOneHot(y,
                                         self.vocabulary[id_out],
                                         self.vocabulary_len[id_out],
@@ -4362,9 +4402,18 @@ class Dataset(object):
                                         sample_weights=self.sample_weights[id_out][set_name],
                                         loading_X=False,
                                         label_smoothing=self.label_smoothing[id_out][set_name])
+            elif type_out == 'dense-text':
+                y = self.loadText(y,
+                                  self.vocabulary[id_out],
+                                  self.max_text_len[id_out][set_name],
+                                  self.text_offset[id_out],
+                                  self.fill_text[id_out],
+                                  self.pad_on_batch[id_out],
+                                  self.words_so_far[id_out],
+                                  loading_X=False)
 
-            if type_out == 'dense_text':
                 y = (y[0][:, :, None], y[1])
+
 
             Y.append(y)
 
