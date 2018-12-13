@@ -25,7 +25,7 @@ from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_G
 from keras_wrapper.extra.callbacks import *
 from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
-    decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters
+    decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters, print_dict
 from keras_wrapper.search import beam_search
 try:
     import cupy as cp
@@ -952,7 +952,7 @@ class Model_Wrapper(object):
         if state is None:
             state = dict()
         if params['verbose'] > 0:
-            logging.info("Training parameters: " + str(params))
+            logging.info(print_dict(params, header="Training parameters: "))
 
         # initialize state
         state['samples_per_epoch'] = ds.len_train
@@ -1142,7 +1142,8 @@ class Model_Wrapper(object):
     def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None):
 
         if params['verbose'] > 0:
-            logging.info("Training parameters: " + str(params))
+            logging.info(print_dict(params, header="Training parameters: "))
+
         callbacks = []
 
         # Extra callbacks (e.g. evaluation)
@@ -1822,6 +1823,8 @@ class Model_Wrapper(object):
             if params['verbose'] > 0:
                 print("", file=sys.stderr)
                 logging.info("<<< Predicting outputs of " + s + " set >>>")
+                logging.info(print_dict(params, header="Prediction parameters: "))
+
             # Calculate how many iterations are we going to perform
             if params['n_samples'] is None:
                 if params['init_sample'] > -1 and params['final_sample'] > -1:
