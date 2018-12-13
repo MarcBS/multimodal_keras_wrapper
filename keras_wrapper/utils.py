@@ -49,7 +49,8 @@ class MultiprocessQueue():
 
     def __init__(self, manager, multiprocess_type='Queue'):
         if multiprocess_type != 'Queue' and multiprocess_type != 'Pipe':
-            raise NotImplementedError('Not valid multiprocessing queue of type ' + multiprocess_type)
+            raise NotImplementedError(
+                'Not valid multiprocessing queue of type ' + multiprocess_type)
 
         self.type = multiprocess_type
         if multiprocess_type == 'Queue':
@@ -101,7 +102,8 @@ def bbox(img, mode='max'):
         return x, y, xmax, ymax
 
 
-def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ecoc_version=2):
+def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01,
+                             ecoc_version=2):
     """
 
     :param n_classes_ecoc:
@@ -125,10 +127,12 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ec
 
         # Create each one_vs_one classifier of the intermediate stage
         if ecoc_version == 1:
-            s = Stage(nInput=n_classes, nOutput=n_classes_ecoc, input_shape=input_shape, output_shape=[1, 2],
+            s = Stage(nInput=n_classes, nOutput=n_classes_ecoc,
+                      input_shape=input_shape, output_shape=[1, 2],
                       type='One_vs_One_Inception', silence=True)
         elif ecoc_version == 2:
-            s = Stage(nInput=n_classes, nOutput=n_classes_ecoc, input_shape=input_shape, output_shape=[1, 2],
+            s = Stage(nInput=n_classes, nOutput=n_classes_ecoc,
+                      input_shape=input_shape, output_shape=[1, 2],
                       type='One_vs_One_Inception_v2', silence=True)
         # Build input mapping
         input_mapping = dict()
@@ -148,7 +152,8 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01, ec
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (str(count + 1), str(n_combs), c, str(time.time() - t)))
+        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
+        str(count + 1), str(n_combs), c, str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -173,7 +178,8 @@ def build_OneVsAllECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr):
         t = time.time()
 
         # Create each one_vs_one classifier of the intermediate stage
-        s = Stage(nInput=n_classes, nOutput=n_classes_ecoc, input_shape=input_shape, output_shape=[1],
+        s = Stage(nInput=n_classes, nOutput=n_classes_ecoc, input_shape=input_shape,
+                  output_shape=[1],
                   type='One_vs_One_Inception', silence=True)
         # Build input mapping
         input_mapping = dict()
@@ -193,7 +199,8 @@ def build_OneVsAllECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr):
         outputs_list.append('loss_OnevsOne/output')
 
         logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
-            str(count + 1), str(n_classes), '(' + str(c) + ' vs All)', str(time.time() - t)))
+            str(count + 1), str(n_classes), '(' + str(c) + ' vs All)',
+            str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -223,10 +230,12 @@ def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2
 
         # Create each one_vs_one classifier of the intermediate stage
         if ecoc_version == 1:
-            s = Stage(nInput=n_classes, nOutput=2, input_shape=input_shape, output_shape=[2],
+            s = Stage(nInput=n_classes, nOutput=2, input_shape=input_shape,
+                      output_shape=[2],
                       type='One_vs_One_Inception', silence=True)
         elif ecoc_version == 2:
-            s = Stage(nInput=n_classes, nOutput=2, input_shape=input_shape, output_shape=[2],
+            s = Stage(nInput=n_classes, nOutput=2, input_shape=input_shape,
+                      output_shape=[2],
                       type='One_vs_One_Inception_v2', silence=True)
         # Build input mapping
         input_mapping = dict()
@@ -246,13 +255,15 @@ def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2
         outputs_list.append('loss_OnevsOne/output')
 
         logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
-            str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time() - t)))
+            str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]),
+            str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
 
 
-def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2):
+def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr,
+                                            ecoc_version=2):
     """
 
     :param pairs:
@@ -274,10 +285,12 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
 
         # Create each one_vs_one classifier of the intermediate stage
         if ecoc_version == 1:
-            s = Stage(nInput=n_classes, nOutput=3, input_shape=input_shape, output_shape=[3],
+            s = Stage(nInput=n_classes, nOutput=3, input_shape=input_shape,
+                      output_shape=[3],
                       type='One_vs_One_Inception', silence=True)
         elif ecoc_version == 2:
-            s = Stage(nInput=n_classes, nOutput=3, input_shape=input_shape, output_shape=[3],
+            s = Stage(nInput=n_classes, nOutput=3, input_shape=input_shape,
+                      output_shape=[3],
                       type='One_vs_One_Inception_v2', silence=True)
         # Build input mapping
         input_mapping = dict()
@@ -297,13 +310,15 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr, ecoc_ver
         outputs_list.append('loss_OnevsOne/output')
 
         logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
-            str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]), str(time.time() - t)))
+            str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]),
+            str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
 
 
-def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes, ecoc_version=3, pairs=None,
+def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes,
+                                           ecoc_version=3, pairs=None,
                                            functional_api=False, activations=None):
     """
 
@@ -340,16 +355,23 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes,
         # Create each one_vs_one classifier of the intermediate stage
         if not functional_api:
             if ecoc_version == 1:
-                output_name = net.add_One_vs_One_Inception(input_net, input_shape, i, nOutput=2, activation=activations[0])
+                output_name = net.add_One_vs_One_Inception(input_net, input_shape, i,
+                                                           nOutput=2,
+                                                           activation=activations[0])
             elif ecoc_version == 2:
-                output_name = net.add_One_vs_One_Inception_v2(input_net, input_shape, i, nOutput=2,
-                                                              activation=activations[0])
+                output_name = net.add_One_vs_One_Inception_v2(input_net, input_shape,
+                                                              i, nOutput=2,
+                                                              activation=activations[
+                                                                  0])
             else:
                 raise NotImplementedError
         else:
             if ecoc_version == 1:
-                output_name = net.add_One_vs_One_Inception_Functional(input_net, input_shape, i, nOutput=2,
-                                                                      activation=activations[0])
+                output_name = net.add_One_vs_One_Inception_Functional(input_net,
+                                                                      input_shape, i,
+                                                                      nOutput=2,
+                                                                      activation=
+                                                                      activations[0])
             elif ecoc_version == 2:
                 raise NotImplementedError()
             elif ecoc_version == 3 or ecoc_version == 4 or ecoc_version == 5 or ecoc_version == 6:
@@ -365,15 +387,24 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes,
                     raise NotImplementedError()
                 if i == 0:
                     in_node = net.model.get_layer(input_net).output
-                    padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')(in_node)
-                output_name = net.add_One_vs_One_3x3_Functional(padding_node, input_shape, i, nkernels, nOutput=2,
-                                                                activation=activations[0])
+                    padding_node = ZeroPadding2D(padding=(1, 1),
+                                                 name='3x3/ecoc_padding')(in_node)
+                output_name = net.add_One_vs_One_3x3_Functional(padding_node,
+                                                                input_shape, i,
+                                                                nkernels, nOutput=2,
+                                                                activation=
+                                                                activations[0])
             elif ecoc_version == 7:
                 if i == 0:
                     in_node = net.model.get_layer(input_net).output
-                    padding_node = ZeroPadding2D(padding=(1, 1), name='3x3/ecoc_padding')(in_node)
-                output_name = net.add_One_vs_One_3x3_double_Functional(padding_node, input_shape, i, nOutput=2,
-                                                                       activation=activations[0])
+                    padding_node = ZeroPadding2D(padding=(1, 1),
+                                                 name='3x3/ecoc_padding')(in_node)
+                output_name = net.add_One_vs_One_3x3_double_Functional(padding_node,
+                                                                       input_shape,
+                                                                       i, nOutput=2,
+                                                                       activation=
+                                                                       activations[
+                                                                           0])
             else:
                 raise NotImplementedError()
         outputs_list.append(output_name)
@@ -385,15 +416,18 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes,
 
     # Build final Softmax layer
     if not functional_api:
-        output_names = net.add_One_vs_One_Merge(outputs_list, n_classes, activation=activations[1])
+        output_names = net.add_One_vs_One_Merge(outputs_list, n_classes,
+                                                activation=activations[1])
     else:
-        output_names = net.add_One_vs_One_Merge_Functional(outputs_list, n_classes, activation=activations[1])
+        output_names = net.add_One_vs_One_Merge_Functional(outputs_list, n_classes,
+                                                           activation=activations[1])
     logging.info('Built ECOC merge layers.')
 
     return [ecoc_table, output_names]
 
 
-def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits=None):
+def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names,
+                           splits=None):
     """
 
     :param net:
@@ -440,7 +474,8 @@ def prepareECOCLossOutputs(net, ds, ecoc_table, input_name, output_names, splits
     net.setOutputsMapping(outputMapping, acc_output=output_names[1])
 
 
-def loadGoogleNetForFood101(nClasses=101, load_path='/media/HDD_2TB/CNN_MODELS/GoogleNet'):
+def loadGoogleNetForFood101(nClasses=101,
+                            load_path='/media/HDD_2TB/CNN_MODELS/GoogleNet'):
     """
 
     :param nClasses:
@@ -450,7 +485,8 @@ def loadGoogleNetForFood101(nClasses=101, load_path='/media/HDD_2TB/CNN_MODELS/G
     logging.info('Loading GoogLeNet...')
 
     # Build model (loading the previously converted Caffe's model)
-    googLeNet = Stage(nClasses, nClasses, [224, 224, 3], [nClasses], type='GoogleNet',
+    googLeNet = Stage(nClasses, nClasses, [224, 224, 3], [nClasses],
+                      type='GoogleNet',
                       model_name='GoogleNet_Food101_retrained',
                       structure_path=load_path + '/Keras_model_structure.json',
                       weights_path=load_path + '/Keras_model_weights.h5')
@@ -465,10 +501,14 @@ def prepareGoogleNet_Food101(model_wrapper):
     :return:
     """
     # Remove unnecessary intermediate optimizers
-    layers_to_delete = ['loss2/ave_pool', 'loss2/conv', 'loss2/relu_conv', 'loss2/fc_flatten', 'loss2/fc',
-                        'loss2/relu_fc', 'loss2/drop_fc', 'loss2/classifier', 'output_loss2/loss',
-                        'loss1/ave_pool', 'loss1/conv', 'loss1/relu_conv', 'loss1/fc_flatten', 'loss1/fc',
-                        'loss1/relu_fc', 'loss1/drop_fc', 'loss1/classifier', 'output_loss1/loss']
+    layers_to_delete = ['loss2/ave_pool', 'loss2/conv', 'loss2/relu_conv',
+                        'loss2/fc_flatten', 'loss2/fc',
+                        'loss2/relu_fc', 'loss2/drop_fc', 'loss2/classifier',
+                        'output_loss2/loss',
+                        'loss1/ave_pool', 'loss1/conv', 'loss1/relu_conv',
+                        'loss1/fc_flatten', 'loss1/fc',
+                        'loss1/relu_fc', 'loss1/drop_fc', 'loss1/classifier',
+                        'output_loss1/loss']
     model_wrapper.removeLayers(layers_to_delete)
     model_wrapper.removeOutputs(['loss1/loss', 'loss2/loss'])
 
@@ -480,20 +520,29 @@ def prepareGoogleNet_Food101_ECOC_loss(model_wrapper):
     :return:
     """
     # Remove all last layers (from 'inception_5a' included)
-    layers_to_delete = ['inception_5a/1x1', 'inception_5a/relu_1x1', 'inception_5a/3x3_reduce',
+    layers_to_delete = ['inception_5a/1x1', 'inception_5a/relu_1x1',
+                        'inception_5a/3x3_reduce',
                         'inception_5a/relu_3x3_reduce',
-                        'inception_5a/3x3_zeropadding', 'inception_5a/3x3', 'inception_5a/relu_3x3',
+                        'inception_5a/3x3_zeropadding', 'inception_5a/3x3',
+                        'inception_5a/relu_3x3',
                         'inception_5a/5x5_reduce',
-                        'inception_5a/relu_5x5_reduce', 'inception_5a/5x5_zeropadding', 'inception_5a/5x5',
+                        'inception_5a/relu_5x5_reduce',
+                        'inception_5a/5x5_zeropadding', 'inception_5a/5x5',
                         'inception_5a/relu_5x5',
-                        'inception_5a/pool_zeropadding', 'inception_5a/pool', 'inception_5a/pool_proj',
-                        'inception_5a/relu_pool_proj', 'inception_5a/output', 'inception_5b/1x1',
-                        'inception_5b/relu_1x1', 'inception_5b/3x3_reduce', 'inception_5b/relu_3x3_reduce',
-                        'inception_5b/3x3_zeropadding', 'inception_5b/3x3', 'inception_5b/relu_3x3',
+                        'inception_5a/pool_zeropadding', 'inception_5a/pool',
+                        'inception_5a/pool_proj',
+                        'inception_5a/relu_pool_proj', 'inception_5a/output',
+                        'inception_5b/1x1',
+                        'inception_5b/relu_1x1', 'inception_5b/3x3_reduce',
+                        'inception_5b/relu_3x3_reduce',
+                        'inception_5b/3x3_zeropadding', 'inception_5b/3x3',
+                        'inception_5b/relu_3x3',
                         'inception_5b/5x5_reduce',
-                        'inception_5b/relu_5x5_reduce', 'inception_5b/5x5_zeropadding', 'inception_5b/5x5',
+                        'inception_5b/relu_5x5_reduce',
+                        'inception_5b/5x5_zeropadding', 'inception_5b/5x5',
                         'inception_5b/relu_5x5',
-                        'inception_5b/pool_zeropadding', 'inception_5b/pool', 'inception_5b/pool_proj',
+                        'inception_5b/pool_zeropadding', 'inception_5b/pool',
+                        'inception_5b/pool_proj',
                         'inception_5b/relu_pool_proj',
                         'inception_5b/output', 'pool5/7x7_s1', 'pool5/drop_7x7_s1',
                         'loss3/classifier_foodrecognition_flatten',
@@ -502,7 +551,8 @@ def prepareGoogleNet_Food101_ECOC_loss(model_wrapper):
     # Remove softmax output
     model_wrapper.removeOutputs(['loss3/loss3'])
 
-    return ['pool4/3x3_s2', [832, 7, 7]]  # returns the name of the last layer and its output shape
+    return ['pool4/3x3_s2',
+            [832, 7, 7]]  # returns the name of the last layer and its output shape
     # Adds a new output after the layer 'pool4/3x3_s2'
     # model_wrapper.model.add_output(name='pool4', input='pool4/3x3_s2')
 
@@ -525,21 +575,29 @@ def prepareGoogleNet_Stage2(stage1, stage2):
     :return:
     """
     # Remove all last layers (from 'inception_5a' included)
-    layers_to_delete = ['inception_5a/1x1', 'inception_5a/relu_1x1', 'inception_5a/3x3_reduce',
+    layers_to_delete = ['inception_5a/1x1', 'inception_5a/relu_1x1',
+                        'inception_5a/3x3_reduce',
                         'inception_5a/relu_3x3_reduce',
-                        'inception_5a/3x3_zeropadding', 'inception_5a/3x3', 'inception_5a/relu_3x3',
+                        'inception_5a/3x3_zeropadding', 'inception_5a/3x3',
+                        'inception_5a/relu_3x3',
                         'inception_5a/5x5_reduce',
-                        'inception_5a/relu_5x5_reduce', 'inception_5a/5x5_zeropadding', 'inception_5a/5x5',
+                        'inception_5a/relu_5x5_reduce',
+                        'inception_5a/5x5_zeropadding', 'inception_5a/5x5',
                         'inception_5a/relu_5x5',
-                        'inception_5a/pool_zeropadding', 'inception_5a/pool', 'inception_5a/pool_proj',
+                        'inception_5a/pool_zeropadding', 'inception_5a/pool',
+                        'inception_5a/pool_proj',
                         'inception_5a/relu_pool_proj',
-                        'inception_5a/output', 'inception_5b/1x1', 'inception_5b/relu_1x1', 'inception_5b/3x3_reduce',
+                        'inception_5a/output', 'inception_5b/1x1',
+                        'inception_5b/relu_1x1', 'inception_5b/3x3_reduce',
                         'inception_5b/relu_3x3_reduce',
-                        'inception_5b/3x3_zeropadding', 'inception_5b/3x3', 'inception_5b/relu_3x3',
+                        'inception_5b/3x3_zeropadding', 'inception_5b/3x3',
+                        'inception_5b/relu_3x3',
                         'inception_5b/5x5_reduce',
-                        'inception_5b/relu_5x5_reduce', 'inception_5b/5x5_zeropadding', 'inception_5b/5x5',
+                        'inception_5b/relu_5x5_reduce',
+                        'inception_5b/5x5_zeropadding', 'inception_5b/5x5',
                         'inception_5b/relu_5x5',
-                        'inception_5b/pool_zeropadding', 'inception_5b/pool', 'inception_5b/pool_proj',
+                        'inception_5b/pool_zeropadding', 'inception_5b/pool',
+                        'inception_5b/pool_proj',
                         'inception_5b/relu_pool_proj',
                         'inception_5b/output', 'pool5/7x7_s1', 'pool5/drop_7x7_s1',
                         'loss3/classifier_foodrecognition_flatten',
@@ -548,49 +606,92 @@ def prepareGoogleNet_Stage2(stage1, stage2):
     # Remove softmax output
     stage1.removeOutputs(['loss3/loss3'])
 
-    layers_to_delete_2 = ["conv1/7x7_s2_zeropadding", "conv1/7x7_s2", "conv1/relu_7x7", "pool1/3x3_s2_zeropadding",
-                          "pool1/3x3_s2", "pool1/norm1", "conv2/3x3_reduce", "conv2/relu_3x3_reduce",
-                          "conv2/3x3_zeropadding", "conv2/3x3", "conv2/relu_3x3", "conv2/norm2",
-                          "pool2/3x3_s2_zeropadding", "pool2/3x3_s2", "inception_3a/1x1", "inception_3a/relu_1x1",
-                          "inception_3a/3x3_reduce", "inception_3a/relu_3x3_reduce", "inception_3a/3x3_zeropadding",
-                          "inception_3a/3x3", "inception_3a/relu_3x3", "inception_3a/5x5_reduce",
-                          "inception_3a/relu_5x5_reduce", "inception_3a/5x5_zeropadding", "inception_3a/5x5",
-                          "inception_3a/relu_5x5", "inception_3a/pool_zeropadding", "inception_3a/pool",
-                          "inception_3a/pool_proj", "inception_3a/relu_pool_proj", "inception_3a/output",
-                          "inception_3b/1x1", "inception_3b/relu_1x1", "inception_3b/3x3_reduce",
-                          "inception_3b/relu_3x3_reduce", "inception_3b/3x3_zeropadding", "inception_3b/3x3",
-                          "inception_3b/relu_3x3", "inception_3b/5x5_reduce", "inception_3b/relu_5x5_reduce",
-                          "inception_3b/5x5_zeropadding", "inception_3b/5x5", "inception_3b/relu_5x5",
-                          "inception_3b/pool_zeropadding", "inception_3b/pool", "inception_3b/pool_proj",
-                          "inception_3b/relu_pool_proj", "inception_3b/output", "pool3/3x3_s2_zeropadding",
-                          "pool3/3x3_s2", "inception_4a/1x1", "inception_4a/relu_1x1", "inception_4a/3x3_reduce",
-                          "inception_4a/relu_3x3_reduce", "inception_4a/3x3_zeropadding", "inception_4a/3x3",
-                          "inception_4a/relu_3x3", "inception_4a/5x5_reduce", "inception_4a/relu_5x5_reduce",
-                          "inception_4a/5x5_zeropadding", "inception_4a/5x5", "inception_4a/relu_5x5",
-                          "inception_4a/pool_zeropadding", "inception_4a/pool", "inception_4a/pool_proj",
-                          "inception_4a/relu_pool_proj", "inception_4a/output", "inception_4b/1x1",
-                          "inception_4b/relu_1x1", "inception_4b/3x3_reduce", "inception_4b/relu_3x3_reduce",
-                          "inception_4b/3x3_zeropadding", "inception_4b/3x3", "inception_4b/relu_3x3",
-                          "inception_4b/5x5_reduce", "inception_4b/relu_5x5_reduce", "inception_4b/5x5_zeropadding",
-                          "inception_4b/5x5", "inception_4b/relu_5x5", "inception_4b/pool_zeropadding",
-                          "inception_4b/pool", "inception_4b/pool_proj", "inception_4b/relu_pool_proj",
-                          "inception_4b/output", "inception_4c/1x1", "inception_4c/relu_1x1", "inception_4c/3x3_reduce",
-                          "inception_4c/relu_3x3_reduce", "inception_4c/3x3_zeropadding", "inception_4c/3x3",
-                          "inception_4c/relu_3x3", "inception_4c/5x5_reduce", "inception_4c/relu_5x5_reduce",
-                          "inception_4c/5x5_zeropadding", "inception_4c/5x5", "inception_4c/relu_5x5",
-                          "inception_4c/pool_zeropadding", "inception_4c/pool", "inception_4c/pool_proj",
-                          "inception_4c/relu_pool_proj", "inception_4c/output", "inception_4d/1x1",
-                          "inception_4d/relu_1x1", "inception_4d/3x3_reduce", "inception_4d/relu_3x3_reduce",
-                          "inception_4d/3x3_zeropadding", "inception_4d/3x3", "inception_4d/relu_3x3",
-                          "inception_4d/5x5_reduce", "inception_4d/relu_5x5_reduce", "inception_4d/5x5_zeropadding",
-                          "inception_4d/5x5", "inception_4d/relu_5x5", "inception_4d/pool_zeropadding",
-                          "inception_4d/pool", "inception_4d/pool_proj", "inception_4d/relu_pool_proj",
-                          "inception_4d/output", "inception_4e/1x1", "inception_4e/relu_1x1", "inception_4e/3x3_reduce",
-                          "inception_4e/relu_3x3_reduce", "inception_4e/3x3_zeropadding", "inception_4e/3x3",
-                          "inception_4e/relu_3x3", "inception_4e/5x5_reduce", "inception_4e/relu_5x5_reduce",
-                          "inception_4e/5x5_zeropadding", "inception_4e/5x5", "inception_4e/relu_5x5",
-                          "inception_4e/pool_zeropadding", "inception_4e/pool", "inception_4e/pool_proj",
-                          "inception_4e/relu_pool_proj", "inception_4e/output", "pool4/3x3_s2_zeropadding",
+    layers_to_delete_2 = ["conv1/7x7_s2_zeropadding", "conv1/7x7_s2",
+                          "conv1/relu_7x7", "pool1/3x3_s2_zeropadding",
+                          "pool1/3x3_s2", "pool1/norm1", "conv2/3x3_reduce",
+                          "conv2/relu_3x3_reduce",
+                          "conv2/3x3_zeropadding", "conv2/3x3", "conv2/relu_3x3",
+                          "conv2/norm2",
+                          "pool2/3x3_s2_zeropadding", "pool2/3x3_s2",
+                          "inception_3a/1x1", "inception_3a/relu_1x1",
+                          "inception_3a/3x3_reduce", "inception_3a/relu_3x3_reduce",
+                          "inception_3a/3x3_zeropadding",
+                          "inception_3a/3x3", "inception_3a/relu_3x3",
+                          "inception_3a/5x5_reduce",
+                          "inception_3a/relu_5x5_reduce",
+                          "inception_3a/5x5_zeropadding", "inception_3a/5x5",
+                          "inception_3a/relu_5x5", "inception_3a/pool_zeropadding",
+                          "inception_3a/pool",
+                          "inception_3a/pool_proj", "inception_3a/relu_pool_proj",
+                          "inception_3a/output",
+                          "inception_3b/1x1", "inception_3b/relu_1x1",
+                          "inception_3b/3x3_reduce",
+                          "inception_3b/relu_3x3_reduce",
+                          "inception_3b/3x3_zeropadding", "inception_3b/3x3",
+                          "inception_3b/relu_3x3", "inception_3b/5x5_reduce",
+                          "inception_3b/relu_5x5_reduce",
+                          "inception_3b/5x5_zeropadding", "inception_3b/5x5",
+                          "inception_3b/relu_5x5",
+                          "inception_3b/pool_zeropadding", "inception_3b/pool",
+                          "inception_3b/pool_proj",
+                          "inception_3b/relu_pool_proj", "inception_3b/output",
+                          "pool3/3x3_s2_zeropadding",
+                          "pool3/3x3_s2", "inception_4a/1x1",
+                          "inception_4a/relu_1x1", "inception_4a/3x3_reduce",
+                          "inception_4a/relu_3x3_reduce",
+                          "inception_4a/3x3_zeropadding", "inception_4a/3x3",
+                          "inception_4a/relu_3x3", "inception_4a/5x5_reduce",
+                          "inception_4a/relu_5x5_reduce",
+                          "inception_4a/5x5_zeropadding", "inception_4a/5x5",
+                          "inception_4a/relu_5x5",
+                          "inception_4a/pool_zeropadding", "inception_4a/pool",
+                          "inception_4a/pool_proj",
+                          "inception_4a/relu_pool_proj", "inception_4a/output",
+                          "inception_4b/1x1",
+                          "inception_4b/relu_1x1", "inception_4b/3x3_reduce",
+                          "inception_4b/relu_3x3_reduce",
+                          "inception_4b/3x3_zeropadding", "inception_4b/3x3",
+                          "inception_4b/relu_3x3",
+                          "inception_4b/5x5_reduce", "inception_4b/relu_5x5_reduce",
+                          "inception_4b/5x5_zeropadding",
+                          "inception_4b/5x5", "inception_4b/relu_5x5",
+                          "inception_4b/pool_zeropadding",
+                          "inception_4b/pool", "inception_4b/pool_proj",
+                          "inception_4b/relu_pool_proj",
+                          "inception_4b/output", "inception_4c/1x1",
+                          "inception_4c/relu_1x1", "inception_4c/3x3_reduce",
+                          "inception_4c/relu_3x3_reduce",
+                          "inception_4c/3x3_zeropadding", "inception_4c/3x3",
+                          "inception_4c/relu_3x3", "inception_4c/5x5_reduce",
+                          "inception_4c/relu_5x5_reduce",
+                          "inception_4c/5x5_zeropadding", "inception_4c/5x5",
+                          "inception_4c/relu_5x5",
+                          "inception_4c/pool_zeropadding", "inception_4c/pool",
+                          "inception_4c/pool_proj",
+                          "inception_4c/relu_pool_proj", "inception_4c/output",
+                          "inception_4d/1x1",
+                          "inception_4d/relu_1x1", "inception_4d/3x3_reduce",
+                          "inception_4d/relu_3x3_reduce",
+                          "inception_4d/3x3_zeropadding", "inception_4d/3x3",
+                          "inception_4d/relu_3x3",
+                          "inception_4d/5x5_reduce", "inception_4d/relu_5x5_reduce",
+                          "inception_4d/5x5_zeropadding",
+                          "inception_4d/5x5", "inception_4d/relu_5x5",
+                          "inception_4d/pool_zeropadding",
+                          "inception_4d/pool", "inception_4d/pool_proj",
+                          "inception_4d/relu_pool_proj",
+                          "inception_4d/output", "inception_4e/1x1",
+                          "inception_4e/relu_1x1", "inception_4e/3x3_reduce",
+                          "inception_4e/relu_3x3_reduce",
+                          "inception_4e/3x3_zeropadding", "inception_4e/3x3",
+                          "inception_4e/relu_3x3", "inception_4e/5x5_reduce",
+                          "inception_4e/relu_5x5_reduce",
+                          "inception_4e/5x5_zeropadding", "inception_4e/5x5",
+                          "inception_4e/relu_5x5",
+                          "inception_4e/pool_zeropadding", "inception_4e/pool",
+                          "inception_4e/pool_proj",
+                          "inception_4e/relu_pool_proj", "inception_4e/output",
+                          "pool4/3x3_s2_zeropadding",
                           "pool4/3x3_s2"]
 
     # Remove initial layers
@@ -599,7 +700,8 @@ def prepareGoogleNet_Stage2(stage1, stage2):
     stage2.removeInputs(['input_data'])
     # Add new input
     stage2.model.add_input(name='input_data', input_shape=(832, 7, 7))
-    stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs['input_data']
+    stage2.model.nodes[layers_to_delete[0]].previous = stage2.model.inputs[
+        'input_data']
     """
     # Insert layers into stage
      stage2.model = Graph()
@@ -630,7 +732,8 @@ def simplifyDataset(ds, id_classes, n_classes=50):
     :param n_classes:
     :return:
     """
-    logging.info("Simplifying %s from %d to %d classes." % (str(ds.name), len(ds.classes), n_classes))
+    logging.info("Simplifying %s from %d to %d classes." % (
+    str(ds.name), len(ds.classes), n_classes))
     ds.classes[id_classes] = ds.classes[id_classes][:n_classes]
 
     id_labels = ds.ids_outputs[ds.types_outputs.index('categorical')]
@@ -675,61 +778,82 @@ def average_models(models, output_model, weights=None):
     if len(models) == 0:
         raise AssertionError('You provided an empty list of models to average!')
 
-    model_weights = np.asarray([1. / len(models)] * len(models), dtype=np.float32) if (weights is None) or (weights == []) else np.asarray(weights, dtype=np.float32)
+    model_weights = np.asarray([1. / len(models)] * len(models),
+                               dtype=np.float32) if (weights is None) or (
+    weights == []) else np.asarray(weights, dtype=np.float32)
     if len(model_weights) != len(models):
-        raise AssertionError('You must give a list of weights of the same size than the list of models.')
+        raise AssertionError(
+            'You must give a list of weights of the same size than the list of models.')
     loaded_models = [loadModel(m, -1, full_path=True) for m in models]
 
     # Check that all models are compatible
     if not all([hasattr(loaded_model, 'model') for loaded_model in loaded_models]):
         raise AssertionError('Not all models have the attribute "model".')
-    if not (all([hasattr(loaded_model, 'model_init') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_init') for loaded_model in loaded_models])):
-            raise AssertionError('Not all models have the attribute "model_init".')
+    if not (all([hasattr(loaded_model, 'model_init') for loaded_model in
+                 loaded_models]) or all(
+            [not hasattr(loaded_model, 'model_init') for loaded_model in
+             loaded_models])):
+        raise AssertionError('Not all models have the attribute "model_init".')
 
-    if not (all([hasattr(loaded_model, 'model_next') for loaded_model in loaded_models]) or all([not hasattr(loaded_model, 'model_next') for loaded_model in loaded_models])):
-            raise AssertionError('Not all models have the attribute "model_next".')
+    if not (all([hasattr(loaded_model, 'model_next') for loaded_model in
+                 loaded_models]) or all(
+            [not hasattr(loaded_model, 'model_next') for loaded_model in
+             loaded_models])):
+        raise AssertionError('Not all models have the attribute "model_next".')
 
     # Check all layers are the same
-    if not (all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
-                 range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models])):
-            raise AssertionError('Not all models have the same weights!')
+    if not (all([[str(loaded_models[0].model.weights[i]) == str(
+            loaded_model.model.weights[i]) for i in
+                  range(len(loaded_models[0].model.weights))] for loaded_model in
+                 loaded_models])):
+        raise AssertionError('Not all models have the same weights!')
 
     if hasattr(loaded_models[0], 'model_init'):
-        if not all([[str(loaded_models[0].model_init.weights[i]) == str(loaded_model.model_init.weights[i]) for i in
-                     range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models]):
+        if not all([[str(loaded_models[0].model_init.weights[i]) == str(
+                loaded_model.model_init.weights[i]) for i in
+                     range(len(loaded_models[0].model.weights))] for loaded_model in
+                    loaded_models]):
             raise AssertionError('Not all models have the same weights!')
 
-    if not all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
-                 range(len(loaded_models[0].model_init.weights))] for loaded_model in loaded_models]):
+    if not all([[str(loaded_models[0].model.weights[i]) == str(
+            loaded_model.model.weights[i]) for i in
+                 range(len(loaded_models[0].model_init.weights))] for loaded_model in
+                loaded_models]):
         raise AssertionError('Not all model_inits have the same weights!')
 
     if hasattr(loaded_models[0], 'model_next'):
-        if not all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in
-                     range(len(loaded_models[0].model_next.weights))] for loaded_model in loaded_models]):
+        if not all([[str(loaded_models[0].model_next.weights[i]) == str(
+                loaded_model.model_next.weights[i]) for i in
+                     range(len(loaded_models[0].model_next.weights))] for
+                    loaded_model in loaded_models]):
             raise AssertionError('Not all model_nexts have the same weights!')
 
     # Retrieve weights, weigh them and overwrite in model[0].
     current_weights = loaded_models[0].model.get_weights()
     loaded_models[0].model.set_weights(
-        [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+        [current_weights[matrix_index] * model_weights[0] for matrix_index in
+         range(len(current_weights))])
     # We have model_init
     if hasattr(loaded_models[0], 'model_init'):
         current_weights = loaded_models[0].model_init.get_weights()
         loaded_models[0].model_init.set_weights(
-            [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+            [current_weights[matrix_index] * model_weights[0] for matrix_index in
+             range(len(current_weights))])
 
     # We have model_next
     if hasattr(loaded_models[0], 'model_next'):
         current_weights = loaded_models[0].model_next.get_weights()
         loaded_models[0].model_next.set_weights(
-            [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
+            [current_weights[matrix_index] * model_weights[0] for matrix_index in
+             range(len(current_weights))])
 
     # Weighted sum of all models
     for m in range(1, len(models)):
         current_weights = loaded_models[m].model.get_weights()
         prev_weights = loaded_models[0].model.get_weights()
         loaded_models[0].model.set_weights(
-            [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+            [current_weights[matrix_index] * model_weights[m] + prev_weights[
+                matrix_index] for matrix_index in
              range(len(current_weights))])
 
         # We have model_init
@@ -737,7 +861,8 @@ def average_models(models, output_model, weights=None):
             current_weights = loaded_models[m].model_init.get_weights()
             prev_weights = loaded_models[0].model_init.get_weights()
             loaded_models[0].model_init.set_weights(
-                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[
+                    matrix_index] for matrix_index in
                  range(len(current_weights))])
 
         # We have model_next
@@ -745,11 +870,13 @@ def average_models(models, output_model, weights=None):
             current_weights = loaded_models[m].model_next.get_weights()
             prev_weights = loaded_models[0].model_next.get_weights()
             loaded_models[0].model_next.set_weights(
-                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[
+                    matrix_index] for matrix_index in
                  range(len(current_weights))])
 
     # Save averaged model
-    saveModel(loaded_models[0], -1, path=output_model, full_path=True, store_iter=False)
+    saveModel(loaded_models[0], -1, path=output_model, full_path=True,
+              store_iter=False)
 
 
 # Text-related utils
@@ -836,14 +963,17 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
         logging.info('Decoding one hot prediction ...')
     preds = list(map(lambda prediction: np.argmax(prediction, axis=1), preds))
     PAD = '<pad>'
-    flattened_answer_pred = [list(map(lambda index: index2word[index], pred)) for pred in preds]
+    flattened_answer_pred = [list(map(lambda index: index2word[index], pred)) for
+                             pred in preds]
     answer_pred_matrix = np.asarray(flattened_answer_pred)
     answer_pred = []
 
     for a_no in answer_pred_matrix:
         end_token_pos = [j for j, x in list(enumerate(a_no)) if x == PAD]
         end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-        a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
+        a_no = [a.decode('utf-8') if isinstance(a,
+                                                str) and sys.version_info.major == 2 else a
+                for a in a_no]
         tmp = u' '.join(a_no[:end_token_pos])
         answer_pred.append(tmp)
     return answer_pred
@@ -863,9 +993,10 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     if verbose > 0:
         logging.info('Decoding prediction ...')
     flattened_preds = preds.reshape(-1, preds.shape[-1])
-    flattened_answer_pred = list(map(lambda index: index2word[index], sampling(scores=flattened_preds,
-                                                                               sampling_type=sampling_type,
-                                                                               temperature=temperature)))
+    flattened_answer_pred = list(
+        map(lambda index: index2word[index], sampling(scores=flattened_preds,
+                                                      sampling_type=sampling_type,
+                                                      temperature=temperature)))
     answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
 
     answer_pred = []
@@ -873,11 +1004,15 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     PAD = '<pad>'
 
     for a_no in answer_pred_matrix:
-        if len(a_no.shape) > 1:  # only process word by word if our prediction has more than one output
+        if len(
+                a_no.shape) > 1:  # only process word by word if our prediction has more than one output
             init_token_pos = 0
-            end_token_pos = [j for j, x in list(enumerate(a_no)) if x == EOS or x == PAD]
+            end_token_pos = [j for j, x in list(enumerate(a_no)) if
+                             x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
+            a_no = [a.decode('utf-8') if isinstance(a,
+                                                    str) and sys.version_info.major == 2 else a
+                    for a in a_no]
             tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
             tmp = a_no
@@ -936,7 +1071,8 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     new_trans_words = []
     for j in range(len(trans_words)):
         current_word = trans_words[j]
-        if glossary is not None and glossary.get(src_word_seq[hard_alignment[j]]) is not None:
+        if glossary is not None and glossary.get(
+                src_word_seq[hard_alignment[j]]) is not None:
             current_word = glossary.get(src_word_seq[hard_alignment[j]])
             new_trans_words.append(current_word)
         elif current_word == unk_symbol:
@@ -964,8 +1100,10 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     return new_trans_words
 
 
-def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None, heuristic=0,
-                                   x_text=None, unk_symbol='<unk>', pad_sequences=False,
+def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None,
+                                   heuristic=0,
+                                   x_text=None, unk_symbol='<unk>',
+                                   pad_sequences=False,
                                    mapping=None, verbose=0):
     """
     Decodes predictions from the BeamSearch method.
@@ -992,13 +1130,15 @@ def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None
             logging.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
-    flattened_predictions = [list(map(lambda x: index2word[x], pred)) for pred in preds]
+    flattened_predictions = [list(map(lambda x: index2word[x], pred)) for pred in
+                             preds]
     final_predictions = []
 
     if alphas is not None:
         x_text = list(map(lambda x: x.split(), x_text))
         hard_alignments = list(
-            map(lambda alignment, x_sentence: np.argmax(alignment[:, :max(1, len(x_sentence))], axis=1), alphas,
+            map(lambda alignment, x_sentence: np.argmax(
+                alignment[:, :max(1, len(x_sentence))], axis=1), alphas,
                 x_text))
 
         for i, a_no in list(enumerate(flattened_predictions)):
@@ -1011,12 +1151,16 @@ def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None
                                              heuristic=heuristic,
                                              mapping=mapping,
                                              verbose=verbose)
-            a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
+            a_no = [a.decode('utf-8') if isinstance(a,
+                                                    str) and sys.version_info.major == 2 else a
+                    for a in a_no]
             tmp = u' '.join(a_no[:-1])
             final_predictions.append(tmp)
     else:
         for a_no in flattened_predictions:
-            a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a for a in a_no]
+            a_no = [a.decode('utf-8') if isinstance(a,
+                                                    str) and sys.version_info.major == 2 else a
+                    for a in a_no]
             tmp = u' '.join(a_no[:-1])
             final_predictions.append(tmp)
     return final_predictions
@@ -1066,7 +1210,9 @@ def flatten(l):
     """
     if not l:
         return l
-    return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if isinstance(l, list) else [l]
+    return flatten(l[0]) + (flatten(l[1:]) if len(l) > 1 else []) if isinstance(l,
+                                                                                list) else [
+        l]
 
 
 def key_with_max_val(d):
@@ -1080,3 +1226,16 @@ def key_with_max_val(d):
         return -1
     else:
         return k[v.index(max(v))]
+
+
+def print_dict(d, header=''):
+    """
+    Formats a dictionary for printing.
+    :param d: Dictionary to print.
+    :return: String containing the formatted dictionary.
+    """
+    obj_str = str(header) + '{ \n\t'
+    obj_str += "\n\t".join([str(key) + ": " + str(d[key]) for key in sorted(d.keys())])
+    obj_str += '\n'
+    obj_str += '}'
+    return obj_str
