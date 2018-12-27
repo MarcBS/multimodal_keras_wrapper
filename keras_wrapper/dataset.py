@@ -24,14 +24,11 @@ from keras_wrapper.extra.read_write import create_dir_if_not_exists
 from keras_wrapper.extra.tokenizers import *
 from .utils import bbox, to_categorical
 
-from .utils import MultiprocessQueue
-import multiprocessing
-
-
 # ------------------------------------------------------- #
 #       SAVE/LOAD
 #           External functions for saving and loading Dataset instances
 # ------------------------------------------------------- #
+
 
 def saveDataset(dataset, store_path):
     """
@@ -159,6 +156,10 @@ class Parallel_Data_Batch_Generator(object):
         :param temporally_linked: Indicates if we are using a temporally-linked model
         :param n_parallel_loaders: Number of parallel loaders that will be used.
         """
+
+        from .utils import MultiprocessQueue
+        import multiprocessing
+
         if da_enhance_list is None:
             da_enhance_list = []
 
@@ -1745,10 +1746,8 @@ class Dataset(object):
         else:
             dtype_text = 'uint32'
         vocab = self.vocabulary[data_id]['words2idx']
-        sentence_features = np.ones((len(sentences),
-                                     max_text_len + 1)  # always leave space for <eos> symbol
-                                    ).astype(dtype_text) * self.extra_words['<pad>']
-
+        sentence_features = np.ones((len(sentences), max_text_len)).astype(dtype_text) * self.extra_words['<pad>']
+        max_text_len -= 1  # always leave space for <eos> symbol
         for i in range(len(sentences)):
             words = sentences[i].strip().split()
             len_j = len(words)
@@ -2333,7 +2332,7 @@ class Dataset(object):
         """
         X_out = np.asarray(X)
         max_len_X = max(np.sum(X_out != 0, axis=-1))
-        max_len_out = min(max_len_X + 1, max_len) - offset if pad_on_batch else maxlen
+        max_len_out = min(max_len_X + 1, max_len) if pad_on_batch else maxlen
         X_out_aux = np.zeros((X_out.shape[0], max_len_out), dtype='int64')
         X_out_aux[:, :max_len_X] = X_out[:, :max_len_X].astype('int64')
         # Mask all zero-values
