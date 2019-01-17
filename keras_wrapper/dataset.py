@@ -23,6 +23,9 @@ import numpy as np
 from keras_wrapper.extra.read_write import create_dir_if_not_exists
 from keras_wrapper.extra.tokenizers import *
 from .utils import bbox, to_categorical
+from .utils import MultiprocessQueue
+import multiprocessing
+
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
@@ -156,9 +159,6 @@ class Parallel_Data_Batch_Generator(object):
         :param temporally_linked: Indicates if we are using a temporally-linked model
         :param n_parallel_loaders: Number of parallel loaders that will be used.
         """
-
-        from .utils import MultiprocessQueue
-        import multiprocessing
 
         if da_enhance_list is None:
             da_enhance_list = []
@@ -434,7 +434,7 @@ class Data_Batch_Generator(object):
                                                             normalization=self.params['normalization'],
                                                             normalization_type=self.params['normalization_type'],
                                                             meanSubstraction=self.params['mean_substraction'],
-                                                            dataAugmentation=data_augmentatio,
+                                                            dataAugmentation=data_augmentation,
                                                             wo_da_patch_type=self.params['wo_da_patch_type'],
                                                             da_patch_type=self.params['da_patch_type'],
                                                             da_enhance_list=self.params['da_enhance_list'])
@@ -1699,8 +1699,8 @@ class Dataset(object):
             else:
                 raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
-            for i in range(len(sentences)):
-                sentences[i] = tokfun(sentences[i])
+            for sentence_idx in range(len(sentences)):
+                sentences[sentence_idx] = tokfun(sentences[sentence_idx])
         else:
             tokfun = None
 
@@ -1748,8 +1748,8 @@ class Dataset(object):
         vocab = self.vocabulary[data_id]['words2idx']
         sentence_features = np.ones((len(sentences), max_text_len)).astype(dtype_text) * self.extra_words['<pad>']
         max_text_len -= 1  # always leave space for <eos> symbol
-        for i in range(len(sentences)):
-            words = sentences[i].strip().split()
+        for sentence_idx in range(len(sentences)):
+            words = sentences[sentence_idx].strip().split()
             len_j = len(words)
             if fill == 'start':
                 offset_j = max_text_len - len_j - 1
@@ -1763,10 +1763,10 @@ class Dataset(object):
                 len_j += offset_j
                 offset_j = 0
 
-            for j, w in list(zip(range(len_j), words[:len_j])):
-                sentence_features[i, j + offset_j] = vocab.get(w, vocab['<unk>'])
+            for word_idx, word in list(zip(range(len_j), words[:len_j])):
+                sentence_features[sentence_idx, word_idx + offset_j] = vocab.get(word, vocab['<unk>'])
             if offset > 0:  # Move the text to the right -> null symbol
-                sentence_features[i] = np.append([vocab['<null>']] * offset, sentence_features[i, :-offset])
+                sentence_features[sentence_idx] = np.append([vocab['<null>']] * offset, sentence_features[sentence_idx, :-offset])
         return sentence_features
 
     def build_vocabulary(self, captions, data_id, do_split=True, min_occ=0, n_words=0, split_symbol=' ',
@@ -2197,12 +2197,12 @@ class Dataset(object):
 
         if max_len == 0:  # use whole sentence as class
             X_out = np.zeros(n_batch).astype(dtype_text)
-            for i in range(n_batch):
-                w = X[i]
+            for sentence_idx in range(n_batch):
+                word = X[sentence_idx]
                 if '<unk>' in vocab:
-                    X_out[i] = vocab.get(w, vocab['<unk>'])
+                    X_out[sentence_idx] = vocab.get(word, vocab['<unk>'])
                 else:
-                    X_out[i] = vocab[w]
+                    X_out[sentence_idx] = vocab[word]
             if loading_X:
                 X_out = (X_out, None)  # This None simulates a mask
         else:  # process text as a sequence of words
@@ -2225,8 +2225,8 @@ class Dataset(object):
             max_len_batch -= 1  # always leave space for <eos> symbol
 
             # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
-            for i in range(n_batch):
-                words = X[i].strip().split(' ')
+            for sentence_idx in range(n_batch):
+                words = X[sentence_idx].strip().split(' ')
                 len_j = len(words)
                 if fill == 'start':
                     offset_j = max_len_batch - len_j - 1
@@ -2241,29 +2241,29 @@ class Dataset(object):
                     offset_j = 0
 
                 if words_so_far:
-                    for j, w in list(zip(range(len_j), words[:len_j])):
-                        next_w = vocab.get(w, next_w=vocab['<unk>'])
-                        for k in range(j, len_j):
-                            X_out[i, k + offset_j, j + offset_j] = next_w
-                            X_mask[i, k + offset_j, j + offset_j] = 1  # fill mask
-                        X_mask[i, j + offset_j, j + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
+                    for word_idx, word in list(zip(range(len_j), words[:len_j])):
+                        next_w = vocab.get(word, next_w=vocab['<unk>'])
+                        for k in range(word_idx, len_j):
+                            X_out[sentence_idx, k + offset_j, word_idx + offset_j] = next_w
+                            X_mask[sentence_idx, k + offset_j, word_idx + offset_j] = 1  # fill mask
+                        X_mask[sentence_idx, word_idx + offset_j, word_idx + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
 
                 else:
-                    for j, w in list(zip(range(len_j), words[:len_j])):
-                        X_out[i, j + offset_j] = vocab.get(w, vocab['<unk>'])
-                        X_mask[i, j + offset_j] = 1  # fill mask
-                    X_mask[i, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
+                    for word_idx, word in list(zip(range(len_j), words[:len_j])):
+                        X_out[sentence_idx, word_idx + offset_j] = vocab.get(word, vocab['<unk>'])
+                        X_mask[sentence_idx, word_idx + offset_j] = 1  # fill mask
+                    X_mask[sentence_idx, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
 
                 if offset > 0:  # Move the text to the right -> null symbol
                     if words_so_far:
                         for k in range(len_j):
-                            X_out[i, k] = np.append([vocab['<null>']] * offset, X_out[i, k, :-offset])
-                            X_mask[i, k] = np.append([0] * offset, X_mask[i, k, :-offset])
-                        X_out[i] = np.append(null_row, X_out[i, :-offset], axis=0)
-                        X_mask[i] = np.append(zero_row, X_mask[i, :-offset], axis=0)
+                            X_out[sentence_idx, k] = np.append([vocab['<null>']] * offset, X_out[sentence_idx, k, :-offset])
+                            X_mask[sentence_idx, k] = np.append([0] * offset, X_mask[sentence_idx, k, :-offset])
+                        X_out[sentence_idx] = np.append(null_row, X_out[sentence_idx, :-offset], axis=0)
+                        X_mask[sentence_idx] = np.append(zero_row, X_mask[sentence_idx, :-offset], axis=0)
                     else:
-                        X_out[i] = np.append([vocab['<null>']] * offset, X_out[i, :-offset])
-                        X_mask[i] = np.append([1] * offset, X_mask[i, :-offset])
+                        X_out[sentence_idx] = np.append([vocab['<null>']] * offset, X_out[sentence_idx, :-offset])
+                        X_mask[sentence_idx] = np.append([1] * offset, X_mask[sentence_idx, :-offset])
             X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
 
         return X_out
@@ -2332,7 +2332,7 @@ class Dataset(object):
         """
         X_out = np.asarray(X)
         max_len_X = max(np.sum(X_out != 0, axis=-1))
-        max_len_out = min(max_len_X + 1, max_len) if pad_on_batch else maxlen
+        max_len_out = min(max_len_X + 1 - offset, max_len) if pad_on_batch else max_len
         X_out_aux = np.zeros((X_out.shape[0], max_len_out), dtype='int64')
         X_out_aux[:, :max_len_X] = X_out[:, :max_len_X].astype('int64')
         # Mask all zero-values
