@@ -1026,6 +1026,7 @@ class Model_Wrapper(object):
                 embeddings_freq=params['tensorboard_params']['embeddings_freq'],
                 embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
                 embeddings_metadata=embeddings_metadata)
+            callback_tensorboard.set_model(self.model)
             callbacks.append(callback_tensorboard)
 
         # Prepare data generators
