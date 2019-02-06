@@ -996,25 +996,25 @@ class Model_Wrapper(object):
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
-            embeddings_metadata = params['tensorboard_params']['embeddings_metadata']
+            # embeddings_metadata = params['tensorboard_params']['embeddings_metadata']
             create_dir_if_not_exists(self.model_path + '/' + params['tensorboard_params']['log_dir'])
-            if params['tensorboard_params']['label_word_embeddings_with_vocab'] \
-                    and params['tensorboard_params']['word_embeddings_labels'] is not None:
-                embeddings_metadata = {}
-                if len(params['tensorboard_params']['embeddings_layer_names']) != len(params['tensorboard_params']['word_embeddings_labels']):
-                    raise AssertionError('The number of "embeddings_layer_names" and "word_embeddings_labels" do not match. Currently, '
-                                         'we have %d "embeddings_layer_names" and %d "word_embeddings_labels"' %
-                                         (len(params['tensorboard_params']['embeddings_layer_names']),
-                                          len(params['tensorboard_params']['word_embeddings_labels'])))
-                # Prepare word embeddings mapping
-                for i, layer_name in list(enumerate(params['tensorboard_params']['embeddings_layer_names'])):
-                    layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
-                    mapping_name = layer_label + '.tsv'
-                    dict2file(ds.vocabulary[layer_label]['words2idx'],
-                              self.model_path + '/' + params['tensorboard_params']['log_dir'] + '/' + mapping_name,
-                              title='Word\tIndex',
-                              separator='\t')
-                    embeddings_metadata[layer_name] = mapping_name
+            # if params['tensorboard_params']['label_word_embeddings_with_vocab'] \
+            #         and params['tensorboard_params']['word_embeddings_labels'] is not None:
+            #     embeddings_metadata = {}
+            #     if len(params['tensorboard_params']['embeddings_layer_names']) != len(params['tensorboard_params']['word_embeddings_labels']):
+            #         raise AssertionError('The number of "embeddings_layer_names" and "word_embeddings_labels" do not match. Currently, '
+            #                              'we have %d "embeddings_layer_names" and %d "word_embeddings_labels"' %
+            #                              (len(params['tensorboard_params']['embeddings_layer_names']),
+            #                               len(params['tensorboard_params']['word_embeddings_labels'])))
+            #     # Prepare word embeddings mapping
+            #     for i, layer_name in list(enumerate(params['tensorboard_params']['embeddings_layer_names'])):
+            #         layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
+            #         mapping_name = layer_label + '.tsv'
+            #         dict2file(ds.vocabulary[layer_label]['words2idx'],
+            #                   self.model_path + '/' + params['tensorboard_params']['log_dir'] + '/' + mapping_name,
+            #                   title='Word\tIndex',
+            #                   separator='\t')
+            #         embeddings_metadata[layer_name] = mapping_name
 
             callback_tensorboard = keras.callbacks.TensorBoard(
                 log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
@@ -1023,9 +1023,10 @@ class Model_Wrapper(object):
                 write_graph=params['tensorboard_params']['write_graph'],
                 write_grads=params['tensorboard_params']['write_grads'],
                 write_images=params['tensorboard_params']['write_images'],
-                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
-                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                embeddings_metadata=embeddings_metadata)
+                # embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                # embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                # embeddings_metadata=embeddings_metadata
+            )
             callback_tensorboard.set_model(self.model)
             callbacks.append(callback_tensorboard)
 
@@ -1189,9 +1190,10 @@ class Model_Wrapper(object):
                 write_graph=params['tensorboard_params']['write_graph'],
                 write_grads=params['tensorboard_params']['write_grads'],
                 write_images=params['tensorboard_params']['write_images'],
-                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
-                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'])
+                # embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                # embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                # embeddings_metadata=params['tensorboard_params']['embeddings_metadata']
+            )
             callbacks.append(callback_tensorboard)
 
         # Train model
