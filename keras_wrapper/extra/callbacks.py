@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import ast
 import copy
 import warnings
 
@@ -351,7 +352,7 @@ class EvalPerformance(KerasCallback):
                 gt_positions = self.gt_pos
 
             # Select each output to evaluate separately
-            for gt_pos, type, these_metrics, gt_id, write_type, index2word_y, index2word_x in zip(
+            for gt_pos, type_out, these_metrics, gt_id, write_type, index2word_y, index2word_x in zip(
                     gt_positions,
                     self.output_types,
                     self.metric_name,
@@ -365,15 +366,15 @@ class EvalPerformance(KerasCallback):
                 if self.verbose > 0:
                     print('')
                     logging.info('Prediction output ' + str(gt_pos) + ': ' + str(
-                        gt_id) + ' (' + str(type) + ')')
-
+                        gt_id) + ' (' + str(type_out) + ')')
+                self.post_process_output(type_out)
                 # Postprocess outputs of type text
-                if type == 'text':
+                if type_out == 'text':
                     if params_prediction.get('pos_unk', False):
                         samples = predictions[0]
                         alphas = predictions[1]
 
-                        if eval('self.ds.loaded_raw_' + s + '[0]'):
+                        if ast.literal_eval('self.ds.loaded_raw_' + s + '[0]'):
                             sources = predictions[2]
                         else:
                             sources = []
@@ -417,7 +418,7 @@ class EvalPerformance(KerasCallback):
                                           predictions)
 
                 # Postprocess outputs of type binary
-                elif type == 'binary':
+                elif type_out == 'binary':
                     predictions = decode_multilabel(predictions,
                                                     index2word_y,
                                                     min_val=self.min_pred_multilabel[
@@ -431,7 +432,7 @@ class EvalPerformance(KerasCallback):
                     self.extra_vars[gt_pos][s]['references'] = self.ds.loadBinary(y_raw, gt_id)
 
                 # Postprocess outputs of type 3DLabel
-                elif type == '3DLabel':
+                elif type_out == '3DLabel':
                     self.extra_vars[gt_pos][s] = dict()
                     # exec ('ref=self.ds.Y_' + s + '["' + gt_id + '"]')
                     y_split = getattr(self.ds, 'Y_' + s)
@@ -442,7 +443,7 @@ class EvalPerformance(KerasCallback):
                     self.extra_vars[gt_pos][s]['references_orig_sizes'] = original_sizes
 
                 # Postprocess outputs of type 3DSemanticLabel
-                elif type == '3DSemanticLabel':
+                elif type_out == '3DSemanticLabel':
                     self.extra_vars[gt_pos]['eval_orig_size'] = self.eval_orig_size
                     self.extra_vars[gt_pos][s] = dict()
                     # exec ('ref=self.ds.Y_' + s + '["' + gt_id + '"]')
@@ -493,7 +494,7 @@ class EvalPerformance(KerasCallback):
                             epoch)  # results folder
                         numpy2imgs(folder_path,
                                    predictions,
-                                   eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
+                                   ast.literal_eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
                                    self.ds)
                     else:
                         raise NotImplementedError('The store type "' + self.write_type + '" is not implemented.')

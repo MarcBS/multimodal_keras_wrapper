@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import ast
 import math
 import shutil
 import sys
@@ -1603,12 +1604,12 @@ class Model_Wrapper(object):
                 # Calculate how many iterations are we going to perform
                 if params['n_samples'] < 1:
                     if params['max_eval_samples'] is not None:
-                        n_samples = min(eval("ds.len_" + s), params['max_eval_samples'])
+                        n_samples = min(ast.literal_eval("ds.len_" + s), params['max_eval_samples'])
                     else:
-                        n_samples = eval("ds.len_" + s)
+                        n_samples = ast.literal_eval("ds.len_" + s)
 
                     num_iterations = int(math.ceil(float(n_samples)))  # / params['max_batch_size']))
-                    n_samples = min(eval("ds.len_" + s), num_iterations)  # * params['batch_size'])
+                    n_samples = min(ast.literal_eval("ds.len_" + s), num_iterations)  # * params['batch_size'])
                     # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
                     if params['n_parallel_loaders'] > 1:
                         data_gen_instance = Parallel_Data_Batch_Generator(s,
@@ -1693,7 +1694,7 @@ class Model_Wrapper(object):
                             X[input_id] = data[input_id]
                             if params['pos_unk']:
                                 s_dict[input_id] = X[input_id]
-                        if params['pos_unk'] and not eval('ds.loaded_raw_' + s + '[0]'):
+                        if params['pos_unk'] and not ast.literal_eval('ds.loaded_raw_' + s + '[0]'):
                             sources.append(s_dict)
 
                     for i in range(len(X[params['model_inputs'][0]])):  # process one sample at a time
@@ -1787,8 +1788,8 @@ class Model_Wrapper(object):
                 sys.stdout.flush()
 
                 if params['pos_unk']:
-                    if eval('ds.loaded_raw_' + s + '[0]'):
-                        sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
+                    if ast.literal_eval('ds.loaded_raw_' + s + '[0]'):
+                        sources = file2list(ast.literal_eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
                                             stripfile=False)
                     predictions[s] = (np.asarray(best_samples), best_alphas, sources)
                 else:
@@ -1833,9 +1834,9 @@ class Model_Wrapper(object):
                 if params['init_sample'] > -1 and params['final_sample'] > -1:
                     n_samples = params['final_sample'] - params['init_sample']
                 else:
-                    n_samples = eval("ds.len_" + s)
+                    n_samples = ast.literal_eval("ds.len_" + s)
                 num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
-                n_samples = min(eval("ds.len_" + s), num_iterations * params['batch_size'])
+                n_samples = min(ast.literal_eval("ds.len_" + s), num_iterations * params['batch_size'])
 
                 # Prepare data generator
                 if params['n_parallel_loaders'] > 1:
@@ -2072,7 +2073,7 @@ class Model_Wrapper(object):
 
             params['pad_on_batch'] = self.dataset.pad_on_batch[params['dataset_inputs'][-1]]
             # Calculate how many iterations are we going to perform
-            n_samples = eval("self.dataset.len_" + s)
+            n_samples = ast.literal_eval("self.dataset.len_" + s)
             num_iterations = int(math.ceil(float(n_samples) / params['batch_size']))
 
             # Prepare data generator: We won't use an Homogeneous_Data_Batch_Generator here
