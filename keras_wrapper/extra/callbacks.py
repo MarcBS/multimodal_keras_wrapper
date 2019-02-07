@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-import ast
 import copy
 import warnings
 
@@ -374,7 +373,7 @@ class EvalPerformance(KerasCallback):
                         samples = predictions[0]
                         alphas = predictions[1]
 
-                        if ast.literal_eval('self.ds.loaded_raw_' + s + '[0]'):
+                        if eval('self.ds.loaded_raw_' + s + '[0]'):
                             sources = predictions[2]
                         else:
                             sources = []
@@ -494,7 +493,7 @@ class EvalPerformance(KerasCallback):
                             epoch)  # results folder
                         numpy2imgs(folder_path,
                                    predictions,
-                                   ast.literal_eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
+                                   eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
                                    self.ds)
                     else:
                         raise NotImplementedError('The store type "' + self.write_type + '" is not implemented.')
