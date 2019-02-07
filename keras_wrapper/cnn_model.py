@@ -573,6 +573,7 @@ class Model_Wrapper(object):
                                         'lr_reducer_exp_base': 0.5,
                                         'lr_half_life': 50000,
                                         'lr_warmup_exp': -1.5,
+                                        'min_lr': 1e-9,
                                         'tensorboard': False,
                                         'n_gpus': 1,
                                         'tensorboard_params': {'log_dir': 'tensorboard_logs',
@@ -976,6 +977,7 @@ class Model_Wrapper(object):
                                                       half_life=params['lr_half_life'],
                                                       warmup_exp=params['lr_warmup_exp'],
                                                       reduction_function=params['lr_reducer_type'],
+                                                      min_lr=params['min_lr'],
                                                       verbose=params['verbose'])
             callbacks.append(callback_lr_reducer)
         # Early stopper
