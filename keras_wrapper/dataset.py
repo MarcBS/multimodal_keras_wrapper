@@ -2001,13 +2001,13 @@ class Dataset(object):
             line = bbox_list[i]
             arrayLine = line.split(';')
             arrayBndBox = arrayLine[:-1]
-            w_original, h_original, d_original = ast.literal_eval(arrayLine[-1])
+            w_original, h_original, d_original = eval(arrayLine[-1])
 
             label3D = np.zeros((nClasses, h_original, w_original), dtype=np.float32)
 
             for array in arrayBndBox:
-                bndbox = ast.literal_eval(array)[0]
-                idxclass = ast.literal_eval(array)[1]
+                bndbox = eval(array)[0]
+                idxclass = eval(array)[1]
 
                 # bndbox_ones = np.ones((bndbox[3] - bndbox[1] + 1, bndbox[2] - bndbox[0] + 1))
                 # label3D[idxclass, bndbox[1] - 1:bndbox[3], bndbox[0] - 1:bndbox[2]] = bndbox_ones
@@ -2853,7 +2853,7 @@ class Dataset(object):
         idx = [0 for i in range(n_videos)]
         # recover all indices from image's paths of all videos
         for v in range(n_videos):
-            idx[v] = int(sum(ast.literal_eval('self.X_' + set_name + '[data_id][indices[v]]')))
+            idx[v] = int(sum(eval('self.X_' + set_name + '[data_id][indices[v]]')))
 
         # load images from each video
         for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
@@ -3203,13 +3203,13 @@ class Dataset(object):
             line = gt[i]
             arrayLine = line.split(';')
             arrayBndBox = arrayLine[:-1]
-            w_original, h_original, d_original = ast.literal_eval(arrayLine[-1])
+            w_original, h_original, d_original = eval(arrayLine[-1])
             original_sizes.append([h_original, w_original])
 
             for array in arrayBndBox:
-                bndbox = ast.literal_eval(array)[0]
+                bndbox = eval(array)[0]
                 # bndbox = [bndbox[1], bndbox[0], bndbox[3], bndbox[2]]
-                idxclass = ast.literal_eval(array)[1]
+                idxclass = eval(array)[1]
                 Y.append(idxclass)
                 bboxes.append(bndbox)
                 # bndbox_ones = np.ones((bndbox[2] - bndbox[0] + 1, bndbox[3] - bndbox[1] + 1))
@@ -3502,7 +3502,7 @@ class Dataset(object):
                                       'contrast': 'ImageEnhance.Contrast(im)'}
 
                 for da_enhance in da_enhance_list:
-                    image_enhance = ast.literal_eval(image_enhance_dict[da_enhance])
+                    image_enhance = eval(image_enhance_dict[da_enhance])
                     im = image_enhance.enhance((1 - min_value_enhance) + np.random.rand() * min_value_enhance * 2)
 
                 randomParams = daRandomParams[images[i]]
