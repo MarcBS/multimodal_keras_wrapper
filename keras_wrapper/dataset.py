@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import ast
 import copy
 import fnmatch
 import logging
@@ -707,7 +708,8 @@ class Dataset(object):
                                         'id', 'ghost', 'file-name']
         self.__accepted_types_outputs = ['categorical', 'binary',
                                          'real',
-                                         'text', 'dense-text', 'text-features',  # TODO: Document dense-text type!
+                                         'text', 'dense-text', 'text-features',  # Dense text is just like text,
+                                                                                 # but directly storing indices.
                                          '3DLabel', '3DSemanticLabel',
                                          'id', 'file-name']
         #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
@@ -1057,7 +1059,7 @@ class Dataset(object):
         elif type == 'ghost':
             data = []
 
-        if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
+        if isinstance(repeat_set, (np.ndarray, np.generic, list)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
 
         self.__setInput(data, set_name, type, id, overwrite_split, add_additional)
@@ -1270,7 +1272,7 @@ class Dataset(object):
         elif type == '3DSemanticLabel':
             data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in, num_poolings)
 
-        if isinstance(repeat_set, list) or isinstance(repeat_set, (np.ndarray, np.generic)) or repeat_set > 1:
+        if isinstance(repeat_set, (np.ndarray, np.generic, list)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
         if self.sample_weights.get(id) is None:
             self.sample_weights[id] = dict()
@@ -1610,8 +1612,8 @@ class Dataset(object):
             else:
                 raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
-            for i in range(len(sentences)):
-                sentences[i] = tokfun(sentences[i])
+            for i, sentence in enumerate(sentences):
+                sentences[i] = tokfun(sentence)
         else:
             tokfun = None
 
@@ -1699,8 +1701,8 @@ class Dataset(object):
             else:
                 raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
-            for sentence_idx in range(len(sentences)):
-                sentences[sentence_idx] = tokfun(sentences[sentence_idx])
+            for sentence_idx, sentence in enumerate(sentences):
+                sentences[sentence_idx] = tokfun(sentence)
         else:
             tokfun = None
 
@@ -1748,8 +1750,8 @@ class Dataset(object):
         vocab = self.vocabulary[data_id]['words2idx']
         sentence_features = np.ones((len(sentences), max_text_len)).astype(dtype_text) * self.extra_words['<pad>']
         max_text_len -= 1  # always leave space for <eos> symbol
-        for sentence_idx in range(len(sentences)):
-            words = sentences[sentence_idx].strip().split()
+        for sentence_idx, sentence in enumerate(sentences):
+            words = sentence.strip().split()
             len_j = len(words)
             if fill == 'start':
                 offset_j = max_text_len - len_j - 1
@@ -1999,13 +2001,13 @@ class Dataset(object):
             line = bbox_list[i]
             arrayLine = line.split(';')
             arrayBndBox = arrayLine[:-1]
-            w_original, h_original, d_original = eval(arrayLine[-1])
+            w_original, h_original, d_original = ast.literal_eval(arrayLine[-1])
 
             label3D = np.zeros((nClasses, h_original, w_original), dtype=np.float32)
 
             for array in arrayBndBox:
-                bndbox = eval(array)[0]
-                idxclass = eval(array)[1]
+                bndbox = ast.literal_eval(array)[0]
+                idxclass = ast.literal_eval(array)[1]
 
                 # bndbox_ones = np.ones((bndbox[3] - bndbox[1] + 1, bndbox[2] - bndbox[0] + 1))
                 # label3D[idxclass, bndbox[1] - 1:bndbox[3], bndbox[0] - 1:bndbox[2]] = bndbox_ones
@@ -2529,7 +2531,7 @@ class Dataset(object):
         """
         if not self.BPE_built:
             raise Exception('Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"')
-        if type(caption) == str:
+        if isinstance(caption, str):
             caption = caption.decode('utf-8')
         tokenized = re.sub(u'[\n\t]+', u'', caption)
         tokenized = self.BPE.segment(tokenized).strip()
@@ -2851,7 +2853,7 @@ class Dataset(object):
         idx = [0 for i in range(n_videos)]
         # recover all indices from image's paths of all videos
         for v in range(n_videos):
-            idx[v] = int(sum(eval('self.X_' + set_name + '[data_id][indices[v]]')))
+            idx[v] = int(sum(ast.literal_eval('self.X_' + set_name + '[data_id][indices[v]]')))
 
         # load images from each video
         for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
@@ -3201,13 +3203,13 @@ class Dataset(object):
             line = gt[i]
             arrayLine = line.split(';')
             arrayBndBox = arrayLine[:-1]
-            w_original, h_original, d_original = eval(arrayLine[-1])
+            w_original, h_original, d_original = ast.literal_eval(arrayLine[-1])
             original_sizes.append([h_original, w_original])
 
             for array in arrayBndBox:
-                bndbox = eval(array)[0]
+                bndbox = ast.literal_eval(array)[0]
                 # bndbox = [bndbox[1], bndbox[0], bndbox[3], bndbox[2]]
-                idxclass = eval(array)[1]
+                idxclass = ast.literal_eval(array)[1]
                 Y.append(idxclass)
                 bboxes.append(bndbox)
                 # bndbox_ones = np.ones((bndbox[2] - bndbox[0] + 1, bndbox[3] - bndbox[1] + 1))
@@ -3274,16 +3276,13 @@ class Dataset(object):
             self.train_mean[data_id] /= 255.0
 
         if self.train_mean[data_id].shape != tuple(self.img_size_crop[data_id]):
-            """
-            if not use_RGB:
-                if len(self.train_mean[data_id].shape) == 1:
-                    if not self.silence:
-                        logging.info("Converting input train mean pixels into mean image.")
-                    mean_image = np.zeros(tuple(self.img_size_crop[data_id]), np.float64)
-                    mean_image[:, :] = self.train_mean[data_id]
-                    self.train_mean[data_id] = mean_image
-            else:
-            """
+            # if not use_RGB:
+            #     if len(self.train_mean[data_id].shape) == 1:
+            #         if not self.silence:
+            #             logging.info("Converting input train mean pixels into mean image.")
+            #         mean_image = np.zeros(tuple(self.img_size_crop[data_id]), np.float64)
+            #         mean_image[:, :] = self.train_mean[data_id]
+            #         self.train_mean[data_id] = mean_image
             if len(self.train_mean[data_id].shape) == 1 and self.train_mean[data_id].shape[0] == self.img_size_crop[data_id][2]:
                 if not self.silence:
                     logging.info("Converting input train mean pixels into mean image.")
@@ -3321,21 +3320,21 @@ class Dataset(object):
             # Load images in batches and sum all of them
             init = 0
             batch = 200
-            for final in range(batch, self.len_train, batch):
-                I = self.getX('train', init, final, meanSubstraction=False)[self.ids_inputs.index(data_id)]
+            for current_image in range(batch, self.len_train, batch):
+                I = self.getX('train', init, current_image, meanSubstraction=False)[self.ids_inputs.index(data_id)]
                 for im in I:
                     I_sum += im
                 if not self.silence:
                     sys.stdout.write('\r')
-                    sys.stdout.write("Processed %d/%d images..." % (final, self.len_train))
+                    sys.stdout.write("Processed %d/%d images..." % (current_image, self.len_train))
                     sys.stdout.flush()
-                init = final
+                init = current_image
             I = self.getX('train', init, self.len_train, meanSubstraction=False)[self.ids_inputs.index(data_id)]
             for im in I:
                 I_sum += im
             if not self.silence:
                 sys.stdout.write('\r')
-                sys.stdout.write("Processed %d/%d images..." % (final, self.len_train))
+                sys.stdout.write("Processed %d/%d images..." % (current_image, self.len_train))
                 sys.stdout.flush()
 
             # Mean calculation
@@ -3503,7 +3502,7 @@ class Dataset(object):
                                       'contrast': 'ImageEnhance.Contrast(im)'}
 
                 for da_enhance in da_enhance_list:
-                    image_enhance = eval(image_enhance_dict[da_enhance])
+                    image_enhance = ast.literal_eval(image_enhance_dict[da_enhance])
                     im = image_enhance.enhance((1 - min_value_enhance) + np.random.rand() * min_value_enhance * 2)
 
                 randomParams = daRandomParams[images[i]]
@@ -3653,7 +3652,7 @@ class Dataset(object):
 
     def getDataAugmentationRandomParams(self, images, data_id, prob_flip_horizontal=0.5, prob_flip_vertical=0.0):
         daRandomParams = dict()
-        for i in range(len(images)):
+        for i, image in enumerate(images):
             # Random crop
             margin = [self.img_size[data_id][0] - self.img_size_crop[data_id][0],
                       self.img_size[data_id][1] - self.img_size_crop[data_id][1]]
@@ -3678,7 +3677,7 @@ class Dataset(object):
             randomParams["prob_flip_horizontal"] = prob_flip_horizontal
             randomParams["prob_flip_vertical"] = prob_flip_vertical
 
-            daRandomParams[images[i]] = randomParams
+            daRandomParams[image] = randomParams
 
         return daRandomParams
 

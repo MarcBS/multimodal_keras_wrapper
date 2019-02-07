@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import ast
 import copy
 import warnings
 
@@ -351,7 +352,7 @@ class EvalPerformance(KerasCallback):
                 gt_positions = self.gt_pos
 
             # Select each output to evaluate separately
-            for gt_pos, type, these_metrics, gt_id, write_type, index2word_y, index2word_x in zip(
+            for gt_pos, type_out, these_metrics, gt_id, write_type, index2word_y, index2word_x in zip(
                     gt_positions,
                     self.output_types,
                     self.metric_name,
@@ -365,15 +366,15 @@ class EvalPerformance(KerasCallback):
                 if self.verbose > 0:
                     print('')
                     logging.info('Prediction output ' + str(gt_pos) + ': ' + str(
-                        gt_id) + ' (' + str(type) + ')')
-
+                        gt_id) + ' (' + str(type_out) + ')')
+                self.post_process_output(type_out)
                 # Postprocess outputs of type text
-                if type == 'text':
+                if type_out == 'text':
                     if params_prediction.get('pos_unk', False):
                         samples = predictions[0]
                         alphas = predictions[1]
 
-                        if eval('self.ds.loaded_raw_' + s + '[0]'):
+                        if ast.literal_eval('self.ds.loaded_raw_' + s + '[0]'):
                             sources = predictions[2]
                         else:
                             sources = []
@@ -417,7 +418,7 @@ class EvalPerformance(KerasCallback):
                                           predictions)
 
                 # Postprocess outputs of type binary
-                elif type == 'binary':
+                elif type_out == 'binary':
                     predictions = decode_multilabel(predictions,
                                                     index2word_y,
                                                     min_val=self.min_pred_multilabel[
@@ -431,7 +432,7 @@ class EvalPerformance(KerasCallback):
                     self.extra_vars[gt_pos][s]['references'] = self.ds.loadBinary(y_raw, gt_id)
 
                 # Postprocess outputs of type 3DLabel
-                elif type == '3DLabel':
+                elif type_out == '3DLabel':
                     self.extra_vars[gt_pos][s] = dict()
                     # exec ('ref=self.ds.Y_' + s + '["' + gt_id + '"]')
                     y_split = getattr(self.ds, 'Y_' + s)
@@ -442,7 +443,7 @@ class EvalPerformance(KerasCallback):
                     self.extra_vars[gt_pos][s]['references_orig_sizes'] = original_sizes
 
                 # Postprocess outputs of type 3DSemanticLabel
-                elif type == '3DSemanticLabel':
+                elif type_out == '3DSemanticLabel':
                     self.extra_vars[gt_pos]['eval_orig_size'] = self.eval_orig_size
                     self.extra_vars[gt_pos][s] = dict()
                     # exec ('ref=self.ds.Y_' + s + '["' + gt_id + '"]')
@@ -493,7 +494,7 @@ class EvalPerformance(KerasCallback):
                             epoch)  # results folder
                         numpy2imgs(folder_path,
                                    predictions,
-                                   eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
+                                   ast.literal_eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
                                    self.ds)
                     else:
                         raise NotImplementedError('The store type "' + self.write_type + '" is not implemented.')
@@ -890,10 +891,10 @@ class EarlyStopping(KerasCallback):
 
 class LearningRateReducer(KerasCallback):
     def __init__(self, initial_lr=1., reduce_rate=0.99, reduce_each_epochs=True,
-                 reduce_frequency=1,
-                 start_reduction_on_epoch=0,
+                 reduce_frequency=1, start_reduction_on_epoch=0,
                  exp_base=0.5, half_life=50000, warmup_exp=-1.5,
-                 reduction_function='linear', epsilon=1e-11, verbose=1):
+                 reduction_function='linear', epsilon=1e-11,
+                 min_lr=1e-9, verbose=1):
         """
         Reduces learning rate during the training.
         Two different decays are implemented:
@@ -913,6 +914,7 @@ class LearningRateReducer(KerasCallback):
         :param half_life: Half-life for exponential reduction.
         :param reduction_function: Either 'linear' or 'exponential' reduction.
         :param epsilon: Stop training if LR is below this value
+        :param min_lr: Minimum LR allowed
         :param verbose: Be verbose.
         """
 
@@ -932,6 +934,7 @@ class LearningRateReducer(KerasCallback):
         self.epsilon = epsilon
         self.epoch = 0
         self.new_lr = None
+        self.min_lr = np.float32(min_lr)
         if self.reduction_function not in ['linear', 'exponential', 'noam']:
             raise AssertionError('Reduction function "%s" unimplemented!' % str(self.reduction_function))
 
@@ -949,7 +952,8 @@ class LearningRateReducer(KerasCallback):
             self.model.stop_training = True
 
     def on_batch_end(self, n_update, logs=None):
-
+        # n_update is restarted at the beginning of each epoch
+        # we carry the absolute update count in self.current_update_nb
         self.current_update_nb += 1
         if self.reduce_each_epochs:
             return
@@ -978,12 +982,10 @@ class LearningRateReducer(KerasCallback):
         if self.reduction_function == 'noam':
             lr = self.initial_lr
         else:
-            lr = self.model.optimizer.lr.get_value()
-        self.new_lr = np.float32(lr * new_rate)
-
+            lr = K.get_value(self.model.optimizer.lr)
+        self.new_lr = np.maximum(np.float32(lr * new_rate), self.min_lr)
         K.set_value(self.model.optimizer.lr, self.new_lr)
 
         if self.reduce_each_epochs and self.verbose > 0:
             logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr),
-                                                                         float(
-                                                                             self.new_lr)))
+                                                                         float(self.new_lr)))
