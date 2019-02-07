@@ -890,10 +890,10 @@ class EarlyStopping(KerasCallback):
 
 class LearningRateReducer(KerasCallback):
     def __init__(self, initial_lr=1., reduce_rate=0.99, reduce_each_epochs=True,
-                 reduce_frequency=1,
-                 start_reduction_on_epoch=0,
+                 reduce_frequency=1, start_reduction_on_epoch=0,
                  exp_base=0.5, half_life=50000, warmup_exp=-1.5,
-                 reduction_function='linear', epsilon=1e-11, verbose=1):
+                 reduction_function='linear', epsilon=1e-11,
+                 min_lr=1e-9, verbose=1):
         """
         Reduces learning rate during the training.
         Two different decays are implemented:
@@ -913,6 +913,7 @@ class LearningRateReducer(KerasCallback):
         :param half_life: Half-life for exponential reduction.
         :param reduction_function: Either 'linear' or 'exponential' reduction.
         :param epsilon: Stop training if LR is below this value
+        :param min_lr: Minimum LR allowed
         :param verbose: Be verbose.
         """
 
@@ -932,6 +933,7 @@ class LearningRateReducer(KerasCallback):
         self.epsilon = epsilon
         self.epoch = 0
         self.new_lr = None
+        self.min_lr = np.float32(min_lr)
         if self.reduction_function not in ['linear', 'exponential', 'noam']:
             raise AssertionError('Reduction function "%s" unimplemented!' % str(self.reduction_function))
 
@@ -949,7 +951,8 @@ class LearningRateReducer(KerasCallback):
             self.model.stop_training = True
 
     def on_batch_end(self, n_update, logs=None):
-
+        # n_update is restarted at the beginning of each epoch
+        # we carry the absolute update count in self.current_update_nb
         self.current_update_nb += 1
         if self.reduce_each_epochs:
             return
@@ -978,12 +981,10 @@ class LearningRateReducer(KerasCallback):
         if self.reduction_function == 'noam':
             lr = self.initial_lr
         else:
-            lr = self.model.optimizer.lr.get_value()
-        self.new_lr = np.float32(lr * new_rate)
-
+            lr = K.get_value(self.model.optimizer.lr)
+        self.new_lr = np.maximum(np.float32(lr * new_rate), self.min_lr)
         K.set_value(self.model.optimizer.lr, self.new_lr)
 
         if self.reduce_each_epochs and self.verbose > 0:
             logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr),
-                                                                         float(
-                                                                             self.new_lr)))
+                                                                         float(self.new_lr)))
