@@ -366,7 +366,7 @@ class EvalPerformance(KerasCallback):
                     print('')
                     logging.info('Prediction output ' + str(gt_pos) + ': ' + str(
                         gt_id) + ' (' + str(type_out) + ')')
-                self.post_process_output(type_out)
+
                 # Postprocess outputs of type text
                 if type_out == 'text':
                     if params_prediction.get('pos_unk', False):
