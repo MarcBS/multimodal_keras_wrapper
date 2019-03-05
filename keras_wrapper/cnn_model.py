@@ -543,10 +543,10 @@ class Model_Wrapper(object):
                                         'epochs_for_save': 1,
                                         'num_iterations_val': None,
                                         'n_parallel_loaders': 1,
-                                        'normalize': True,
-                                        'normalization_type': '(-1)-1',
+                                        'normalize': False,
+                                        'normalization_type': None,
                                         'mean_substraction': False,
-                                        'data_augmentation': True,
+                                        'data_augmentation': False,
                                         'wo_da_patch_type': 'whole',  # wo_da_patch_type = 'central_crop' or 'whole'.
                                         'da_patch_type': 'resize_and_rndcrop',
                                         'da_enhance_list': [],  # da_enhance_list = {brightness, color, sharpness, contrast}
@@ -588,7 +588,7 @@ class Model_Wrapper(object):
                                         }
         self.defaut_test_params = {'batch_size': 50,
                                    'n_parallel_loaders': 1,
-                                   'normalize': True,
+                                   'normalize': False,
                                    'normalization_type': None,
                                    'wo_da_patch_type': 'whole',
                                    'mean_substraction': False
@@ -598,7 +598,7 @@ class Model_Wrapper(object):
                                                  'n_parallel_loaders': 1,
                                                  'beam_size': 5,
                                                  'beam_batch_size': 50,
-                                                 'normalize': True,
+                                                 'normalize': False,
                                                  'normalization_type': None,
                                                  'mean_substraction': False,
                                                  'predict_on_sets': ['val'],
@@ -632,8 +632,8 @@ class Model_Wrapper(object):
                                                  }
         self.default_predict_params = {'batch_size': 50,
                                        'n_parallel_loaders': 1,
-                                       'normalize': True,
-                                       'normalization_type': '(-1)-1',
+                                       'normalize': False,
+                                       'normalization_type': None,
                                        'wo_da_patch_type': 'whole',
                                        'mean_substraction': False,
                                        'n_samples': None,

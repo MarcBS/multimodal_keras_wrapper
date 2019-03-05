@@ -130,7 +130,7 @@ class Parallel_Data_Batch_Generator(object):
                  dataset,
                  num_iterations,
                  batch_size=50,
-                 normalization=True,
+                 normalization=False,
                  normalization_type=None,
                  data_augmentation=True,
                  wo_da_patch_type='whole',
@@ -302,7 +302,7 @@ class Data_Batch_Generator(object):
                  dataset,
                  num_iterations,
                  batch_size=50,
-                 normalization=True,
+                 normalization=False,
                  normalization_type=None,
                  data_augmentation=True,
                  wo_da_patch_type='whole',
@@ -3357,8 +3357,8 @@ class Dataset(object):
         return self.train_mean[data_id]
 
     def loadImages(self, images, data_id, normalization_type='(-1)-1',
-                   normalization=True, meanSubstraction=False,
-                   dataAugmentation=True, daRandomParams=None,
+                   normalization=False, meanSubstraction=False,
+                   dataAugmentation=False, daRandomParams=None,
                    wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
                    useBGR=False,
                    external=False, loaded=False):
@@ -3693,8 +3693,8 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def getX(self, set_name, init, final, normalization_type='(-1)-1',
-             normalization=True, meanSubstraction=False,
-             dataAugmentation=True,
+             normalization=False, meanSubstraction=False,
+             dataAugmentation=False,
              wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None):
         """
         Gets all the data samples stored between the positions init to final
@@ -3812,8 +3812,8 @@ class Dataset(object):
         return X
 
     def getXY(self, set_name, k, normalization_type='(-1)-1',
-              normalization=True, meanSubstraction=False,
-              dataAugmentation=True,
+              normalization=False, meanSubstraction=False,
+              dataAugmentation=False,
               wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None):
         """
         Gets the [X,Y] pairs for the next 'k' samples in the desired set.
@@ -4026,8 +4026,8 @@ class Dataset(object):
         return [X, Y]
 
     def getXY_FromIndices(self, set_name, k, normalization_type='(-1)-1',
-                          normalization=True, meanSubstraction=False,
-                          dataAugmentation=True,
+                          normalization=False, meanSubstraction=False,
+                          dataAugmentation=False,
                           wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -4214,8 +4214,8 @@ class Dataset(object):
         return [X, Y]
 
     def getX_FromIndices(self, set_name, k, normalization_type='(-1)-1',
-                         normalization=True, meanSubstraction=False,
-                         dataAugmentation=True,
+                         normalization=False, meanSubstraction=False,
+                         dataAugmentation=False,
                          wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -4323,7 +4323,7 @@ class Dataset(object):
 
         return X
 
-    def getY(self, set_name, init, final, dataAugmentation=True):
+    def getY(self, set_name, init, final, dataAugmentation=False):
         """
         Gets the [Y] samples for the FULL dataset
         :param set_name: 'train', 'val' or 'test' set

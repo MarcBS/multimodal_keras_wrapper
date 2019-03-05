@@ -129,7 +129,7 @@ class BeamSearchEnsemble:
                           'n_parallel_loaders': 8,
                           'beam_size': 5,
                           'normalize': False,
-                          'normalization_type': 'normalization_type',
+                          'normalization_type': None,
                           'mean_substraction': False,
                           'predict_on_sets': ['val'],
                           'maxlen': 20,
