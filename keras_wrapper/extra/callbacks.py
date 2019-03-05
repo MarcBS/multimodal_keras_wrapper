@@ -366,7 +366,6 @@ class EvalPerformance(KerasCallback):
                     print('')
                     logging.info('Prediction output ' + str(gt_pos) + ': ' + str(
                         gt_id) + ' (' + str(type_out) + ')')
-                self.post_process_output(type_out)
                 # Postprocess outputs of type text
                 if type_out == 'text':
                     if params_prediction.get('pos_unk', False):
@@ -392,6 +391,7 @@ class EvalPerformance(KerasCallback):
                         sources = None
                     if self.out_pred_idx is not None:
                         samples = samples[self.out_pred_idx]
+
                     # Convert predictions into sentences
                     if self.beam_search:
                         predictions = decode_predictions_beam_search(samples,
@@ -410,11 +410,9 @@ class EvalPerformance(KerasCallback):
                                                          index2word_y,
                                                          self.sampling_type,
                                                          verbose=self.verbose)
-
                     # Apply detokenization function if needed
                     if self.extra_vars.get('apply_detokenization', False):
-                        predictions = map(self.extra_vars['detokenize_f'],
-                                          predictions)
+                        predictions = list(map(self.extra_vars['detokenize_f'], predictions))
 
                 # Postprocess outputs of type binary
                 elif type_out == 'binary':
@@ -752,10 +750,9 @@ class Sample(KerasCallback):
                     # Apply detokenization function if needed
                     if self.extra_vars.get('apply_detokenization', False):
                         if self.print_sources:
-                            sources = map(self.extra_vars['detokenize_f'], sources)
-                        predictions = map(self.extra_vars['detokenize_f'],
-                                          predictions)
-                        truths = map(self.extra_vars['detokenize_f'], truths)
+                            sources = list(map(self.extra_vars['detokenize_f'], sources))
+                        predictions = list(map(self.extra_vars['detokenize_f'], predictions))
+                        truths = list(map(self.extra_vars['detokenize_f'], truths))
 
                 # Write samples
                 if self.print_sources:
