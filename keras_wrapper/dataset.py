@@ -635,7 +635,7 @@ class Dataset(object):
     easily managing data splits, image loading, mean calculation, etc.
     """
 
-    def __init__(self, name, path, silence=False):
+    def __init__(self, name, path, pad_symbol='<pad>', unk_symbol='<unk>', null_symbol='<null>', silence=False):
         """
         Dataset initializer
         :param name: Dataset name
@@ -649,6 +649,10 @@ class Dataset(object):
 
         # If silence = False, some informative sentences will be printed while using the "Dataset" object instance
         self.silence = silence
+
+        self.pad_symbol = pad_symbol
+        self.unk_symbol = unk_symbol
+        self.null_symbol = null_symbol
 
         # Variable for storing external extra variables
         self.extra_variables = dict()
@@ -724,7 +728,7 @@ class Dataset(object):
         #################################################
 
         # Parameters used for inputs/outputs of type 'text'
-        self.extra_words = {'<pad>': 0, '<unk>': 1, '<null>': 2}  # extra words introduced in all vocabularies
+        self.extra_words = {self.pad_symbol: 0, self.unk_symbol: 1, self.null_symbol: 2}  # extra words introduced in all vocabularies
         self.vocabulary = dict()  # vocabularies (words2idx and idx2words)
         self.max_text_len = dict()  # number of words accepted in a 'text' sample
         self.vocabulary_len = dict()  # number of words in the vocabulary
@@ -1619,7 +1623,10 @@ class Dataset(object):
 
         # Build vocabulary
         if build_vocabulary:
-            self.build_vocabulary(sentences, data_id, max_text_len != 0, min_occ=min_occ, n_words=max_words,
+            self.build_vocabulary(sentences, data_id,
+                                  max_text_len != 0,
+                                  min_occ=min_occ,
+                                  n_words=max_words,
                                   use_extra_words=(max_text_len != 0))
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
@@ -1748,7 +1755,7 @@ class Dataset(object):
         else:
             dtype_text = 'uint32'
         vocab = self.vocabulary[data_id]['words2idx']
-        sentence_features = np.ones((len(sentences), max_text_len)).astype(dtype_text) * self.extra_words['<pad>']
+        sentence_features = np.ones((len(sentences), max_text_len)).astype(dtype_text) * self.extra_words[self.pad_symbol]
         max_text_len -= 1  # always leave space for <eos> symbol
         for sentence_idx, sentence in enumerate(sentences):
             words = sentence.strip().split()
@@ -1766,9 +1773,9 @@ class Dataset(object):
                 offset_j = 0
 
             for word_idx, word in list(zip(range(len_j), words[:len_j])):
-                sentence_features[sentence_idx, word_idx + offset_j] = vocab.get(word, vocab['<unk>'])
+                sentence_features[sentence_idx, word_idx + offset_j] = vocab.get(word, vocab[self.unk_symbol])
             if offset > 0:  # Move the text to the right -> null symbol
-                sentence_features[sentence_idx] = np.append([vocab['<null>']] * offset, sentence_features[sentence_idx, :-offset])
+                sentence_features[sentence_idx] = np.append([vocab[self.null_symbol]] * offset, sentence_features[sentence_idx, :-offset])
         return sentence_features
 
     def build_vocabulary(self, captions, data_id, do_split=True, min_occ=0, n_words=0, split_symbol=' ',
@@ -2201,8 +2208,8 @@ class Dataset(object):
             X_out = np.zeros(n_batch).astype(dtype_text)
             for sentence_idx in range(n_batch):
                 word = X[sentence_idx]
-                if '<unk>' in vocab:
-                    X_out[sentence_idx] = vocab.get(word, vocab['<unk>'])
+                if self.unk_symbol in vocab:
+                    X_out[sentence_idx] = vocab.get(word, vocab[self.unk_symbol])
                 else:
                     X_out[sentence_idx] = vocab[word]
             if loading_X:
@@ -2214,14 +2221,14 @@ class Dataset(object):
                 max_len_batch = max_len
 
             if words_so_far:
-                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype(dtype_text) * self.extra_words[self.pad_symbol]
                 X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
-                null_row = np.ones((1, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
+                null_row = np.ones((1, max_len_batch)).astype(dtype_text) * self.extra_words[self.pad_symbol]
                 zero_row = np.zeros((1, max_len_batch)).astype('int8')
                 if offset > 0:
-                    null_row[0] = np.append([vocab['<null>']] * offset, null_row[0, :-offset])
+                    null_row[0] = np.append([vocab[self.null_symbol]] * offset, null_row[0, :-offset])
             else:
-                X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words['<pad>']
+                X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words[self.pad_symbol]
                 X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
 
             max_len_batch -= 1  # always leave space for <eos> symbol
@@ -2244,7 +2251,7 @@ class Dataset(object):
 
                 if words_so_far:
                     for word_idx, word in list(zip(range(len_j), words[:len_j])):
-                        next_w = vocab.get(word, next_w=vocab['<unk>'])
+                        next_w = vocab.get(word, next_w=vocab[self.unk_symbol])
                         for k in range(word_idx, len_j):
                             X_out[sentence_idx, k + offset_j, word_idx + offset_j] = next_w
                             X_mask[sentence_idx, k + offset_j, word_idx + offset_j] = 1  # fill mask
@@ -2252,19 +2259,19 @@ class Dataset(object):
 
                 else:
                     for word_idx, word in list(zip(range(len_j), words[:len_j])):
-                        X_out[sentence_idx, word_idx + offset_j] = vocab.get(word, vocab['<unk>'])
+                        X_out[sentence_idx, word_idx + offset_j] = vocab.get(word, vocab[self.unk_symbol])
                         X_mask[sentence_idx, word_idx + offset_j] = 1  # fill mask
                     X_mask[sentence_idx, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
 
                 if offset > 0:  # Move the text to the right -> null symbol
                     if words_so_far:
                         for k in range(len_j):
-                            X_out[sentence_idx, k] = np.append([vocab['<null>']] * offset, X_out[sentence_idx, k, :-offset])
+                            X_out[sentence_idx, k] = np.append([vocab[self.null_symbol]] * offset, X_out[sentence_idx, k, :-offset])
                             X_mask[sentence_idx, k] = np.append([0] * offset, X_mask[sentence_idx, k, :-offset])
                         X_out[sentence_idx] = np.append(null_row, X_out[sentence_idx, :-offset], axis=0)
                         X_mask[sentence_idx] = np.append(zero_row, X_mask[sentence_idx, :-offset], axis=0)
                     else:
-                        X_out[sentence_idx] = np.append([vocab['<null>']] * offset, X_out[sentence_idx, :-offset])
+                        X_out[sentence_idx] = np.append([vocab[self.null_symbol]] * offset, X_out[sentence_idx, :-offset])
                         X_mask[sentence_idx] = np.append([1] * offset, X_mask[sentence_idx, :-offset])
             X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
 

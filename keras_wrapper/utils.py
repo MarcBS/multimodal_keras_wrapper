@@ -940,7 +940,6 @@ def decode_predictions_one_hot(preds, index2word, pad_sequences=True, verbose=0)
     answer_pred_matrix = np.asarray(flattened_answer_pred)
     answer_pred = []
 
-
     for a_no in answer_pred_matrix:
         end_token_pos = [j for j, x in list(enumerate(a_no)) if x == PAD]
         end_token_pos = None if len(end_token_pos) == 0 or not pad_sequences else end_token_pos[0]
