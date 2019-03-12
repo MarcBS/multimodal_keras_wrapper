@@ -8,7 +8,7 @@ from keras.engine.training import Model
 from keras.layers import Dense
 from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
 
-logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 
 def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, atol=1e-08, verbose=0):

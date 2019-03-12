@@ -27,6 +27,7 @@ from .utils import bbox, to_categorical
 from .utils import MultiprocessQueue
 import multiprocessing
 
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
