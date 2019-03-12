@@ -304,8 +304,7 @@ class EvalPerformance(KerasCallback):
             # Apply model predictions
             if self.beam_search:
                 params_prediction = {'max_batch_size': self.batch_size,
-                                     'n_parallel_loaders': self.extra_vars[
-                                         'n_parallel_loaders'],
+                                     'n_parallel_loaders': self.extra_vars.get('n_parallel_loaders', 1),
                                      'predict_on_sets': [s],
                                      'beam_batch_size': self.beam_batch_size if
                                      self.beam_batch_size is not None else self.batch_size,
@@ -320,8 +319,7 @@ class EvalPerformance(KerasCallback):
             else:
                 orig_size = self.extra_vars.get('eval_orig_size', False)
                 params_prediction = {'batch_size': self.batch_size,
-                                     'n_parallel_loaders': self.extra_vars.get(
-                                         'n_parallel_loaders', 8),
+                                     'n_parallel_loaders': self.extra_vars.get('n_parallel_loaders', 1),
                                      'predict_on_sets': [s],
                                      'normalize': self.normalize,
                                      'normalization_type': self.normalization_type,
@@ -696,6 +694,7 @@ class Sample(KerasCallback):
                                      'n_parallel_loaders': self.extra_vars['n_parallel_loaders'],
                                      'predict_on_sets': [s],
                                      'n_samples': self.n_samples,
+                                     'verbose': self.verbose,
                                      }
                 # Convert predictions
                 postprocess_fun = None

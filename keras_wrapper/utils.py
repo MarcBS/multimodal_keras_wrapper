@@ -923,7 +923,7 @@ def categorical_probas_to_classes(p):
 #           Functions for decoding predictions
 # ------------------------------------------------------- #
 
-def decode_predictions_one_hot(preds, index2word, verbose=0):
+def decode_predictions_one_hot(preds, index2word, pad_sequences=True, verbose=0):
     """
     Decodes predictions following a one-hot codification.
     :param preds: Predictions codified as one-hot vectors.
@@ -942,7 +942,7 @@ def decode_predictions_one_hot(preds, index2word, verbose=0):
 
     for a_no in answer_pred_matrix:
         end_token_pos = [j for j, x in list(enumerate(a_no)) if x == PAD]
-        end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
+        end_token_pos = None if len(end_token_pos) == 0 or not pad_sequences else end_token_pos[0]
         a_no = [a.decode('utf-8') if isinstance(a,
                                                 str) and sys.version_info.major == 2 else a
                 for a in a_no]
@@ -965,10 +965,9 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     if verbose > 0:
         logging.info('Decoding prediction ...')
     flattened_preds = preds.reshape(-1, preds.shape[-1])
-    flattened_answer_pred = list(
-        map(lambda index: index2word[index], sampling(scores=flattened_preds,
-                                                      sampling_type=sampling_type,
-                                                      temperature=temperature)))
+    flattened_answer_pred = list(map(lambda index: index2word[index], sampling(scores=flattened_preds,
+                                                                               sampling_type=sampling_type,
+                                                                               temperature=temperature)))
     answer_pred_matrix = np.asarray(flattened_answer_pred).reshape(preds.shape[:-1])
 
     answer_pred = []
@@ -976,14 +975,11 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     PAD = '<pad>'
 
     for a_no in answer_pred_matrix:
-        if len(
-                a_no.shape) > 1:  # only process word by word if our prediction has more than one output
+        if len(a_no.shape) > 1:  # only process word by word if our prediction has more than one output
             init_token_pos = 0
-            end_token_pos = [j for j, x in list(enumerate(a_no)) if
-                             x == EOS or x == PAD]
+            end_token_pos = [j for j, x in list(enumerate(a_no)) if x == EOS or x == PAD]
             end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
-            a_no = [a.decode('utf-8') if isinstance(a,
-                                                    str) and sys.version_info.major == 2 else a
+            a_no = [a.decode('utf-8') if isinstance(a, str) and sys.version_info.major == 2 else a
                     for a in a_no]
             tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
