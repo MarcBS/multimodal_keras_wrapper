@@ -988,6 +988,21 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     return answer_pred
 
 
+def decode_categorical(preds, index2word, verbose=0):
+    """
+    Decodes predictions
+    :param preds: Predictions codified as the output of a softmax activation function.
+    :param index2word: Mapping from word indices into word characters.
+    :return: List of decoded predictions.
+    """
+
+    if verbose > 0:
+        logging.info('Decoding prediction ...')
+
+    word_indices = categorical_probas_to_classes(preds)
+    return decode_predictions_beam_search(word_indices, index2word)
+
+
 def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0):
     """
     Decodes predictions
