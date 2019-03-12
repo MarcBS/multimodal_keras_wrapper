@@ -639,7 +639,7 @@ class Model_Wrapper(object):
                                        'n_samples': None,
                                        'init_sample': -1,
                                        'final_sample': -1,
-                                       'verbose': 1,
+                                       'verbose': 0,
                                        'predict_on_sets': ['val'],
                                        'max_eval_samples': None,
                                        'model_name': 'model',  # name of the attribute where the model for prediction is stored
@@ -1888,8 +1888,7 @@ class Model_Wrapper(object):
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=True,
                                                              random_samples=n_samples,
-                                                             n_parallel_loaders=params[
-                                                                 'n_parallel_loaders']).generator()
+                                                             n_parallel_loaders=params['n_parallel_loaders']).generator()
                 else:
                     data_gen = Data_Batch_Generator(s,
                                                     self,
