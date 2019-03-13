@@ -1000,7 +1000,7 @@ def decode_categorical(preds, index2word, verbose=0):
         logging.info('Decoding prediction ...')
 
     word_indices = categorical_probas_to_classes(preds)
-    return decode_predictions_beam_search(word_indices, index2word)
+    return [index2word.get(word) for word in word_indices]
 
 
 def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0):
