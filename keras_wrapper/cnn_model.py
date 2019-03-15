@@ -5,6 +5,8 @@ import math
 import shutil
 import sys
 import time
+import logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 if sys.version_info.major == 3:
     import _pickle as pk
@@ -27,6 +29,8 @@ from keras_wrapper.extra.read_write import file2list
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
     decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters, print_dict
 from keras_wrapper.search import beam_search
+
+# General setup of libraries
 try:
     import cupy as cp
 except:
@@ -45,16 +49,11 @@ else:
 mpl.use('Agg')  # run matplotlib without X server (GUI)
 import matplotlib.pyplot as plt
 
-# General setup of libraries
-logging.basicConfig(level=logging.DEBUG, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-logger = logging.getLogger(__name__)
-
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
 #           External functions for saving and loading Model_Wrapper instances
 # ------------------------------------------------------- #
-
 
 def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=False):
     """
@@ -720,10 +719,10 @@ class Model_Wrapper(object):
             elif optimizer.lower() == 'rmsprop':
                 optimizer = TFOptimizer(tf.train.RMSPropOptimizer(lr, decay=decay, momentum=momentum, epsilon=epsilon))
             elif optimizer.lower() == 'nadam':
-                logger.warning('The Nadam optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                logging.warning('The Nadam optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
                 optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
             elif optimizer.lower() == 'adamax':
-                logger.warning('The Adamax optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                logging.warning('The Adamax optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
                 optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
             elif optimizer.lower() == 'adadelta':
                 optimizer = TFOptimizer(tf.train.AdadeltaOptimizer(learning_rate=lr, epsilon=epsilon))
@@ -1512,14 +1511,14 @@ class Model_Wrapper(object):
         """
         DEPRECATED, use search.beam_search instead.
         """
-        logger.warning("Deprecated function, use search.beam_search instead.")
+        logging.warning("Deprecated function, use search.beam_search instead.")
         return beam_search(self, X, params, return_alphas=return_alphas, eos_sym=eos_sym, null_sym=null_sym)
 
     def BeamSearchNet(self, ds, parameters):
         """
         DEPRECATED, use predictBeamSearchNet() instead.
         """
-        logger.warning("Deprecated function, use predictBeamSearchNet() instead.")
+        logging.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet(ds, parameters)
 
     def predictBeamSearchNet(self, ds, parameters=None):
@@ -2169,7 +2168,7 @@ class Model_Wrapper(object):
                             Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples
         """
-        logger.warning("Deprecated function, use utils.sampling() instead")
+        logging.warning("Deprecated function, use utils.sampling() instead")
         return sampling(scores, sampling_type=sampling_type, temperature=temperature)
 
     @staticmethod
@@ -2183,7 +2182,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions.
         """
-        logger.warning("Deprecated function, use utils.decode_predictions() instead.")
+        logging.warning("Deprecated function, use utils.decode_predictions() instead.")
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
     @staticmethod
@@ -2201,7 +2200,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level
         :return: trg_word_seq with replaced unknown words
         """
-        logger.warning("Deprecated function, use utils.replace_unknown_words() instead.")
+        logging.warning("Deprecated function, use utils.replace_unknown_words() instead.")
         return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                                      heuristic=heuristic, mapping=mapping, verbose=verbose)
 
@@ -2222,7 +2221,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        logger.warning("Deprecated function, use utils.decode_predictions_beam_search() instead.")
+        logging.warning("Deprecated function, use utils.decode_predictions_beam_search() instead.")
         return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
                                               x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
                                               mapping=mapping, verbose=verbose)
@@ -2236,7 +2235,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of converted predictions
         """
-        logger.warning("Deprecated function, use utils.one_hot_2_indices() instead.")
+        logging.warning("Deprecated function, use utils.one_hot_2_indices() instead.")
         return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
 
     @staticmethod
@@ -2248,7 +2247,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        logger.warning("Deprecated function, use utils.decode_predictions_one_hot() instead.")
+        logging.warning("Deprecated function, use utils.decode_predictions_one_hot() instead.")
         return decode_predictions_one_hot(preds, index2word, verbose=verbose)
 
     def prepareData(self, X_batch, Y_batch=None):

@@ -27,6 +27,7 @@ from .utils import bbox, to_categorical
 from .utils import MultiprocessQueue
 import multiprocessing
 
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
@@ -929,7 +930,7 @@ class Dataset(object):
                  # 'raw-image' / 'video'   (height, width, depth)
                  max_text_len=35, tokenization='tokenize_none', offset=0, fill='end', min_occ=0,  # 'text'
                  pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
-                 bpe_codes=None, separator='@@',  # 'text'
+                 bpe_codes=None, separator='@@', use_unk_class=False,  # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
                  max_video_len=26,  # 'video'
                  sparse=False,  # 'binary'
@@ -1032,13 +1033,13 @@ class Dataset(object):
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                                        max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                       bpe_codes=bpe_codes, separator=separator)
+                                       bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
         elif type == 'text-features':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessTextFeatures(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                                                max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                               bpe_codes=bpe_codes, separator=separator)
+                                               bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
         elif type == 'image-features':
             data = self.preprocessFeatures(path_list, id, set_name, feat_len)
         elif type == 'video-features':
@@ -1052,7 +1053,8 @@ class Dataset(object):
             self.inputs_data_augmentation_types[id] = data_augmentation_types
             data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len)
         elif type == 'categorical':
-            self.setClasses(path_list, id)
+            if build_vocabulary:
+                self.setClasses(path_list, id)
             data = self.preprocessCategorical(path_list, id)
         elif type == 'categorical_raw':
             data = self.preprocessIDs(path_list, id, set_name)
@@ -1171,7 +1173,7 @@ class Dataset(object):
                   add_additional=False, sample_weights=False, label_smoothing=0.,
                   tokenization='tokenize_none', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
                   pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
-                  bpe_codes=None, separator='@@',  # 'text'
+                  bpe_codes=None, separator='@@', use_unk_class=False,  # 'text'
                   associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
                   sparse=False,  # 'binary'
                   ):
@@ -1250,7 +1252,8 @@ class Dataset(object):
 
         # Preprocess the output data depending on its type
         if type == 'categorical':
-            self.setClasses(path_list, id)
+            if build_vocabulary:
+                self.setClasses(path_list, id)
             data = self.preprocessCategorical(path_list, id,
                                               sample_weights=True if sample_weights and set_name == 'train' else False)
         elif type == 'text' or type == 'dense-text':
@@ -1258,13 +1261,13 @@ class Dataset(object):
                 self.max_text_len[id] = dict()
             data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                                        max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                       bpe_codes=bpe_codes, separator=separator)
+                                       bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
         elif type == 'text-features':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
             data = self.preprocessTextFeatures(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
                                                max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                               bpe_codes=bpe_codes, separator=separator)
+                                               bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
         elif type == 'binary':
             data = self.preprocessBinary(path_list, id, sparse)
         elif type == 'real':
@@ -1566,7 +1569,8 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocessText(self, annotations_list, data_id, set_name, tokenization, build_vocabulary, max_text_len,
-                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None, separator='@@'):
+                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
+                       bpe_codes=None, separator='@@', use_unk_class=False):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
@@ -1586,6 +1590,7 @@ class Dataset(object):
         :param words_so_far: Experimental feature. Should be ignored.
         :param bpe_codes: Codes used for applying BPE encoding.
         :param separator: BPE encoding separator.
+        :param use_unk_class: Add a special class for the unknown word when maxt_text_len == 0.
 
         :return: Preprocessed sentences.
         """
@@ -1627,7 +1632,8 @@ class Dataset(object):
                                   max_text_len != 0,
                                   min_occ=min_occ,
                                   n_words=max_words,
-                                  use_extra_words=(max_text_len != 0))
+                                  use_extra_words=(max_text_len != 0),
+                                  use_unk_class=use_unk_class)
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[data_id] = self.vocabulary[build_vocabulary]
@@ -1658,7 +1664,7 @@ class Dataset(object):
         return sentences
 
     def preprocessTextFeatures(self, annotations_list, data_id, set_name, tokenization, build_vocabulary, max_text_len,
-                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None, separator='@@'):
+                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None, separator='@@', use_unk_class=False):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
@@ -1715,8 +1721,11 @@ class Dataset(object):
 
         # Build vocabulary
         if build_vocabulary:
-            self.build_vocabulary(sentences, data_id, max_text_len != 0, min_occ=min_occ, n_words=max_words,
-                                  use_extra_words=(max_text_len != 0))
+            self.build_vocabulary(sentences, data_id, max_text_len != 0,
+                                  min_occ=min_occ,
+                                  n_words=max_words,
+                                  use_extra_words=(max_text_len != 0),
+                                  use_unk_class=use_unk_class)
         elif isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[data_id] = self.vocabulary[build_vocabulary]
@@ -1779,7 +1788,7 @@ class Dataset(object):
         return sentence_features
 
     def build_vocabulary(self, captions, data_id, do_split=True, min_occ=0, n_words=0, split_symbol=' ',
-                         use_extra_words=True, is_val=False):
+                         use_extra_words=True, use_unk_class=False, is_val=False):
         """
         Vocabulary builder for data of type 'text'
 
@@ -1854,10 +1863,17 @@ class Dataset(object):
                 dictionary[word] = i
             if use_extra_words:
                 dictionary[word] += len(self.extra_words)
+            elif use_unk_class:
+                if i >= self.extra_words[self.unk_symbol]:
+                    dictionary[word] += 1
 
         if use_extra_words:
             for w, k in iteritems(self.extra_words):
                 dictionary[w] = k
+        elif use_unk_class:
+            if not self.silence:
+                logging.info("\tAdding an additional unknown class")
+            dictionary[self.unk_symbol] = self.extra_words[self.unk_symbol]
 
         # Store dictionary and append to previously existent if needed.
         if data_id not in self.vocabulary:
@@ -1869,6 +1885,8 @@ class Dataset(object):
             self.vocabulary_len[data_id] = len(vocab_count)
             if use_extra_words:
                 self.vocabulary_len[data_id] += len(self.extra_words)
+            elif use_unk_class:
+                self.vocabulary_len[data_id] += 1
 
         else:
             old_keys = list(self.vocabulary[data_id]['words2idx'])
@@ -3818,6 +3836,101 @@ class Dataset(object):
 
         return X
 
+    def getY(self, set_name, init, final, dataAugmentation=False):
+        """
+        Gets the [Y] samples for the FULL dataset
+        :param set_name: 'train', 'val' or 'test' set
+        :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than
+                     final.
+        :param final: final position in the corresponding set split.
+        :return: Y, list of output data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
+        """
+        self.__checkSetName(set_name)
+        self.__isLoaded(set_name, 1)
+
+        if final > getattr(self, 'len_' + set_name):
+            raise Exception('"final" index must be smaller than the number of samples in the set.')
+        if init < 0:
+            raise Exception('"init" index must be equal or greater than 0.')
+        if init >= final:
+            raise Exception('"init" index must be smaller than "final" index.')
+
+        # Recover output samples
+        Y = []
+        for id_out in list(self.ids_outputs):
+            types_index = self.ids_outputs.index(id_out)
+            type_out = self.types_outputs[set_name][types_index]
+            y = getattr(self, 'Y_' + set_name)[id_out][init:final]
+            # Pre-process outputs
+            if type_out == 'categorical':
+                nClasses = len(self.dic_classes[id_out])
+                y = self.loadCategorical(y, nClasses)
+            elif type_out == 'binary':
+                y = self.loadBinary(y, id_out)
+            elif type_out == 'real':
+                y = np.array(y).astype(np.float32)
+            elif type_out == '3DLabel':
+                nClasses = len(self.classes[id_out])
+                assoc_id_in = self.id_in_3DLabel[id_out]
+                imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
+
+                y = self.load3DLabels(y,
+                                      nClasses,
+                                      dataAugmentation,
+                                      None,
+                                      self.img_size[assoc_id_in],
+                                      self.img_size_crop[assoc_id_in],
+                                      imlist)
+            elif type_out == '3DSemanticLabel':
+                nClasses = len(self.classes[id_out])
+                classes_to_colour = self.semantic_classes[id_out]
+                assoc_id_in = self.id_in_3DLabel[id_out]
+                imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
+                y = self.load3DSemanticLabels(y,
+                                              nClasses,
+                                              classes_to_colour,
+                                              dataAugmentation,
+                                              None,
+                                              self.img_size[assoc_id_in],
+                                              self.img_size_crop[assoc_id_in],
+                                              imlist)
+            elif type_out == 'text-features':
+                y = self.loadTextFeaturesOneHot(y,
+                                                self.vocabulary_len[id_out],
+                                                self.max_text_len[id_out][set_name],
+                                                self.pad_on_batch[id_out],
+                                                self.text_offset.get(id_out, 0),
+                                                sample_weights=self.sample_weights[id_out][set_name],
+                                                label_smoothing=self.label_smoothing[id_out][set_name])
+
+            elif type_out == 'text':
+                y = self.loadTextOneHot(y,
+                                        self.vocabulary[id_out],
+                                        self.vocabulary_len[id_out],
+                                        self.max_text_len[id_out][set_name],
+                                        self.text_offset[id_out],
+                                        self.fill_text[id_out],
+                                        self.pad_on_batch[id_out],
+                                        self.words_so_far[id_out],
+                                        sample_weights=self.sample_weights[id_out][set_name],
+                                        loading_X=False,
+                                        label_smoothing=self.label_smoothing[id_out][set_name])
+            elif type_out == 'dense-text':
+                y = self.loadText(y,
+                                  self.vocabulary[id_out],
+                                  self.max_text_len[id_out][set_name],
+                                  self.text_offset[id_out],
+                                  self.fill_text[id_out],
+                                  self.pad_on_batch[id_out],
+                                  self.words_so_far[id_out],
+                                  loading_X=False)
+
+                y = (y[0][:, :, None], y[1])
+
+            Y.append(y)
+
+        return Y
+
     def getXY(self, set_name, k, normalization_type='(-1)-1',
               normalization=False, meanSubstraction=False,
               dataAugmentation=False,
@@ -4330,31 +4443,40 @@ class Dataset(object):
 
         return X
 
-    def getY(self, set_name, init, final, dataAugmentation=False):
+    def getY_FromIndices(self, set_name, k, dataAugmentation=False, return_mask=True,
+                         wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None):
         """
-        Gets the [Y] samples for the FULL dataset
+        Gets the [Y] pairs for the samples in positions 'k' in the desired set.
         :param set_name: 'train', 'val' or 'test' set
-        :param init: initial position in the corresponding set split. Must be bigger or equal than 0 and smaller than
-                     final.
-        :param final: final position in the corresponding set split.
-        :return: Y, list of output data variables from sample 'init' to 'final' belonging to the chosen 'set_name'
+        :param k: positions of the desired samples
+        # 'raw-image', 'video', 'image-features' and 'video-features'-related parameters
+        :param normalization: indicates if we want to normalize the data.
+        # 'image-features' and 'video-features'-related parameters
+        :param normalization_type: indicates the type of normalization applied. See available types in
+                                   self.__available_norm_im_vid for 'raw-image' and 'video' and
+                                   self.__available_norm_feat for 'image-features' and 'video-features'.
+        # 'raw-image' and 'video'-related parameters
+        :param meanSubstraction: indicates if we want to substract the training mean from the returned images
+                                (only applicable if normalization=True)
+        :param dataAugmentation: indicates if we want to apply data augmentation to the loaded images
+                                (random flip and cropping)
+        :return: [X,Y], list of input and output data variables of the samples identified by the indices in 'k'
+                 samples belonging to the chosen 'set_name'
         """
-        self.__checkSetName(set_name)
-        self.__isLoaded(set_name, 1)
 
-        if final > getattr(self, 'len_' + set_name):
-            raise Exception('"final" index must be smaller than the number of samples in the set.')
-        if init < 0:
-            raise Exception('"init" index must be equal or greater than 0.')
-        if init >= final:
-            raise Exception('"init" index must be smaller than "final" index.')
+        self.__checkSetName(set_name)
+        self.__isLoaded(set_name, 0)
+        if da_enhance_list is None:
+            da_enhance_list = []
 
         # Recover output samples
         Y = []
         for id_out in list(self.ids_outputs):
             types_index = self.ids_outputs.index(id_out)
             type_out = self.types_outputs[set_name][types_index]
-            y = getattr(self, 'Y_' + set_name)[id_out][init:final]
+
+            y = [getattr(self, 'Y_' + set_name)[id_out][index] for index in k]
+
             # Pre-process outputs
             if type_out == 'categorical':
                 nClasses = len(self.dic_classes[id_out])
@@ -4366,28 +4488,20 @@ class Dataset(object):
             elif type_out == '3DLabel':
                 nClasses = len(self.classes[id_out])
                 assoc_id_in = self.id_in_3DLabel[id_out]
-                imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
+                imlist = [getattr(self, 'X_' + set_name)[assoc_id_in][index] for index in k]
 
-                y = self.load3DLabels(y,
-                                      nClasses,
-                                      dataAugmentation,
-                                      None,
-                                      self.img_size[assoc_id_in],
-                                      self.img_size_crop[assoc_id_in],
+                y = self.load3DLabels(y, nClasses, dataAugmentation, daRandomParams,
+                                      self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                       imlist)
             elif type_out == '3DSemanticLabel':
                 nClasses = len(self.classes[id_out])
                 classes_to_colour = self.semantic_classes[id_out]
                 assoc_id_in = self.id_in_3DLabel[id_out]
-                imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
-                y = self.load3DSemanticLabels(y,
-                                              nClasses,
-                                              classes_to_colour,
-                                              dataAugmentation,
-                                              None,
-                                              self.img_size[assoc_id_in],
-                                              self.img_size_crop[assoc_id_in],
+                imlist = [getattr(self, 'X_' + set_name)[assoc_id_in][index] for index in k]
+                y = self.load3DSemanticLabels(y, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
+                                              self.img_size[assoc_id_in], self.img_size_crop[assoc_id_in],
                                               imlist)
+
             elif type_out == 'text-features':
                 y = self.loadTextFeaturesOneHot(y,
                                                 self.vocabulary_len[id_out],
@@ -4409,6 +4523,8 @@ class Dataset(object):
                                         sample_weights=self.sample_weights[id_out][set_name],
                                         loading_X=False,
                                         label_smoothing=self.label_smoothing[id_out][set_name])
+                if not return_mask:
+                    y = y[0]
             elif type_out == 'dense-text':
                 y = self.loadText(y,
                                   self.vocabulary[id_out],
@@ -4419,10 +4535,13 @@ class Dataset(object):
                                   self.words_so_far[id_out],
                                   loading_X=False)
 
-                y = (y[0][:, :, None], y[1])
+                if self.label_smoothing[id_out][set_name] > 0.:
+                    y[0] = self.apply_label_smoothing(y[0],
+                                                      self.label_smoothing[id_out][set_name],
+                                                      self.vocabulary_len[id_out])
+                y = (y[0][:, :, None], y[1]) if return_mask else y[0][:, :, None]
 
             Y.append(y)
-
         return Y
 
     # ------------------------------------------------------- #

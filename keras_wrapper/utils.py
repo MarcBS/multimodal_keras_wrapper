@@ -765,7 +765,7 @@ def simplifyDataset(ds, id_classes, n_classes=50):
         setattr(ds, 'len_' + s, len(kept_Y[id_labels]))
 
 
-def average_models(models, output_model, weights=None):
+def average_models(models, output_model, weights=None, custom_objects=None):
     from keras_wrapper.cnn_model import loadModel, saveModel
     if not isinstance(models, list):
         raise AssertionError('You must give a list of models to average.')
@@ -777,7 +777,7 @@ def average_models(models, output_model, weights=None):
     if len(model_weights) != len(models):
         raise AssertionError(
             'You must give a list of weights of the same size than the list of models.')
-    loaded_models = [loadModel(m, -1, full_path=True) for m in models]
+    loaded_models = [loadModel(m, -1, full_path=True, custom_objects=custom_objects) for m in models]
 
     # Check that all models are compatible
     if not all([hasattr(loaded_model, 'model') for loaded_model in loaded_models]):
@@ -795,17 +795,15 @@ def average_models(models, output_model, weights=None):
         raise AssertionError('Not all models have the attribute "model_next".')
 
     # Check all layers are the same
+
     if not (all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models])):
         raise AssertionError('Not all models have the same weights!')
 
-    if hasattr(loaded_models[0], 'model_init'):
-        if not all([[str(loaded_models[0].model_init.weights[i]) == str(loaded_model.model_init.weights[i]) for i in range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models]):
-            raise AssertionError('Not all models have the same weights!')
+    if hasattr(loaded_models[0], 'model_init') and getattr(loaded_models[0], 'model_init') is not None:
+        if not all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model_init.weights))] for loaded_model in loaded_models]):
+            raise AssertionError('Not all model_inits have the same weights!')
 
-    if not all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model_init.weights))] for loaded_model in loaded_models]):
-        raise AssertionError('Not all model_inits have the same weights!')
-
-    if hasattr(loaded_models[0], 'model_next'):
+    if hasattr(loaded_models[0], 'model_next') and getattr(loaded_models[0], 'model_next') is not None:
         if not all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in range(len(loaded_models[0].model_next.weights))] for loaded_model in loaded_models]):
             raise AssertionError('Not all model_nexts have the same weights!')
 
@@ -814,13 +812,13 @@ def average_models(models, output_model, weights=None):
     loaded_models[0].model.set_weights(
         [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
     # We have model_init
-    if hasattr(loaded_models[0], 'model_init'):
+    if hasattr(loaded_models[0], 'model_init') and getattr(loaded_models[0], 'model_init') is not None:
         current_weights = loaded_models[0].model_init.get_weights()
         loaded_models[0].model_init.set_weights(
             [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
 
     # We have model_next
-    if hasattr(loaded_models[0], 'model_next'):
+    if hasattr(loaded_models[0], 'model_next') and getattr(loaded_models[0], 'model_next') is not None:
         current_weights = loaded_models[0].model_next.get_weights()
         loaded_models[0].model_next.set_weights(
             [current_weights[matrix_index] * model_weights[0] for matrix_index in range(len(current_weights))])
@@ -833,14 +831,14 @@ def average_models(models, output_model, weights=None):
             [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
 
         # We have model_init
-        if hasattr(loaded_models[0], 'model_init'):
+        if hasattr(loaded_models[0], 'model_init') and getattr(loaded_models[0], 'model_init') is not None:
             current_weights = loaded_models[m].model_init.get_weights()
             prev_weights = loaded_models[0].model_init.get_weights()
             loaded_models[0].model_init.set_weights(
                 [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
 
         # We have model_next
-        if hasattr(loaded_models[0], 'model_next'):
+        if hasattr(loaded_models[0], 'model_next') and getattr(loaded_models[0], 'model_next') is not None:
             current_weights = loaded_models[m].model_next.get_weights()
             prev_weights = loaded_models[0].model_next.get_weights()
             loaded_models[0].model_next.set_weights(
@@ -983,9 +981,24 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
                     for a in a_no]
             tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
-            tmp = a_no
+            tmp = a_no[:-1]
         answer_pred.append(tmp)
     return answer_pred
+
+
+def decode_categorical(preds, index2word, verbose=0):
+    """
+    Decodes predictions
+    :param preds: Predictions codified as the output of a softmax activation function.
+    :param index2word: Mapping from word indices into word characters.
+    :return: List of decoded predictions.
+    """
+
+    if verbose > 0:
+        logging.info('Decoding prediction ...')
+
+    word_indices = categorical_probas_to_classes(preds)
+    return [index2word.get(word) for word in word_indices]
 
 
 def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0):
