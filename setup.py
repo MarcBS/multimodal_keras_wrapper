@@ -10,7 +10,6 @@ setup(name='Multimodal Keras Wrapper',
       url='https://github.com/MarcBS/multimodal_keras_wrapper',
       download_url='https://github.com/MarcBS/multimodal_keras_wrapper/archive/master.zip',
       install_requires=['scipy',
-                        'coco-caption',
                         'six',
                         'keras'],
       extras_require={
