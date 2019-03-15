@@ -190,6 +190,7 @@ def test_decode_predictions_one_hot():
     desired_preds = [u'This is text']
     assert desired_preds == decoded_preds
 
+
 # def test_decode_predictions():
 #     index2word = {
 #         0: u'<pad>',
@@ -213,7 +214,6 @@ def test_decode_predictions_one_hot():
 #     preds = np.array([[0.1, 0.2, 0.7, 0.1, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
 #                       [0.1, 0.2, 0.3, 0.7, 0.6, 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.],
 #                       [0., 0., 0., 0., 0., 1.0, 0., 0., 0., 0., 0., 0., 0., 0., 0.]])
-# 
 #     decoded_preds = decode_predictions(preds[:, :, None], temperature, index2word, 'max_likelihood')
 #     desired_preds = [u'This', u'is', u'text']
 #     assert desired_preds == decoded_preds
