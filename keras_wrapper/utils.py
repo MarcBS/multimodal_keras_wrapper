@@ -981,7 +981,7 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
                     for a in a_no]
             tmp = u' '.join(a_no[init_token_pos:end_token_pos])
         else:
-            tmp = a_no
+            tmp = a_no[:-1]
         answer_pred.append(tmp)
     return answer_pred
 
