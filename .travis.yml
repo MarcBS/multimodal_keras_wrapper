@@ -36,6 +36,8 @@ install:
   - travis_wait 30 conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
   - travis_wait 30 conda install mkl mkl-service
+  - pip install -e git+https://github.com/MarcBS/keras#egg=keras
+  - pip install -e git+https://github.com/lvapeab/coco-caption.git#egg=coco-caption
   - travis_wait 30 pip install -r requirements.txt
   - export PYTHONPATH=$PWD:$PWD/src:$PYTHONPATH
 
