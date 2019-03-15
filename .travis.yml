@@ -35,7 +35,7 @@ install:
   # Replace dep1 dep2 ... with your dependencies
   - travis_wait 30 conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
-  - travis_wait 30 conda install mkl mkl-service
+  - travis_wait 30 conda install mkl mkl-service tensorflow
   - pip install -e git+https://github.com/MarcBS/keras#egg=keras
   - pip install -e git+https://github.com/lvapeab/coco-caption.git#egg=coco-caption
   - travis_wait 30 pip install -r requirements.txt
