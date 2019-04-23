@@ -2556,7 +2556,7 @@ class Dataset(object):
         """
         if not self.BPE_built:
             raise Exception('Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"')
-        if isinstance(caption, str):
+        if isinstance(caption, str) and sys.version_info < (3, 0):
             caption = caption.decode('utf-8')
         tokenized = re.sub(u'[\n\t]+', u'', caption)
         tokenized = self.BPE.segment(tokenized).strip()
@@ -2617,7 +2617,7 @@ class Dataset(object):
             self.moses_tokenizer_built = False
         if not self.moses_tokenizer_built:
             self.build_moses_tokenizer(language=language)
-        if isinstance(caption, str):
+        if isinstance(caption, str) and sys.version_info < (3, 0):
             caption = caption.decode('utf-8')
         tokenized = re.sub(u'[\n\t]+', u'', caption)
         if lowercase:
@@ -2642,7 +2642,7 @@ class Dataset(object):
             self.moses_detokenizer_built = False
         if not self.moses_detokenizer_built:
             self.build_moses_detokenizer(language=language)
-        if isinstance(caption, str):
+        if isinstance(caption, str) and sys.version_info < (3, 0):
             caption = caption.decode('utf-8')
         tokenized = re.sub(u'[\n\t]+', u'', caption)
         if lowercase:
