@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 import copy
 import itertools
-import logging
 import sys
 import time
 from six import iteritems
-
 import numpy as np
+import logging
 
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 if sys.version_info.major == 2:
     from itertools import imap as map
 
@@ -152,7 +153,7 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01,
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (str(count + 1), str(n_combs), c, str(time.time() - t)))
+        logger.info('Built model %s/%s for classes %s in %0.5s seconds.' % (str(count + 1), str(n_combs), c, str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -197,7 +198,7 @@ def build_OneVsAllECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr):
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logging.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
+        logger.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
             str(count + 1), str(n_classes), '(' + str(c) + ' vs All)',
             str(time.time() - t)))
         count += 1
@@ -222,7 +223,7 @@ def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2
 
     count = 0
     n_pairs = len(pairs)
-    logging.info("Building " + str(n_pairs) + " classifiers...")
+    logger.info("Building " + str(n_pairs) + " classifiers...")
 
     for c in pairs:
         t = time.time()
@@ -253,7 +254,7 @@ def build_Specific_OneVsOneECOC_Stage(pairs, input_shape, ds, lr, ecoc_version=2
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
+        logger.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
             str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]),
             str(time.time() - t)))
         count += 1
@@ -308,7 +309,7 @@ def build_Specific_OneVsOneVsRestECOC_Stage(pairs, input_shape, ds, lr,
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
+        logger.info('Built model %s/%s for classes %s = %s in %0.5s seconds.' % (
             str(count + 1), str(n_pairs), c, (ds.classes[c[0]], ds.classes[c[1]]),
             str(time.time() - t)))
         count += 1
@@ -342,7 +343,7 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes,
     n_pairs = len(pairs)
     ecoc_table = np.zeros((n_classes, n_pairs, 2))
 
-    logging.info("Building " + str(n_pairs) + " OneVsOne structures...")
+    logger.info("Building " + str(n_pairs) + " OneVsOne structures...")
 
     for i, c in list(enumerate(pairs)):
         # t = time.time()
@@ -404,7 +405,7 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes,
                 raise NotImplementedError()
         outputs_list.append(output_name)
 
-        # logging.info('Built model %s/%s for classes %s = %s in %0.5s seconds.'%(str(i+1),
+        # logger.info('Built model %s/%s for classes %s = %s in %0.5s seconds.'%(str(i+1),
         #  str(n_pairs), c, (classes[c[0]], classes[c[1]]), str(time.time()-t)))
 
     ecoc_table = np.reshape(ecoc_table, [n_classes, 2 * n_pairs])
@@ -416,7 +417,7 @@ def build_Specific_OneVsOneECOC_loss_Stage(net, input_net, input_shape, classes,
     else:
         output_names = net.add_One_vs_One_Merge_Functional(outputs_list, n_classes,
                                                            activation=activations[1])
-    logging.info('Built ECOC merge layers.')
+    logger.info('Built ECOC merge layers.')
 
     return [ecoc_table, output_names]
 
@@ -477,7 +478,7 @@ def loadGoogleNetForFood101(nClasses=101,
     :param load_path:
     :return:
     """
-    logging.info('Loading GoogLeNet...')
+    logger.info('Loading GoogLeNet...')
 
     # Build model (loading the previously converted Caffe's model)
     googLeNet = Stage(nClasses, nClasses, [224, 224, 3], [nClasses],
@@ -727,7 +728,7 @@ def simplifyDataset(ds, id_classes, n_classes=50):
     :param n_classes:
     :return:
     """
-    logging.info("Simplifying %s from %d to %d classes." % (str(ds.name), len(ds.classes), n_classes))
+    logger.info("Simplifying %s from %d to %d classes." % (str(ds.name), len(ds.classes), n_classes))
     ds.classes[id_classes] = ds.classes[id_classes][:n_classes]
 
     id_labels = ds.ids_outputs[ds.types_outputs.index('categorical')]
@@ -859,7 +860,7 @@ def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     :return: List of convertedpredictions
     """
     if verbose > 0:
-        logging.info('Converting one hot prediction into indices...')
+        logger.info('Converting one hot prediction into indices...')
     preds = list(map(lambda x: np.argmax(x, axis=1), preds))
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
@@ -930,7 +931,7 @@ def decode_predictions_one_hot(preds, index2word, pad_sequences=True, verbose=0)
     :return: List of decoded predictions
     """
     if verbose > 0:
-        logging.info('Decoding one hot prediction ...')
+        logger.info('Decoding one hot prediction ...')
     preds = list(map(lambda prediction: np.argmax(prediction, axis=1), preds))
     PAD = '<pad>'
     flattened_answer_pred = [list(map(lambda index: index2word[index], pred)) for
@@ -961,7 +962,7 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     """
 
     if verbose > 0:
-        logging.info('Decoding prediction ...')
+        logger.info('Decoding prediction ...')
     flattened_preds = preds.reshape(-1, preds.shape[-1])
     flattened_answer_pred = list(map(lambda index: index2word[index], sampling(scores=flattened_preds,
                                                                                sampling_type=sampling_type,
@@ -995,7 +996,7 @@ def decode_categorical(preds, index2word, verbose=0):
     """
 
     if verbose > 0:
-        logging.info('Decoding prediction ...')
+        logger.info('Decoding prediction ...')
 
     word_indices = categorical_probas_to_classes(preds)
     return [index2word.get(word) for word in word_indices]
@@ -1013,7 +1014,7 @@ def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0
     """
 
     if verbose > 0:
-        logging.info('Decoding prediction ...')
+        logger.info('Decoding prediction ...')
 
     answer_pred = []
     probs_pred = []
@@ -1101,14 +1102,14 @@ def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None
     :return: List of decoded predictions
     """
     if verbose > 0:
-        logging.info('Decoding beam search prediction ...')
+        logger.info('Decoding beam search prediction ...')
 
     if alphas is not None:
         if x_text is None:
             raise AssertionError('When using POS_UNK, you must provide the input '
                                  'text to decode_predictions_beam_search!')
         if verbose > 0:
-            logging.info('Using heuristic %d' % heuristic)
+            logger.info('Using heuristic %d' % heuristic)
     if pad_sequences:
         preds = [pred[:sum([int(elem > 0) for elem in pred]) + 1] for pred in preds]
     flattened_predictions = [list(map(lambda x: index2word[x], pred)) for pred in

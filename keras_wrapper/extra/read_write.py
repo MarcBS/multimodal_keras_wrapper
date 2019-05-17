@@ -11,12 +11,15 @@ Modified by: Marc Bola\~nos
 from __future__ import print_function
 from six import iteritems
 import json
-import logging
 import os
 import codecs
 import numpy as np
 import tables
 import sys
+import logging
+
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 
 if sys.version_info.major == 3:
     import _pickle as pk
@@ -44,7 +47,7 @@ def create_dir_if_not_exists(directory):
     :return: None
     """
     if not os.path.exists(directory):
-        logging.info("<<< creating directory " + directory + " ... >>>")
+        logger.info("<<< creating directory " + directory + " ... >>>")
         os.makedirs(directory)
 
 
@@ -57,7 +60,7 @@ def clean_dir(directory):
 
     if os.path.exists(directory):
         import shutil
-        logging.warning('<<< Deleting directory: %s >>>' % directory)
+        logger.warning('<<< Deleting directory: %s >>>' % directory)
         shutil.rmtree(directory)
         os.makedirs(directory)
     else:

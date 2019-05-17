@@ -9,12 +9,15 @@ import numpy as np
 from keras_wrapper.dataset import Data_Batch_Generator
 from keras_wrapper.utils import one_hot_2_indices, checkParameters
 from keras_wrapper.search import beam_search
+
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 try:
     import cupy as cp
     cupy = True
 except:
     import numpy as cp
-    logging.info('<<< Cupy not available. Using numpy. >>>')
+    logger.info('<<< Cupy not available. Using numpy. >>>')
     cupy = False
 
 
@@ -36,7 +39,7 @@ class BeamSearchEnsemble:
         self.model_weights = np.asarray([1. / len(models)] * len(models), dtype='float32') if (model_weights is None) or (model_weights == []) else np.asarray(model_weights, dtype='float32')
         self._dynamic_display = ((hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()) or 'ipykernel' in sys.modules)
         if self.verbose > 0:
-            logging.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
+            logger.info('<<< "Optimized search: %s >>>' % str(self.optimized_search))
 
     # PREDICTION FUNCTIONS: Functions for making prediction on input samples
     def predict_cond_optimized(self, X, states_below, params, ii, prev_outs):
@@ -160,7 +163,7 @@ class BeamSearchEnsemble:
         params = checkParameters(self.params, default_params)
         predictions = dict()
         for s in params['predict_on_sets']:
-            logging.info("\n <<< Predicting outputs of " + s + " set >>>")
+            logger.info("\n <<< Predicting outputs of " + s + " set >>>")
             if len(params['model_inputs']) == 0:
                 raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
@@ -575,7 +578,7 @@ class BeamSearchEnsemble:
         scores_dict = dict()
 
         for s in params['predict_on_sets']:
-            logging.info("<<< Scoring outputs of " + s + " set >>>")
+            logger.info("<<< Scoring outputs of " + s + " set >>>")
             if len(params['model_inputs']) == 0:
                 raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
@@ -787,7 +790,7 @@ class BeamSearchEnsemble:
         """
         DEPRECATED, use predictBeamSearchNet() instead.
         """
-        logging.warning("Deprecated function, use predictBeamSearchNet() instead.")
+        logger.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet()
 
 
@@ -909,7 +912,7 @@ class PredictEnsemble:
         predictions = dict()
 
         for s in params['predict_on_sets']:
-            logging.info("\n <<< Predicting outputs of " + s + " set >>>")
+            logger.info("\n <<< Predicting outputs of " + s + " set >>>")
             if len(params['model_inputs']) == 0:
                 raise AssertionError('We need at least one input!')
             # Calculate how many interations are we going to perform
