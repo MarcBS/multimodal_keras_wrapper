@@ -6,8 +6,7 @@ from keras_wrapper.utils import average_models
 sys.path.insert(1, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath("../"))
 
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__).basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 
 
 def parse_args():
@@ -26,9 +25,9 @@ def parse_args():
 
 def weighted_average(args):
 
-    logging.info("Averaging %d models" % len(args.models))
+    logger.info("Averaging %d models" % len(args.models))
     average_models(args.models, args.dest, weights=args.weights)
-    logging.info('Averaging finished.')
+    logger.info('Averaging finished.')
 
 
 if __name__ == "__main__":

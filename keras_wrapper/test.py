@@ -9,6 +9,7 @@ from keras.layers import Dense
 from keras_wrapper.dataset import Dataset, saveDataset, loadDataset
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 
 
 def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, atol=1e-08, verbose=0):
@@ -18,10 +19,10 @@ def test_models_allclose(model, model_init=None, model_next=None, rtol=1e-05, at
         model_init = model.model_init
         model_next = model.model_next
         model = model.model
-    logging.info("Checking all models are close")
+    logger.info("Checking all models are close")
     model_names = map(str, model.weights)
     if model_init is None and model_next is None:
-        logging.warning("Checking of models_allclose won't be performed, because model_init and model_next are None")
+        logger.warning("Checking of models_allclose won't be performed, because model_init and model_next are None")
         return True
 
     if verbose > 0:
@@ -63,17 +64,17 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
         model2_next = model2.model_next
         model2 = model2.model
 
-    logging.info("Checking all models (from model 1) are close...")
+    logger.info("Checking all models (from model 1) are close...")
     if test_models_allclose(model1, model1_init, model1_next, rtol=rtol, atol=atol, verbose=verbose):
-        logging.info("All close")
+        logger.info("All close")
     else:
-        logging.info("Not close!")
+        logger.info("Not close!")
 
-    logging.info("Checking all models (from model 2) are close...")
+    logger.info("Checking all models (from model 2) are close...")
     if test_models_allclose(model2, model2_init, model2_next, rtol=rtol, atol=atol, verbose=verbose):
-        logging.info("All close")
+        logger.info("All close")
     else:
-        logging.info("Not close!")
+        logger.info("Not close!")
 
     model1_names = map(str, model1.weights)
     model2_names = map(str, model2.weights)
@@ -82,7 +83,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
         print ("===========================")
         print ("Checking model weights")
 
-    logging.info("Checking model_next 1 is close to model_next 2")
+    logger.info("Checking model_next 1 is close to model_next 2")
     if model1 is not None:
         model_next_names = map(str, model1.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
@@ -104,7 +105,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
     if verbose > 0:
         print ("Checking model next weights")
 
-    logging.info("Checking model_next 1 is close to model_next 2")
+    logger.info("Checking model_next 1 is close to model_next 2")
     if model1_next is not None:
         model_next_names = map(str, model1_next.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
@@ -126,7 +127,7 @@ def test_2models_allclose(model1, model2, rtol=1e-05, atol=1e-08, verbose=0):
     if verbose > 0:
         print ("Checking model init weights")
 
-    logging.info("Checking model_next 1 is close to model_next 2")
+    logger.info("Checking model_next 1 is close to model_next 2")
     if model1_init is not None:
         model_next_names = map(str, model1_init.weights)
         for (index_next, name) in list(enumerate(model_next_names)):
@@ -167,7 +168,7 @@ def main_test():
 
 def classifyFood101():
     from keras_wrapper.cnn_model import CNN_Model, loadModel, saveModel
-    logging.info('Defining CNN model and training it.')
+    logger.info('Defining CNN model and training it.')
 
     # Load food classification dataset
     dataset_name = 'Food101'
@@ -226,8 +227,8 @@ def classifyFood101():
     # Predict network on all sets
     test_params['predict_on_sets'] = ['val']
     predictions = net.predictNet(ds, test_params)
-    logging.info("Predicted %d samples." % (len(predictions)))
-    logging.info("Done")
+    logger.info("Predicted %d samples." % (len(predictions)))
+    logger.info("Done")
 
 
 #################################
@@ -237,7 +238,7 @@ def classifyFood101():
 #################################
 
 def loadFlickr8k():
-    logging.info('Loading Flickr8k dataset')
+    logger.info('Loading Flickr8k dataset')
 
     # Build basic dataset structure
     #    we assign it a name and the path were the images are stored
@@ -280,11 +281,11 @@ def loadFlickr8k():
 
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
-    logging.info('Sample data loaded correctly. %d input samples. %d output samples' % (len(X), len(Y)))
+    logger.info('Sample data loaded correctly. %d input samples. %d output samples' % (len(X), len(Y)))
 
 
 def loadMSVD():
-    logging.info('Loading MSVD dataset')
+    logger.info('Loading MSVD dataset')
 
     # Build basic dataset structure
     #    we assign it a name and the path were the images are stored
@@ -338,12 +339,12 @@ def loadMSVD():
 
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
-    logging.info('Sample data loaded correctly.')
+    logger.info('Sample data loaded correctly.')
 
 
 def loadFood101():
-    logging.info('Loading Food101 dataset')
-    logging.info(
+    logger.info('Loading Food101 dataset')
+    logger.info(
         'INFO: in order to load this dataset it must be placed in ../data/Food101/images/ after downloading it form https://www.vision.ee.ethz.ch/datasets_extra/food-101/')
 
     base_path = '../data/Food101/'
@@ -380,4 +381,4 @@ def loadFood101():
 
     # Lets recover the first batch of data
     [X, Y] = ds.getXY('train', 10)
-    logging.info('Sample data loaded correctly.')
+    logger.info('Sample data loaded correctly.')

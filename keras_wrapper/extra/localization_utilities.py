@@ -258,7 +258,6 @@ def getBBoxesFromCAMs(CAMs, reshape_size=None, percentage_heat=0.4, size_restric
 
     # Now apply NMS on all the obtained bboxes
     nms_threshold = 0.3
-    # logging.info('bboxes before NMS: '+str(len(predicted_scores)))
     if (len(predicted_scores) > 0):
         dets = np.hstack((np.array(predicted_bboxes), np.array(predicted_scores)[:, np.newaxis])).astype(np.float32)
         if (use_gpu):
@@ -271,7 +270,6 @@ def getBBoxesFromCAMs(CAMs, reshape_size=None, percentage_heat=0.4, size_restric
         for idet in range(dets.shape[0]):
             predicted_bboxes.append(dets[idet, :4])
             predicted_scores.append(dets[idet, -1])
-            # logging.info('bboxes after NMS: '+str(len(predicted_scores)))
 
     return [predicted_bboxes, predicted_scores]
 

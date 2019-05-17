@@ -13,6 +13,9 @@ from keras_wrapper.utils import decode_predictions_one_hot, \
     decode_predictions_beam_search, decode_predictions, \
     decode_multilabel
 
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
+
 
 def checkDefaultParamsBeamSearch(params):
     required_params = ['model_inputs',
@@ -269,12 +272,12 @@ class EvalPerformance(KerasCallback):
             return
         if epoch < self.start_eval_on_epoch:
             if self.verbose > 0:
-                logging.info('Not evaluating until end of epoch ' + str(
+                logger.info('Not evaluating until end of epoch ' + str(
                     self.start_eval_on_epoch))
             return
         elif (epoch - self.start_eval_on_epoch) % self.each_n_epochs != 0:
             if self.verbose > 0:
-                logging.info(
+                logger.info(
                     'Evaluating only every ' + str(self.each_n_epochs) + ' epochs')
             return
         self.evaluate(epoch, counter_name='epoch')
@@ -362,7 +365,7 @@ class EvalPerformance(KerasCallback):
 
                 if self.verbose > 0:
                     print('')
-                    logging.info('Prediction output ' + str(gt_pos) + ': ' + str(
+                    logger.info('Prediction output ' + str(gt_pos) + ': ' + str(
                         gt_id) + ' (' + str(type_out) + ')')
                 # Postprocess outputs of type text
                 if type_out == 'text':
@@ -497,11 +500,11 @@ class EvalPerformance(KerasCallback):
                 # Evaluate on each metric
                 for metric in these_metrics:
                     if self.verbose > 0:
-                        logging.info('Evaluating on metric ' + metric)
+                        logger.info('Evaluating on metric ' + metric)
                     filepath = self.save_path + '/' + s + '.' + metric  # results file
 
                     if s == 'train':
-                        logging.info(
+                        logger.info(
                             "WARNING: evaluation results on 'train' split might be incorrect when"
                             "applying random image shuffling.")
 
@@ -534,7 +537,7 @@ class EvalPerformance(KerasCallback):
                         f.write(line + '\n')
 
                     if self.verbose > 0:
-                        logging.info('Done evaluating on metric ' + metric)
+                        logger.info('Done evaluating on metric ' + metric)
 
         # Store losses
         if logs.get('loss') is not None:
@@ -606,16 +609,32 @@ StoreModelWeightsOnEpochEnd = StoreModel
 ###################################################
 
 class Sample(KerasCallback):
-    def __init__(self, model, dataset, gt_id, set_name, n_samples,
-                 each_n_updates=10000, extra_vars=None,
-                 is_text=False, index2word_x=None, index2word_y=None,
-                 input_text_id=None, print_sources=False,
-                 sampling='max_likelihood', temperature=1.,
-                 beam_search=False, beam_batch_size=None,
-                 batch_size=50, reload_epoch=0, start_sampling_on_epoch=0,
+    def __init__(self,
+                 model,
+                 dataset,
+                 gt_id,
+                 set_name,
+                 n_samples,
+                 each_n_updates=10000,
+                 extra_vars=None,
+                 is_text=False,
+                 index2word_x=None,
+                 index2word_y=None,
+                 input_text_id=None,
+                 print_sources=False,
+                 sampling='max_likelihood',
+                 temperature=1.,
+                 beam_search=False,
+                 beam_batch_size=None,
+                 batch_size=50,
+                 reload_epoch=0,
+                 start_sampling_on_epoch=0,
                  is_3DLabel=False,
-                 write_type='list', sampling_type='max_likelihood',
-                 out_pred_idx=None, in_pred_idx=None, verbose=1):
+                 write_type='list',
+                 sampling_type='max_likelihood',
+                 out_pred_idx=None,
+                 in_pred_idx=None,
+                 verbose=1):
         """
             :param model: model to evaluate
             :param dataset: instance of the class Dataset in keras_wrapper.dataset
@@ -867,15 +886,15 @@ class EarlyStopping(KerasCallback):
             self.best_score = current_score
             self.wait = 0
             if self.verbose > 0:
-                logging.info('---current best %s %s: %.3f' % (self.check_split, self.metric_check, current_score if not self.want_to_minimize else -current_score))
+                logger.info('---current best %s %s: %.3f' % (self.check_split, self.metric_check, current_score if not self.want_to_minimize else -current_score))
 
         # Stop training if performance has not improved for self.patience epochs
         elif self.patience > 0:
             self.wait += 1
-            logging.info('---bad counter: %d/%d' % (self.wait, self.patience))
+            logger.info('---bad counter: %d/%d' % (self.wait, self.patience))
             if self.wait >= self.patience:
                 if self.verbose > 0:
-                    logging.info(
+                    logger.info(
                         "---%s %d: early stopping. Best %s found at %s %d: %f" % (
                             str(counter_name), epoch, self.metric_check,
                             str(counter_name), self.best_epoch,
@@ -885,11 +904,19 @@ class EarlyStopping(KerasCallback):
 
 
 class LearningRateReducer(KerasCallback):
-    def __init__(self, initial_lr=1., reduce_rate=0.99, reduce_each_epochs=True,
-                 reduce_frequency=1, start_reduction_on_epoch=0,
-                 exp_base=0.5, half_life=50000, warmup_exp=-1.5,
-                 reduction_function='linear', epsilon=1e-11,
-                 min_lr=1e-9, verbose=1):
+    def __init__(self,
+                 initial_lr=1.,
+                 reduce_rate=0.99,
+                 reduce_each_epochs=True,
+                 reduce_frequency=1,
+                 start_reduction_on_epoch=0,
+                 exp_base=0.5,
+                 half_life=50000,
+                 warmup_exp=-1.5,
+                 reduction_function='linear',
+                 epsilon=1e-11,
+                 min_lr=1e-9,
+                 verbose=1):
         """
         Reduces learning rate during the training.
         Two different decays are implemented:
@@ -943,7 +970,7 @@ class LearningRateReducer(KerasCallback):
 
         if float(self.new_lr) <= self.epsilon:
             if self.verbose > 0:
-                logging.info('Learning rate too small, learning stops now')
+                logger.info('Learning rate too small, learning stops now')
             self.model.stop_training = True
 
     def on_batch_end(self, n_update, logs=None):
@@ -982,5 +1009,4 @@ class LearningRateReducer(KerasCallback):
         K.set_value(self.model.optimizer.lr, self.new_lr)
 
         if self.reduce_each_epochs and self.verbose > 0:
-            logging.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr),
-                                                                         float(self.new_lr)))
+            logger.info("LR reduction from {0:0.6f} to {1:0.6f}".format(float(lr), float(self.new_lr)))
