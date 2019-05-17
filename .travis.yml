@@ -3,7 +3,7 @@ dist: trusty
 language: python
 matrix:
     include:
-        - python: 2.7
+        - python: 3.6
           env: TEST_MODE=PEP8
         - python: 2.7
           env: TEST_MODE=GENERAL
@@ -35,9 +35,9 @@ install:
   # Replace dep1 dep2 ... with your dependencies
   - travis_wait 30 conda create --quiet -n test-environment python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
-  - travis_wait 30 conda install tensorflow=*=mkl* --quiet
+  - travis_wait 30 conda install tensorflow=*=mkl* pytables --quiet
   - pip install -e git+https://github.com/MarcBS/keras#egg=keras --progress-bar off
-  - pip install pyux pandas flaky Pillow theano --progress-bar off
+  - pip install pyux pandas flaky Pillow theano pytest pytest-cache pytest-cov pytest-forked pytest-pep8 pytest-xdist --progress-bar off
   - pip install -e git+https://github.com/lvapeab/coco-caption.git#egg=coco-caption --progress-bar off
   - travis_wait 30 pip install -r requirements.txt --progress-bar off
   - export PYTHONPATH=$PWD:$PWD/src:$PYTHONPATH
