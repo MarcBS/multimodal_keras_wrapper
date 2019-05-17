@@ -28,6 +28,7 @@ from .utils import MultiprocessQueue
 import multiprocessing
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------- #
 #       SAVE/LOAD
@@ -46,12 +47,12 @@ def saveDataset(dataset, store_path):
     create_dir_if_not_exists(store_path)
     store_path = store_path + '/Dataset_' + dataset.name + '.pkl'
     if not dataset.silence:
-        logging.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
+        logger.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
 
     pk.dump(dataset, open(store_path, 'wb'), protocol=-1)
 
     if not dataset.silence:
-        logging.info("<<< Dataset instance saved >>>")
+        logger.info("<<< Dataset instance saved >>>")
 
 
 def loadDataset(dataset_path):
@@ -62,13 +63,20 @@ def loadDataset(dataset_path):
     :return: Loaded Dataset object
     """
 
-    logging.info("<<< Loading Dataset instance from " + dataset_path + " ... >>>")
+    logger.info("<<< Loading Dataset instance from " + dataset_path + " ... >>>")
     if sys.version_info.major == 3:
-        dataset = pk.load(open(dataset_path, 'rb'), encoding='latin1')
+        dataset = pk.load(open(dataset_path, 'rb'), encoding='utf-8')
     else:
         dataset = pk.load(open(dataset_path, 'rb'))
 
-    logging.info("<<< Dataset instance loaded >>>")
+    if not hasattr(dataset, 'pad_symbol'):
+        dataset.pad_symbol = '<pad>'
+    if not hasattr(dataset, 'unk_symbol'):
+        dataset.unk_symbol = '<unk>'
+    if not hasattr(dataset, 'null_symbol'):
+        dataset.null_symbol = '<null>'
+
+    logger.info("<<< Dataset instance loaded >>>")
     return dataset
 
 
@@ -77,7 +85,7 @@ def loadDataset(dataset_path):
 # ------------------------------------------------------- #
 
 def dataLoad(process_name, net, dataset, max_queue_len, queues):
-    logging.info("Starting " + process_name + "...")
+    logger.info("Starting " + process_name + "...")
     in_queue, out_queue = queues
 
     while True:
@@ -800,7 +808,7 @@ class Dataset(object):
         Applies a random shuffling to the training samples.
         """
         if not self.silence:
-            logging.info("Shuffling training samples.")
+            logger.info("Shuffling training samples.")
 
         # Shuffle
         num = self.len_train
@@ -814,7 +822,7 @@ class Dataset(object):
             self.Y_train[sample_id] = [self.Y_train[sample_id][s] for s in shuffled_order]
 
         if not self.silence:
-            logging.info("Shuffling training done.")
+            logger.info("Shuffling training done.")
 
     def keepTopOutputs(self, set_name, id_out, n_top):
         self.__checkSetName(set_name)
@@ -823,7 +831,7 @@ class Dataset(object):
             raise Exception("The parameter 'id_out' must specify a valid id for an output of the dataset.\n"
                             "Error produced because parameter %s was not in %s" % (id_out, self.ids_outputs))
 
-        logging.info('Keeping top ' + str(n_top) + ' outputs from the ' + set_name + ' set and removing the rest.')
+        logger.info('Keeping top ' + str(n_top) + ' outputs from the ' + set_name + ' set and removing the rest.')
 
         # Sort outputs by number of occurrences
         samples = None
@@ -853,7 +861,7 @@ class Dataset(object):
         setattr(self, 'len_' + set_name, new_len)
         self.__checkLengthSet(set_name)
 
-        logging.info(str(new_len) + ' samples remaining after removal.')
+        logger.info(str(new_len) + ' samples remaining after removal.')
 
     # ------------------------------------------------------- #
     #       GENERAL SETTERS
@@ -921,7 +929,7 @@ class Dataset(object):
         setattr(self, 'loaded_raw_' + set_name, aux_list)
         del aux_list
         if not self.silence:
-            logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
+            logger.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
     def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
                  overwrite_split=False, normalization_types=None, data_augmentation_types=None,
@@ -1092,7 +1100,7 @@ class Dataset(object):
                 self.__checkLengthSet(set_name)
 
         if not self.silence:
-            logging.info(
+            logger.info(
                 'Loaded "' + set_name + '" set inputs of data_type "' + data_type + '" with data_id "' + data_id + '" and length ' + str(getattr(self, 'len_' + set_name)) + '.')
 
     def replaceInput(self, data, set_name, data_type, data_id):
@@ -1116,7 +1124,7 @@ class Dataset(object):
         elif id not in keys_X_set:
             raise Exception('An input with id "' + id + '" does not exist in the Database.')
         if not self.silence:
-            logging.info('Removed "' + set_name + '" set input of type "' + type + '" with id "' + id + '.')
+            logger.info('Removed "' + set_name + '" set input of type "' + type + '" with id "' + id + '.')
 
     def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False,
                      add_additional=False):
@@ -1167,7 +1175,7 @@ class Dataset(object):
         del aux_list
 
         if not self.silence:
-            logging.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
+            logger.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
     def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
                   add_additional=False, sample_weights=False, label_smoothing=0.,
@@ -1305,7 +1313,7 @@ class Dataset(object):
             self.__checkLengthSet(set_name)
 
         if not self.silence:
-            logging.info(
+            logger.info(
                 'Loaded "' + set_name + '" set outputs of data_type "' + data_type + '" with data_id "' + data_id + '" and length ' + str(getattr(self, 'len_' + set_name)) + '.')
 
     def removeOutput(self, set_name, id='label', type='categorical'):
@@ -1323,7 +1331,7 @@ class Dataset(object):
         elif id not in keys_Y_set:
             raise Exception('An output with id "' + id + '" does not exist in the Database.')
         if not self.silence:
-            logging.info('Removed "' + set_name + '" set output with id "' + id + '.')
+            logger.info('Removed "' + set_name + '" set output with id "' + id + '.')
 
     # ------------------------------------------------------- #
     #       TYPE 'categorical' SPECIFIC FUNCTIONS
@@ -1358,7 +1366,7 @@ class Dataset(object):
             self.dic_classes[data_id][self.classes[data_id][c]] = c
 
         if not self.silence:
-            logging.info('Loaded classes list with ' + str(len(self.dic_classes[data_id])) + " different labels.")
+            logger.info('Loaded classes list with ' + str(len(self.dic_classes[data_id])) + " different labels.")
 
     def preprocessCategorical(self, labels_list, data_id, sample_weights=False):
         """
@@ -1617,7 +1625,7 @@ class Dataset(object):
                     self.build_bpe(bpe_codes, separator)
                 tokfun = eval('self.' + tokenization)
                 if not self.silence:
-                    logging.info('\tApplying tokenization function: "' + tokenization + '".')
+                    logger.info('\tApplying tokenization function: "' + tokenization + '".')
             else:
                 raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
@@ -1639,7 +1647,7 @@ class Dataset(object):
                 self.vocabulary[data_id] = self.vocabulary[build_vocabulary]
                 self.vocabulary_len[data_id] = self.vocabulary_len[build_vocabulary]
                 if not self.silence:
-                    logging.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with data_id "' + data_id + '".')
+                    logger.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with data_id "' + data_id + '".')
             else:
                 raise Exception('The parameter "build_vocabulary" must be a boolean '
                                 'or a str containing an data_id of the vocabulary we want to copy.\n'
@@ -1648,7 +1656,7 @@ class Dataset(object):
         elif isinstance(build_vocabulary, dict):
             self.vocabulary[data_id] = build_vocabulary
             if not self.silence:
-                logging.info('\tReusing vocabulary from dictionary for data with data_id "' + data_id + '".')
+                logger.info('\tReusing vocabulary from dictionary for data with data_id "' + data_id + '".')
 
         if data_id not in self.vocabulary:
             raise Exception('The dataset must include a vocabulary with data_id "' + data_id +
@@ -1710,7 +1718,7 @@ class Dataset(object):
                     self.build_bpe(bpe_codes, separator)
                 tokfun = eval('self.' + tokenization)
                 if not self.silence:
-                    logging.info('\tApplying tokenization function: "' + tokenization + '".')
+                    logger.info('\tApplying tokenization function: "' + tokenization + '".')
             else:
                 raise Exception('Tokenization procedure "' + tokenization + '" is not implemented.')
 
@@ -1731,7 +1739,7 @@ class Dataset(object):
                 self.vocabulary[data_id] = self.vocabulary[build_vocabulary]
                 self.vocabulary_len[data_id] = self.vocabulary_len[build_vocabulary]
                 if not self.silence:
-                    logging.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with data_id "' + data_id + '".')
+                    logger.info('\tReusing vocabulary named "' + build_vocabulary + '" for data with data_id "' + data_id + '".')
             else:
                 raise Exception('The parameter "build_vocabulary" must be a boolean '
                                 'or a str containing an data_id of the vocabulary we want to copy.\n'
@@ -1740,7 +1748,7 @@ class Dataset(object):
         elif isinstance(build_vocabulary, dict):
             self.vocabulary[data_id] = build_vocabulary
             if not self.silence:
-                logging.info('\tReusing vocabulary from dictionary for data with data_id "' + data_id + '".')
+                logger.info('\tReusing vocabulary from dictionary for data with data_id "' + data_id + '".')
 
         if data_id not in self.vocabulary:
             raise Exception('The dataset must include a vocabulary with data_id "' + data_id +
@@ -1803,7 +1811,7 @@ class Dataset(object):
         :return: None.
         """
         if not self.silence:
-            logging.info("Creating vocabulary for data with data_id '" + data_id + "'.")
+            logger.info("Creating vocabulary for data with data_id '" + data_id + "'.")
 
         counters = []
         sentence_counts = []
@@ -1818,14 +1826,14 @@ class Dataset(object):
             sentence_count += 1
 
         if not do_split and not self.silence:
-            logging.info('Using whole sentence as a single word.')
+            logger.info('Using whole sentence as a single word.')
 
         counters.append(counter)
         sentence_counts.append(sentence_count)
         combined_counter = reduce(add, counters)
         if not self.silence:
-            logging.info("\t Total: %d unique words in %d sentences with a total of %d words." %
-                         (len(combined_counter), sum(sentence_counts), sum(list(combined_counter.values()))))
+            logger.info("\t Total: %d unique words in %d sentences with a total of %d words." %
+                        (len(combined_counter), sum(sentence_counts), sum(list(combined_counter.values()))))
 
         # keep only words with less than 'min_occ' occurrences
         if min_occ > 1:
@@ -1835,8 +1843,8 @@ class Dataset(object):
                     del combined_counter[k]
                     removed += 1
             if not self.silence:
-                logging.info("\t Removed %d words with less than %d occurrences. New total: %d." %
-                             (removed, min_occ, len(combined_counter)))
+                logger.info("\t Removed %d words with less than %d occurrences. New total: %d." %
+                            (removed, min_occ, len(combined_counter)))
 
         # keep only top 'n_words'
         if n_words > 0:
@@ -1845,14 +1853,11 @@ class Dataset(object):
             else:
                 vocab_count = combined_counter.most_common(n_words)
             if not self.silence:
-                logging.info("Creating dictionary of %s most common words, covering "
-                             "%2.1f%% of the text."
-                             % (n_words,
-                                100.0 * sum([count for word, count in vocab_count]) /
-                                sum(list(combined_counter.values()))))
+                logger.info("Creating dictionary of %s most common words, covering %2.1f%% of the text."
+                            % (n_words, 100.0 * sum([count for word, count in vocab_count]) / sum(list(combined_counter.values()))))
         else:
             if not self.silence:
-                logging.info("Creating dictionary of all words")
+                logger.info("Creating dictionary of all words")
             vocab_count = counter.most_common()
 
         dictionary = {}
@@ -1872,7 +1877,7 @@ class Dataset(object):
                 dictionary[w] = k
         elif use_unk_class:
             if not self.silence:
-                logging.info("\tAdding an additional unknown class")
+                logger.info("\tAdding an additional unknown class")
             dictionary[self.unk_symbol] = self.extra_words[self.unk_symbol]
 
         # Store dictionary and append to previously existent if needed.
@@ -1902,8 +1907,8 @@ class Dataset(object):
             self.vocabulary[data_id]['idx2words'] = inv_dictionary
 
             if not self.silence:
-                logging.info('Appending ' + str(added) + ' words to dictionary with data_id "' + data_id + '".')
-                logging.info('\tThe new total is ' + str(self.vocabulary_len[data_id]) + '.')
+                logger.info('Appending ' + str(added) + ' words to dictionary with data_id "' + data_id + '".')
+                logger.info('\tThe new total is ' + str(self.vocabulary_len[data_id]) + '.')
 
     def merge_vocabularies(self, ids):
         """
@@ -1915,7 +1920,7 @@ class Dataset(object):
         if not isinstance(ids, list):
             raise AssertionError('ids must be a list of inputs/outputs identifiers of type text')
         if not self.silence:
-            logging.info('Merging vocabularies of the following ids: ' + str(ids))
+            logger.info('Merging vocabularies of the following ids: ' + str(ids))
 
         # Pick the first vocabulary as reference
         vocab_ref = self.vocabulary[ids[0]]['words2idx']
@@ -1943,7 +1948,7 @@ class Dataset(object):
             self.vocabulary_len[ids[i]] = self.vocabulary_len[ids[0]]
 
         if not self.silence:
-            logging.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
+            logger.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
 
     def build_bpe(self, codes, merges=-1, separator=u'@@', vocabulary=None, glossaries=None):
         """
@@ -2129,9 +2134,9 @@ class Dataset(object):
                 logging.disable(logging.NOTSET)
                 labeled_im = misc.imresize(labeled_im, (h, w))
             except Exception:
-                logging.info(labeled_im)
-                logging.warning("WARNING!")
-                logging.warning("Can't load image " + labeled_im)
+                logger.info(labeled_im)
+                logger.warning("WARNING!")
+                logger.warning("Can't load image " + labeled_im)
                 labeled_im = np.zeros((h, w))
 
             label3D = np.zeros((nClasses, h, w), dtype=np.float32)
@@ -2421,13 +2426,13 @@ class Dataset(object):
         :return: None
         """
         if not self.silence:
-            logging.info("Loading source -- target mapping.")
+            logger.info("Loading source -- target mapping.")
         if sys.version_info.major == 3:
             self.mapping = pk.load(open(path_list, 'rb'), encoding='utf-8')
         else:
             self.mapping = pk.load(open(path_list, 'rb'))
         if not self.silence:
-            logging.info("Source -- target mapping loaded with a total of %d words." % len(list(self.mapping)))
+            logger.info("Source -- target mapping loaded with a total of %d words." % len(list(self.mapping)))
 
     # ------------------------------------------------------- #
     #       Tokenizing functions
@@ -2907,7 +2912,7 @@ class Dataset(object):
     @staticmethod
     def preprocessIDs(path_list, data_id, set_name):
 
-        logging.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
+        logger.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
         if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of IDs
             data = []
             with codecs.open(path_list, 'r', encoding='utf-8') as list_:
@@ -2986,7 +2991,7 @@ class Dataset(object):
                             'It currently is: %s' % str(path_classes))
 
         if not self.silence:
-            logging.info('Loaded semantic classes list for data with data_id: ' + data_id)
+            logger.info('Loaded semantic classes list for data with data_id: ' + data_id)
 
     def load_GT_3DSemanticLabels(self, gt, data_id):
         """
@@ -3042,8 +3047,8 @@ class Dataset(object):
                 logging.disable(logging.NOTSET)
                 labeled_im = misc.imresize(labeled_im, (h, w))
             except Exception:
-                logging.warning("WARNING!")
-                logging.warning("Can't load image " + labeled_im)
+                logger.warning("WARNING!")
+                logger.warning("Can't load image " + labeled_im)
                 labeled_im = np.zeros((h, w))
 
             label3D = np.zeros((nClasses, h, w), dtype=np.float32)
@@ -3291,7 +3296,7 @@ class Dataset(object):
 
         if isinstance(mean_image, str):
             if not self.silence:
-                logging.info("Loading train mean image from file.")
+                logger.info("Loading train mean image from file.")
             mean_image = misc.imread(mean_image)
         elif isinstance(mean_image, list):
             mean_image = np.array(mean_image, np.float64)
@@ -3304,19 +3309,19 @@ class Dataset(object):
             # if not use_RGB:
             #     if len(self.train_mean[data_id].shape) == 1:
             #         if not self.silence:
-            #             logging.info("Converting input train mean pixels into mean image.")
+            #             logger.info("Converting input train mean pixels into mean image.")
             #         mean_image = np.zeros(tuple(self.img_size_crop[data_id]), np.float64)
             #         mean_image[:, :] = self.train_mean[data_id]
             #         self.train_mean[data_id] = mean_image
             if len(self.train_mean[data_id].shape) == 1 and self.train_mean[data_id].shape[0] == self.img_size_crop[data_id][2]:
                 if not self.silence:
-                    logging.info("Converting input train mean pixels into mean image.")
+                    logger.info("Converting input train mean pixels into mean image.")
                 mean_image = np.zeros(tuple(self.img_size_crop[data_id]), np.float64)
                 for c in range(self.img_size_crop[data_id][2]):
                     mean_image[:, :, c] = self.train_mean[data_id][c]
                 self.train_mean[data_id] = mean_image
             else:
-                logging.warning(
+                logger.warning(
                     "The loaded training mean size does not match the desired images size.\n"
                     "Change the images size with setImageSize(size) or "
                     "recalculate the training mean with calculateTrainMean().")
@@ -3333,12 +3338,12 @@ class Dataset(object):
         elif self.train_mean[data_id].shape != tuple(self.img_size[data_id]):
             calculate = True
             if not self.silence:
-                logging.warning(
+                logger.warning(
                     "The loaded training mean size does not match the desired images size. Recalculating mean...")
 
         if calculate:
             if not self.silence:
-                logging.info("Start training set mean calculation...")
+                logger.info("Start training set mean calculation...")
 
             I_sum = np.zeros(self.img_size_crop[data_id], dtype=np.float64)
 
@@ -3376,7 +3381,7 @@ class Dataset(object):
             # self.train_mean[data_id] = self.train_mean[data_id].astype(np.float32)/255.0
 
             if not self.silence:
-                logging.info("Image mean stored in " + store_path)
+                logger.info("Image mean stored in " + store_path)
 
         # Return the mean
         return self.train_mean[data_id]
@@ -3482,8 +3487,8 @@ class Dataset(object):
                     logging.disable(logging.NOTSET)
 
                 except Exception:
-                    logging.warning("WARNING!")
-                    logging.warning("Can't load image " + im)
+                    logger.warning("WARNING!")
+                    logger.warning("Can't load image " + im)
                     im = np.zeros(tuple(self.img_size[data_id]))
 
             # Convert to RGB
@@ -3603,11 +3608,11 @@ class Dataset(object):
                     try:
                         im = im[left[0]:right[0], left[1]:right[1], :]
                     except Exception:
-                        logging.error('------- ERROR -------')
-                        logging.error(left)
-                        logging.error(right)
-                        logging.error(im.shape)
-                        logging.error(imname)
+                        logger.error('------- ERROR -------')
+                        logger.error(left)
+                        logger.error(right)
+                        logger.error(im.shape)
+                        logger.error(imname)
                         raise Exception('Error with image ' + imname)
 
                 # Randomly flip (with a certain probability)
@@ -4683,19 +4688,19 @@ class Dataset(object):
         """
         if split is None:
             split = [0.8, 0.1, 0.1]
-        logging.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
+        logger.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
         self.setInput(path_list, split, type=type, id=id)
 
     def setList(self, path_list, set_name, type='raw-image', id='image'):
         """
         DEPRECATED
         """
-        logging.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
+        logger.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
         self.setInput(path_list, set_name, type, id)
 
     def setLabels(self, labels_list, set_name, type='categorical', id='label'):
         """
             DEPRECATED
         """
-        logging.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
+        logger.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
         self.setOutput(labels_list, set_name, type=type, id=id)

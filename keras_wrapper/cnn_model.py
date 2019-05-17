@@ -7,13 +7,13 @@ import sys
 import time
 import logging
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 
 if sys.version_info.major == 3:
     import _pickle as pk
 else:
     import cPickle as pk
 import cloudpickle as cloudpk
-import matplotlib as mpl
 import keras
 from keras.engine.training import Model
 from keras.layers import concatenate, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Dense, Dropout, Flatten, Input, \
@@ -35,7 +35,7 @@ try:
     import cupy as cp
 except:
     import numpy as cp
-    logging.info('<<< Cupy not available. Using numpy. >>>')
+    logger.info('<<< Cupy not available. Using numpy. >>>')
 
 if int(keras.__version__.split('.')[0]) == 1:
     from keras.layers import Concat as Concatenate
@@ -45,9 +45,6 @@ else:
     from keras.layers import Concatenate
     from keras.layers import Conv2D
     from keras.layers import Conv2DTranspose
-
-mpl.use('Agg')  # run matplotlib without X server (GUI)
-import matplotlib.pyplot as plt
 
 
 # ------------------------------------------------------- #
@@ -83,7 +80,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
             model_name = path + '/epoch_' + iteration
 
     if not model_wrapper.silence:
-        logging.info("<<< Saving model to " + model_name + " ... >>>")
+        logger.info("<<< Saving model to " + model_name + " ... >>>")
 
     # Create models dir
     if not os.path.isdir(path):
@@ -93,7 +90,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     try:  # Try to save model at one time
         model_wrapper.model.save(model_name + '.h5')
     except Exception as e:  # Split saving in model structure / weights
-        logging.info(str(e))
+        logger.info(str(e))
         # Save model structure
         json_string = model_wrapper.model.to_json()
         open(model_name + '_structure.json', 'w').write(json_string)
@@ -105,9 +102,9 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         try:  # Try to save model at one time
             model_wrapper.model_init.save(model_name + '_init.h5')
         except Exception as e:  # Split saving in model structure / weights
-            logging.info(str(e))
+            logger.info(str(e))
             # Save model structure
-            logging.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
+            logger.info("<<< Saving model_init to " + model_name + "_structure_init.json... >>>")
             json_string = model_wrapper.model_init.to_json()
             open(model_name + '_structure_init.json', 'w').write(json_string)
             # Save model weights
@@ -117,9 +114,9 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         try:  # Try to save model at one time
             model_wrapper.model_next.save(model_name + '_next.h5')
         except Exception as e:  # Split saving in model structure / weights
-            logging.info(str(e))
+            logger.info(str(e))
             # Save model structure
-            logging.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
+            logger.info("<<< Saving model_next to " + model_name + "_structure_next.json... >>>")
             json_string = model_wrapper.model_next.to_json()
             open(model_name + '_structure_next.json', 'w').write(json_string)
             # Save model weights
@@ -135,7 +132,7 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
     setattr(model_wrapper, 'multi_gpu_model', backup_multi_gpu_model)
 
     if not model_wrapper.silence:
-        logging.info("<<< Model saved >>>")
+        logger.info("<<< Model saved >>>")
 
 
 def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile_model=False):
@@ -163,14 +160,14 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         else:
             model_name = model_path + "/update_" + iteration
 
-    logging.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
+    logger.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
     try:
-        logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
+        logger.info("<<< Loading model from " + model_name + ".h5 ... >>>")
         model = load_model(model_name + '.h5', custom_objects=custom_objects, compile=compile_model)
     except Exception as e:
-        logging.info(str(e))
+        logger.info(str(e))
         # Load model structure
-        logging.info("<<< Loading model from " + model_name + "_structure.json' ... >>>")
+        logger.info("<<< Loading model from " + model_name + "_structure.json' ... >>>")
         model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
         # Load model weights
         model.load_weights(model_name + '_weights.h5')
@@ -186,19 +183,19 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         loading_optimized = 0
 
     if loading_optimized == 1:
-        logging.info("<<< Loading optimized model... >>>")
+        logger.info("<<< Loading optimized model... >>>")
         model_init = load_model(model_name + '_init.h5', custom_objects=custom_objects, compile=False)
         model_next = load_model(model_name + '_next.h5', custom_objects=custom_objects, compile=False)
 
     elif loading_optimized == 2:
         # Load model structure
-        logging.info("\t <<< Loading model_init from " + model_name + "_structure_init.json ... >>>")
+        logger.info("\t <<< Loading model_init from " + model_name + "_structure_init.json ... >>>")
         model_init = model_from_json(open(model_name + '_structure_init.json').read(),
                                      custom_objects=custom_objects)
         # Load model weights
         model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
-        logging.info("\t <<< Loading model_next from " + model_name + "_structure_next.json ... >>>")
+        logger.info("\t <<< Loading model_next from " + model_name + "_structure_next.json ... >>>")
         model_next = model_from_json(open(model_name + '_structure_next.json').read(), custom_objects=custom_objects)
         # Load model weights
         model_next.load_weights(model_name + '_weights_next.h5')
@@ -211,7 +208,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
             model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
     except Exception as e:
         # try:
-        logging.info(str(e))
+        logger.info(str(e))
         if sys.version_info.major == 3:
             model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'), encoding='latin1')
         else:
@@ -226,11 +223,11 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     if loading_optimized != 0:
         model_wrapper.model_init = model_init
         model_wrapper.model_next = model_next
-        logging.info("<<< Optimized model loaded. >>>")
+        logger.info("<<< Optimized model loaded. >>>")
     else:
         model_wrapper.model_init = None
         model_wrapper.model_next = None
-    logging.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time() - t))
+    logger.info("<<< Model loaded in %0.6s seconds. >>>" % str(time.time() - t))
     return model_wrapper
 
 
@@ -255,16 +252,16 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
         else:
             model_path = model_path + "/update_" + iteration
 
-    logging.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
+    logger.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
     try:
-        logging.info("<<< Updating model from " + model_path + ".h5 ... >>>")
+        logger.info("<<< Updating model from " + model_path + ".h5 ... >>>")
         model.model.set_weights(load_model(model_path + '.h5', compile=False).get_weights())
 
     except Exception as e:
-        logging.info(str(e))
+        logger.info(str(e))
         # Load model structure
-        logging.info("<<< Failed -> Loading model from " + model_path + "_weights.h5' ... >>>")
+        logger.info("<<< Failed -> Loading model from " + model_path + "_weights.h5' ... >>>")
         # Load model weights
         model.model.load_weights(model_path + '_weights.h5')
 
@@ -277,21 +274,21 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
         loading_optimized = 0
 
     if loading_optimized != 0:
-        logging.info("<<< Updating optimized model... >>>")
+        logger.info("<<< Updating optimized model... >>>")
         if loading_optimized == 1:
-            logging.info("\t <<< Updating model_init from " + model_path + "_init.h5 ... >>>")
+            logger.info("\t <<< Updating model_init from " + model_path + "_init.h5 ... >>>")
             model.model_init.set_weights(load_model(model_path + '_init.h5', compile=False).get_weights())
-            logging.info("\t <<< Updating model_next from " + model_path + "_next.h5 ... >>>")
+            logger.info("\t <<< Updating model_next from " + model_path + "_next.h5 ... >>>")
             model.model_next.set_weights(load_model(model_path + '_next.h5', compile=False).get_weights())
         elif loading_optimized == 2:
-            logging.info("\t <<< Updating model_init from " + model_path + "_structure_init.json ... >>>")
+            logger.info("\t <<< Updating model_init from " + model_path + "_structure_init.json ... >>>")
             model.model_init.load_weights(model_path + '_weights_init.h5')
             # Load model structure
-            logging.info("\t <<< Updating model_next from " + model_path + "_structure_next.json ... >>>")
+            logger.info("\t <<< Updating model_next from " + model_path + "_structure_next.json ... >>>")
             # Load model weights
             model.model_next.load_weights(model_path + '_weights_next.h5')
 
-    logging.info("<<< Model updated in %0.6s seconds. >>>" % str(time.time() - t))
+    logger.info("<<< Model updated in %0.6s seconds. >>>" % str(time.time() - t))
     return model
 
 
@@ -305,7 +302,7 @@ def transferWeights(old_model, new_model, layers_mapping):
     :return: new model with weights transferred
     """
 
-    logging.info("<<< Transferring weights from models. >>>")
+    logger.info("<<< Transferring weights from models. >>>")
 
     old_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in list(enumerate(old_model.model.layers))])
     new_layer_dict = dict([(layer.name, [layer, idx]) for idx, layer in list(enumerate(new_model.model.layers))])
@@ -333,14 +330,14 @@ def transferWeights(old_model, new_model, layers_mapping):
             # Alert for any weight matrix not inserted to new model
             for pos_old, wo in list(enumerate(old)):
                 if pos_old not in list(mapping_weights.values()):
-                    logging.info('  Pre-trained weight matrix of layer "' + lold +
-                                 '" with dimensions ' + str(wo.shape) + ' can not be inserted to new model.')
+                    logger.info('  Pre-trained weight matrix of layer "' + lold +
+                                '" with dimensions ' + str(wo.shape) + ' can not be inserted to new model.')
 
             # Alert for any weight matrix not modified
             for pos_new, wn in list(enumerate(new)):
                 if pos_new not in list(mapping_weights):
-                    logging.info('  New model weight matrix of layer "' + lnew +
-                                 '" with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
+                    logger.info('  New model weight matrix of layer "' + lnew +
+                                '" with dimensions ' + str(wn.shape) + ' can not be loaded from pre-trained model.')
 
             # Transfer weights for each layer
             for new_idx, old_idx in iteritems(mapping_weights):
@@ -348,9 +345,9 @@ def transferWeights(old_model, new_model, layers_mapping):
             new_model.model.layers[new_layer_dict[lnew][1]].set_weights(new)
 
         else:
-            logging.info('Can not apply weights transfer from "' + lold + '" to "' + lnew + '"')
+            logger.info('Can not apply weights transfer from "' + lold + '" to "' + lnew + '"')
 
-    logging.info("<<< Weights transferred successfully. >>>")
+    logger.info("<<< Weights transferred successfully. >>>")
 
     return new_model
 
@@ -489,14 +486,14 @@ class Model_Wrapper(object):
             if structure_path:
                 # Load a .json model
                 if not self.silence:
-                    logging.info("<<< Loading model structure from file " + structure_path + " >>>")
+                    logger.info("<<< Loading model structure from file " + structure_path + " >>>")
                 self.model = model_from_json(open(structure_path).read())
 
             else:
                 # Build model from scratch
                 if hasattr(self, model_type):
                     if not self.silence:
-                        logging.info("<<< Building " + model_type + " Model_Wrapper >>>")
+                        logger.info("<<< Building " + model_type + " Model_Wrapper >>>")
                     eval('self.' + model_type + '(nOutput, input_shape)')
                 else:
                     raise Exception('Model_Wrapper model_type "' + model_type + '" is not implemented.')
@@ -504,7 +501,7 @@ class Model_Wrapper(object):
             # Load weights from file
             if weights_path:
                 if not self.silence:
-                    logging.info("<<< Loading weights from file " + weights_path + " >>>")
+                    logger.info("<<< Loading weights from file " + weights_path + " >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
 
     def updateLogger(self, force=False):
@@ -719,10 +716,10 @@ class Model_Wrapper(object):
             elif optimizer.lower() == 'rmsprop':
                 optimizer = TFOptimizer(tf.train.RMSPropOptimizer(lr, decay=decay, momentum=momentum, epsilon=epsilon))
             elif optimizer.lower() == 'nadam':
-                logging.warning('The Nadam optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                logger.warning('The Nadam optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
                 optimizer = Nadam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
             elif optimizer.lower() == 'adamax':
-                logging.warning('The Adamax optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
+                logger.warning('The Adamax optimizer is not natively implemented in Tensorflow. Using Keras optimizer.')
                 optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
             elif optimizer.lower() == 'adadelta':
                 optimizer = TFOptimizer(tf.train.AdadeltaOptimizer(learning_rate=lr, epsilon=epsilon))
@@ -748,7 +745,7 @@ class Model_Wrapper(object):
                 raise Exception('\tThe chosen optimizer is not implemented.')
 
         if not self.silence:
-            logging.info("Compiling model...")
+            logger.info("Compiling model...")
 
         # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
@@ -758,7 +755,7 @@ class Model_Wrapper(object):
             raise NotImplementedError()
 
         if not self.silence:
-            logging.info("Optimizer updated, learning rate set to " + str(lr))
+            logger.info("Optimizer updated, learning rate set to " + str(lr))
 
     def compile(self, **kwargs):
         self.model.compile(kwargs)
@@ -821,7 +818,7 @@ class Model_Wrapper(object):
             Function only valid for Sequential models. Use self.removeLayers(...) for Graph models.
         """
         if not self.silence:
-            logging.info("Replacing layers...")
+            logger.info("Replacing layers...")
 
         removed_layers = []
         removed_params = []
@@ -910,11 +907,11 @@ class Model_Wrapper(object):
         del save_params['extra_callbacks']
         self.training_parameters.append(save_params)
         if params['verbose'] > 0:
-            logging.info("<<< Training model >>>")
+            logger.info("<<< Training model >>>")
 
         self.__train(ds, params)
 
-        logging.info("<<< Finished training model >>>")
+        logger.info("<<< Finished training model >>>")
 
     def trainNetFromSamples(self, x, y, parameters=None, class_weight=None, sample_weight=None, out_name=None):
         """
@@ -945,14 +942,14 @@ class Model_Wrapper(object):
         self.training_parameters.append(save_params)
         self.__train_from_samples(x, y, params, class_weight=class_weight, sample_weight=sample_weight)
         if params['verbose'] > 0:
-            logging.info("<<< Finished training model >>>")
+            logger.info("<<< Finished training model >>>")
 
     def __train(self, ds, params, state=None):
 
         if state is None:
             state = dict()
         if params['verbose'] > 0:
-            logging.info(print_dict(params, header="Training parameters: "))
+            logger.info(print_dict(params, header="Training parameters: "))
 
         # initialize state
         state['samples_per_epoch'] = ds.len_train
@@ -1145,7 +1142,7 @@ class Model_Wrapper(object):
     def __train_from_samples(self, x, y, params, class_weight=None, sample_weight=None):
 
         if params['verbose'] > 0:
-            logging.info(print_dict(params, header="Training parameters: "))
+            logger.info(print_dict(params, header="Training parameters: "))
 
         callbacks = []
 
@@ -1223,7 +1220,7 @@ class Model_Wrapper(object):
         params = checkParameters(parameters, self.defaut_test_params)
         self.testing_parameters.append(copy.copy(params))
 
-        logging.info("<<< Testing model >>>")
+        logger.info("<<< Testing model >>>")
 
         # Calculate how many test iterations are we going to perform
         n_samples = ds.len_test
@@ -1258,15 +1255,15 @@ class Model_Wrapper(object):
 
         # Display metrics results
         for name, o in zip(self.model.metrics_names, out):
-            logging.info('test ' + name + ': %0.8s' % o)
+            logger.info('test ' + name + ': %0.8s' % o)
 
             # loss_all = out[0]
             # loss_ecoc = out[1]
             # loss_final = out[2]
             # acc_ecoc = out[3]
             # acc_final = out[4]
-            # logging.info('Test loss: %0.8s' % loss_final)
-            # logging.info('Test accuracy: %0.8s' % acc_final)
+            # logger.info('Test loss: %0.8s' % loss_final)
+            # logger.info('Test accuracy: %0.8s' % acc_final)
 
     def testNetSamples(self, X, batch_size=50):
         """
@@ -1511,14 +1508,14 @@ class Model_Wrapper(object):
         """
         DEPRECATED, use search.beam_search instead.
         """
-        logging.warning("Deprecated function, use search.beam_search instead.")
+        logger.warning("Deprecated function, use search.beam_search instead.")
         return beam_search(self, X, params, return_alphas=return_alphas, eos_sym=eos_sym, null_sym=null_sym)
 
     def BeamSearchNet(self, ds, parameters):
         """
         DEPRECATED, use predictBeamSearchNet() instead.
         """
-        logging.warning("Deprecated function, use predictBeamSearchNet() instead.")
+        logger.warning("Deprecated function, use predictBeamSearchNet() instead.")
         return self.predictBeamSearchNet(ds, parameters)
 
     def predictBeamSearchNet(self, ds, parameters=None):
@@ -1579,11 +1576,11 @@ class Model_Wrapper(object):
         for s in params['predict_on_sets']:
             print ("")
             print("", file=sys.stderr)
-            logging.info("<<< Predicting outputs of " + s + " set >>>")
+            logger.info("<<< Predicting outputs of " + s + " set >>>")
 
             # TODO: enable 'train' sampling on temporally-linked models
             if params['temporally_linked'] and s == 'train':
-                logging.info('Sampling is currently not implemented on the "train" set for temporally-linked models.')
+                logger.info('Sampling is currently not implemented on the "train" set for temporally-linked models.')
                 data_gen = -1
                 data_gen_instance = -1
             else:
@@ -1826,8 +1823,8 @@ class Model_Wrapper(object):
             predictions[s] = []
             if params['verbose'] > 0:
                 print("", file=sys.stderr)
-                logging.info("<<< Predicting outputs of " + s + " set >>>")
-                logging.info(print_dict(params, header="Prediction parameters: "))
+                logger.info("<<< Predicting outputs of " + s + " set >>>")
+                logger.info(print_dict(params, header="Prediction parameters: "))
 
             # Calculate how many iterations are we going to perform
             if params['n_samples'] is None:
@@ -2063,7 +2060,7 @@ class Model_Wrapper(object):
 
         for s in params['predict_on_sets']:
             print("", file=sys.stderr)
-            logging.info("<<< Scoring outputs of " + s + " set >>>")
+            logger.info("<<< Scoring outputs of " + s + " set >>>")
             if len(params['model_inputs']) == 0:
                 raise AssertionError('We need at least one input!')
             if not params['optimized_search']:  # use optimized search model if available
@@ -2168,7 +2165,7 @@ class Model_Wrapper(object):
                             Hence more random outputs.
         :return: set of indices chosen as output, a vector of size #samples
         """
-        logging.warning("Deprecated function, use utils.sampling() instead")
+        logger.warning("Deprecated function, use utils.sampling() instead")
         return sampling(scores, sampling_type=sampling_type, temperature=temperature)
 
     @staticmethod
@@ -2182,7 +2179,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions.
         """
-        logging.warning("Deprecated function, use utils.decode_predictions() instead.")
+        logger.warning("Deprecated function, use utils.decode_predictions() instead.")
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
     @staticmethod
@@ -2200,7 +2197,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level
         :return: trg_word_seq with replaced unknown words
         """
-        logging.warning("Deprecated function, use utils.replace_unknown_words() instead.")
+        logger.warning("Deprecated function, use utils.replace_unknown_words() instead.")
         return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
                                      heuristic=heuristic, mapping=mapping, verbose=verbose)
 
@@ -2221,7 +2218,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        logging.warning("Deprecated function, use utils.decode_predictions_beam_search() instead.")
+        logger.warning("Deprecated function, use utils.decode_predictions_beam_search() instead.")
         return decode_predictions_beam_search(preds, index2word, alphas=alphas, heuristic=heuristic,
                                               x_text=x_text, unk_symbol=unk_symbol, pad_sequences=pad_sequences,
                                               mapping=mapping, verbose=verbose)
@@ -2235,7 +2232,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of converted predictions
         """
-        logging.warning("Deprecated function, use utils.one_hot_2_indices() instead.")
+        logger.warning("Deprecated function, use utils.one_hot_2_indices() instead.")
         return one_hot_2_indices(preds, pad_sequences=pad_sequences, verbose=verbose)
 
     @staticmethod
@@ -2247,7 +2244,7 @@ class Model_Wrapper(object):
         :param verbose: Verbosity level, by default 0.
         :return: List of decoded predictions
         """
-        logging.warning("Deprecated function, use utils.decode_predictions_one_hot() instead.")
+        logger.warning("Deprecated function, use utils.decode_predictions_one_hot() instead.")
         return decode_predictions_one_hot(preds, index2word, verbose=verbose)
 
     def prepareData(self, X_batch, Y_batch=None):
@@ -2422,6 +2419,10 @@ class Model_Wrapper(object):
         :param colours_shapes_dict: dictionary of '<metric>_<split>' and the colour and/or shape
                 that we want them to have in the plot
         """
+        import matplotlib as mpl
+        mpl.use('Agg')  # run matplotlib without X server (GUI)
+        import matplotlib.pyplot as plt
+
         # Build default colours_shapes_dict if not provided
         if colours_shapes_dict is None:
             colours_shapes_dict = dict()
@@ -2486,7 +2487,7 @@ class Model_Wrapper(object):
         plt.savefig(plot_file)
         if not self.silence:
             print("", file=sys.stderr)
-            logging.info("<<< Progress plot saved in " + plot_file + ' >>>')
+            logger.info("<<< Progress plot saved in " + plot_file + ' >>>')
 
         # Close plot window
         plt.close()

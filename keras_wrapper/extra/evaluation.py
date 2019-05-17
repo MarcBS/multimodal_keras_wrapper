@@ -4,6 +4,8 @@ from six import iteritems
 from builtins import map, zip
 import json
 import logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 
 from keras_wrapper.extra.localization_utilities import *
 
@@ -66,10 +68,10 @@ def get_coco_score(pred_list, verbose, extra_vars, split):
             final_scores[method] = score
 
     if verbose > 0:
-        logging.info('Computing coco scores on the %s split...' % split)
+        logger.info('Computing coco scores on the %s split...' % split)
     for metric in sorted(final_scores):
         value = final_scores[metric]
-        logging.info(metric + ': ' + str(value))
+        logger.info(metric + ': ' + str(value))
 
     return final_scores
 
@@ -101,8 +103,7 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
     # create vqa object and vqaRes object
     vqa_ = visual_qa.VQA(annFile, quesFile)
     vqaRes = vqa_.loadRes(resFile, quesFile)
-    vqaEval_ = vqaEval.VQAEval(vqa_, vqaRes,
-                               n=2)  # n is precision of accuracy (number of places after decimal), default is 2
+    vqaEval_ = vqaEval.VQAEval(vqa_, vqaRes, n=2)  # n is precision of accuracy (number of places after decimal), default is 2
     vqaEval_.evaluate()
     os.remove(resFile)  # remove temporal file
 
@@ -115,8 +116,8 @@ def eval_vqa(pred_list, verbose, extra_vars, split):
     # acc_class_normalized = vqaEval_.accuracy['classNormalizedOverall']
 
     if verbose > 0:
-        logging.info('VQA Metric: Accuracy yes/no is {0}, other is {1}, number is {2}, overall is {3}'.
-                     format(acc_yes_no, acc_other, acc_number, acc_overall))  # , acc_class_normalized))
+        logger.info('VQA Metric: Accuracy yes/no is {0}, other is {1}, number is {2}, overall is {3}'.
+                    format(acc_yes_no, acc_other, acc_number, acc_overall))
     return {'overall accuracy': acc_overall,
             'yes/no accuracy': acc_yes_no,
             'number accuracy': acc_number,
@@ -144,7 +145,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     # in that case a more general evaluation will be considered
     raw2basic = extra_vars[split].get('raw2basic', None)
     if raw2basic is not None:
-        logging.info('Applying general evaluation with raw2basic dictionary.')
+        logger.info('Applying general evaluation with raw2basic dictionary.')
 
     if raw2basic is None:
         n_classes = len(word2idx)
@@ -187,13 +188,13 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
 
     if verbose > 0:
-        logging.info(
+        logger.info(
             '"coverage_error" (best: avg labels per sample = %f): %f' % (float(np.sum(y_gt)) / float(n_samples), coverr))
-        logging.info('Label Ranking "average_precision" (best: 1.0): %f' % avgprec)
-        logging.info('Label "ranking_loss" (best: 0.0): %f' % rankloss)
-        logging.info('precision: %f' % precision)
-        logging.info('recall: %f' % recall)
-        logging.info('f1: %f' % f1)
+        logger.info('Label Ranking "average_precision" (best: 1.0): %f' % avgprec)
+        logger.info('Label "ranking_loss" (best: 0.0): %f' % rankloss)
+        logger.info('precision: %f' % precision)
+        logger.info('recall: %f' % recall)
+        logger.info('f1: %f' % f1)
 
     return {'coverage_error': coverr,
             'average_precision': avgprec,
@@ -223,7 +224,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     n_classes = extra_vars['n_classes']
 
     n_samples = len(pred_list)
-    logging.info("---# of samples: " + str(n_samples))
+    logger.info("---# of samples: " + str(n_samples))
     gt_list = extra_vars[split]['references']
     pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
     # Create prediction matrix
@@ -275,12 +276,12 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     top5_acc = np.mean(np.max(arg_top5_pred == np.repeat(np.expand_dims(arg_gt, -1), 5, -1), -1))
 
     if verbose > 0:
-        logging.info('Top5 Accuracy: %f' % top5_acc)
-        logging.info('accuracy: %f' % accuracy, )
-        logging.info('balanced_accuracy: %f' % accuracy_balanced)
-        logging.info('precision: ' + str(precision))
-        logging.info('recall: ' + str(recall))
-        logging.info('f1: ' + str(f1))
+        logger.info('Top5 Accuracy: %f' % top5_acc)
+        logger.info('accuracy: %f' % accuracy, )
+        logger.info('balanced_accuracy: %f' % accuracy_balanced)
+        logger.info('precision: ' + str(precision))
+        logger.info('recall: ' + str(recall))
+        logger.info('f1: ' + str(f1))
 
     return {'accuracy': accuracy,
             'balanced_accuracy': accuracy_balanced,
@@ -340,7 +341,7 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
     # Compute Coverage Error
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
     if verbose > 0:
-        logging.info('Accuracy: %f' % accuracy)
+        logger.info('Accuracy: %f' % accuracy)
 
     return {'semantic global accuracy': accuracy}
 
@@ -410,8 +411,8 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split):
     acc = np.sum(inter) / np.sum(cm)
 
     if verbose > 0:
-        logging.info('Mean IoU: %f' % mean_iou)
-        logging.info('Accuracy: %f' % float(acc))
+        logger.info('Mean IoU: %f' % mean_iou)
+        logger.info('Accuracy: %f' % float(acc))
 
     return {'mean IoU': mean_iou, 'semantic global accuracy': acc}
 
@@ -548,7 +549,7 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
     AP = _computeAP(prec, rec)
 
     # for thres in range(n_thresholds):
-    #     logging.info(
+    #     logger.info(
     #         'Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n
     #         \tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
     #         (thresholds[thres],
@@ -556,8 +557,8 @@ def averagePrecision(pred_list, verbose, extra_vars, split):
     #          general_measures[thres][3], general_measures[thres][4]))
 
     if verbose > 0:
-        logging.info('Average Precision (AP): %f' % AP)
-        logging.info(
+        logger.info('Average Precision (AP): %f' % AP)
+        logger.info(
             'Evaluation results (score >= %0.2f):\n\tPrecision: %f\n\tRecall: %f\n'
             '\tAccuracy: %f\n\tSamples GT: %d\n\tSamples predicted: %d' %
             (thresholds[5],
@@ -717,14 +718,14 @@ def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
         predictions = y_pred.flatten()[truth_mask]
         ppl = np.power(2, np.mean(-np.log2(predictions)))
         if verbose > 0:
-            logging.info('Computing perplexity scores on the %s split...' % split)
-            logging.info('PPL: ' + str(ppl))
+            logger.info('Computing perplexity scores on the %s split...' % split)
+            logger.info('PPL: ' + str(ppl))
         return ppl
     else:
         ppl = np.power(2, np.mean(-np.log2(y_pred)))
         if verbose > 0:
-            logging.info('Computing perplexity scores on the %s split...' % split)
-            logging.info('PPL: ' + str(ppl))
+            logger.info('Computing perplexity scores on the %s split...' % split)
+            logger.info('PPL: ' + str(ppl))
         return ppl
 
 
