@@ -1622,7 +1622,7 @@ class Dataset(object):
                 if 'bpe' in tokenization.lower():
                     if bpe_codes is None:
                         raise AssertionError('bpe_codes must be specified when applying a BPE tokenization.')
-                    self.build_bpe(bpe_codes, separator)
+                    self.build_bpe(bpe_codes, separator=separator)
                 tokfun = eval('self.' + tokenization)
                 if not self.silence:
                     logger.info('\tApplying tokenization function: "' + tokenization + '".')
@@ -1715,7 +1715,7 @@ class Dataset(object):
                 if 'bpe' in tokenization.lower():
                     if bpe_codes is None:
                         raise AssertionError('bpe_codes must be specified when applying a BPE tokenization.')
-                    self.build_bpe(bpe_codes, separator)
+                    self.build_bpe(bpe_codes, separator=separator)
                 tokfun = eval('self.' + tokenization)
                 if not self.silence:
                     logger.info('\tApplying tokenization function: "' + tokenization + '".')
