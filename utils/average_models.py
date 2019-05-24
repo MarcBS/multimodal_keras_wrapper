@@ -6,7 +6,8 @@ from keras_wrapper.utils import average_models
 sys.path.insert(1, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath("../"))
 
-logger = logging.getLogger(__name__).basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logger = logging.getLogger(__name__)
 
 
 def parse_args():
