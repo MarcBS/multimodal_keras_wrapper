@@ -555,6 +555,7 @@ class Model_Wrapper(object):
                                         'epoch_offset': 0,
                                         'patience': 0,
                                         'metric_check': None,
+                                        'min_delta': 0.,
                                         'patience_check_split': 'val',
                                         'eval_on_epochs': True,
                                         'each_n_epochs': 1,
@@ -981,6 +982,7 @@ class Model_Wrapper(object):
                                                 patience=params['patience'],
                                                 metric_check=params['metric_check'],
                                                 want_to_minimize=True if 'TER' in params['metric_check'] else False,
+                                                min_delta=params['min_delta'],
                                                 check_split=params['patience_check_split'],
                                                 eval_on_epochs=params['eval_on_epochs'],
                                                 each_n_epochs=params['each_n_epochs'],
@@ -1169,6 +1171,7 @@ class Model_Wrapper(object):
                                                 patience=params['patience'],
                                                 metric_check=params['metric_check'],
                                                 want_to_minimize=True if 'TER' in params['metric_check'] else False,
+                                                min_delta=params['min_delta'],
                                                 eval_on_epochs=params['eval_on_epochs'],
                                                 each_n_epochs=params['each_n_epochs'],
                                                 start_eval_on_epoch=params['start_eval_on_epoch'])

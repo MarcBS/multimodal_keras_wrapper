@@ -797,18 +797,17 @@ class Sample(KerasCallback):
 SampleEachNUpdates = Sample
 
 
-###################################################
 # Learning modifiers callbacks
-###################################################
 class EarlyStopping(KerasCallback):
     """
-    Applies early stopping if performance has not improved for some epochs.
+    Applies early stopping if performance has not improved for some evaluations.
     """
 
     def __init__(self,
                  model,
                  patience=0,
                  check_split='val',
+                 min_delta=0.,
                  metric_check='acc',
                  want_to_minimize=False,
                  eval_on_epochs=True,
@@ -819,6 +818,7 @@ class EarlyStopping(KerasCallback):
         :param model: model to check performance
         :param patience: number of beginning epochs without reduction; by default 0 (disabled)
         :param check_split: data split used to check metric value improvement
+        :param min_delta: minimum change in the monitored quantity to qualify as an improvement
         :param metric_check: name of the metric to check
         :param verbose: verbosity level; by default 1
         """
@@ -826,11 +826,14 @@ class EarlyStopping(KerasCallback):
         self.model_to_eval = model
         self.patience = patience
         self.check_split = check_split
+        self.min_delta = min_delta
         self.metric_check = metric_check
         self.eval_on_epochs = eval_on_epochs
         self.start_eval_on_epoch = start_eval_on_epoch
         self.each_n_epochs = each_n_epochs
         self.want_to_minimize = want_to_minimize
+        if self.want_to_minimize:
+            self.min_delta *= -1.
 
         self.verbose = verbose
         self.cum_update = 0
@@ -881,7 +884,7 @@ class EarlyStopping(KerasCallback):
         if self.want_to_minimize:
             current_score = -current_score
         # Check if the best score has been outperformed in the current epoch
-        if current_score > self.best_score:
+        if current_score - self.min_delta > self.best_score:
             self.best_epoch = epoch
             self.best_score = current_score
             self.wait = 0
