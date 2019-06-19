@@ -85,6 +85,15 @@ def loadDataset(dataset_path):
 # ------------------------------------------------------- #
 
 def dataLoad(process_name, net, dataset, max_queue_len, queues):
+    """
+    Parallel data loader. Risky and untested!
+    :param process_name:
+    :param net:
+    :param dataset:
+    :param max_queue_len:
+    :param queues:
+    :return:
+    """
     logger.info("Starting " + process_name + "...")
     in_queue, out_queue = queues
 
@@ -560,7 +569,10 @@ class Homogeneous_Data_Batch_Generator(object):
         self.reset()
 
     def retrieve_maxibatch(self):
-
+        """
+        Gets a maxibatch of self.params['joint_batches'] * self.batch_size samples.
+        :return:
+        """
         if self.set_split == 'train' and not self.predict:
             data_augmentation = self.params['data_augmentation']
         else:
@@ -602,6 +614,10 @@ class Homogeneous_Data_Batch_Generator(object):
         self.Y_maxibatch = Y_batch
 
     def reset(self):
+        """
+        Resets the counters.
+        :return:
+        """
         self.retrieve_maxibatch()
         text_Y_batch = self.Y_maxibatch[0][1]  # just use mask
         batch_lengths = np.asarray([int(np.sum(cc)) for cc in text_Y_batch])
@@ -825,6 +841,13 @@ class Dataset(object):
             logger.info("Shuffling training done.")
 
     def keepTopOutputs(self, set_name, id_out, n_top):
+        """
+        Keep the most frequent outputs from a set_name.
+        :param set_name: Set name to modify.
+        :param id_out: Id.
+        :param n_top: Number of elements to keep.
+        :return:
+        """
         self.__checkSetName(set_name)
 
         if id_out not in self.ids_outputs:
@@ -1110,6 +1133,13 @@ class Dataset(object):
         self.__setInput(data, set_name, data_type, data_id, True, False)
 
     def removeInput(self, set_name, id='label', type='categorical'):
+        """
+        Deletes an input from the dataset.
+        :param set_name: Set name to remove.
+        :param id: Input to remove id.
+        :param type: Type of the input to remove.
+        :return:
+        """
         # Ensure that the output exists before removing it
         keys_X_set = getattr(self, 'X_' + set_name)
         if id in self.ids_inputs:
@@ -1317,6 +1347,13 @@ class Dataset(object):
                 'Loaded "' + set_name + '" set outputs of data_type "' + data_type + '" with data_id "' + data_id + '" and length ' + str(getattr(self, 'len_' + set_name)) + '.')
 
     def removeOutput(self, set_name, id='label', type='categorical'):
+        """
+        Deletes an output from the dataset.
+        :param set_name: Set name to remove.
+        :param id: Output to remove id.
+        :param type: Type of the output to remove.
+        :return:
+        """
         # Ensure that the output exists before removing it
         keys_Y_set = list(getattr(self, 'Y_' + set_name))
         if id in self.ids_outputs:
@@ -1406,6 +1443,12 @@ class Dataset(object):
 
     @staticmethod
     def loadCategorical(y_raw, nClasses):
+        """
+        Converts a class vector (integers) to binary class matrix. From utils.
+        :param y_raw: class vector to be converted into a matrix (integers from 0 to num_classes).
+        :param nClasses: total number of classes.
+        :return:
+        """
         y = to_categorical(y_raw, nClasses).astype(np.uint8)
         return y
 
@@ -1444,7 +1487,12 @@ class Dataset(object):
         return labels
 
     def loadBinary(self, y_raw, data_id):
-
+        """
+        Load a binary vector. May be of type 'sparse'
+        :param y_raw: Vector to load.
+        :param data_id: Id to load.
+        :return:
+        """
         try:
             sparse = self.sparse_binary[data_id]
         except Exception:  # allows backwards compatibility
@@ -2659,7 +2707,16 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocessVideos(self, path_list, data_id, set_name, max_video_len, img_size, img_size_crop):
-
+        """
+        Preprocess videos. Subsample and crop frames.
+        :param path_list: path to all images in all videos
+        :param data_id: Data id to be processed.
+        :param set_name: Set name to be processed.
+        :param max_video_len: Maximum number of subsampled video frames.
+        :param img_size: Size of each frame.
+        :param img_size_crop: Size of each image crop.
+        :return:
+        """
         if isinstance(path_list, list) and len(path_list) == 2:
             # path to all images in all videos
             data = []
@@ -2688,7 +2745,17 @@ class Dataset(object):
         return counts_frames
 
     def preprocessVideoFeatures(self, path_list, data_id, set_name, max_video_len, img_size, img_size_crop, feat_len):
-
+        """
+        Preprocess already extracted features from video frames.
+        :param path_list: path to all features in all videos
+        :param data_id: Data id to be processed.
+        :param set_name: Set name to be processed.
+        :param max_video_len: Maximum number of subsampled video features.
+        :param img_size: Size of each frame.
+        :param img_size_crop: Size of each image crop.
+        :param feat_len: Length of each feature.
+        :return:
+        """
         if isinstance(path_list, list) and len(path_list) == 2:
             if isinstance(path_list[0], str):
                 # path to all images in all videos
@@ -2877,6 +2944,19 @@ class Dataset(object):
 
     def loadVideosByIndex(self, n_frames, data_id, indices, set_name, max_len, normalization_type, normalization,
                           meanSubstraction, dataAugmentation):
+        """
+        Get videos by indices.
+        :param n_frames: Indices of the frames to load from each video.
+        :param data_id: Data id to be processed.
+        :param indices: Indices of the videos to load.
+        :param set_name: Set name to be processed.
+        :param max_len: Maximum length of each video.
+        :param normalization_type: Normalization type applied to the frames.
+        :param normalization: Normalization applied to the frames.
+        :param meanSubstraction: Mean subtraction applied to the frames.
+        :param dataAugmentation: Whether apply data augmentation.
+        :return:
+        """
         n_videos = len(indices)
         V = np.zeros((n_videos, max_len * 3, self.img_size_crop[data_id][0], self.img_size_crop[data_id][1]))
 
@@ -2911,7 +2991,9 @@ class Dataset(object):
 
     @staticmethod
     def preprocessIDs(path_list, data_id, set_name):
-
+        """
+        Preprocess ID outputs: Strip and put each ID in a line.
+        """
         logger.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
         if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of IDs
             data = []
@@ -2957,6 +3039,9 @@ class Dataset(object):
         return out_img
 
     def preprocess3DSemanticLabel(self, path_list, data_id, associated_id_in, num_poolings):
+        """
+        Preprocess 3D Semantic labels
+        """
         return self.preprocess3DLabel(path_list, data_id, associated_id_in, num_poolings)
 
     def setSemanticClasses(self, path_classes, data_id):
@@ -3080,6 +3165,9 @@ class Dataset(object):
         return out_list
 
     def resize_semantic_output(self, predictions, ids_out):
+        """
+        Resize semantic output.
+        """
         from scipy import misc
 
         out_pred = []
@@ -3254,6 +3342,16 @@ class Dataset(object):
     # ------------------------------------------------------- #
 
     def preprocessImages(self, path_list, data_id, set_name, img_size, img_size_crop, use_RGB):
+        """
+        Image preprocessing function.
+        :param path_list: Path to the images.
+        :param data_id: Data id.
+        :param set_name: Set name.
+        :param img_size: Size of the images to process.
+        :param img_size_crop: Size of the image crops.
+        :param use_RGB: Whether use RGB color encoding.
+        :return:
+        """
         if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of images' paths
             data = []
             with open(path_list, 'r') as list_:

@@ -750,6 +750,12 @@ def vqa_store(question_id_list, answer_list, path):
 
 
 def caption_store(samples, path):
+    """
+    Save the samples into a file.
+    :param samples: Samples generated.
+    :param path: Path to the output file.
+    :return:
+    """
     with open(path, 'w') as f:
         print('\n'.join(samples), file=f)
 

@@ -22,12 +22,16 @@ except:
 
 
 class BeamSearchEnsemble:
+    """
+    Beam search with one or more autoreggressive models.
+    """
+
     def __init__(self, models, dataset, params_prediction, model_weights=None, n_best=False, verbose=0):
         """
-
-        :param models:
-        :param dataset:
-        :param params_prediction:
+        Initialize the models, dataset and params of the method.
+        :param models: Models for provide the probabilities.
+        :param dataset: Dataset instance for the model.
+        :param params_prediction: Prediction parameters.
         """
         self.models = models
         self.dataset = dataset
