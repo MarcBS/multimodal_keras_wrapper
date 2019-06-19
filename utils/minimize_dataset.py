@@ -5,6 +5,10 @@ from keras_wrapper.dataset import loadDataset, saveDataset
 
 
 def parse_args():
+    """
+    Argument parser
+    :return:
+    """
     parser = argparse.ArgumentParser("Minimizes a dataset by removing the data stored in it: Tranining, development and test. "
                                      "The rest of parameters are kept."
                                      "Useful for reloading datasets with new data.")

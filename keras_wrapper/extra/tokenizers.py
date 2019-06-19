@@ -41,6 +41,9 @@ def tokenize_basic(caption, lowercase=True):
              u'!']
 
     def processPunctuation(inText):
+        """
+        Removes punctuation.
+        """
         outText = inText
         for p in punct:
             outText = outText.replace(p, u' ' + p + u' ')
@@ -188,6 +191,9 @@ def tokenize_none_char(caption):
     """
 
     def convert_chars(x):
+        """
+        Convert spaces to the '<space>' token.
+        """
         if x == ' ':
             return u'<space>'
         else:
@@ -284,6 +290,9 @@ def tokenize_questions(caption):
     articles = ['a', 'an', 'the']
 
     def processPunctuation(inText):
+        """
+        Process (remove) the punctuation.
+        """
         if isinstance(inText, str) and sys.version_info < (3, 0):
             inText = inText.decode("utf-8").encode("utf-8")
         outText = inText

@@ -759,6 +759,11 @@ class Model_Wrapper(object):
             logger.info("Optimizer updated, learning rate set to " + str(lr))
 
     def compile(self, **kwargs):
+        """
+        Compile the model.
+        :param kwargs:
+        :return:
+        """
         self.model.compile(kwargs)
 
     def setName(self, model_name, plots_path=None, models_path=None, create_plots=False, clear_dirs=True):
@@ -806,6 +811,11 @@ class Model_Wrapper(object):
                     os.makedirs(self.plot_path)
 
     def setParams(self, params):
+        """
+        Set self.params as params.
+        :param params:
+        :return:
+        """
         self.params = params
 
     # ------------------------------------------------------- #
@@ -1218,7 +1228,13 @@ class Model_Wrapper(object):
                            initial_epoch=params['epoch_offset'])
 
     def testNet(self, ds, parameters, out_name=None):
-
+        """
+        Evaluate the model on a given split.
+        :param ds: Dataset
+        :param parameters: Parameters
+        :param out_name: Deprecated.
+        :return:
+        """
         # Check input parameters and recover default values if needed
         params = checkParameters(parameters, self.defaut_test_params)
         self.testing_parameters.append(copy.copy(params))
@@ -2827,7 +2843,9 @@ class Model_Wrapper(object):
         self.model = Model(inputs=[vis_input], outputs=[x])
 
     def VGG_19(self, nOutput, input_shape):
-
+        """
+        19-layered VGG model implemented in Keras' Functional API
+        """
         # Define inputs and outputs IDs
         self.ids_inputs = ['input_1']
         self.ids_outputs = ['predictions']
@@ -2846,7 +2864,9 @@ class Model_Wrapper(object):
         self.model = Model(inputs=[image], outputs=[out])
 
     def VGG_19_ImageNet(self, nOutput, input_shape):
-
+        """
+        19-layered VGG model implemented in Keras' Functional API trained on Imagenet.
+        """
         # Define inputs and outputs IDs
         self.ids_inputs = ['input_1']
         self.ids_outputs = ['predictions']

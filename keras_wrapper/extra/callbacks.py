@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 def checkDefaultParamsBeamSearch(params):
+    """
+    Checks that the provided parameters to the BeamSearch are compatible with the default ones.
+    :param params: Parameters to check.
+    :return: Checked and updated parameters.
+    """
+
     required_params = ['model_inputs',
                        'model_outputs',
                        'dataset_inputs',
@@ -66,6 +72,9 @@ def checkDefaultParamsBeamSearch(params):
 ###################################################
 
 class EvalPerformance(KerasCallback):
+    """
+    Evaluates a model each N epochs or updates
+    """
     def __init__(self,
                  model,
                  dataset,
@@ -109,8 +118,6 @@ class EvalPerformance(KerasCallback):
                  do_plot=True,
                  verbose=1):
         """
-        Evaluates a model each N epochs or updates
-
         :param model: Model_Wrapper object model to evaluate
         :param dataset: instance of the class Dataset in keras_wrapper.dataset
 
@@ -283,6 +290,12 @@ class EvalPerformance(KerasCallback):
         self.evaluate(epoch, counter_name='epoch')
 
     def on_batch_end(self, n_update, logs=None):
+        """
+        On (mini)batch end (update), sample and evaluate on the specified datasets.
+        :param n_update: Current update number
+        :param logs:
+        :return:
+        """
         if logs is None:
             logs = {}
         self.cum_update += 1  # start by index 1
@@ -295,6 +308,14 @@ class EvalPerformance(KerasCallback):
         self.evaluate(self.cum_update, counter_name='iteration', logs=logs)
 
     def evaluate(self, epoch, counter_name='epoch', logs=None):
+        """
+        Evaluation function. Works for evaluators external to Keras.
+        Computes the predictions according to the configuration and evaluates them, storing the results.
+        :param epoch: Current epoch or update.
+        :param counter_name: 'epoch' or 'update', string used for logging.
+        :param logs:
+        :return:
+        """
         if logs is None:
             logs = {}
         # Change inputs and outputs mappings for evaluation
@@ -560,6 +581,10 @@ class EvalPerformance(KerasCallback):
         self.recoverInOutMappings()
 
     def changeInOutMappings(self):
+        """
+        Change inputs and outputs mappings for evaluation.
+        :return:
+        """
         self.train_mappings = {'in': self.model_to_eval.inputsMapping,
                                'out': self.model_to_eval.outputsMapping,
                                }
@@ -570,6 +595,10 @@ class EvalPerformance(KerasCallback):
             self.model_to_eval.setOutputsMapping(self.outputs_mapping_eval)
 
     def recoverInOutMappings(self):
+        """
+        Change inputs and outputs mappings for training.
+        :return:
+        """
         self.model_to_eval.setInputsMapping(self.train_mappings['in'])
         self.model_to_eval.setOutputsMapping(self.train_mappings['out'])
 
@@ -581,9 +610,11 @@ PrintPerformanceMetricOnEpochEndOrEachNUpdates = EvalPerformance
 # Storing callbacks
 ###################################################
 class StoreModel(KerasCallback):
+    """
+    Saves a model into disk.
+    """
     def __init__(self, model, fun, epochs_for_save, verbose=0):
         """
-        In:
             model - model to save
             fun - function for saving the model
             epochs_for_save - number of epochs before the last save
@@ -595,6 +626,12 @@ class StoreModel(KerasCallback):
         self.verbose = verbose
 
     def on_epoch_end(self, epoch, logs=None):
+        """
+        On epoch end, store the model.
+        :param epoch:
+        :param logs:
+        :return:
+        """
         epoch += 1
         if epoch % self.epochs_for_save == 0:
             print('')
@@ -609,6 +646,9 @@ StoreModelWeightsOnEpochEnd = StoreModel
 ###################################################
 
 class Sample(KerasCallback):
+    """
+    Applies the sampling function of a model.
+    """
     def __init__(self,
                  model,
                  dataset,
@@ -688,9 +728,21 @@ class Sample(KerasCallback):
         super(Sample, self).__init__()
 
     def on_epoch_end(self, n_epoch, logs=None):
+        """
+        Increment the epoch counter.
+        :param n_epoch:
+        :param logs:
+        :return:
+        """
         self.epoch_count += 1
 
     def on_batch_end(self, n_update, logs=None):
+        """
+        On batch end, perform sampling if required.
+        :param n_update:
+        :param logs:
+        :return:
+        """
         self.cum_update += 1
         if self.epoch_count + self.reload_epoch < self.start_sampling_on_epoch:
             return
@@ -857,6 +909,12 @@ class EarlyStopping(KerasCallback):
             self.wait = 0
 
     def on_epoch_end(self, epoch, logs=None):
+        """
+        Increment the epoch counter. Evaluate if necessary.
+        :param epoch:
+        :param logs:
+        :return:
+        """
         epoch += 1  # start by index 1
         self.epoch = epoch
         if not self.eval_on_epochs:
@@ -866,6 +924,12 @@ class EarlyStopping(KerasCallback):
         self.evaluate(self.epoch, counter_name='epoch')
 
     def on_batch_end(self, n_update, logs=None):
+        """
+        Increment the update counter. Evaluate if necessary.
+        :param n_update:
+        :param logs:
+        :return:
+        """
         self.cum_update += 1  # start by index 1
         if self.eval_on_epochs:
             return
@@ -876,6 +940,12 @@ class EarlyStopping(KerasCallback):
         self.evaluate(self.cum_update, counter_name='update')
 
     def evaluate(self, epoch, counter_name='epoch'):
+        """
+        Get the model evaluation and check for the early stopping conditions.
+        :param epoch: Epoch or update number.
+        :param counter_name: 'epoch' or 'update', for consistent logging.
+        :return:
+        """
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         # Get last metric value from logs
         if current_score is None:
@@ -907,6 +977,17 @@ class EarlyStopping(KerasCallback):
 
 
 class LearningRateReducer(KerasCallback):
+    """
+    Reduces learning rate during the training.
+    Three different decays are implemented:
+        * linear:
+            lr = reduce_rate * lr
+        * exponential:
+            lr = exp_base**{current_step / half_life) * reduce_rate * lr
+        * noam:
+            lr = initial_lr * min(current_step**exp_base, current_step * half_life ** warmup_exp)
+
+    """
     def __init__(self,
                  initial_lr=1.,
                  reduce_rate=0.99,
@@ -921,15 +1002,6 @@ class LearningRateReducer(KerasCallback):
                  min_lr=1e-9,
                  verbose=1):
         """
-        Reduces learning rate during the training.
-        Two different decays are implemented:
-            * linear:
-                lr = reduce_rate * lr
-            * exponential:
-                lr = exp_base**{current_step / half_life) * reduce_rate * lr
-            * noam:
-                lr = initial_lr * min(current_step**exp_base, current_step * half_life ** warmup_exp)
-
         :param initial_lr: Initial learning rate.
         :param reduce_rate: Reduction rate.
         :param reduce_each_epochs: Whether we reduce each epochs or each updates.
@@ -964,7 +1036,12 @@ class LearningRateReducer(KerasCallback):
             raise AssertionError('Reduction function "%s" unimplemented!' % str(self.reduction_function))
 
     def on_epoch_end(self, epoch, logs=None):
-
+        """
+        Apply after each epoch.
+        :param epoch:
+        :param logs:
+        :return:
+        """
         if not self.reduce_each_epochs:
             return
         elif (epoch - self.start_reduction_on_epoch) % self.reduce_frequency != 0:
@@ -977,8 +1054,12 @@ class LearningRateReducer(KerasCallback):
             self.model.stop_training = True
 
     def on_batch_end(self, n_update, logs=None):
-        # n_update is restarted at the beginning of each epoch
-        # we carry the absolute update count in self.current_update_nb
+        """
+        On batch end, n_update is restarted at the beginning of each epoch. We carry the absolute update count in self.current_update_nb
+        :param n_update:
+        :param logs:
+        :return:
+        """
         self.current_update_nb += 1
         if self.reduce_each_epochs:
             return
@@ -988,16 +1069,21 @@ class LearningRateReducer(KerasCallback):
             return
         self.reduce_lr(self.current_update_nb)
 
-    def reduce_lr(self, current_nb):
+    def reduce_lr(self, n_update):
+        """
+        Learning rate reducer.
+        :param n_update: Current update
+        :return:
+        """
         if self.reduction_function == 'linear':
             new_rate = self.reduce_rate
         elif self.reduction_function == 'exponential':
             new_rate = np.power(self.exp_base,
-                                current_nb / self.half_life) * self.reduce_rate
+                                n_update / self.half_life) * self.reduce_rate
         elif self.reduction_function == 'noam':
-            new_rate = np.float32(min(float(current_nb) ** self.exp_base,
+            new_rate = np.float32(min(float(n_update) ** self.exp_base,
                                       float(
-                                          current_nb) * self.half_life ** self.warmup_exp))
+                                          n_update) * self.half_life ** self.warmup_exp))
 
         else:
             raise NotImplementedError(

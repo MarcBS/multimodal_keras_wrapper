@@ -11,6 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 def parse_args():
+    """
+    Argument parser.
+    :return:
+    """
     parser = argparse.ArgumentParser("Averages models")
 
     parser.add_argument("-d", "--dest",
@@ -25,7 +29,15 @@ def parse_args():
 
 
 def weighted_average(args):
-
+    """
+    Apply a weighted average to the models.
+    :param args: Options for the averaging function:
+              * models: Path to the models.
+              * dest: Path to the averaged model. If unspecified, the model is saved in './model'
+              * weights: Weight given to each model in the averaging. Should be the same number of weights than models.
+                         If unspecified, it applies the same weight to each model (1/N).
+    :return:
+    """
     logger.info("Averaging %d models" % len(args.models))
     average_models(args.models, args.dest, weights=args.weights)
     logger.info('Averaging finished.')

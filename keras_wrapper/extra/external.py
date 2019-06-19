@@ -1,16 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # Author: Rico Sennrich
-
-"""Use operations learned with learn_bpe.py to encode a new text.
-The text will not be smaller, but use only a fixed vocabulary, with rare words
-encoded as variable-length sequences of subword units.
-
-Reference:
-Rico Sennrich, Barry Haddow and Alexandra Birch (2015). Neural Machine Translation of Rare Words with Subword Units.
-Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (ACL 2016). Berlin, Germany.
-"""
-
 from __future__ import division, unicode_literals
 
 import sys
@@ -24,7 +14,14 @@ argparse.open = open
 
 
 class BPE(object):
+    """Use operations learned with learn_bpe.py to encode a new text.
+    The text will not be smaller, but use only a fixed vocabulary, with rare words
+    encoded as variable-length sequences of subword units.
 
+    Reference:
+    Rico Sennrich, Barry Haddow and Alexandra Birch (2015). Neural Machine Translation of Rare Words with Subword Units.
+    Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (ACL 2016). Berlin, Germany.
+    """
     def __init__(self, codes, merges=-1, separator='@@', vocab=None, glossaries=None):
 
         codes.seek(0)

@@ -32,10 +32,21 @@ else:
 
 
 def encode_list(mylist):
+    """
+    Encode list as utf-8 if we are working with Python 2.x or as str if we are working with Python 3.x.
+    :param mylist:
+    :return:
+    """
     return [l.decode('utf-8') if isinstance(l, str) else unicode(l) for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
 
 
 def dirac(pred, gt):
+    """
+    Chechks whether pred == gt.
+    :param pred: Prediction
+    :param gt: Ground-truth.
+    :return:
+    """
     return int(pred == gt)
 
 
@@ -69,12 +80,21 @@ def clean_dir(directory):
 
 # Main functions
 def file2list(filepath, stripfile=True):
+    """
+    Loads a file into a list. One line per element.
+    :param filepath: Path to the file to load.
+    :param stripfile: Whether we should strip the lines of the file or not.
+    :return: List containing the lines read.
+    """
     with codecs.open(filepath, 'r', encoding='utf-8') as f:
         lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in f.readlines()]
         return lines
 
 
 def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
+    """
+    Saves a numpy array as HDF5.
+    """
     if 'w' in permission:
         f = tables.open_file(filepath, mode=permission)
         atom = tables.Float32Atom()
@@ -89,6 +109,14 @@ def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
 
 
 def numpy2file(filepath, mylist, permission='wb', split=False):
+    """
+    Saves a numpy array as a file.
+    :param filepath: Destination path.
+    :param mylist: Numpy array to save.
+    :param permission: Write permission.
+    :param split: Whether we save each element from mylist in a separate file or not.
+    :return:
+    """
     mylist = np.asarray(mylist)
     if split:
         for i, filepath_ in list(enumerate(filepath)):
@@ -100,6 +128,14 @@ def numpy2file(filepath, mylist, permission='wb', split=False):
 
 
 def numpy2imgs(folder_path, mylist, imgs_names, dataset):
+    """
+    Save a numpy array as images.
+    :param folder_path: Folder of the images to save.
+    :param mylist: Numpy array containing the images.
+    :param imgs_names: Names of the images to be saved.
+    :param dataset:
+    :return:
+    """
     from PIL import Image as pilimage
     create_dir_if_not_exists(folder_path)
     n_classes = mylist.shape[-1]
@@ -116,6 +152,13 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
 
 
 def listoflists2file(filepath, mylist, permission='w'):
+    """
+    Saves a list of lists into a file. Each element in a line.
+    :param filepath: Destination file.
+    :param mylist: List of lists to save.
+    :param permission: Writing permission.
+    :return:
+    """
     mylist = [encode_list(sublist) for sublist in mylist]
     mylist = [item for sublist in mylist for item in sublist]
     mylist = u'\n'.join(mylist)
@@ -125,6 +168,13 @@ def listoflists2file(filepath, mylist, permission='w'):
 
 
 def list2file(filepath, mylist, permission='w'):
+    """
+    Saves a list into a file. Each element in a line.
+    :param filepath: Destination file.
+    :param mylist: List to save.
+    :param permission: Writing permission.
+    :return:
+    """
     mylist = encode_list(mylist)
     mylist = u'\n'.join(mylist)
     with codecs.open(filepath, permission, encoding='utf-8') as f:
@@ -133,12 +183,24 @@ def list2file(filepath, mylist, permission='w'):
 
 
 def list2stdout(mylist):
+    """
+    Prints a list in STDOUT
+    :param mylist: List to print.
+    """
     mylist = encode_list(mylist)
     mylist = '\n'.join(mylist)
     print (mylist)
 
 
 def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
+    """
+    Saves an N-best list into a file.
+    :param filepath: Destination path.
+    :param mylist: List to save.
+    :param separator: Separator between N-best list components.
+    :param permission: Writing permission.
+    :return:
+    """
     newlist = []
     for l in mylist:
         for l2 in l:
@@ -163,6 +225,9 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
 
 
 def list2vqa(filepath, mylist, qids, permission='w', extra=None):
+    """
+    Saves a list with the VQA format.
+    """
     res = []
     for i, (ans, qst) in list(enumerate(zip(mylist, qids))):
         line = {'answer': ans, 'question_id': int(qst)}
@@ -177,6 +242,9 @@ def list2vqa(filepath, mylist, qids, permission='w', extra=None):
 
 
 def dump_hdf5_simple(filepath, dataset_name, data):
+    """
+    Saves a HDF5 file.
+    """
     import h5py
     h5f = h5py.File(filepath, 'w')
     h5f.create_dataset(dataset_name, data=data)
@@ -184,57 +252,14 @@ def dump_hdf5_simple(filepath, dataset_name, data):
 
 
 def load_hdf5_simple(filepath, dataset_name='data'):
+    """
+    Loads a HDF5 file.
+    """
     import h5py
     h5f = h5py.File(filepath, 'r')
     tmp = h5f[dataset_name][:]
     h5f.close()
     return tmp
-
-
-def pickle_model(path, model, word2index_x, word2index_y, index2word_x, index2word_y):
-    modifier = 10
-    tmp = sys.getrecursionlimit()
-    sys.setrecursionlimit(tmp * modifier)
-    with open(path, 'w') as f:
-        p_dict = {'model': model,
-                  'word2index_x': word2index_x,
-                  'word2index_y': word2index_y,
-                  'index2word_x': index2word_x,
-                  'index2word_y': index2word_y}
-        pk.dump(p_dict, f, protocol=-1)
-    sys.setrecursionlimit(tmp)
-
-
-def unpickle_model(path):
-    with open(path, 'r') as f:
-        if sys.version_info.major == 3:
-            model = pk.load(f, encoding='latin1')['model']
-        else:
-            model = pk.load(f)['model']
-    return model
-
-
-def unpickle_vocabulary(path):
-    p_dict = {}
-    with open(path, 'r') as f:
-        if sys.version_info.major == 3:
-            pickle_load = pk.load(f, encoding='latin1')
-        else:
-            pickle_load = pk.load(f)
-        p_dict['word2index_x'] = pickle_load['word2index_x']
-        p_dict['word2index_y'] = pickle_load['word2index_y']
-        p_dict['index2word_x'] = pickle_load['index2word_x']
-        p_dict['index2word_y'] = pickle_load['index2word_y']
-    return p_dict
-
-
-def unpickle_data_provider(path):
-    with open(path, 'r') as f:
-        if sys.version_info.major == 3:
-            dp = pk.load(f, encoding='latin1')['data_provider']
-        else:
-            dp = pk.load(f)['data_provider']
-    return dp
 
 
 def model_to_json(path, model):
