@@ -2,7 +2,7 @@
 from setuptools import setup
 from setuptools import find_packages
 
-setup(name='Multimodal Keras Wrapper',
+setup(name='Multimodal-Keras-Wrapper',
       version='2.2',
       description='Wrapper for Keras with support to easy multimodal data and models loading and handling.',
       author='Marc Bolaños - Alvaro Peris',
