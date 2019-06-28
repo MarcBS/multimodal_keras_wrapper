@@ -31,7 +31,7 @@ Assuming that you have [pip](https://en.wikipedia.org/wiki/Pip_(package_manager)
 pip install multimodal-keras-wrapper
 ```
 
-In order to install the library from source, you just have to follow these steps:
+Alternatively, if you want to install the library from the source code, you just have to follow these steps:
 
 1) Clone this repository.
 
