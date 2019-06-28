@@ -25,7 +25,13 @@ Only when using NMS for certain localization utilities:
 
 ## Installation
 
-In order to install the library you just have to follow these steps:
+Assuming that you have [pip](https://en.wikipedia.org/wiki/Pip_(package_manager)) installed, run:
+
+```
+pip install multimodal-keras-wrapper
+```
+
+Alternatively, if you want to install the library from the source code, you just have to follow these steps:
 
 1) Clone this repository.
 
