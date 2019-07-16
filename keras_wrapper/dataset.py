@@ -1528,7 +1528,7 @@ class Dataset(object):
             labels = []
             with codecs.open(labels_list, 'r', encoding='utf-8') as list_:
                 for line in list_:
-                    labels.append(int(line.rstrip('\n')))
+                    labels.append(float(line))
         elif isinstance(labels_list, list):
             labels = labels_list
         else:
