@@ -842,7 +842,7 @@ class EarlyStopping(KerasCallback):
                         str(counter_name), epoch, self.metric_check, str(counter_name), self.best_epoch,
                         self.best_score if not self.want_to_minimize else -self.best_score))
                 self.model.stop_training = True
-                exit(1)
+                #exit(1)
 
 
 class LearningRateReducer(KerasCallback):
