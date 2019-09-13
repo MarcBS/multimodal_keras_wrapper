@@ -247,8 +247,8 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     #accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights, )
 
     # The following two lines should both provide the same measure (balanced accuracy)
-    #_, accuracy_balanced, _, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='macro')
-    accuracy_balanced = sklearn_metrics.balanced_accuracy_score(y_gt, y_pred)
+    _, accuracy_balanced, _, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='macro')
+    #accuracy_balanced = sklearn_metrics.balanced_accuracy_score(y_gt, y_pred)
 
     # Compute Precision, Recall and F1 score
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
