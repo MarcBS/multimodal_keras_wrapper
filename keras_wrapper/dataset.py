@@ -6,6 +6,7 @@ import logging
 import ntpath
 import os
 import random
+import time
 import re
 import sys
 #import threading
@@ -269,6 +270,7 @@ class Data_Batch_Generator(object):
             while out_queue.qsize() > 0:
                 data = out_queue.get()
                 yield(data)
+                time.sleep(0.1)
 
 
 class Homogeneous_Data_Batch_Generator(object):
