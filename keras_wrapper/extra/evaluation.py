@@ -245,23 +245,55 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
         sample_weights[i_s] = weights_per_class[gt_class]
 
     # Compute accuracy
+    top_n_accuracies = [3, 5]
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
-    accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights)
+    acc_top_n = []
+    for topn in top_n_accuracies:
+        acc_top_n[topn] = __top_k_accuracy(y_gt, y_pred, topn)
+    # accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights, )
+
+    # The following two lines should both provide the same measure (balanced accuracy)
+    _, accuracy_balanced, _, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='macro')
+    # accuracy_balanced = sklearn_metrics.balanced_accuracy_score(y_gt, y_pred)
+
     # Compute Precision, Recall and F1 score
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
 
     if verbose > 0:
-        logging.info('accuracy: %f' % accuracy, )
-        logging.info('balanced_accuracy: %f' % accuracy_balanced)
-        logging.info('precision: %f' % precision)
-        logging.info('recall: %f' % recall)
-        logging.info('f1: %f' % f1)
+        logging.info('Accuracy: %f' % accuracy)
+        for topn in top_n_accuracies:
+            logging.info('Accuracy top-%d: %f' % (topn, acc_top_n[topn]))
+        logging.info('Balanced Accuracy: %f' % accuracy_balanced)
+        logging.info('Precision: %f' % precision)
+        logging.info('Recall: %f' % recall)
+        logging.info('F1 score: %f' % f1)
 
-    return {'accuracy': accuracy,
-            'balanced_accuracy': accuracy_balanced,
+    dic_metrics = {'accuracy': accuracy,
+            'accuracy_balanced': accuracy_balanced,
             'precision': precision,
             'recall': recall,
             'f1': f1}
+    for topn in top_n_accuracies:
+        dic_metrics['accuracy_top_'+str(topn)] = acc_top_n[topn]
+
+    return dic_metrics
+
+
+def __top_k_accuracy(truths, preds, k):
+    """
+    Both preds and truths are same shape m by n (m is number of predictions and n is number of classes)
+    :param preds:
+    :param truths:
+    :param k:
+    :return:
+    """
+    best_k = np.argsort(preds, axis=1)[:, -k:]
+    ts = np.argmax(truths, axis=1)
+    successes = 0
+    for i in range(ts.shape[0]):
+      if ts[i] in best_k[i,:]:
+        successes += 1
+    return float(successes)/ts.shape[0]
 
 
 def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split):
