@@ -141,9 +141,10 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         logging.info("<<< Loading model from " + model_name + ".h5 ... >>>")
         model = load_model(model_name + '.h5', custom_objects=custom_objects, compile=compile)
     except Exception as e:
+        logging.info('Error loading ' + model_name + '.h5 file!!')
         logging.info(str(e))
         # Load model structure
-        logging.info("<<< Loading model from " + model_name + "_structure.json' ... >>>")
+        logging.info("<<< Try loading model from " + model_name + "_structure.json' ... >>>")
         model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
         # Load model weights
         model.load_weights(model_name + '_weights.h5')
@@ -171,7 +172,9 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     # Load Model_Wrapper information
     try:
         model_wrapper = pk.load(open(model_name + '_Model_Wrapper.pkl', 'rb'))
-    except:  # backwards compatibility
+    except Exception as e:  # backwards compatibility
+        logging.info('Error loading ' + model_name + '_Model_Wrapper.pkl file!!')
+        logging.info(str(e))
         # try:
         model_wrapper = pk.load(open(model_name + '_CNN_Model.pkl', 'rb'))
         # except:
