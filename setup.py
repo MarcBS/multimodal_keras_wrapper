@@ -3,12 +3,12 @@ from setuptools import setup
 from setuptools import find_packages
 
 setup(name='multimodal-keras-wrapper',
-      version='2.2.0',
+      version='3.0.2',
       description='Wrapper for Keras with support to easy multimodal data and models loading and handling.',
       author='Marc Bolaños - Alvaro Peris',
       author_email='marc.bolanos@ub.edu',
-      url='https://github.com/lvapeab/multimodal_keras_wrapper',
-      download_url='https://github.com/lvapeab/multimodal_keras_wrapper/archive/master.zip',
+      url='https://github.com/MarcBS/multimodal_keras_wrapper',
+      download_url='https://github.com/MarcBS/multimodal_keras_wrapper/archive/master.zip',
       license='MIT',
       classifiers=[
           'Intended Audience :: Developers',
