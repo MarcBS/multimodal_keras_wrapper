@@ -253,7 +253,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
     accuracy_balanced = sklearn_metrics.accuracy_score(y_gt, y_pred, sample_weight=sample_weights)
     # Compute Precision, Recall and F1 score
-    avrg = extra_vars.get('average_mode', None)
+    avrg = extra_vars.get('average_mode', 'macro')
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average=avrg)
     # Compute Confusion Matrix
     cf = sklearn_metrics.confusion_matrix(np.argmax(y_gt, -1), np.argmax(y_pred, -1))
@@ -271,7 +271,7 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     # Compute top 5 fp classes
     top5_fps = np.argpartition(cf * neg_identity, -5)[:, -5:][:, ::-1]
     # Compute top 5 accuracy
-    arg_top5_pred = np.argpartition(y_pred, -5)[:, -5:]
+    arg_top5_pred = np.argpartition(pred_list, -5)[:, -5:]
     arg_gt = np.argmax(y_gt, -1)
     top5_acc = np.mean(np.max(arg_top5_pred == np.repeat(np.expand_dims(arg_gt, -1), 5, -1), -1))
 

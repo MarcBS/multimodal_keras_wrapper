@@ -89,7 +89,7 @@ class EvalPerformance(KerasCallback):
                  each_n_epochs=1,
                  max_eval_samples=None,
                  extra_vars=None,
-                 normalize=True,
+                 normalize=False,
                  normalization_type=None,
                  output_types=None,
                  is_text=False,
@@ -261,7 +261,7 @@ class EvalPerformance(KerasCallback):
 
         else:
             # Convert min_pred_multilabel to list
-            if isinstance(self.min_pred_multilabel, list):
+            if not isinstance(self.min_pred_multilabel, list):
                 self.min_pred_multilabel = [self.min_pred_multilabel for _ in self.gt_pos]
 
         super(EvalPerformance, self).__init__()
