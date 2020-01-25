@@ -1,7 +1,7 @@
 # Multimodal Keras Wrapper
 Wrapper for Keras with support to easy multimodal data and models loading and handling.
 
-[![Build Status](https://travis-ci.org/lvapeab/multimodal_keras_wrapper.svg?branch=master)](https://travis-ci.org/lvapeab/multimodal_keras_wrapper) [![Requirements Status](https://requires.io/github/lvapeab/multimodal_keras_wrapper/requirements.svg?branch=master)](https://requires.io/github/lvapeab/multimodal_keras_wrapper/requirements/?branch=master) ![Compatibility](https://img.shields.io/badge/Python-2.7%2F3.7-blue.svg) [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/lvapeab/multimodal_keras_wrapper/blob/master/LICENSE)
+[![PyPI version](https://badge.fury.io/py/multimodal-keras-wrapper.svg)](https://badge.fury.io/py/multimodal-keras-wrapper) [![Build Status](https://travis-ci.org/lvapeab/multimodal_keras_wrapper.svg?branch=master)](https://travis-ci.org/lvapeab/multimodal_keras_wrapper) [![Requirements Status](https://requires.io/github/lvapeab/multimodal_keras_wrapper/requirements.svg?branch=master)](https://requires.io/github/lvapeab/multimodal_keras_wrapper/requirements/?branch=master) ![Compatibility](https://img.shields.io/badge/Python-2.7%2F3.7-blue.svg) [![license](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/lvapeab/multimodal_keras_wrapper/blob/master/LICENSE)
 
 ## Documentation
 
