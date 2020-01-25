@@ -1683,14 +1683,7 @@ class Dataset(object):
             tokfun = None
 
         # Build vocabulary
-        if build_vocabulary:
-            self.build_vocabulary(sentences, data_id,
-                                  max_text_len != 0,
-                                  min_occ=min_occ,
-                                  n_words=max_words,
-                                  use_extra_words=(max_text_len != 0),
-                                  use_unk_class=use_unk_class)
-        elif isinstance(build_vocabulary, str):
+        if isinstance(build_vocabulary, str):
             if build_vocabulary in self.vocabulary:
                 self.vocabulary[data_id] = self.vocabulary[build_vocabulary]
                 self.vocabulary_len[data_id] = self.vocabulary_len[build_vocabulary]
@@ -1705,6 +1698,14 @@ class Dataset(object):
             self.vocabulary[data_id] = build_vocabulary
             if not self.silence:
                 logger.info('\tReusing vocabulary from dictionary for data with data_id "' + data_id + '".')
+
+        elif build_vocabulary:
+            self.build_vocabulary(sentences, data_id,
+                                  max_text_len != 0,
+                                  min_occ=min_occ,
+                                  n_words=max_words,
+                                  use_extra_words=(max_text_len != 0),
+                                  use_unk_class=use_unk_class)
 
         if data_id not in self.vocabulary:
             raise Exception('The dataset must include a vocabulary with data_id "' + data_id +

@@ -35,7 +35,8 @@ install:
   # Replace dep1 dep2 ... with your dependencies
   - travis_wait 30 conda create --quiet -n test-environment python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
-  - travis_wait 30 conda install tensorflow=*=mkl* pytables --quiet
+  - travis_wait 30 conda install pytables --quiet
+  - pip install tensorflow==1.14.0
   - pip install -e git+https://github.com/MarcBS/keras#egg=keras --progress-bar off
   - pip install pyux pandas flaky Pillow theano pytest pytest-cache pytest-cov pytest-forked pytest-pep8 pytest-xdist --progress-bar off
   - pip install -e git+https://github.com/lvapeab/coco-caption.git#egg=coco-caption --progress-bar off
