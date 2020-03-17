@@ -8,6 +8,7 @@ import os
 import random
 import re
 import sys
+from PIL import ImageEnhance
 #import threading
 from collections import Counter
 from operator import add
@@ -3183,8 +3184,24 @@ class Dataset(object):
 
             else:
                 randomParams = daRandomParams[images[i]]
-                # Resize
 
+
+                # Colour, brightness, sharpness and contrast data augmentation
+                da_enhance_list = ["brightness", "color", "sharpness", "contrast"]
+
+                min_value_enhance = 0.25
+                im = pilimage.fromarray(im.astype(np.uint8))
+                image_enhance_dict = {'brightness': 'ImageEnhance.Brightness(im)',
+                                      'color': 'ImageEnhance.Color(im)',
+                                      'sharpness': 'ImageEnhance.Sharpness(im)',
+                                      'contrast': 'ImageEnhance.Contrast(im)'}
+
+                for da_enhance in da_enhance_list:
+                    image_enhance = eval(image_enhance_dict[da_enhance])
+                    im = image_enhance.enhance((1 - min_value_enhance) + np.random.rand() * min_value_enhance * 2)
+
+
+                # Resize
                 im = misc.imresize(im, (self.img_size[id][0], self.img_size[id][1]))
                 im = np.asarray(im, dtype=type_imgs)
 
