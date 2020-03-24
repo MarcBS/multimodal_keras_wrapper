@@ -4,6 +4,7 @@ toolz
 cloudpickle
 matplotlib
 sacremoses
+sacrebleu
 scipy
 future
 cython
