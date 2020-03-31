@@ -968,8 +968,10 @@ class EarlyStopping(KerasCallback):
             self.best_score = current_score
             self.wait = 0
             if self.verbose > 0:
-                logger.info('---current best %s %s: %.3f' % (
-                self.check_split, self.metric_check, current_score if not self.want_to_minimize else -current_score))
+                logger.info('---current best %s %s: %.3f' % (self.check_split,
+                                                             self.metric_check,
+                                                             current_score if not self.want_to_minimize
+                                                             else -current_score))
 
         # Stop training if performance has not improved for self.patience epochs
         elif self.patience > 0:

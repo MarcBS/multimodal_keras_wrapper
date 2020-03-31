@@ -5,12 +5,8 @@ matrix:
     include:
         - python: 3.6
           env: TEST_MODE=PEP8
-        - python: 2.7
-          env: TEST_MODE=GENERAL
         - python: 3.6
           env: TEST_MODE=GENERAL
-        - python: 2.7
-          env: TEST_MODE=EXTRA
         - python: 3.6
           env: TEST_MODE=EXTRA
 
