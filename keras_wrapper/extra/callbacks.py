@@ -79,6 +79,7 @@ class EvalPerformance(KerasCallback):
     """
     Evaluates a model each N epochs or updates
     """
+
     def __init__(self,
                  model,
                  dataset,
@@ -489,7 +490,8 @@ class EvalPerformance(KerasCallback):
                 # Store predictions
                 if self.write_samples:
                     # Store result
-                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '_output_' + str(gt_pos) + '.pred'  # results file
+                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '_output_' + str(
+                        gt_pos) + '.pred'  # results file
                     if write_type == 'list':
                         list2file(filepath, predictions)
                     elif write_type == 'vqa':
@@ -617,6 +619,7 @@ class StoreModel(KerasCallback):
     """
     Saves a model into disk.
     """
+
     def __init__(self, model, fun, epochs_for_save, verbose=0):
         """
             model - model to save
@@ -653,6 +656,7 @@ class Sample(KerasCallback):
     """
     Applies the sampling function of a model.
     """
+
     def __init__(self,
                  model,
                  dataset,
@@ -953,7 +957,8 @@ class EarlyStopping(KerasCallback):
         current_score = self.model_to_eval.getLog(self.check_split, self.metric_check)[-1]
         # Get last metric value from logs
         if current_score is None:
-            warnings.warn('The chosen metric ' + str(self.metric_check) + ' does not exist; the EarlyStopping callback works only with a valid metric.')
+            warnings.warn('The chosen metric ' + str(
+                self.metric_check) + ' does not exist; the EarlyStopping callback works only with a valid metric.')
             return
         if self.want_to_minimize:
             current_score = -current_score
@@ -963,7 +968,8 @@ class EarlyStopping(KerasCallback):
             self.best_score = current_score
             self.wait = 0
             if self.verbose > 0:
-                logger.info('---current best %s %s: %.3f' % (self.check_split, self.metric_check, current_score if not self.want_to_minimize else -current_score))
+                logger.info('---current best %s %s: %.3f' % (
+                self.check_split, self.metric_check, current_score if not self.want_to_minimize else -current_score))
 
         # Stop training if performance has not improved for self.patience epochs
         elif self.patience > 0:
@@ -977,7 +983,7 @@ class EarlyStopping(KerasCallback):
                             str(counter_name), self.best_epoch,
                             self.best_score if not self.want_to_minimize else -self.best_score))
                 self.model.stop_training = True
-                exit(1)
+                return
 
 
 class LearningRateReducer(KerasCallback):
@@ -992,6 +998,7 @@ class LearningRateReducer(KerasCallback):
             lr = initial_lr * min(current_step**exp_base, current_step * half_life ** warmup_exp)
 
     """
+
     def __init__(self,
                  initial_lr=1.,
                  reduce_rate=0.99,
