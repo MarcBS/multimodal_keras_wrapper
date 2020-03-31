@@ -2,6 +2,22 @@
 import re
 import sys
 
+__all__ = [
+    'tokenize_basic',
+    'tokenize_aggressive',
+    'tokenize_icann',
+    'tokenize_montreal',
+    'tokenize_soft',
+    'tokenize_none',
+    'tokenize_none_char',
+    'tokenize_CNN_sentence',
+    'tokenize_questions',
+    'tokenize_bpe',
+    'detokenize_none',
+    'detokenize_bpe',
+    'detokenize_none_char',
+]
+
 
 def tokenize_basic(caption, lowercase=True):
     """

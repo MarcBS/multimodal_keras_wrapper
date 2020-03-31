@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+import numpy as np
 from six import iteritems
 from builtins import map, zip
 import json
 import logging
 
+from keras_wrapper.extra.localization_utilities import computeIoU
+
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
 
-from keras_wrapper.extra.localization_utilities import *
 
-
-# EVALUATION FUNCTIONS SELECTOR
+# Evaluation function selection
 
 def get_sacrebleu_score(pred_list, verbose, extra_vars, split):
     """
@@ -28,11 +29,11 @@ def get_sacrebleu_score(pred_list, verbose, extra_vars, split):
     """
     import sacrebleu
     gts = extra_vars[split]['references']
+
     if extra_vars.get('tokenize_hypotheses', False):
-        hypo = [list(map(
-            lambda x: extra_vars['tokenize_f'](x.strip()), line)) for line in pred_list]
+        hypo = [extra_vars['tokenize_f'](line) for line in pred_list]
     else:
-        hypo = [line.strip() for line in pred_list]
+        hypo = pred_list
 
     initial_references = gts.get(0)
     if initial_references is None:
@@ -44,9 +45,10 @@ def get_sacrebleu_score(pred_list, verbose, extra_vars, split):
         assert len(references) == num_references, '"get_sacrebleu_score" does not support a different number of references per sample.'
         for ref_idx, reference in enumerate(references):
             # De/Tokenize refereces if needed
-            tokenized_ref = extra_vars['tokenize_f'](reference) if extra_vars.get('tokenize_references', False)\
+            tokenized_ref = extra_vars['tokenize_f'](reference) if extra_vars.get('tokenize_references', False) \
                 else reference
-            detokenized_ref = extra_vars['detokenize_f'](tokenized_ref) if extra_vars.get('apply_detokenization', False) else tokenized_ref
+            detokenized_ref = extra_vars['detokenize_f'](tokenized_ref) if extra_vars.get('apply_detokenization',
+                                                                                          False) else tokenized_ref
             refs[ref_idx].append(detokenized_ref)
 
     scorers = [
@@ -55,7 +57,9 @@ def get_sacrebleu_score(pred_list, verbose, extra_vars, split):
 
     final_scores = {}
     for scorer, method in scorers:
-        score = scorer(hypo, refs)
+        score = scorer(hypo,
+                       refs,
+                       force=True)
         final_scores[method] = score.score
 
     if verbose > 0:
@@ -246,7 +250,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     if verbose > 0:
         logger.info(
             '"coverage_error" (best: avg labels per sample = %f): %f' % (
-            float(np.sum(y_gt)) / float(n_samples), coverr))
+                float(np.sum(y_gt)) / float(n_samples), coverr))
         logger.info('Label Ranking "average_precision" (best: 1.0): %f' % avgprec)
         logger.info('Label "ranking_loss" (best: 0.0): %f' % rankloss)
         logger.info('precision: %f' % precision)
@@ -818,6 +822,7 @@ def caption_store(samples, path):
 selectMetric = {
     'vqa': eval_vqa,  # Metric for the VQA challenge
     'coco': get_coco_score,  # MS COCO evaluation library (BLEU, METEOR and CIDEr scores)
+    'sacrebleu': get_sacrebleu_score,  # MS COCO evaluation library (BLEU, METEOR and CIDEr scores)
     'multilabel_metrics': multilabel_metrics,  # Set of multilabel classification metrics from sklearn
     'multiclass_metrics': multiclass_metrics,  # Set of multiclass classification metrics from sklearn
     'AP': averagePrecision,

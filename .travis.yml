@@ -1,5 +1,5 @@
 sudo: required
-dist: trusty
+dist: bionic
 language: python
 matrix:
     include:
@@ -16,42 +16,14 @@ matrix:
 
 # command to install dependencies
 install:
-  # code below is taken from http://conda.pydata.org/docs/travis.html
-  # We do this conditionally because it saves us some downloading if the
-  # version is the same.
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
-    else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
-    fi
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - hash -r
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  # Useful for debugging any issues with conda
-  - conda info -a
 
-  # Replace dep1 dep2 ... with your dependencies
-  - travis_wait 30 conda create --quiet -n test-environment python=$TRAVIS_PYTHON_VERSION
-  - source activate test-environment
-  - travis_wait 30 conda install pytables --quiet
-  - pip install tensorflow==1.14.0
-  - pip install -e git+https://github.com/MarcBS/keras#egg=keras --progress-bar off
-  - pip install pyux pandas flaky Pillow theano pytest pytest-cache pytest-cov pytest-forked pytest-pep8 pytest-xdist --progress-bar off
-  - pip install -e git+https://github.com/lvapeab/coco-caption.git#egg=coco-caption --progress-bar off
-  - travis_wait 30 pip install -r requirements.txt --progress-bar off
-  - export PYTHONPATH=$PWD:$PWD/src:$PYTHONPATH
-
-  # set library path
-  - export LD_LIBRARY_PATH=$HOME/miniconda/envs/test-environment/lib/:$LD_LIBRARY_PATH
+  - travis_wait 30 pip install .
+  - pip install pytest pytest-cache pytest-cov pytest-forked pytest-pep8 pytest-xdist --progress-bar off
 
 # command to run tests
 script:
-  - export MKL_THREADING_LAYER="GNU"
-  - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
   - if [[ "$TEST_MODE" == "PEP8" ]]; then
-      PYTHONPATH=$PWD:$PYTHONPATH pytest --pep8 -m pep8 -n0;
+      PYTHONPATH=$PWD:$PYTHONPATH pytest --pep8 -m pep8 ;
     elif [[ "$TEST_MODE" == "GENERAL" ]]; then
       PYTHONPATH=$PWD:$PYTHONPATH pytest -s tests/general/ 2>&1 ;
     elif [[ "$TEST_MODE" == "EXTRA" ]]; then

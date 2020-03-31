@@ -1,24 +1,35 @@
 import pytest
 import numpy as np
-from keras_wrapper.extra.evaluation import get_sacrebleu_score, get_coco_score,  multilabel_metrics, compute_perplexity
+from keras_wrapper.extra.evaluation import get_sacrebleu_score, get_coco_score, multilabel_metrics, compute_perplexity
 
 
 def test_get_sacrebleu_score():
     pred_list = ['Prediction 1 X W Z', 'Prediction 2 X W Z', 'Prediction 3 X W Z']
-    extra_vars = {'val': {'references': {0: ['Prediction 1 X W Z', 'Prediction 5'],
-                                         1: ['Prediction 2 X W Z', 'X Y Z'],
-                                         2: ['Prediction 3 X W Z', 'Prediction 5']}},
 
-                  'test': {'references': {0: ['Prediction 2 X W Z'],
-                                          1: ['Prediction 3 X W Z'],
-                                          2: ['Prediction 1 X W Z']}}
-                  }
-    val_scores = get_sacrebleu_score(pred_list, 0, extra_vars, 'val')
-    assert np.allclose(val_scores['Bleu_4'], 100.0, atol=1e6)
+    for tokenize_hypothesis in {True, False}:
+        for tokenize_references in {True, False}:
+            for apply_detokenization in {True, False}:
+                extra_vars = {'val': {'references': {0: ['Prediction 1 X W Z', 'Prediction 5'],
+                                                     1: ['Prediction 2 X W Z', 'X Y Z'],
+                                                     2: ['Prediction 3 X W Z', 'Prediction 5']},
+                                      },
 
+                              'test': {'references': {0: ['Prediction 2 X W Z'],
+                                                      1: ['Prediction 3 X W Z'],
+                                                      2: ['Prediction 1 X W Z']}
+                                       },
+                              'tokenize_hypothesis': tokenize_hypothesis,
+                              'tokenize_references': tokenize_references,
+                              'tokenize_references': apply_detokenization,
+                              'tokenize_f': lambda x: x,
+                              'detokenize_f': lambda x: x,
+                              }
+                val_scores = get_sacrebleu_score(pred_list, 0, extra_vars, 'val')
+                assert np.allclose(val_scores['Bleu_4'], 100.0, atol=1e6)
 
-    test_scores = get_sacrebleu_score(pred_list, 0, extra_vars, 'test')
-    assert np.allclose(test_scores['Bleu_4'], 0., atol=1e6)
+                test_scores = get_sacrebleu_score(pred_list, 0, extra_vars, 'test')
+                assert np.allclose(test_scores['Bleu_4'], 0., atol=1e6)
+
 
 def test_get_coco_score():
     pred_list = ['Prediction 1', 'Prediction 2', 'Prediction 3']

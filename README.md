@@ -10,19 +10,6 @@ You can access the library documentation page at [marcbs.github.io/multimodal_ke
 Some code examples are available in demo.ipynb and test.py. Additionally, in the section Projects you can see some practical examples of projects using this library.
 
 
-## Dependencies
-
-The following dependencies are required for using this library:
-
- - Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
- - [Coco-caption evaluation package](https://github.com/lvapeab/coco-caption/tree/master/pycocoevalcap/) (Only required to perform evaluation). This package requires `java` (version 1.8.0 or newer).
- - Those specified in the `requirements.txt` file.   
- - The `cupy` package can be used for performing numpy-like operations in the GPU. If not available, the package will fall back to numpy.
- 
-Only when using NMS for certain localization utilities:
- - [cython](https://pypi.python.org/pypi/Cython/0.25.2) >= 0.23.4
-
-
 ## Installation
 
 Assuming that you have [pip](https://en.wikipedia.org/wiki/Pip_(package_manager)) installed, run:
@@ -44,6 +31,18 @@ export PYTHONPATH=$PYTHONPATH:/path/to/multimodal_keras_wrapper
 ```
 pip install -r requirements.txt
 ```
+
+
+## Additional dependencies
+
+The following additional dependencies are required to fully exploit this library:
+
+ - Keras - [custom fork](https://github.com/MarcBS/keras) or [original version](https://github.com/fchollet/keras)
+ - The `cupy` package can be used for performing numpy-like operations in the GPU. If not available, the package will fall back to numpy.
+ - [Coco-caption evaluation package](https://github.com/lvapeab/coco-caption/tree/master/pycocoevalcap/) (Only required to perform COCO evaluation). This package requires `java` (version 1.8.0 or newer).
+ 
+Only when using NMS for certain localization utilities:
+ - [cython](https://pypi.python.org/pypi/Cython/0.25.2) >= 0.23.4
 
 
 ## Projects

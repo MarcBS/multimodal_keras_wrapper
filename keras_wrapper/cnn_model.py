@@ -2,10 +2,16 @@
 from __future__ import print_function
 
 import math
+import os
 import shutil
 import sys
 import time
 import logging
+import numpy as np
+import cloudpickle as cloudpk
+import copy
+from six import iteritems
+
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
 
@@ -13,21 +19,24 @@ if sys.version_info.major == 3:
     import _pickle as pk
 else:
     import cPickle as pk
-import cloudpickle as cloudpk
+
 import keras
+import keras.backend as K
 from keras.engine.training import Model
 from keras.layers import concatenate, MaxPooling2D, ZeroPadding2D, AveragePooling2D, Dense, Dropout, Flatten, Input, \
     Activation, BatchNormalization
 from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json, load_model
-from keras.optimizers import *
+from keras.optimizers import Adam, Adadelta, Adagrad, Adamax, Nadam, RMSprop, SGD, TFOptimizer
 from keras.regularizers import l2
 from keras.utils.layer_utils import print_summary
+
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator, Parallel_Data_Batch_Generator
-from keras_wrapper.extra.callbacks import *
-from keras_wrapper.extra.read_write import file2list
+from keras_wrapper.extra.callbacks import LearningRateReducer, EarlyStopping, StoreModelWeightsOnEpochEnd
+from keras_wrapper.extra.read_write import file2list, create_dir_if_not_exists
 from keras_wrapper.utils import one_hot_2_indices, decode_predictions, decode_predictions_one_hot, \
-    decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters, print_dict
+    decode_predictions_beam_search, replace_unknown_words, sampling, categorical_probas_to_classes, checkParameters, \
+    print_dict
 from keras_wrapper.search import beam_search
 
 # General setup of libraries
@@ -35,6 +44,7 @@ try:
     import cupy as cp
 except:
     import numpy as cp
+
     logger.info('<<< Cupy not available. Using numpy. >>>')
 
 if int(keras.__version__.split('.')[0]) == 1:
@@ -176,8 +186,8 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     if os.path.exists(model_name + '_init.h5') and os.path.exists(model_name + '_next.h5'):
         loading_optimized = 1
     elif os.path.exists(model_name + '_structure_init.json') and os.path.exists(
-            model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and os.path.exists(
-            model_name + '_weights_next.h5'):
+            model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and\
+            os.path.exists(model_name + '_weights_next.h5'):
         loading_optimized = 2
     else:
         loading_optimized = 0
@@ -545,7 +555,8 @@ class Model_Wrapper(object):
                                         'data_augmentation': False,
                                         'wo_da_patch_type': 'whole',  # wo_da_patch_type = 'central_crop' or 'whole'.
                                         'da_patch_type': 'resize_and_rndcrop',
-                                        'da_enhance_list': [],  # da_enhance_list = {brightness, color, sharpness, contrast}
+                                        'da_enhance_list': [],
+                                        # da_enhance_list = {brightness, color, sharpness, contrast}
                                         'verbose': 1,
                                         'eval_on_sets': ['val'],
                                         'reload_epoch': 0,
@@ -639,7 +650,8 @@ class Model_Wrapper(object):
                                        'verbose': 0,
                                        'predict_on_sets': ['val'],
                                        'max_eval_samples': None,
-                                       'model_name': 'model',  # name of the attribute where the model for prediction is stored
+                                       'model_name': 'model',
+                                       # name of the attribute where the model for prediction is stored
                                        }
 
     def setInputsMapping(self, inputsMapping):
@@ -1593,7 +1605,7 @@ class Model_Wrapper(object):
         references = []
         sources_sampling = []
         for s in params['predict_on_sets']:
-            print ("")
+            print("")
             print("", file=sys.stderr)
             logger.info("<<< Predicting outputs of " + s + " set >>>")
 
@@ -1634,11 +1646,13 @@ class Model_Wrapper(object):
                                                                           num_iterations,
                                                                           batch_size=1,
                                                                           normalization=params['normalize'],
-                                                                          normalization_type=params['normalization_type'],
+                                                                          normalization_type=params[
+                                                                              'normalization_type'],
                                                                           data_augmentation=False,
                                                                           mean_substraction=params['mean_substraction'],
                                                                           predict=True,
-                                                                          n_parallel_loaders=params['n_parallel_loaders'])
+                                                                          n_parallel_loaders=params[
+                                                                              'n_parallel_loaders'])
                     else:
                         data_gen_instance = Data_Batch_Generator(s,
                                                                  self,
@@ -1660,13 +1674,15 @@ class Model_Wrapper(object):
                         data_gen_instance = Parallel_Data_Batch_Generator(s, self, ds, num_iterations,
                                                                           batch_size=1,
                                                                           normalization=params['normalize'],
-                                                                          normalization_type=params['normalization_type'],
+                                                                          normalization_type=params[
+                                                                              'normalization_type'],
                                                                           data_augmentation=False,
                                                                           mean_substraction=params['mean_substraction'],
                                                                           predict=False,
                                                                           random_samples=n_samples,
                                                                           temporally_linked=params['temporally_linked'],
-                                                                          n_parallel_loaders=params['n_parallel_loaders'])
+                                                                          n_parallel_loaders=params[
+                                                                              'n_parallel_loaders'])
                     else:
                         data_gen_instance = Data_Batch_Generator(s, self, ds, num_iterations,
                                                                  batch_size=1,
@@ -1772,7 +1788,8 @@ class Model_Wrapper(object):
                                     coverage_penalties.append(params['coverage_norm_factor'] * cp_penalty)
                             else:
                                 coverage_penalties = [0.0 for _ in samples]
-                            scores = [co / lp + cov_p for co, lp, cov_p in zip(scores, length_penalties, coverage_penalties)]
+                            scores = [co / lp + cov_p for co, lp, cov_p in
+                                      zip(scores, length_penalties, coverage_penalties)]
 
                         elif params['normalize_probs']:
                             counts = [len(sample) ** params['alpha_factor'] for sample in samples]
@@ -1798,8 +1815,11 @@ class Model_Wrapper(object):
                                 previous_outputs[input_id][first_idx + sampled - 1] = best_sample[:sum(
                                     [int(elem > 0) for elem in best_sample])]
 
-                sys.stdout.write('\n Total cost of the translations: %f \t Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
-                sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' % ((time.time() - start_time), (time.time() - start_time) / n_samples))
+                sys.stdout.write('\n Total cost of the translations: %f \t'
+                                 ' Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
+                sys.stdout.write('The sampling took: %f secs '
+                                 '(Speed: %f sec/sample)\n' % ((time.time() - start_time),
+                                                               (time.time() - start_time) / n_samples))
 
                 sys.stdout.flush()
 
@@ -1903,7 +1923,8 @@ class Model_Wrapper(object):
                                                              mean_substraction=params['mean_substraction'],
                                                              predict=True,
                                                              random_samples=n_samples,
-                                                             n_parallel_loaders=params['n_parallel_loaders']).generator()
+                                                             n_parallel_loaders=params[
+                                                                 'n_parallel_loaders']).generator()
                 else:
                     data_gen = Data_Batch_Generator(s,
                                                     self,
@@ -2363,7 +2384,7 @@ class Model_Wrapper(object):
         """
         top_pred = np.argsort(pred, axis=1)[:, ::-1][:, :np.min([topN, pred.shape[1]])]
         pred = categorical_probas_to_classes(pred)
-        GT = np_utils.categorical_probas_to_classes(GT)
+        GT = categorical_probas_to_classes(GT)
 
         # Top1 accuracy
         correct = [1 if pred[i] == GT[i] else 0 for i in range(len(pred))]
