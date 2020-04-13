@@ -166,9 +166,9 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         model_name = model_path
     else:
         if reload_epoch:
-            model_name = model_path + "/epoch_" + iteration
+            model_name = os.path.join(model_path, "epoch_" + iteration)
         else:
-            model_name = model_path + "/update_" + iteration
+            model_name = os.path.join(model_path, "update_" + iteration)
 
     logger.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
     try:
@@ -186,7 +186,7 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     if os.path.exists(model_name + '_init.h5') and os.path.exists(model_name + '_next.h5'):
         loading_optimized = 1
     elif os.path.exists(model_name + '_structure_init.json') and os.path.exists(
-            model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and\
+            model_name + '_weights_init.h5') and os.path.exists(model_name + '_structure_next.json') and \
             os.path.exists(model_name + '_weights_next.h5'):
         loading_optimized = 2
     else:
@@ -258,9 +258,9 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
 
     if not full_path:
         if reload_epoch:
-            model_path = model_path + "/epoch_" + iteration
+            model_name = os.path.join(model_path, "epoch_" + iteration)
         else:
-            model_path = model_path + "/update_" + iteration
+            model_name = os.path.join(model_path, "update_" + iteration)
 
     logger.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
@@ -583,17 +583,18 @@ class Model_Wrapper(object):
                                         'min_lr': 1e-9,
                                         'tensorboard': False,
                                         'n_gpus': 1,
-                                        'tensorboard_params': {'log_dir': 'tensorboard_logs',
-                                                               'histogram_freq': 0,
-                                                               'batch_size': 50,
-                                                               'write_graph': True,
-                                                               'write_grads': False,
-                                                               'write_images': False,
-                                                               'embeddings_freq': 0,
-                                                               'embeddings_layer_names': None,
-                                                               'embeddings_metadata': None,
-                                                               'update_freq':'epoch'
-                                                               }
+                                        'tensorboard_params':
+                                            {'log_dir': 'tensorboard_logs',
+                                             'histogram_freq': 0,
+                                             'batch_size': 50,
+                                             'write_graph': True,
+                                             'write_grads': False,
+                                             'write_images': False,
+                                             'embeddings_freq': 0,
+                                             'embeddings_layer_names': None,
+                                             'embeddings_metadata': None,
+                                             'update_freq': 'epoch'
+                                             }
                                         }
         self.defaut_test_params = {'batch_size': 50,
                                    'n_parallel_loaders': 1,
@@ -1019,19 +1020,19 @@ class Model_Wrapper(object):
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
-            create_dir_if_not_exists(self.model_path + '/' + params['tensorboard_params']['log_dir'])
+            create_dir_if_not_exists(os.path.join(self.model_path, params['tensorboard_params']['log_dir']))
             callback_tensorboard = keras.callbacks.TensorBoard(
-                    log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
-                    histogram_freq=params['tensorboard_params']['histogram_freq'],
-                    batch_size=params['tensorboard_params']['batch_size'],
-                    write_graph=params['tensorboard_params']['write_graph'],
-                    write_grads=params['tensorboard_params']['write_grads'],
-                    write_images=params['tensorboard_params']['write_images'],
-                    embeddings_freq=params['tensorboard_params']['embeddings_freq'],
-                    embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                    embeddings_metadata=params['tensorboard_params']['embeddings_metadata'],
-                    update_freq=params['tensorboard_params']['update_freq'],
-                )
+                log_dir=os.path.join(self.model_path, params['tensorboard_params']['log_dir']),
+                histogram_freq=params['tensorboard_params']['histogram_freq'],
+                batch_size=params['tensorboard_params']['batch_size'],
+                write_graph=params['tensorboard_params']['write_graph'],
+                write_grads=params['tensorboard_params']['write_grads'],
+                write_images=params['tensorboard_params']['write_images'],
+                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'],
+                update_freq=params['tensorboard_params']['update_freq'],
+            )
             callback_tensorboard.set_model(self.model)
             callbacks.append(callback_tensorboard)
 
@@ -1195,8 +1196,9 @@ class Model_Wrapper(object):
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
+            create_dir_if_not_exists(os.path.join(self.model_path, params['tensorboard_params']['log_dir']))
             callback_tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
+                log_dir=os.path.join(self.model_path, params['tensorboard_params']['log_dir']),
                 histogram_freq=params['tensorboard_params']['histogram_freq'],
                 batch_size=params['tensorboard_params']['batch_size'],
                 write_graph=params['tensorboard_params']['write_graph'],
@@ -2514,7 +2516,7 @@ class Model_Wrapper(object):
             os.makedirs(self.model_path)
 
         # Save figure
-        plot_file = self.model_path + '/' + time_measure + '_' + str(max_iter) + '.jpg'
+        plot_file = os.path.join(self.model_path ,time_measure + '_' + str(max_iter) + '.jpg')
         plt.savefig(plot_file)
         if not self.silence:
             print("", file=sys.stderr)
