@@ -2516,7 +2516,7 @@ class Model_Wrapper(object):
             os.makedirs(self.model_path)
 
         # Save figure
-        plot_file = os.path.join(self.model_path ,time_measure + '_' + str(max_iter) + '.jpg')
+        plot_file = os.path.join(self.model_path, time_measure + '_' + str(max_iter) + '.jpg')
         plt.savefig(plot_file)
         if not self.silence:
             print("", file=sys.stderr)
