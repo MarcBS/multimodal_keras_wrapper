@@ -758,37 +758,7 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
     return [TP, FP, FN, TP_classes, FP_classes, FN_classes]
 
 
-def compute_perplexity(y_pred, y_true, verbose, split, mask=None):
-    """
-    Computes perplexity
-    :param y_pred:
-    :param y_true:
-    :param verbose:
-    :param split:
-    :param mask:
-    :return:
-    """
-
-    if mask is not None:
-        y_pred /= np.sum(y_pred, axis=-1, keepdims=True)
-        mask = np.reshape(np.asarray(mask), np.asarray(y_true).shape[:-1])[:, :, None]
-        truth_mask = (y_true * mask).flatten().nonzero()[0]
-        predictions = y_pred.flatten()[truth_mask]
-        ppl = np.power(2, np.mean(-np.log2(predictions)))
-        if verbose > 0:
-            logger.info('Computing perplexity scores on the %s split...' % split)
-            logger.info('PPL: ' + str(ppl))
-        return ppl
-    else:
-        ppl = np.power(2, np.mean(-np.log2(y_pred)))
-        if verbose > 0:
-            logger.info('Computing perplexity scores on the %s split...' % split)
-            logger.info('PPL: ' + str(ppl))
-        return ppl
-
-
 # AUXILIARY FUNCTIONS
-
 def vqa_store(question_id_list, answer_list, path):
     """
     Saves the answers on question_id_list in the VQA-like format.
@@ -828,7 +798,6 @@ selectMetric = {
     'AP': averagePrecision,
     'sem_seg_acc': semantic_segmentation_accuracy,
     'sem_seg_iou': semantic_segmentation_meaniou,
-    'ppl': compute_perplexity,
 }
 
 select = selectMetric

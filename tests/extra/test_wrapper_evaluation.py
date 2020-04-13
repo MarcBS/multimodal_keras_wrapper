@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from keras_wrapper.extra.evaluation import get_sacrebleu_score, get_coco_score, multilabel_metrics, compute_perplexity
+from keras_wrapper.extra.evaluation import get_sacrebleu_score, get_coco_score, multilabel_metrics
 
 
 def test_get_sacrebleu_score():
@@ -90,13 +90,6 @@ def test_multilabel_metrics():
 def test_multiclass_metrics():
     # TODO
     pass
-
-
-def test_compute_perplexity():
-    y_pred = [[1, 2, 3, 3, 4], [1, 1, 2, 3, 4]]
-    y_true = [[1, 2, 3, 3, 4], [1, 1, 2, 3, 4]]
-    ppl = compute_perplexity(y_pred, y_true, 0, 'val')
-    assert np.allclose(ppl, 0.47, atol=1e6)
 
 
 def test_semantic_segmentation_accuracy():

@@ -558,7 +558,7 @@ class Model_Wrapper(object):
                                         'da_enhance_list': [],
                                         # da_enhance_list = {brightness, color, sharpness, contrast}
                                         'verbose': 1,
-                                        'eval_on_sets': ['val'],
+                                        'eval_on_sets': 'val',
                                         'reload_epoch': 0,
                                         'extra_callbacks': [],
                                         'class_weights': None,
@@ -591,7 +591,8 @@ class Model_Wrapper(object):
                                                                'write_images': False,
                                                                'embeddings_freq': 0,
                                                                'embeddings_layer_names': None,
-                                                               'embeddings_metadata': None
+                                                               'embeddings_metadata': None,
+                                                               'update_freq':'epoch'
                                                                }
                                         }
         self.defaut_test_params = {'batch_size': 50,
@@ -1018,37 +1019,19 @@ class Model_Wrapper(object):
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
-            # embeddings_metadata = params['tensorboard_params']['embeddings_metadata']
             create_dir_if_not_exists(self.model_path + '/' + params['tensorboard_params']['log_dir'])
-            # if params['tensorboard_params']['label_word_embeddings_with_vocab'] \
-            #         and params['tensorboard_params']['word_embeddings_labels'] is not None:
-            #     embeddings_metadata = {}
-            #     if len(params['tensorboard_params']['embeddings_layer_names']) != len(params['tensorboard_params']['word_embeddings_labels']):
-            #         raise AssertionError('The number of "embeddings_layer_names" and "word_embeddings_labels" do not match. Currently, '
-            #                              'we have %d "embeddings_layer_names" and %d "word_embeddings_labels"' %
-            #                              (len(params['tensorboard_params']['embeddings_layer_names']),
-            #                               len(params['tensorboard_params']['word_embeddings_labels'])))
-            #     # Prepare word embeddings mapping
-            #     for i, layer_name in list(enumerate(params['tensorboard_params']['embeddings_layer_names'])):
-            #         layer_label = params['tensorboard_params']['word_embeddings_labels'][i]
-            #         mapping_name = layer_label + '.tsv'
-            #         dict2file(ds.vocabulary[layer_label]['words2idx'],
-            #                   self.model_path + '/' + params['tensorboard_params']['log_dir'] + '/' + mapping_name,
-            #                   title='Word\tIndex',
-            #                   separator='\t')
-            #         embeddings_metadata[layer_name] = mapping_name
-
             callback_tensorboard = keras.callbacks.TensorBoard(
-                log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
-                histogram_freq=params['tensorboard_params']['histogram_freq'],
-                batch_size=params['tensorboard_params']['batch_size'],
-                write_graph=params['tensorboard_params']['write_graph'],
-                write_grads=params['tensorboard_params']['write_grads'],
-                write_images=params['tensorboard_params']['write_images'],
-                # embeddings_freq=params['tensorboard_params']['embeddings_freq'],
-                # embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                # embeddings_metadata=embeddings_metadata
-            )
+                    log_dir=self.model_path + '/' + params['tensorboard_params']['log_dir'],
+                    histogram_freq=params['tensorboard_params']['histogram_freq'],
+                    batch_size=params['tensorboard_params']['batch_size'],
+                    write_graph=params['tensorboard_params']['write_graph'],
+                    write_grads=params['tensorboard_params']['write_grads'],
+                    write_images=params['tensorboard_params']['write_images'],
+                    embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                    embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                    embeddings_metadata=params['tensorboard_params']['embeddings_metadata'],
+                    update_freq=params['tensorboard_params']['update_freq'],
+                )
             callback_tensorboard.set_model(self.model)
             callbacks.append(callback_tensorboard)
 
@@ -1098,8 +1081,7 @@ class Model_Wrapper(object):
                                              shuffle=params['shuffle']).generator()
 
         # Are we going to validate on 'val' data?
-        if False:  # TODO: loss calculation on val set is deactivated
-            # if 'val' in params['eval_on_sets']:
+        if params['eval_on_sets']:
             # Calculate how many validation iterations are we going to perform per test
             n_valid_samples = ds.len_val
             if params['num_iterations_val'] is None:
@@ -1107,7 +1089,10 @@ class Model_Wrapper(object):
 
             # prepare data generator
             if params['n_parallel_loaders'] > 1:
-                val_gen = Parallel_Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+                val_gen = Parallel_Data_Batch_Generator(params['eval_on_sets'],
+                                                        self,
+                                                        ds,
+                                                        params['num_iterations_val'],
                                                         batch_size=params['batch_size'],
                                                         normalization=params['normalize'],
                                                         normalization_type=params['normalization_type'],
@@ -1116,7 +1101,10 @@ class Model_Wrapper(object):
                                                         shuffle=False,
                                                         n_parallel_loaders=params['n_parallel_loaders']).generator()
             else:
-                val_gen = Data_Batch_Generator('val', self, ds, params['num_iterations_val'],
+                val_gen = Data_Batch_Generator(params['eval_on_sets'],
+                                               self,
+                                               ds,
+                                               params['num_iterations_val'],
                                                batch_size=params['batch_size'],
                                                normalization=params['normalize'],
                                                normalization_type=params['normalization_type'],
@@ -1158,6 +1146,7 @@ class Model_Wrapper(object):
                                          callbacks=callbacks,
                                          validation_data=val_gen,
                                          validation_steps=n_valid_samples,
+                                         validation_freq=params['each_n_epochs'],
                                          class_weight=class_weight,
                                          max_queue_size=params['n_parallel_loaders'],
                                          workers=1,
@@ -1213,10 +1202,12 @@ class Model_Wrapper(object):
                 write_graph=params['tensorboard_params']['write_graph'],
                 write_grads=params['tensorboard_params']['write_grads'],
                 write_images=params['tensorboard_params']['write_images'],
-                # embeddings_freq=params['tensorboard_params']['embeddings_freq'],
-                # embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                # embeddings_metadata=params['tensorboard_params']['embeddings_metadata']
+                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'],
+                update_freq=params['tensorboard_params']['update_freq'],
             )
+            callback_tensorboard.set_model(self.model)
             callbacks.append(callback_tensorboard)
 
         # Train model
