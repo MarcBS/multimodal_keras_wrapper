@@ -85,9 +85,9 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
             model_name = path
     else:
         if store_iter:
-            model_name = path + '/update_' + iteration
+            model_name = os.path.join(path, 'update_' + iteration)
         else:
-            model_name = path + '/epoch_' + iteration
+            model_name = os.path.join(path, 'epoch_' + iteration)
 
     if not model_wrapper.silence:
         logger.info("<<< Saving model to " + model_name + " ... >>>")

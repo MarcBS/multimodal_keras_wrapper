@@ -45,7 +45,7 @@ def saveDataset(dataset, store_path):
     :return: None
     """
     create_dir_if_not_exists(store_path)
-    store_path = store_path + '/Dataset_' + dataset.name + '.pkl'
+    store_path = os.path.join(store_path, 'Dataset_' + dataset.name + '.pkl')
     if not dataset.silence:
         logger.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
 

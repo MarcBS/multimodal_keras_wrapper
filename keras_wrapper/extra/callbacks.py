@@ -3,6 +3,7 @@ from __future__ import print_function
 import copy
 import logging
 import numpy as np
+import os
 import sys
 import warnings
 
@@ -490,8 +491,9 @@ class EvalPerformance(KerasCallback):
                 # Store predictions
                 if self.write_samples:
                     # Store result
-                    filepath = self.save_path + '/' + s + '_' + counter_name + '_' + str(epoch) + '_output_' + str(
-                        gt_pos) + '.pred'  # results file
+                    filepath = os.path.join(
+                        self.save_path,
+                        s + '_' + counter_name + '_' + str(epoch) + '_output_' + str(gt_pos) + '.pred')  # results file
                     if write_type == 'list':
                         list2file(filepath, decoded_predictions)
                     elif write_type == 'vqa':
@@ -515,8 +517,8 @@ class EvalPerformance(KerasCallback):
                         raise NotImplementedError(
                             'Write 3DLabels function is not implemented')
                     elif write_type == '3DSemanticLabel':
-                        folder_path = self.save_path + '/' + s + '_' + counter_name + '_' + str(
-                            epoch)  # results folder
+                        folder_path = os.path.join(self.save_path,
+                                                   s + '_' + counter_name + '_' + str(epoch))
                         numpy2imgs(folder_path,
                                    decoded_predictions,
                                    eval('self.ds.X_' + s + '["' + self.input_id + '"]'),
@@ -528,7 +530,8 @@ class EvalPerformance(KerasCallback):
                 for metric in these_metrics:
                     if self.verbose > 0:
                         logger.info('Evaluating on metric ' + metric)
-                    filepath = self.save_path + '/' + s + '.' + metric  # results file
+                    filepath = os.path.join(self.save_path,
+                                            s + '.' + metric)
 
                     if s == 'train':
                         logger.info(
