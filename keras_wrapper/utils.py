@@ -153,7 +153,8 @@ def build_OneVsOneECOC_Stage(n_classes_ecoc, input_shape, ds, stage1_lr=0.01,
 
         outputs_list.append('loss_OnevsOne/output')
 
-        logger.info('Built model %s/%s for classes %s in %0.5s seconds.' % (str(count + 1), str(n_combs), c, str(time.time() - t)))
+        logger.info('Built model %s/%s for classes %s in %0.5s seconds.' % (
+            str(count + 1), str(n_combs), c, str(time.time() - t)))
         count += 1
 
     return [stage, outputs_list]
@@ -774,7 +775,8 @@ def average_models(models, output_model, weights=None, custom_objects=None):
         raise AssertionError('You provided an empty list of models to average!')
 
     model_weights = np.asarray([1. / len(models)] * len(models),
-                               dtype=np.float32) if (weights is None) or (weights == []) else np.asarray(weights, dtype=np.float32)
+                               dtype=np.float32) if (weights is None) or (weights == []) else np.asarray(weights,
+                                                                                                         dtype=np.float32)
     if len(model_weights) != len(models):
         raise AssertionError(
             'You must give a list of weights of the same size than the list of models.')
@@ -785,27 +787,30 @@ def average_models(models, output_model, weights=None, custom_objects=None):
         raise AssertionError('Not all models have the attribute "model".')
     if not (all([hasattr(loaded_model, 'model_init') for loaded_model in
                  loaded_models]) or all(
-            [not hasattr(loaded_model, 'model_init') for loaded_model in
-             loaded_models])):
+        [not hasattr(loaded_model, 'model_init') for loaded_model in
+         loaded_models])):
         raise AssertionError('Not all models have the attribute "model_init".')
 
     if not (all([hasattr(loaded_model, 'model_next') for loaded_model in
                  loaded_models]) or all(
-            [not hasattr(loaded_model, 'model_next') for loaded_model in
-             loaded_models])):
+        [not hasattr(loaded_model, 'model_next') for loaded_model in
+         loaded_models])):
         raise AssertionError('Not all models have the attribute "model_next".')
 
     # Check all layers are the same
 
-    if not (all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models])):
+    if not (all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
+                  range(len(loaded_models[0].model.weights))] for loaded_model in loaded_models])):
         raise AssertionError('Not all models have the same weights!')
 
     if hasattr(loaded_models[0], 'model_init') and getattr(loaded_models[0], 'model_init') is not None:
-        if not all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in range(len(loaded_models[0].model_init.weights))] for loaded_model in loaded_models]):
+        if not all([[str(loaded_models[0].model.weights[i]) == str(loaded_model.model.weights[i]) for i in
+                     range(len(loaded_models[0].model_init.weights))] for loaded_model in loaded_models]):
             raise AssertionError('Not all model_inits have the same weights!')
 
     if hasattr(loaded_models[0], 'model_next') and getattr(loaded_models[0], 'model_next') is not None:
-        if not all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in range(len(loaded_models[0].model_next.weights))] for loaded_model in loaded_models]):
+        if not all([[str(loaded_models[0].model_next.weights[i]) == str(loaded_model.model_next.weights[i]) for i in
+                     range(len(loaded_models[0].model_next.weights))] for loaded_model in loaded_models]):
             raise AssertionError('Not all model_nexts have the same weights!')
 
     # Retrieve weights, weigh them and overwrite in model[0].
@@ -829,21 +834,24 @@ def average_models(models, output_model, weights=None, custom_objects=None):
         current_weights = loaded_models[m].model.get_weights()
         prev_weights = loaded_models[0].model.get_weights()
         loaded_models[0].model.set_weights(
-            [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+            [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+             range(len(current_weights))])
 
         # We have model_init
         if hasattr(loaded_models[0], 'model_init') and getattr(loaded_models[0], 'model_init') is not None:
             current_weights = loaded_models[m].model_init.get_weights()
             prev_weights = loaded_models[0].model_init.get_weights()
             loaded_models[0].model_init.set_weights(
-                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                 range(len(current_weights))])
 
         # We have model_next
         if hasattr(loaded_models[0], 'model_next') and getattr(loaded_models[0], 'model_next') is not None:
             current_weights = loaded_models[m].model_next.get_weights()
             prev_weights = loaded_models[0].model_next.get_weights()
             loaded_models[0].model_next.set_weights(
-                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in range(len(current_weights))])
+                [current_weights[matrix_index] * model_weights[m] + prev_weights[matrix_index] for matrix_index in
+                 range(len(current_weights))])
 
     # Save averaged model
     saveModel(loaded_models[0], -1, path=output_model, full_path=True,
@@ -1084,9 +1092,11 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
 
 def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None,
                                    heuristic=0,
-                                   x_text=None, unk_symbol='<unk>',
+                                   x_text=None,
+                                   unk_symbol='<unk>',
                                    pad_sequences=False,
-                                   mapping=None, verbose=0):
+                                   mapping=None,
+                                   verbose=0):
     """
     Decodes predictions from the BeamSearch method.
 

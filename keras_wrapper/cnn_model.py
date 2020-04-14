@@ -1692,11 +1692,9 @@ class Model_Wrapper(object):
                     references = []
                     sources_sampling = []
                 best_samples = []
-                if params['pos_unk']:
-                    best_alphas = []
-                    sources = []
-
-                total_cost = 0
+                best_scores = np.array([])
+                best_alphas = []
+                sources = []
                 sampled = 0
                 start_time = time.time()
                 eta = -1
@@ -1788,12 +1786,13 @@ class Model_Wrapper(object):
                             counts = [len(sample) ** params['alpha_factor'] for sample in samples]
                             scores = [co / cn for co, cn in zip(scores, counts)]
 
-                        best_score = np.argmin(scores)
-                        best_sample = samples[best_score]
+                        best_score_idx = np.argmin(scores)
+                        best_sample = samples[best_score_idx]
                         best_samples.append(best_sample)
+                        best_scores = np.concatenate([best_scores, [scores[best_score_idx]]])
                         if params['pos_unk']:
-                            best_alphas.append(np.asarray(alphas[best_score]))
-                        total_cost += scores[best_score]
+                            best_alphas.append(np.asarray(alphas[best_score_idx]))
+
                         eta = (n_samples - sampled) * (time.time() - start_time) / sampled
                         if params['n_samples'] > 0:
                             for output_id in params['model_outputs']:
@@ -1807,22 +1806,24 @@ class Model_Wrapper(object):
                                 # Get all words previous to the padding
                                 previous_outputs[input_id][first_idx + sampled - 1] = best_sample[:sum(
                                     [int(elem > 0) for elem in best_sample])]
-
-                sys.stdout.write('\n Total cost of the translations: %f \t'
-                                 ' Average cost of the translations: %f\n' % (total_cost, total_cost / n_samples))
+                sys.stdout.write('\n Total cost: %f \t'
+                                 ' Average cost: %f\n' % (np.sum(best_scores), np.average(best_scores)))
                 sys.stdout.write('The sampling took: %f secs '
                                  '(Speed: %f sec/sample)\n' % ((time.time() - start_time),
                                                                (time.time() - start_time) / n_samples))
 
                 sys.stdout.flush()
-
+                sources = None
                 if params['pos_unk']:
                     if eval('ds.loaded_raw_' + s + '[0]'):
                         sources = file2list(eval('ds.X_raw_' + s + '["raw_' + params['model_inputs'][0] + '"]'),
                                             stripfile=False)
-                    predictions[s] = (np.asarray(best_samples), best_alphas, sources)
-                else:
-                    predictions[s] = np.asarray(best_samples)
+                predictions[s] = {
+                    'samples': np.asarray(best_samples),
+                    'alphas': best_alphas,
+                    'sources': sources,
+                    'costs': best_scores
+                }
         del data_gen
         del data_gen_instance
         if params['n_samples'] < 1:
