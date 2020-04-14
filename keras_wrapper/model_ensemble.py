@@ -306,7 +306,8 @@ class BeamSearchEnsemble:
                             references.append(Y[output_id][i])
 
             sys.stdout.write('\n Total cost: %f \t'
-                             ' Average cost: %f\n' % (np.sum(best_scores), np.average(best_scores)))
+                             ' Average cost: %f\n' % (float(np.sum(best_scores, axis=None)),
+                                                      float(np.average(best_scores, axis=None))))
             sys.stdout.write('The sampling took: %f secs (Speed: %f sec/sample)\n' %
                              ((time.time() - start_time), (time.time() - start_time) / n_samples))
             sys.stdout.flush()

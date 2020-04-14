@@ -194,7 +194,6 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
             sample_scores.append(hyp_scores[idx])
             if ret_alphas:
                 sample_alphas.append(hyp_alphas[idx])
-    if ret_alphas:
-        return samples, sample_scores, np.asarray(sample_alphas)
-    else:
-        return samples, sample_scores, None
+
+    alphas = np.asarray(sample_alphas) if ret_alphas else None
+    return samples, np.asarray(sample_scores, dtype='float32'),  alphas
