@@ -2,11 +2,14 @@
 import copy
 import numpy as np
 import logging
+
 try:
     import cupy as cp
+
     cupy = True
 except:
     import numpy as cp
+
     cupy = False
 
 
@@ -76,10 +79,13 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
     # we must include an additional dimension if the input for each timestep are all the generated "words_so_far"
     if params['words_so_far']:
         if k > maxlen:
-            raise NotImplementedError("BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
-        state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray([np.zeros((maxlen, maxlen))] * live_k)
+            raise NotImplementedError(
+                "BEAM_SIZE can't be higher than MAX_OUTPUT_TEXT_LEN on the current implementation.")
+        state_below = np.asarray([[null_sym]] * live_k) if pad_on_batch else np.asarray(
+            [np.zeros((maxlen, maxlen))] * live_k)
     else:
-        state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray([np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
+        state_below = np.asarray([null_sym] * live_k) if pad_on_batch else np.asarray(
+            [np.zeros(params['state_below_maxlen']) + null_sym] * live_k)
     prev_out = [None] * n_models if model_ensemble else None
 
     for ii in range(maxlen):
@@ -196,4 +202,4 @@ def beam_search(model, X, params, return_alphas=False, eos_sym=0, null_sym=2, mo
                 sample_alphas.append(hyp_alphas[idx])
 
     alphas = np.asarray(sample_alphas) if ret_alphas else None
-    return samples, np.asarray(sample_scores, dtype='float32'),  alphas
+    return samples, np.asarray(sample_scores, dtype='float32'), alphas
