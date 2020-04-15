@@ -87,7 +87,6 @@ class BeamSearchEnsemble:
     def predict_cond(self, X, states_below, params, ii):
         """
         Call the prediction functions of all models, according to their inputs
-        :param models: List of models in the ensemble
         :param X: Input data
         :param states_below: Previously generated words (in case of conditional models)
         :param params: Model parameters

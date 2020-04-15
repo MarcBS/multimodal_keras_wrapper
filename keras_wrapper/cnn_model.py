@@ -448,6 +448,7 @@ class Model_Wrapper(object):
         self.model = None
         self.model_init = None
         self.model_next = None
+        self.multi_gpu_model = None
         # self.model_to_train = None
 
         # Inputs and outputs names for models of class Model
@@ -1121,7 +1122,7 @@ class Model_Wrapper(object):
         if params['class_weights'] is not None:
             class_weight = ds.extra_variables['class_weights_' + params['class_weights']]
         # Train model
-        if params.get('n_gpus', 1) > 1 and hasattr(self, 'multi_gpu_model') and self.multi_gpu_model is not None:
+        if params.get('n_gpus', 1) > 1 and self.multi_gpu_model is not None:
             model_to_train = self.multi_gpu_model
         else:
             model_to_train = self.model

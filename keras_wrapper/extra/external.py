@@ -4,7 +4,6 @@
 from __future__ import division, unicode_literals
 
 import sys
-import inspect
 import argparse
 import re
 

@@ -691,7 +691,6 @@ class Sample(KerasCallback):
             :param model: model to evaluate
             :param dataset: instance of the class Dataset in keras_wrapper.dataset
             :param gt_id: identifier in the Dataset instance of the output data about to evaluate
-            :param metric_name: name of the performance metric
             :param set_name: name of the set split that will be evaluated
             :param n_samples: number of samples predicted during sampling
             :param each_n_updates: sampling each this number of epochs

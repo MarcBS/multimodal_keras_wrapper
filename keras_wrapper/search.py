@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 import copy
 import numpy as np
-import logging
 
 try:
     import cupy as cp
