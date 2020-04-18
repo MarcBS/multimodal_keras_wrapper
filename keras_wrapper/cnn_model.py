@@ -29,7 +29,6 @@ from keras.layers.advanced_activations import PReLU
 from keras.models import Sequential, model_from_json, load_model
 from keras.optimizers import Adam, Adadelta, Adagrad, Adamax, Nadam, RMSprop, SGD, TFOptimizer
 from keras.regularizers import l2
-from keras.utils.layer_utils import print_summary
 
 from keras_wrapper.dataset import Data_Batch_Generator, Homogeneous_Data_Batch_Generator, Parallel_Data_Batch_Generator
 from keras_wrapper.extra.callbacks import LearningRateReducer, EarlyStopping, StoreModelWeightsOnEpochEnd
@@ -138,8 +137,14 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         backup_multi_gpu_model = model_wrapper.multi_gpu_model
         setattr(model_wrapper, 'multi_gpu_model', None)
 
+    backup_tensorboard_callback = None
+    if hasattr(model_wrapper, 'tensorboard_callback'):
+        backup_tensorboard_callback = model_wrapper.tensorboard_callback
+        setattr(model_wrapper, 'tensorboard_callback', None)
+
     cloudpk.dump(model_wrapper, open(model_name + '_Model_Wrapper.pkl', 'wb'))
     setattr(model_wrapper, 'multi_gpu_model', backup_multi_gpu_model)
+    setattr(model_wrapper, 'tensorboard_callback', backup_tensorboard_callback)
 
     if not model_wrapper.silence:
         logger.info("<<< Model saved >>>")
@@ -486,7 +491,7 @@ class Model_Wrapper(object):
         self.default_training_params = dict()
         self.default_predict_with_beam_params = dict()
         self.default_test_params = dict()
-
+        self.tensorboard_callback = None
         self.set_default_params()
 
         # Prepare model
@@ -514,6 +519,9 @@ class Model_Wrapper(object):
                 if not self.silence:
                     logger.info("<<< Loading weights from file " + weights_path + " >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
+
+
+
 
     def updateLogger(self, force=False):
         """
@@ -773,6 +781,21 @@ class Model_Wrapper(object):
         if not self.silence:
             logger.info("Optimizer updated, learning rate set to " + str(lr))
 
+    def set_tensorboard_callback(self, params):
+            create_dir_if_not_exists(os.path.join(self.model_path, params['tensorboard_params']['log_dir']))
+            self.tensorboard_callback = keras.callbacks.TensorBoard(
+                log_dir=os.path.join(self.model_path, params['tensorboard_params']['log_dir']),
+                histogram_freq=params['tensorboard_params']['histogram_freq'],
+                batch_size=params['tensorboard_params']['batch_size'],
+                write_graph=params['tensorboard_params']['write_graph'],
+                write_grads=params['tensorboard_params']['write_grads'],
+                write_images=params['tensorboard_params']['write_images'],
+                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
+                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
+                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'],
+                update_freq=params['tensorboard_params']['update_freq'],
+            )
+
     def compile(self, **kwargs):
         """
         Compile the model.
@@ -837,33 +860,6 @@ class Model_Wrapper(object):
     #       MODEL MODIFICATION
     #           Methods for modifying specific layers of the network
     # ------------------------------------------------------- #
-
-    def replaceLastLayers(self, num_remove, new_layers):
-        """
-            Replaces the last 'num_remove' layers in the model by the newly defined in 'new_layers'.
-            Function only valid for Sequential models. Use self.removeLayers(...) for Graph models.
-        """
-        if not self.silence:
-            logger.info("Replacing layers...")
-
-        removed_layers = []
-        removed_params = []
-        # If it is a Sequential model
-        if isinstance(self.model, Sequential):
-            # Remove old layers
-            for _ in range(num_remove):
-                removed_layers.append(self.model.layers.pop())
-                removed_params.append(self.model.params.pop())
-
-            # Insert new layers
-            for layer in new_layers:
-                self.model.add(layer)
-
-        # If it is a Graph model
-        else:
-            raise NotImplementedError("Try using self.removeLayers(...) instead.")
-
-        return [removed_layers, removed_params]
 
     # ------------------------------------------------------- #
     #       TRAINING/TEST
@@ -1021,21 +1017,9 @@ class Model_Wrapper(object):
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
-            create_dir_if_not_exists(os.path.join(self.model_path, params['tensorboard_params']['log_dir']))
-            callback_tensorboard = keras.callbacks.TensorBoard(
-                log_dir=os.path.join(self.model_path, params['tensorboard_params']['log_dir']),
-                histogram_freq=params['tensorboard_params']['histogram_freq'],
-                batch_size=params['tensorboard_params']['batch_size'],
-                write_graph=params['tensorboard_params']['write_graph'],
-                write_grads=params['tensorboard_params']['write_grads'],
-                write_images=params['tensorboard_params']['write_images'],
-                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
-                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'],
-                update_freq=params['tensorboard_params']['update_freq'],
-            )
-            callback_tensorboard.set_model(self.model)
-            callbacks.append(callback_tensorboard)
+            self.set_tensorboard_callback(params)
+            self.tensorboard_callback.set_model(self.model)
+            callbacks.append(self.tensorboard_callback)
 
         # Prepare data generators
         if params['homogeneous_batches']:
@@ -1197,21 +1181,9 @@ class Model_Wrapper(object):
 
         # Tensorboard callback
         if params['tensorboard'] and K.backend() == 'tensorflow':
-            create_dir_if_not_exists(os.path.join(self.model_path, params['tensorboard_params']['log_dir']))
-            callback_tensorboard = keras.callbacks.TensorBoard(
-                log_dir=os.path.join(self.model_path, params['tensorboard_params']['log_dir']),
-                histogram_freq=params['tensorboard_params']['histogram_freq'],
-                batch_size=params['tensorboard_params']['batch_size'],
-                write_graph=params['tensorboard_params']['write_graph'],
-                write_grads=params['tensorboard_params']['write_grads'],
-                write_images=params['tensorboard_params']['write_images'],
-                embeddings_freq=params['tensorboard_params']['embeddings_freq'],
-                embeddings_layer_names=params['tensorboard_params']['embeddings_layer_names'],
-                embeddings_metadata=params['tensorboard_params']['embeddings_metadata'],
-                update_freq=params['tensorboard_params']['update_freq'],
-            )
-            callback_tensorboard.set_model(self.model)
-            callbacks.append(callback_tensorboard)
+            self.set_tensorboard_callback(params)
+            self.tensorboard_callback.set_model(self.model)
+            callbacks.append(self.tensorboard_callback)
 
         # Train model
         if params.get('n_gpus', 1) > 1 and hasattr(self, 'model_to_train'):
@@ -2219,25 +2191,6 @@ class Model_Wrapper(object):
         return decode_predictions(preds, temperature, index2word, sampling_type, verbose=verbose)
 
     @staticmethod
-    def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
-                              heuristic=0, mapping=None, verbose=0):
-        """
-        Replaces unknown words from the target sentence according to some heuristic.
-        Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
-        :param src_word_seq: Source sentence words
-        :param trg_word_seq: Hypothesis words
-        :param hard_alignment: Target-Source alignments
-        :param unk_symbol: Symbol in trg_word_seq to replace
-        :param heuristic: Heuristic (0, 1, 2)
-        :param mapping: External alignment dictionary
-        :param verbose: Verbosity level
-        :return: trg_word_seq with replaced unknown words
-        """
-        logger.warning("Deprecated function, use utils.replace_unknown_words() instead.")
-        return replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
-                                     heuristic=heuristic, mapping=mapping, verbose=verbose)
-
-    @staticmethod
     def decode_predictions_beam_search(preds, index2word, alphas=None, heuristic=0,
                                        x_text=None, unk_symbol='<unk>', pad_sequences=False,
                                        mapping=None, verbose=0):
@@ -2401,10 +2354,17 @@ class Model_Wrapper(object):
         """
         Plot basic model information.
         """
-
-        # if(isinstance(self.model, Model)):
-        print_summary(self.model.layers)
+        keras.utils.layer_utils.print_summary(self.model.layers)
         return ''
+
+    def log_tensorboard(self, metrics, step, split=None):
+        """Logs scalar metrics in Tensorboard
+        """
+        if self.tensorboard_callback:
+            if split:
+                metrics = {str(split) + '/' + k: v for k, v in iteritems(metrics)}
+            self.tensorboard_callback._write_logs(metrics, step)
+
 
     def log(self, mode, data_type, value):
         """
@@ -2416,9 +2376,6 @@ class Model_Wrapper(object):
         """
         if mode not in self.__modes:
             raise Exception('The provided mode "' + mode + '" is not valid.')
-        # if data_type not in self.__data_types:
-        #    raise Exception('The provided data_type "'+ data_type +'" is not valid.')
-
         if mode not in self.__logger:
             self.__logger[mode] = dict()
         if data_type not in self.__logger[mode]:

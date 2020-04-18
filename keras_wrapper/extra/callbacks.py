@@ -546,6 +546,9 @@ class EvalPerformance(KerasCallback):
                         split=s,
                         costs=prediction_costs
                     )
+                    self.model_to_eval.log_tensorboard(metrics,
+                                                       epoch,
+                                                       split=s)
                     # Print results to file and store in model log
                     with open(filepath, 'a') as f:
                         header = counter_name + ','
