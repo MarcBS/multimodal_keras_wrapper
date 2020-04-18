@@ -319,7 +319,7 @@ class Model_Wrapper(object):
                                    the desired output order (in this case only one value can be provided).
                                    If it is Model then keys must be str.
             :param acc_output: name of the model's output that will be used for calculating
-                              the accuracy of the model (only needed for Graph models)
+                              the accuracy of the model (only needed for Model models)
         """
         if isinstance(self.model, Sequential) and len(list(outputsMapping)) > 1:
             raise Exception("When using Sequential models only one output can be provided in outputsMapping")
@@ -404,9 +404,12 @@ class Model_Wrapper(object):
         if not self.silence:
             logger.info("Compiling model...")
 
-        # compile differently depending if our model is 'Sequential', 'Model' or 'Graph'
+        # compile differently depending if our model is 'Sequential', 'Model'
         if isinstance(self.model, Sequential) or isinstance(self.model, Model):
-            self.model.compile(optimizer=optimizer, metrics=metrics, loss=loss, loss_weights=loss_weights,
+            self.model.compile(optimizer=optimizer,
+                               metrics=metrics,
+                               loss=loss,
+                               loss_weights=loss_weights,
                                sample_weight_mode=sample_weight_mode)
         else:
             raise NotImplementedError()
@@ -576,8 +579,7 @@ class Model_Wrapper(object):
             :param parameters:
             :param class_weight:
             :param sample_weight:
-            :param out_name: name of the output node that will be used to evaluate the network accuracy.
-                             Only applicable to Graph models.
+            :param out_name: name of the output node that will be used to evaluate the network accuracy. Only applicable to Models.
 
             The input 'parameters' is a dict() which may contain the following (optional) training parameters:
             ####    Visualization parameters
@@ -884,7 +886,6 @@ class Model_Wrapper(object):
         for name, o in zip(self.model.metrics_names, out):
             logger.info('test ' + name + ': %0.8s' % o)
 
-
     def testNetSamples(self, X, batch_size=50):
         """
             Applies a forward pass on the samples provided and returns the predicted classes and probabilities.
@@ -914,7 +915,7 @@ class Model_Wrapper(object):
                 return loss, score, top_score, n_samples
             return loss, n_samples
         else:
-            [data, last_output] = self._prepareGraphData(X, Y)
+            [data, last_output] = self._prepareModelData(X, Y)
             loss = self.model.test_on_batch(data)
             loss = loss[0]
             if accuracy:
@@ -1594,10 +1595,10 @@ class Model_Wrapper(object):
         predictions = self.model.predict_on_batch(X)
 
         # Select output if indicated
-        if isinstance(self.model, Model):  # Graph
+        if isinstance(self.model, Model):
             if out_name:
                 predictions = predictions[out_name]
-        elif isinstance(self.model, Sequential):  # Sequential
+        elif isinstance(self.model, Sequential):
             predictions = predictions[0]
 
         return predictions
@@ -1861,7 +1862,7 @@ class Model_Wrapper(object):
 
     def prepareData(self, X_batch, Y_batch=None):
         """
-        Prepares the data for the model, depending on its type (Sequential, Model, Graph).
+        Prepares the data for the model, depending on its type (Sequential, Model).
         :param X_batch: Batch of input data.
         :param Y_batch: Batch output data.
         :return: Prepared data.

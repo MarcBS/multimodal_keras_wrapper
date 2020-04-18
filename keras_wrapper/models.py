@@ -71,8 +71,6 @@ class Predefined_Model(Model_Wrapper):
             inheritance=inheritance,
         )
 
-
-
     def basic_model(self, nOutput, model_input):
         """
             Builds a basic CNN model.
