@@ -233,15 +233,15 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
     logger.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
     try:
-        logger.info("<<< Updating model from " + model_path + ".h5 ... >>>")
-        model.model.set_weights(load_model(model_path + '.h5', compile=False).get_weights())
+        logger.info("<<< Updating model from " + model_name + ".h5 ... >>>")
+        model.model.set_weights(load_model(model_name + '.h5', compile=False).get_weights())
 
     except Exception as e:
         logger.info(str(e))
         # Load model structure
-        logger.info("<<< Failed -> Loading model from " + model_path + "_weights.h5' ... >>>")
+        logger.info("<<< Failed -> Loading model from " + model_name + "_weights.h5' ... >>>")
         # Load model weights
-        model.model.load_weights(model_path + '_weights.h5')
+        model.model.load_weights(model_name + '_weights.h5')
 
     # Load auxiliary models for optimized search
     if os.path.exists(model_name + '_init.h5') and os.path.exists(model_name + '_next.h5'):
@@ -254,17 +254,17 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
     if loading_optimized != 0:
         logger.info("<<< Updating optimized model... >>>")
         if loading_optimized == 1:
-            logger.info("\t <<< Updating model_init from " + model_path + "_init.h5 ... >>>")
-            model.model_init.set_weights(load_model(model_path + '_init.h5', compile=False).get_weights())
-            logger.info("\t <<< Updating model_next from " + model_path + "_next.h5 ... >>>")
-            model.model_next.set_weights(load_model(model_path + '_next.h5', compile=False).get_weights())
+            logger.info("\t <<< Updating model_init from " + model_name + "_init.h5 ... >>>")
+            model.model_init.set_weights(load_model(model_name + '_init.h5', compile=False).get_weights())
+            logger.info("\t <<< Updating model_next from " + model_name + "_next.h5 ... >>>")
+            model.model_next.set_weights(load_model(model_name + '_next.h5', compile=False).get_weights())
         elif loading_optimized == 2:
-            logger.info("\t <<< Updating model_init from " + model_path + "_structure_init.json ... >>>")
-            model.model_init.load_weights(model_path + '_weights_init.h5')
+            logger.info("\t <<< Updating model_init from " + model_name + "_structure_init.json ... >>>")
+            model.model_init.load_weights(model_name + '_weights_init.h5')
             # Load model structure
-            logger.info("\t <<< Updating model_next from " + model_path + "_structure_next.json ... >>>")
+            logger.info("\t <<< Updating model_next from " + model_name + "_structure_next.json ... >>>")
             # Load model weights
-            model.model_next.load_weights(model_path + '_weights_next.h5')
+            model.model_next.load_weights(model_name + '_weights_next.h5')
 
     logger.info("<<< Model updated in %0.6s seconds. >>>" % str(time.time() - t))
     return model
