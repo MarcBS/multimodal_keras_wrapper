@@ -2030,9 +2030,13 @@ class Dataset(object):
                            nor concatenated with other subwords.
         :return: None
         """
-        from keras_wrapper.extra.external import BPE
+        from subword_nmt.apply_bpe import BPE
         with codecs.open(codes, 'rb', encoding='utf-8') as cods:
-            self.BPE = BPE(cods, merges=merges, separator=separator, vocab=vocabulary, glossaries=glossaries)
+            self.BPE = BPE(cods,
+                           merges=merges,
+                           separator=separator,
+                           vocab=vocabulary,
+                           glossaries=glossaries)
         self.BPE_separator = separator
         self.BPE_built = True
 
