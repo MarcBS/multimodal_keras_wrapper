@@ -424,8 +424,14 @@ def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0
         return answer_pred
 
 
-def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol,
-                          glossary=None, heuristic=0, mapping=None, verbose=0):
+def replace_unknown_words(src_word_seq,
+                          trg_word_seq,
+                          hard_alignment,
+                          unk_symbol,
+                          glossary=None,
+                          heuristic=0,
+                          mapping=None,
+                          verbose=0):
     """
     Replaces unknown words from the target sentence according to some heuristic.
     Borrowed from: https://github.com/sebastien-j/LV_groundhog/blob/master/experiments/nmt/replace_UNK.py
@@ -441,6 +447,7 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     """
     trans_words = trg_word_seq
     new_trans_words = []
+    mapping = mapping or {}
     for j in range(len(trans_words)):
         current_word = trans_words[j]
         if glossary is not None and glossary.get(
@@ -472,7 +479,10 @@ def replace_unknown_words(src_word_seq, trg_word_seq, hard_alignment, unk_symbol
     return new_trans_words
 
 
-def decode_predictions_beam_search(preds, index2word, glossary=None, alphas=None,
+def decode_predictions_beam_search(preds,
+                                   index2word,
+                                   glossary=None,
+                                   alphas=None,
                                    heuristic=0,
                                    x_text=None,
                                    unk_symbol='<unk>',
