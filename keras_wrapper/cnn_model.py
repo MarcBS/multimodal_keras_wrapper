@@ -156,6 +156,25 @@ class Model_Wrapper(object):
                     logger.info("<<< Loading weights from file " + weights_path + " >>>")
                 self.model.load_weights(weights_path, seq_to_functional=seq_to_functional)
 
+    def __getstate__(self):
+        """
+            Behaviour applied when pickling a Model_Wrapper instance.
+        """
+        obj_dict = self.__dict__.copy()
+        del obj_dict['model']
+        # Remove also optimized search models if exist
+        if 'model_init' in obj_dict:
+            del obj_dict['model_init']
+            del obj_dict['model_next']
+        return obj_dict
+
+    def __str__(self):
+        """
+        Plot basic model information.
+        """
+        keras.utils.layer_utils.print_summary(self.model.layers)
+        return ''
+
     def updateLogger(self, force=False):
         """
             Checks if the model contains an updated logger.
@@ -1974,13 +1993,6 @@ class Model_Wrapper(object):
     #           Methods for train logging and visualization
     # ------------------------------------------------------- #
 
-    def __str__(self):
-        """
-        Plot basic model information.
-        """
-        keras.utils.layer_utils.print_summary(self.model.layers)
-        return ''
-
     def log_tensorboard(self, metrics, step, split=None):
         """Logs scalar metrics in Tensorboard
         """
@@ -2020,7 +2032,13 @@ class Model_Wrapper(object):
         else:
             return self.__logger[mode][data_type]
 
-    def plot(self, time_measure, metrics, splits, upperbound=None, colours_shapes_dict=None):
+    def plot(self,
+             time_measure,
+             metrics,
+             splits,
+             upperbound=None,
+             colours_shapes_dict=None,
+             epsilon=1e-3):
         """
         Plots the training progress information
 
@@ -2040,8 +2058,7 @@ class Model_Wrapper(object):
         import matplotlib.pyplot as plt
 
         # Build default colours_shapes_dict if not provided
-        if colours_shapes_dict is None:
-            colours_shapes_dict = dict()
+        colours_shapes_dict = colours_shapes_dict or dict()
 
         if not colours_shapes_dict:
             default_colours = ['b', 'g', 'r', 'c', 'm', 'y', 'k']
@@ -2077,17 +2094,20 @@ class Model_Wrapper(object):
                         "' in the model log for split '" + sp + "'.")
 
                 measure = self.__logger[sp][met]
-                # plt.subplot(211)
-                # plt.plot(iterations, loss, colours['train_loss']+'o')
-                plt.plot(iterations, measure, colours_shapes_dict[met + '_' + sp], label=str(met))
+                if upperbound and max(measure) > upperbound:
+                    logging.warning('The value of metric %s is higher than the maximum value ploted (%.3f > %.3f)' %
+                                    (str(met), float(max(measure)), float(upperbound)))
+                plt.plot(iterations,
+                         measure,
+                         colours_shapes_dict[met + '_' + sp],
+                         label=str(met),
+                         marker='x')
 
         max_iter = np.max(all_iterations + [0])
-
         # Plot upperbound
         if upperbound is not None:
-            # plt.subplot(211)
-            plt.plot([0, max_iter], [upperbound, upperbound], 'r-')
-            plt.axis([0, max_iter, 0, upperbound])  # limit height to 1
+            plt.plot([0, max_iter + epsilon], [upperbound, upperbound], 'r-')
+            plt.axis([0, max_iter + epsilon, 0, upperbound])  # limit height to upperbound
 
         # Fill labels
         plt.xlabel(time_measure)
@@ -2102,29 +2122,10 @@ class Model_Wrapper(object):
         plot_file = os.path.join(self.model_path, time_measure + '_' + str(max_iter) + '.jpg')
         plt.savefig(plot_file)
         if not self.silence:
-            print("", file=sys.stderr)
-            logger.info("<<< Progress plot saved in " + plot_file + ' >>>')
+            logger.info("\n<<< Progress plot saved in " + plot_file + ' >>>')
 
         # Close plot window
         plt.close()
-
-    # ------------------------------------------------------- #
-    #       SAVE/LOAD
-    #           Auxiliary methods for saving and loading the model.
-    # ------------------------------------------------------- #
-
-    def __getstate__(self):
-        """
-            Behaviour applied when pickling a Model_Wrapper instance.
-        """
-        obj_dict = self.__dict__.copy()
-        del obj_dict['model']
-        # Remove also optimized search models if exist
-        if 'model_init' in obj_dict:
-            del obj_dict['model_init']
-            del obj_dict['model_next']
-        return obj_dict
-
 
 # Backwards compatibility
 CNN_Model = Model_Wrapper

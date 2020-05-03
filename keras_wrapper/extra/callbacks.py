@@ -120,7 +120,7 @@ class EvalPerformance(KerasCallback):
                  sampling_type='max_likelihood',
                  save_each_evaluation=False,
                  out_pred_idx=None,
-                 max_plot=1.0,
+                 max_plot=None,
                  do_plot=True,
                  verbose=1):
         """
@@ -526,6 +526,8 @@ class EvalPerformance(KerasCallback):
                     else:
                         raise NotImplementedError('The store type "' + self.write_type + '" is not implemented.')
 
+                # Store current epoch/iteration in model log
+                self.model_to_eval.log(s, counter_name, epoch)
                 # Evaluate on each metric
                 for metric in these_metrics:
                     if self.verbose > 0:
@@ -553,8 +555,6 @@ class EvalPerformance(KerasCallback):
                     with open(filepath, 'a') as f:
                         header = counter_name + ','
                         line = str(epoch) + ','
-                        # Store in model log
-                        self.model_to_eval.log(s, counter_name, epoch)
                         for metric_ in sorted(metrics):
                             value = metrics[metric_]
                             # Multiple-output model
@@ -582,8 +582,10 @@ class EvalPerformance(KerasCallback):
         # Plot results so far
         if self.do_plot:
             if self.metric_name:
-                self.model_to_eval.plot(counter_name, set(all_metrics),
-                                        self.set_name, upperbound=self.max_plot)
+                self.model_to_eval.plot(counter_name,
+                                        set(all_metrics),
+                                        self.set_name,
+                                        upperbound=self.max_plot)
 
         # Save the model
         if self.save_each_evaluation:
