@@ -3,7 +3,7 @@ from setuptools import setup
 from setuptools import find_packages
 
 setup(name='multimodal-keras-wrapper',
-      version='3.1.2',
+      version='3.1.4',
       description='Wrapper for Keras with support to easy multimodal data and models loading and handling.',
       author='Marc Bolaños - Alvaro Peris',
       author_email='marc.bolanos@ub.edu',

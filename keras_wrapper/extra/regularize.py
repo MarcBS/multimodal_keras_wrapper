@@ -5,7 +5,8 @@ from keras.regularizers import l2
 from keras.layers.core import Dropout, Lambda
 
 
-def Regularize(layer, params,
+def Regularize(layer,
+               params,
                shared_layers=False,
                name='',
                apply_noise=True,

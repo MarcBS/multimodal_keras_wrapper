@@ -23,10 +23,13 @@ logger = logging.getLogger(__name__)
 
 if sys.version_info.major == 3:
     import _pickle as pk
+
     unicode_fn = str
 else:
     import cPickle as pk
+
     unicode_fn = unicode
+
 
 # Helpers
 
@@ -37,10 +40,12 @@ def encode_list(mylist):
     :param mylist:
     :return:
     """
-    return [l.decode('utf-8') if isinstance(l, str) else unicode(l) for l in mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
+    return [l.decode('utf-8') if isinstance(l, str) else unicode(l) for l in
+            mylist] if sys.version_info.major == 2 else [str(l) for l in mylist]
 
 
-def dirac(pred, gt):
+def dirac(pred,
+          gt):
     """
     Chechks whether pred == gt.
     :param pred: Prediction
@@ -79,7 +84,8 @@ def clean_dir(directory):
 
 
 # Main functions
-def file2list(filepath, stripfile=True):
+def file2list(filepath,
+              stripfile=True):
     """
     Loads a file into a list. One line per element.
     :param filepath: Path to the file to load.
@@ -87,16 +93,21 @@ def file2list(filepath, stripfile=True):
     :return: List containing the lines read.
     """
     with codecs.open(filepath, 'r', encoding='utf-8') as f:
-        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in f.readlines()]
+        lines = [k for k in [k.strip() for k in f.readlines()] if len(k) > 0] if stripfile else [k for k in
+                                                                                                 f.readlines()]
         return lines
 
 
-def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
+def numpy2hdf5(filepath,
+               mylist,
+               data_name='data',
+               permission='w'):
     """
     Saves a numpy array as HDF5.
     """
     if 'w' in permission:
-        f = tables.open_file(filepath, mode=permission)
+        f = tables.open_file(filepath,
+                             mode=permission)
         atom = tables.Float32Atom()
         array_c = f.create_earray(f.root, data_name, atom,
                                   tuple([0] + [mylist.shape[i] for i in range(1, len(mylist.shape))]))
@@ -108,7 +119,10 @@ def numpy2hdf5(filepath, mylist, data_name='data', permission='w'):
         f.close()
 
 
-def numpy2file(filepath, mylist, permission='wb', split=False):
+def numpy2file(filepath,
+               mylist,
+               permission='wb',
+               split=False):
     """
     Saves a numpy array as a file.
     :param filepath: Destination path.
@@ -127,7 +141,10 @@ def numpy2file(filepath, mylist, permission='wb', split=False):
             np.save(f, mylist)
 
 
-def numpy2imgs(folder_path, mylist, imgs_names, dataset):
+def numpy2imgs(folder_path,
+               mylist,
+               imgs_names,
+               dataset):
     """
     Save a numpy array as images.
     :param folder_path: Folder of the images to save.
@@ -151,7 +168,9 @@ def numpy2imgs(folder_path, mylist, imgs_names, dataset):
         out_img.save(file_path)
 
 
-def listoflists2file(filepath, mylist, permission='w'):
+def listoflists2file(filepath,
+                     mylist,
+                     permission='w'):
     """
     Saves a list of lists into a file. Each element in a line.
     :param filepath: Destination file.
@@ -167,7 +186,9 @@ def listoflists2file(filepath, mylist, permission='w'):
         f.write('\n')
 
 
-def list2file(filepath, mylist, permission='w'):
+def list2file(filepath,
+              mylist,
+              permission='w'):
     """
     Saves a list into a file. Each element in a line.
     :param filepath: Destination file.
@@ -177,7 +198,9 @@ def list2file(filepath, mylist, permission='w'):
     """
     mylist = encode_list(mylist)
     mylist = u'\n'.join(mylist)
-    with codecs.open(filepath, permission, encoding='utf-8') as f:
+    with codecs.open(filepath,
+                     permission,
+                     encoding='utf-8') as f:
         f.write(mylist)
         f.write('\n')
 
@@ -189,10 +212,13 @@ def list2stdout(mylist):
     """
     mylist = encode_list(mylist)
     mylist = '\n'.join(mylist)
-    print (mylist)
+    print(mylist)
 
 
-def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
+def nbest2file(filepath,
+               mylist,
+               separator=u'|||',
+               permission='w'):
     """
     Saves an N-best list into a file.
     :param filepath: Destination path.
@@ -224,7 +250,11 @@ def nbest2file(filepath, mylist, separator=u'|||', permission='w'):
         f.write(mylist)
 
 
-def list2vqa(filepath, mylist, qids, permission='w', extra=None):
+def list2vqa(filepath,
+             mylist,
+             qids,
+             permission='w',
+             extra=None):
     """
     Saves a list with the VQA format.
     """
@@ -241,17 +271,22 @@ def list2vqa(filepath, mylist, qids, permission='w', extra=None):
         json.dump(res, f)
 
 
-def dump_hdf5_simple(filepath, dataset_name, data):
+def dump_hdf5_simple(filepath,
+                     dataset_name,
+                     data):
     """
     Saves a HDF5 file.
     """
     import h5py
-    h5f = h5py.File(filepath, 'w')
-    h5f.create_dataset(dataset_name, data=data)
+    h5f = h5py.File(filepath,
+                    'w')
+    h5f.create_dataset(dataset_name,
+                       data=data)
     h5f.close()
 
 
-def load_hdf5_simple(filepath, dataset_name='data'):
+def load_hdf5_simple(filepath,
+                     dataset_name='data'):
     """
     Loads a HDF5 file.
     """
@@ -262,7 +297,8 @@ def load_hdf5_simple(filepath, dataset_name='data'):
     return tmp
 
 
-def model_to_json(path, model):
+def model_to_json(path,
+                  model):
     """
     Saves model as a json file under the path.
     """
@@ -296,7 +332,13 @@ def text_to_model(filepath):
     pass
 
 
-def print_qa(questions, answers_gt, answers_gt_original, answers_pred, era, similarity=dirac, path=''):
+def print_qa(questions,
+             answers_gt,
+             answers_gt_original,
+             answers_pred,
+             era,
+             similarity=dirac,
+             path=''):
     """
     In:
         questions - list of questions
@@ -337,7 +379,11 @@ def print_qa(questions, answers_gt, answers_gt_original, answers_pred, era, simi
     return score
 
 
-def dict2file(mydict, path, title=None, separator=':', permission='a'):
+def dict2file(mydict,
+              path,
+              title=None,
+              separator=':',
+              permission='a'):
     """
     In:
         mydict - dictionary to save in a file
@@ -352,10 +398,13 @@ def dict2file(mydict, path, title=None, separator=':', permission='a'):
         output_list.extend(tmp)
     else:
         output_list = tmp
-    list2file(path, output_list, permission=permission)
+    list2file(path,
+              output_list,
+              permission=permission)
 
 
-def dict2pkl(mydict, path):
+def dict2pkl(mydict,
+             path):
     """
     Saves a dictionary object into a pkl file.
     :param mydict: dictionary to save in a file
@@ -367,7 +416,9 @@ def dict2pkl(mydict, path):
     else:
         extension = '.pkl'
     with open(path + extension, 'wb') as f:
-        pk.dump(mydict, f, protocol=-1)
+        pk.dump(mydict,
+                f,
+                protocol=-1)
 
 
 def pkl2dict(path):
@@ -381,4 +432,5 @@ def pkl2dict(path):
         if sys.version_info.major == 2:
             return pk.load(f)
         else:
-            return pk.load(f, encoding='latin1')
+            return pk.load(f,
+                           encoding='latin1')

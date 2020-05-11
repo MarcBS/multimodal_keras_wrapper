@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-
 import copy
 import fnmatch
 import logging
@@ -20,8 +19,8 @@ import codecs
 from collections import Counter, defaultdict
 from operator import add
 import numpy as np
-from keras_wrapper.extra.read_write import create_dir_if_not_exists
 from keras_wrapper.extra.tokenizers import *
+from keras_wrapper.saving import loadDataset, saveDataset  # Backwards compatibility
 from .utils import bbox, to_categorical
 from .utils import MultiprocessQueue
 import multiprocessing
@@ -31,61 +30,12 @@ logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', date
 logger = logging.getLogger(__name__)
 
 
-# ------------------------------------------------------- #
-#       SAVE/LOAD
-#           External functions for saving and loading Dataset instances
-# ------------------------------------------------------- #
-
-
-def saveDataset(dataset, store_path):
-    """
-    Saves a backup of the current Dataset object.
-
-    :param dataset: Dataset object to save
-    :param store_path: Saving path
-    :return: None
-    """
-    create_dir_if_not_exists(store_path)
-    store_path = os.path.join(store_path, 'Dataset_' + dataset.name + '.pkl')
-    if not dataset.silence:
-        logger.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
-
-    pk.dump(dataset, open(store_path, 'wb'), protocol=-1)
-
-    if not dataset.silence:
-        logger.info("<<< Dataset instance saved >>>")
-
-
-def loadDataset(dataset_path):
-    """
-    Loads a previously saved Dataset object.
-
-    :param dataset_path: Path to the stored Dataset to load
-    :return: Loaded Dataset object
-    """
-
-    logger.info("<<< Loading Dataset instance from " + dataset_path + " ... >>>")
-    if sys.version_info.major == 3:
-        dataset = pk.load(open(dataset_path, 'rb'), encoding='utf-8')
-    else:
-        dataset = pk.load(open(dataset_path, 'rb'))
-
-    if not hasattr(dataset, 'pad_symbol'):
-        dataset.pad_symbol = '<pad>'
-    if not hasattr(dataset, 'unk_symbol'):
-        dataset.unk_symbol = '<unk>'
-    if not hasattr(dataset, 'null_symbol'):
-        dataset.null_symbol = '<null>'
-
-    logger.info("<<< Dataset instance loaded >>>")
-    return dataset
-
-
-# ------------------------------------------------------- #
-#       DATA BATCH GENERATOR CLASS
-# ------------------------------------------------------- #
-
-def dataLoad(process_name, net, dataset, max_queue_len, queues):
+# Data generators
+def dataLoad(process_name,
+             net,
+             dataset,
+             max_queue_len,
+             queues):
     """
     Parallel data loader. Risky and untested!
     :param process_name:
@@ -119,7 +69,8 @@ def dataLoad(process_name, net, dataset, max_queue_len, queues):
                                                    dataAugmentation=data_augmentation)
             elif mode == 'consecutive':
                 X_batch = dataset.getX(set_split,
-                                       ind[0], ind[1],
+                                       ind[0],
+                                       ind[1],
                                        normalization=normalization,
                                        normalization_type=normalization_type,
                                        meanSubstraction=mean_substraction,
@@ -232,17 +183,19 @@ class Parallel_Data_Batch_Generator(object):
         # Initialize list of parallel data loaders
         thread_mngr = multiprocessing.Manager()
         in_queue = MultiprocessQueue(thread_mngr,
-                                     multiprocess_type='Queue')  # if self.params['n_parallel_loaders'] > 1 else 'Pipe')
+                                     multiprocess_type='Queue')
         out_queue = MultiprocessQueue(thread_mngr,
-                                      multiprocess_type='Queue')  # if self.params['n_parallel_loaders'] > 1 else 'Pipe')
+                                      multiprocess_type='Queue')
         # Create a queue per function
         for i in range(self.params['n_parallel_loaders']):
             # create process
             new_process = multiprocessing.Process(target=dataLoad,
                                                   args=('dataLoad_process_' + str(i),
-                                                        self.net, self.dataset,
+                                                        self.net,
+                                                        self.dataset,
                                                         int(self.params['n_parallel_loaders'] * 1.5),
-                                                        [in_queue, out_queue]))
+                                                        [in_queue,
+                                                         out_queue]))
             self.thread_list.append(new_process)  # store processes for terminating later
             new_process.start()
 
@@ -261,7 +214,8 @@ class Parallel_Data_Batch_Generator(object):
             # Checks if we are finishing processing the data split
             init_sample = (it - 1) * self.params['batch_size']
             final_sample = it * self.params['batch_size']
-            n_samples_split = getattr(self.dataset, "len_" + self.set_split)
+            n_samples_split = getattr(self.dataset,
+                                      "len_" + self.set_split)
             if final_sample >= n_samples_split:
                 final_sample = n_samples_split
                 # batch_size = final_sample - init_sample
@@ -270,41 +224,70 @@ class Parallel_Data_Batch_Generator(object):
             # Recovers a batch of data
             # random data selection
             if self.params['random_samples'] > 0:
-                num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
+                num_retrieve = min(self.params['random_samples'],
+                                   self.params['batch_size'])
                 if self.temporally_linked:
                     if self.first_idx == -1:
-                        self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
+                        self.first_idx = np.random.randint(0,
+                                                           n_samples_split - self.params['random_samples'],
+                                                           1)[0]
                         self.next_idx = self.first_idx
-                    indices = range(self.next_idx, self.next_idx + num_retrieve)
+                    indices = range(self.next_idx,
+                                    self.next_idx + num_retrieve)
                     self.next_idx += num_retrieve
                 else:
-                    indices = np.random.randint(0, n_samples_split, num_retrieve)
+                    indices = np.random.randint(0,
+                                                n_samples_split,
+                                                num_retrieve)
                 self.params['random_samples'] -= num_retrieve
 
                 # Prepare query data for parallel data loaders
-                query_data = ['indices', self.predict, self.set_split, [indices],
-                              self.params['normalization'], self.params['normalization_type'],
-                              self.params['mean_substraction'], data_augmentation]
+                query_data = ['indices',
+                              self.predict,
+                              self.set_split,
+                              [indices],
+                              self.params['normalization'],
+                              self.params['normalization_type'],
+                              self.params['mean_substraction'],
+                              data_augmentation]
 
             # specific data selection
             elif self.init_sample > -1 and self.final_sample > -1:
-                indices = range(self.init_sample, self.final_sample)
+                indices = range(self.init_sample,
+                                self.final_sample)
 
                 # Prepare query data for parallel data loaders
-                query_data = ['indices', self.predict, self.set_split, [indices],
-                              self.params['normalization'], self.params['normalization_type'],
-                              self.params['mean_substraction'], data_augmentation]
+                query_data = ['indices',
+                              self.predict,
+                              self.set_split,
+                              [indices],
+                              self.params['normalization'],
+                              self.params['normalization_type'],
+                              self.params['mean_substraction'],
+                              data_augmentation]
 
             # consecutive data selection
             else:
                 if self.predict:
-                    query_data = ['consecutive', self.predict, self.set_split, [init_sample, final_sample],
-                                  self.params['normalization'], self.params['normalization_type'],
-                                  self.params['mean_substraction'], data_augmentation]
+                    query_data = ['consecutive',
+                                  self.predict,
+                                  self.set_split,
+                                  [init_sample,
+                                   final_sample],
+                                  self.params['normalization'],
+                                  self.params['normalization_type'],
+                                  self.params['mean_substraction'],
+                                  data_augmentation]
                 else:
-                    query_data = ['consecutive', self.predict, self.set_split, [range(init_sample, final_sample)],
-                                  self.params['normalization'], self.params['normalization_type'],
-                                  self.params['mean_substraction'], data_augmentation]
+                    query_data = ['consecutive',
+                                  self.predict,
+                                  self.set_split,
+                                  [range(init_sample,
+                                         final_sample)],
+                                  self.params['normalization'],
+                                  self.params['normalization_type'],
+                                  self.params['mean_substraction'],
+                                  data_augmentation]
 
             # Insert data in queue
             in_queue.put(query_data)
@@ -406,7 +389,8 @@ class Data_Batch_Generator(object):
             init_sample = (it - 1) * self.params['batch_size']
             final_sample = it * self.params['batch_size']
             batch_size = self.params['batch_size']
-            n_samples_split = getattr(self.dataset, "len_" + self.set_split)
+            n_samples_split = getattr(self.dataset,
+                                      "len_" + self.set_split)
             if final_sample >= n_samples_split:
                 final_sample = n_samples_split
                 batch_size = final_sample - init_sample
@@ -414,15 +398,21 @@ class Data_Batch_Generator(object):
 
             # Recovers a batch of data
             if self.params['random_samples'] > 0:
-                num_retrieve = min(self.params['random_samples'], self.params['batch_size'])
+                num_retrieve = min(self.params['random_samples'],
+                                   self.params['batch_size'])
                 if self.temporally_linked:
                     if self.first_idx == -1:
-                        self.first_idx = np.random.randint(0, n_samples_split - self.params['random_samples'], 1)[0]
+                        self.first_idx = np.random.randint(0,
+                                                           n_samples_split - self.params['random_samples'],
+                                                           1)[0]
                         self.next_idx = self.first_idx
-                    indices = list(range(self.next_idx, self.next_idx + num_retrieve))
+                    indices = list(range(self.next_idx,
+                                         self.next_idx + num_retrieve))
                     self.next_idx += num_retrieve
                 else:
-                    indices = np.random.randint(0, n_samples_split, num_retrieve)
+                    indices = np.random.randint(0,
+                                                n_samples_split,
+                                                num_retrieve)
                 self.params['random_samples'] -= num_retrieve
 
                 # At sampling from train/val, we always have Y
@@ -453,7 +443,8 @@ class Data_Batch_Generator(object):
                     data = self.net.prepareData(X_batch, Y_batch)
 
             elif self.init_sample > -1 and self.final_sample > -1:
-                indices = list(range(self.init_sample, self.final_sample))
+                indices = list(range(self.init_sample,
+                                     self.final_sample))
                 if self.predict:
                     X_batch = self.dataset.getX_FromIndices(self.set_split,
                                                             indices,
@@ -464,7 +455,8 @@ class Data_Batch_Generator(object):
                                                             wo_da_patch_type=self.params['wo_da_patch_type'],
                                                             da_patch_type=self.params['da_patch_type'],
                                                             da_enhance_list=self.params['da_enhance_list'])
-                    data = self.net.prepareData(X_batch, None)[0]
+                    data = self.net.prepareData(X_batch,
+                                                None)[0]
 
                 else:
                     X_batch, Y_batch = self.dataset.getXY_FromIndices(self.set_split,
@@ -600,7 +592,8 @@ class Homogeneous_Data_Batch_Generator(object):
         batch_size = self.batch_size * joint_batches
         init_sample = (self.it - 1) * batch_size
         final_sample = self.it * batch_size
-        n_samples_split = getattr(self.dataset, "len_" + self.set_split)
+        n_samples_split = getattr(self.dataset,
+                                  "len_" + self.set_split)
 
         if final_sample >= n_samples_split:
             final_sample = n_samples_split
@@ -639,7 +632,8 @@ class Homogeneous_Data_Batch_Generator(object):
         while True:
             new_X = []
             new_Y = []
-            next_idx = min(self.curr_idx + self.batch_size, len(self.tidx))
+            next_idx = min(self.curr_idx + self.batch_size,
+                           len(self.tidx))
             self.batch_tidx = self.tidx[self.curr_idx:next_idx]
             for x_input_idx in range(len(self.X_maxibatch)):
                 x_to_add = [self.X_maxibatch[x_input_idx][i] for i in self.batch_tidx]
@@ -658,16 +652,19 @@ class Homogeneous_Data_Batch_Generator(object):
             yield (data)
 
 
-# ------------------------------------------------------- #
-#       MAIN CLASS
-# ------------------------------------------------------- #
 class Dataset(object):
     """
     Class for defining instances of databases adapted for Keras. It includes several utility functions for
     easily managing data splits, image loading, mean calculation, etc.
     """
 
-    def __init__(self, name, path, pad_symbol='<pad>', unk_symbol='<unk>', null_symbol='<null>', silence=False):
+    def __init__(self,
+                 name,
+                 path,
+                 pad_symbol='<pad>',
+                 unk_symbol='<unk>',
+                 null_symbol='<null>',
+                 silence=False):
         """
         Dataset initializer
         :param name: Dataset name
@@ -722,8 +719,6 @@ class Dataset(object):
         self.Y_raw_val = dict()
         self.Y_raw_test = dict()
 
-        #################################################
-
         # Parameters for managing all the inputs and outputs
         # List of identifiers for the inputs and outputs and their respective types
         # (which will define the preprocessing applied)
@@ -737,30 +732,46 @@ class Dataset(object):
         self.sample_weights = dict()  # Choose whether we should compute output masks or not
 
         # List of implemented input and output data types
-        self.__accepted_types_inputs = ['raw-image', 'image-features',
-                                        'video', 'video-features',
-                                        'text', 'text-features',
-                                        'categorical', 'categorical_raw', 'binary',
-                                        'id', 'ghost', 'file-name']
-        self.__accepted_types_outputs = ['categorical', 'binary',
+        self.__accepted_types_inputs = ['raw-image',
+                                        'image-features',
+                                        'video',
+                                        'video-features',
+                                        'text',
+                                        'text-features',
+                                        'categorical',
+                                        'categorical_raw',
+                                        'binary',
+                                        'id',
+                                        'ghost',
+                                        'file-name']
+        self.__accepted_types_outputs = ['categorical',
+                                         'binary',
                                          'real',
-                                         'text', 'dense-text', 'text-features',  # Dense text is just like text,
+                                         'text',
+                                         'dense-text',
+                                         'text-features',
+                                         # Dense text is just like text,
                                          # but directly storing indices.
-                                         '3DLabel', '3DSemanticLabel',
-                                         'id', 'file-name']
-        #    inputs/outputs with type 'id' are only used for storing external identifiers for your data
-        #    they will not be used in any way. IDs must be stored in text files with a single id per line
+                                         '3DLabel',
+                                         '3DSemanticLabel',
+                                         'id',
+                                         'file-name']
+        # inputs/outputs with type 'id' are only used for storing external identifiers for your data
+        # they will not be used in any way. IDs must be stored in text files with a single id per line
 
         # List of implemented input normalization functions
-        self.__available_norm_im_vid = ['0-1', '(-1)-1', 'inception']  # 'image' and 'video' only
+        self.__available_norm_im_vid = ['0-1',
+                                        '(-1)-1',
+                                        'inception']  # 'image' and 'video' only
         self.__available_norm_feat = ['L2']  # 'image-features' and 'video-features' only
 
         # List of implemented input data augmentation functions
-        self.__available_augm_vid_feat = ['random_selection', 'noise']  # 'video-features' only
-        #################################################
+        self.__available_augm_vid_feat = ['random_selection',
+                                          'noise']  # 'video-features' only
 
         # Parameters used for inputs/outputs of type 'text'
-        self.extra_words = {self.pad_symbol: 0, self.unk_symbol: 1,
+        self.extra_words = {self.pad_symbol: 0,
+                            self.unk_symbol: 1,
                             self.null_symbol: 2}  # extra words introduced in all vocabularies
         self.vocabulary = dict()  # vocabularies (words2idx and idx2words)
         self.max_text_len = dict()  # number of words accepted in a 'text' sample
@@ -781,17 +792,14 @@ class Dataset(object):
         self.moses_detokenizer = None
         self.moses_tokenizer_built = False
         self.moses_detokenizer_built = False
-        #################################################
 
         # Parameters used for inputs of type 'video' or 'video-features'
         self.counts_frames = dict()
         self.paths_frames = dict()
         self.max_video_len = dict()
-        #################################################
 
         # Parameters used for inputs of type 'image-features' or 'video-features'
         self.features_lengths = dict()
-        #################################################
 
         # Parameters used for inputs of type 'raw-image'
         # Image resize dimensions used for all the returned images
@@ -802,30 +810,69 @@ class Dataset(object):
         self.train_mean = dict()
         # Whether they are RGB images (or grayscale)
         self.use_RGB = dict()
-        #################################################
 
         # Parameters used for outputs of type 'categorical', '3DLabels' or '3DSemanticLabel'
         self.classes = dict()
         self.dic_classes = dict()
-        #################################################
 
         # Parameters used for outputs of type '3DLabels' or '3DSemanticLabel'
         self.id_in_3DLabel = dict()
         self.num_poolings_model = dict()
-        #################################################
 
         # Parameters used for outputs of type '3DSemanticLabel'
         self.semantic_classes = dict()
-        #################################################
 
         # Parameters used for outputs of type 'sparse'
         self.sparse_binary = dict()
-        #################################################
+
         # Set and reset counters to start loading data in batches
         self.last_train = 0
         self.last_val = 0
         self.last_test = 0
         self.resetCounters()
+
+    def __str__(self):
+        """
+        Prints the basic input-output information of the Dataset instance.
+
+        :return: String representation of the Dataset.
+        """
+
+        str_ = '---------------------------------------------\n'
+        str_ += '\tDataset ' + self.name + '\n'
+        str_ += '---------------------------------------------\n'
+        str_ += 'store path: ' + self.path + '\n'
+        str_ += 'data length: ' + '\n'
+        str_ += '\ttrain - ' + str(self.len_train) + '\n'
+        str_ += '\tval   - ' + str(self.len_val) + '\n'
+        str_ += '\ttest  - ' + str(self.len_test) + '\n'
+
+        str_ += '\n'
+        str_ += '[ INPUTS ]\n'
+        for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
+            str_ += type_in + ': ' + id_in + '\n'
+
+        str_ += '\n'
+        str_ += '[ OUTPUTS ]\n'
+        for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
+            str_ += type_out + ': ' + id_out + '\n'
+        str_ += '---------------------------------------------\n'
+        return str_
+
+    def __getstate__(self):
+        """
+            Behaviour applied when pickling a Dataset instance.
+        """
+        obj_dict = self.__dict__.copy()
+        # del obj_dict['_Dataset__lock_read']
+        return obj_dict
+
+    def __setstate__(self, new_state):
+        """
+            Behaviour applied when unpickling a Dataset instance.
+        """
+        # dict['_Dataset__lock_read'] = threading.Lock()
+        self.__dict__ = new_state
 
     def shuffleTraining(self):
         """
@@ -848,7 +895,10 @@ class Dataset(object):
         if not self.silence:
             logger.info("Shuffling training done.")
 
-    def keepTopOutputs(self, set_name, id_out, n_top):
+    def keepTopOutputs(self,
+                       set_name,
+                       id_out,
+                       n_top):
         """
         Keep the most frequent outputs from a set_name.
         :param set_name: Set name to modify.
@@ -866,9 +916,12 @@ class Dataset(object):
 
         # Sort outputs by number of occurrences
         samples = None
-        samples = getattr(self, 'Y_' + set_name)
+        samples = getattr(self,
+                          'Y_' + set_name)
         count = Counter(samples[id_out])
-        most_frequent = sorted(list(iteritems(count)), key=lambda x: x[1], reverse=True)[:n_top]
+        most_frequent = sorted(list(iteritems(count)),
+                               key=lambda x: x[1],
+                               reverse=True)[:n_top]
         most_frequent = [m[0] for m in most_frequent]
 
         # Select top samples
@@ -880,7 +933,8 @@ class Dataset(object):
         # Remove non-top samples
         # Inputs
         ids = None
-        ids = list(getattr(self, 'X_' + set_name))
+        ids = list(getattr(self,
+                           'X_' + set_name))
         for sample_id in ids:
             setattr(self, 'X_' + set_name + '[' + sample_id + ']',
                     [getattr(self, 'X_' + set_name + '[' + sample_id + '][' + k + ']') for k in kept])
@@ -896,12 +950,8 @@ class Dataset(object):
 
         logger.info(str(new_len) + ' samples remaining after removal.')
 
-    # ------------------------------------------------------- #
-    #       GENERAL SETTERS
-    #           classes list, train, val and test set, etc.
-    # ------------------------------------------------------- #
-
-    def resetCounters(self, set_name="all"):
+    def resetCounters(self,
+                      set_name="all"):
         """
         Resets some basic counter indices for the next samples to read.
         """
@@ -911,15 +961,22 @@ class Dataset(object):
             self.last_test = 0
         else:
             self.__checkSetName(set_name)
-            setattr(self, 'last_' + set_name, 0)
+            setattr(self,
+                    'last_' + set_name, 0)
 
-    def setSilence(self, silence):
+    def setSilence(self,
+                   silence):
         """
         Changes the silence mode of the 'Dataset' instance.
         """
         self.silence = silence
 
-    def setRawInput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False):
+    def setRawInput(self,
+                    path_list,
+                    set_name,
+                    type='file-name',
+                    id='raw-text',
+                    overwrite_split=False):
         """
         Loads a list which can contain all samples from either the 'train', 'val', or
         'test' set splits (specified by set_name).
@@ -941,7 +998,7 @@ class Dataset(object):
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
         elif id in keys_X_set and not overwrite_split:
-            raise Exception('An input with id "' + id + '" is already loaded into the Database.')
+            raise Exception('An input with id "' + id + '" is already loaded into the Dataset.')
 
         if type not in self.__accepted_types_inputs:
             raise NotImplementedError(
@@ -964,14 +1021,33 @@ class Dataset(object):
         if not self.silence:
             logger.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
-    def setInput(self, path_list, set_name, type='raw-image', id='image', repeat_set=1, required=True,
-                 overwrite_split=False, normalization_types=None, data_augmentation_types=None,
+    def setInput(self,
+                 path_list,
+                 set_name,
+                 type='raw-image',
+                 id='image',
+                 repeat_set=1,
+                 required=True,
+                 overwrite_split=False,
+                 normalization_types=None,
+                 data_augmentation_types=None,
                  add_additional=False,
-                 img_size=None, img_size_crop=None, use_RGB=True,
-                 # 'raw-image' / 'video'   (height, width, depth)
-                 max_text_len=35, tokenization='tokenize_none', offset=0, fill='end', min_occ=0,  # 'text'
-                 pad_on_batch=True, build_vocabulary=False, max_words=0, words_so_far=False,  # 'text'
-                 bpe_codes=None, separator='@@', use_unk_class=False,  # 'text'
+                 img_size=None,
+                 img_size_crop=None,
+                 use_RGB=True,  # 'raw-image' / 'video'   (height, width, depth)
+                 max_text_len=35,
+                 tokenization='tokenize_none',
+                 offset=0,
+                 fill='end',
+                 min_occ=0,  # 'text'
+                 pad_on_batch=True,
+                 build_vocabulary=False,
+                 max_words=0,
+                 words_so_far=False,  # 'text'
+                 bpe_codes=None,
+                 separator='@@',
+                 use_unk_class=False,
+                 # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
                  max_video_len=26,  # 'video'
                  sparse=False,  # 'binary'
@@ -1050,7 +1126,7 @@ class Dataset(object):
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
         elif id in keys_X_set and not overwrite_split and not add_additional:
-            raise Exception('An input with id "' + id + '" is already loaded into the Database.')
+            raise Exception('An input with id "' + id + '" is already loaded into the Dataset.')
 
         if not required and id not in self.optional_inputs:
             self.optional_inputs.append(id)
@@ -1066,23 +1142,60 @@ class Dataset(object):
 
         # Preprocess the input data depending on its type
         if type == 'raw-image':
-            data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop, use_RGB)
+            data = self.preprocessImages(path_list,
+                                         id,
+                                         set_name,
+                                         img_size,
+                                         img_size_crop,
+                                         use_RGB)
         elif type == 'video':
-            data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
+            data = self.preprocessVideos(path_list,
+                                         id,
+                                         set_name,
+                                         max_video_len,
+                                         img_size,
+                                         img_size_crop)
         elif type == 'text' or type == 'dense-text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
-            data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                       bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
+            data = self.preprocessText(path_list,
+                                       id,
+                                       set_name,
+                                       tokenization,
+                                       build_vocabulary,
+                                       max_text_len,
+                                       max_words,
+                                       offset,
+                                       fill,
+                                       min_occ,
+                                       pad_on_batch,
+                                       words_so_far,
+                                       bpe_codes=bpe_codes,
+                                       separator=separator,
+                                       use_unk_class=use_unk_class)
         elif type == 'text-features':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
-            data = self.preprocessTextFeatures(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                               bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
+            data = self.preprocessTextFeatures(path_list,
+                                               id,
+                                               set_name,
+                                               tokenization,
+                                               build_vocabulary,
+                                               max_text_len,
+                                               max_words,
+                                               offset,
+                                               fill,
+                                               min_occ,
+                                               pad_on_batch,
+                                               words_so_far,
+                                               bpe_codes=bpe_codes,
+                                               separator=separator,
+                                               use_unk_class=use_unk_class)
         elif type == 'image-features':
-            data = self.preprocessFeatures(path_list, id, set_name, feat_len)
+            data = self.preprocessFeatures(path_list,
+                                           id,
+                                           set_name,
+                                           feat_len)
         elif type == 'video-features':
             # Check if the chosen data augmentation types exists
             if data_augmentation_types is not None:
@@ -1092,27 +1205,51 @@ class Dataset(object):
                             'The chosen data augmentation type ' + da +
                             ' is not implemented for the type "video-features".')
             self.inputs_data_augmentation_types[id] = data_augmentation_types
-            data = self.preprocessVideoFeatures(path_list, id, set_name, max_video_len, img_size, img_size_crop,
+            data = self.preprocessVideoFeatures(path_list,
+                                                id,
+                                                set_name,
+                                                max_video_len,
+                                                img_size,
+                                                img_size_crop,
                                                 feat_len)
         elif type == 'categorical':
             if build_vocabulary:
-                self.setClasses(path_list, id)
-            data = self.preprocessCategorical(path_list, id)
+                self.setClasses(path_list,
+                                id)
+            data = self.preprocessCategorical(path_list,
+                                              id)
         elif type == 'categorical_raw':
-            data = self.preprocessIDs(path_list, id, set_name)
+            data = self.preprocessIDs(path_list,
+                                      id,
+                                      set_name)
         elif type == 'binary':
-            data = self.preprocessBinary(path_list, id, sparse)
+            data = self.preprocessBinary(path_list,
+                                         id,
+                                         sparse)
         elif type == 'id':
-            data = self.preprocessIDs(path_list, id, set_name)
+            data = self.preprocessIDs(path_list,
+                                      id,
+                                      set_name)
         elif type == 'ghost':
             data = []
 
         if isinstance(repeat_set, (np.ndarray, np.generic, list)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
 
-        self.__setInput(data, set_name, type, id, overwrite_split, add_additional)
+        self.__setInput(data,
+                        set_name,
+                        type,
+                        id,
+                        overwrite_split,
+                        add_additional)
 
-    def __setInput(self, set_data, set_name, data_type, data_id, overwrite_split, add_additional):
+    def __setInput(self,
+                   set_data,
+                   set_name,
+                   data_type,
+                   data_id,
+                   overwrite_split,
+                   add_additional):
         if add_additional:
             aux_dict = getattr(self, 'X_' + set_name)
             aux_dict[data_id] += set_data
@@ -1138,13 +1275,25 @@ class Dataset(object):
                 'Loaded "' + set_name + '" set inputs of data_type "' + data_type + '" with data_id "' + data_id + '" and length ' + str(
                     getattr(self, 'len_' + set_name)) + '.')
 
-    def replaceInput(self, data, set_name, data_type, data_id):
+    def replaceInput(self,
+                     data,
+                     set_name,
+                     data_type,
+                     data_id):
         """
             Replaces the data in a certain set_name and for a given data_id
         """
-        self.__setInput(data, set_name, data_type, data_id, True, False)
+        self.__setInput(data,
+                        set_name,
+                        data_type,
+                        data_id,
+                        True,
+                        False)
 
-    def removeInput(self, set_name, id='label', type='categorical'):
+    def removeInput(self,
+                    set_name,
+                    id='label',
+                    type='categorical'):
         """
         Deletes an input from the dataset.
         :param set_name: Set name to remove.
@@ -1164,11 +1313,16 @@ class Dataset(object):
             del aux_dict
 
         elif id not in keys_X_set:
-            raise Exception('An input with id "' + id + '" does not exist in the Database.')
+            raise Exception('An input with id "' + id + '" does not exist in the Dataset.')
         if not self.silence:
             logger.info('Removed "' + set_name + '" set input of type "' + type + '" with id "' + id + '.')
 
-    def setRawOutput(self, path_list, set_name, type='file-name', id='raw-text', overwrite_split=False,
+    def setRawOutput(self,
+                     path_list,
+                     set_name,
+                     type='file-name',
+                     id='raw-text',
+                     overwrite_split=False,
                      add_additional=False):
         """
         Loads a list which can contain all samples from either the 'train', 'val', or
@@ -1187,14 +1341,15 @@ class Dataset(object):
         self.__checkSetName(set_name)
 
         # Insert type and id of input data
-        keys_Y_set = list(getattr(self, 'Y_raw_' + set_name))
+        keys_Y_set = list(getattr(self,
+                                  'Y_raw_' + set_name))
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
 
-        elif id in keys_Y_set and (not overwrite_split or not add_additional):
-            raise Exception('An input with id "' + id + '" is already loaded into the Database.')
+        elif id in keys_Y_set and not overwrite_split and not add_additional:
+            raise Exception('An input with id "' + id + '" is already loaded into the Dataset.')
 
         if type not in self.__accepted_types_inputs:
             raise NotImplementedError(
@@ -1219,12 +1374,31 @@ class Dataset(object):
         if not self.silence:
             logger.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
 
-    def setOutput(self, path_list, set_name, type='categorical', id='label', repeat_set=1, overwrite_split=False,
-                  add_additional=False, sample_weights=False, label_smoothing=0.,
-                  tokenization='tokenize_none', max_text_len=0, offset=0, fill='end', min_occ=0,  # 'text'
-                  pad_on_batch=True, words_so_far=False, build_vocabulary=False, max_words=0,  # 'text'
-                  bpe_codes=None, separator='@@', use_unk_class=False,  # 'text'
-                  associated_id_in=None, num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
+    def setOutput(self,
+                  path_list,
+                  set_name,
+                  type='categorical',
+                  id='label',
+                  repeat_set=1,
+                  overwrite_split=False,
+                  add_additional=False,
+                  sample_weights=False,
+                  label_smoothing=0.,
+                  tokenization='tokenize_none',
+                  max_text_len=0,
+                  offset=0,
+                  fill='end',
+                  min_occ=0,
+                  # 'text'
+                  pad_on_batch=True,
+                  words_so_far=False,
+                  build_vocabulary=False,
+                  max_words=0,  # 'text'
+                  bpe_codes=None,
+                  separator='@@',
+                  use_unk_class=False,  # 'text'
+                  associated_id_in=None,
+                  num_poolings=None,  # '3DLabel' or '3DSemanticLabel'
                   sparse=False,  # 'binary'
                   ):
         """
@@ -1284,7 +1458,7 @@ class Dataset(object):
         if id not in self.ids_outputs:
             self.ids_outputs.append(id)
         elif id in keys_Y_set and not overwrite_split and not add_additional:
-            raise Exception('An output with id "' + id + '" is already loaded into the Database.')
+            raise Exception('An output with id "' + id + '" is already loaded into the Dataset.')
 
         if type not in self.__accepted_types_outputs:
             raise NotImplementedError('The output type "' + type +
@@ -1305,39 +1479,85 @@ class Dataset(object):
         if type == 'categorical':
             if build_vocabulary:
                 self.setClasses(path_list, id)
-            data = self.preprocessCategorical(path_list, id,
+            data = self.preprocessCategorical(path_list,
+                                              id,
                                               sample_weights=True if sample_weights and set_name == 'train' else False)
         elif type == 'text' or type == 'dense-text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
-            data = self.preprocessText(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                       bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
+            data = self.preprocessText(path_list,
+                                       id,
+                                       set_name,
+                                       tokenization,
+                                       build_vocabulary,
+                                       max_text_len,
+                                       max_words,
+                                       offset,
+                                       fill,
+                                       min_occ,
+                                       pad_on_batch,
+                                       words_so_far,
+                                       bpe_codes=bpe_codes,
+                                       separator=separator,
+                                       use_unk_class=use_unk_class)
         elif type == 'text-features':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
-            data = self.preprocessTextFeatures(path_list, id, set_name, tokenization, build_vocabulary, max_text_len,
-                                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                                               bpe_codes=bpe_codes, separator=separator, use_unk_class=use_unk_class)
+            data = self.preprocessTextFeatures(path_list,
+                                               id,
+                                               set_name,
+                                               tokenization,
+                                               build_vocabulary,
+                                               max_text_len,
+                                               max_words,
+                                               offset,
+                                               fill,
+                                               min_occ,
+                                               pad_on_batch,
+                                               words_so_far,
+                                               bpe_codes=bpe_codes,
+                                               separator=separator,
+                                               use_unk_class=use_unk_class)
         elif type == 'binary':
-            data = self.preprocessBinary(path_list, id, sparse)
+            data = self.preprocessBinary(path_list,
+                                         id,
+                                         sparse)
         elif type == 'real':
             data = self.preprocessReal(path_list)
         elif type == 'id':
-            data = self.preprocessIDs(path_list, id, set_name)
+            data = self.preprocessIDs(path_list,
+                                      id,
+                                      set_name)
         elif type == '3DLabel':
-            data = self.preprocess3DLabel(path_list, id, associated_id_in, num_poolings)
+            data = self.preprocess3DLabel(path_list,
+                                          id,
+                                          associated_id_in,
+                                          num_poolings)
         elif type == '3DSemanticLabel':
-            data = self.preprocess3DSemanticLabel(path_list, id, associated_id_in, num_poolings)
+            data = self.preprocess3DSemanticLabel(path_list,
+                                                  id,
+                                                  associated_id_in,
+                                                  num_poolings)
 
         if isinstance(repeat_set, (np.ndarray, np.generic, list)) or repeat_set > 1:
             data = list(np.repeat(data, repeat_set))
         if self.sample_weights.get(id) is None:
             self.sample_weights[id] = dict()
         self.sample_weights[id][set_name] = sample_weights
-        self.__setOutput(data, set_name, type, id, overwrite_split, add_additional)
+        self.__setOutput(data,
+                         set_name,
+                         type,
+                         id,
+                         overwrite_split,
+                         add_additional)
 
-    def __setOutput(self, labels, set_name, data_type, data_id, overwrite_split, add_additional):
+    def __setOutput(self,
+                    labels,
+                    set_name,
+                    data_type,
+                    data_id,
+                    overwrite_split,
+                    add_additional):
         if add_additional:
             aux_dict = getattr(self, 'Y_' + set_name)
             aux_dict[data_id] += labels
@@ -1360,7 +1580,10 @@ class Dataset(object):
                 'Loaded "' + set_name + '" set outputs of data_type "' + data_type + '" with data_id "' + data_id + '" and length ' + str(
                     getattr(self, 'len_' + set_name)) + '.')
 
-    def removeOutput(self, set_name, id='label', type='categorical'):
+    def removeOutput(self,
+                     set_name,
+                     id='label',
+                     type='categorical'):
         """
         Deletes an output from the dataset.
         :param set_name: Set name to remove.
@@ -1380,15 +1603,14 @@ class Dataset(object):
             del aux_dict
 
         elif id not in keys_Y_set:
-            raise Exception('An output with id "' + id + '" does not exist in the Database.')
+            raise Exception('An output with id "' + id + '" does not exist in the Dataset.')
         if not self.silence:
             logger.info('Removed "' + set_name + '" set output with id "' + id + '.')
 
-    # ------------------------------------------------------- #
-    #       TYPE 'categorical' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def setClasses(self, path_classes, data_id):
+    # Type 'categorical' functions
+    def setClasses(self,
+                   path_classes,
+                   data_id):
         """
         Loads the list of classes of the dataset.
         Each line must contain a unique identifier of the class.
@@ -1419,7 +1641,10 @@ class Dataset(object):
         if not self.silence:
             logger.info('Loaded classes list with ' + str(len(self.dic_classes[data_id])) + " different labels.")
 
-    def preprocessCategorical(self, labels_list, data_id, sample_weights=False):
+    def preprocessCategorical(self,
+                              labels_list,
+                              data_id,
+                              sample_weights=False):
         """
         Preprocesses categorical data.
 
@@ -1456,21 +1681,23 @@ class Dataset(object):
         return labels
 
     @staticmethod
-    def loadCategorical(y_raw, nClasses):
+    def loadCategorical(y_raw,
+                        nClasses):
         """
         Converts a class vector (integers) to binary class matrix. From utils.
         :param y_raw: class vector to be converted into a matrix (integers from 0 to num_classes).
         :param nClasses: total number of classes.
         :return:
         """
-        y = to_categorical(y_raw, nClasses).astype(np.uint8)
+        y = to_categorical(y_raw,
+                           nClasses).astype(np.uint8)
         return y
 
-    # ------------------------------------------------------- #
-    #       TYPE 'binary' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def preprocessBinary(self, labels_list, data_id, sparse):
+    # Type 'binary' functions
+    def preprocessBinary(self,
+                         labels_list,
+                         data_id,
+                         sparse):
         """
         Preprocesses binary classes.
 
@@ -1500,7 +1727,9 @@ class Dataset(object):
 
         return labels
 
-    def loadBinary(self, y_raw, data_id):
+    def loadBinary(self,
+                   y_raw,
+                   data_id):
         """
         Load a binary vector. May be of type 'sparse'
         :param y_raw: Vector to load.
@@ -1525,17 +1754,12 @@ class Dataset(object):
 
         return y
 
-    # ------------------------------------------------------- #
-    #       TYPE 'real' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
+    # Type 'real' functions
     @staticmethod
     def preprocessReal(labels_list):
         """
         Preprocesses real classes.
-
         :param labels_list: Label list. Given as a path to a file or as an instance of the class list.
-
         :return: Preprocessed labels.
         """
         if isinstance(labels_list, str) and os.path.isfile(labels_list):
@@ -1552,15 +1776,15 @@ class Dataset(object):
 
         return labels
 
-    # ------------------------------------------------------- #
-    #       TYPE 'features' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def preprocessFeatures(self, path_list, data_id, set_name, feat_len):
+    # Type 'features' functions
+    def preprocessFeatures(self,
+                           path_list,
+                           data_id,
+                           set_name,
+                           feat_len):
         """
         Preprocesses features. We should give a path to a text file where each line must contain a path to a .npy file
         storing a feature vector. Alternatively "path_list" can be an instance of the class list.
-
         :param path_list: Path to a text file where each line must contain a path to a .npy file
                           storing a feature vector. Alternatively, instance of the class list.
         :param data_id: Dataset id
@@ -1591,7 +1815,13 @@ class Dataset(object):
 
         return data
 
-    def loadFeatures(self, X, feat_len, normalization_type='L2', normalization=False, loaded=False, external=False,
+    def loadFeatures(self,
+                     X,
+                     feat_len,
+                     normalization_type='L2',
+                     normalization=False,
+                     loaded=False,
+                     external=False,
                      data_augmentation=True):
         """
         Loads and normalizes features.
@@ -1623,24 +1853,37 @@ class Dataset(object):
             if data_augmentation:
                 noise_mean = 0.0
                 noise_dev = 0.01
-                noise = np.random.normal(noise_mean, noise_dev, feat.shape)
+                noise = np.random.normal(noise_mean,
+                                         noise_dev,
+                                         feat.shape)
                 feat += noise
 
             if normalization:
                 if normalization_type == 'L2':
-                    feat /= np.linalg.norm(feat, ord=2)
+                    feat /= np.linalg.norm(feat,
+                                           ord=2)
 
             features[i] = feat
 
         return np.array(features)
 
-    # ------------------------------------------------------- #
-    #       TYPE 'text' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def preprocessText(self, annotations_list, data_id, set_name, tokenization, build_vocabulary, max_text_len,
-                       max_words, offset, fill, min_occ, pad_on_batch, words_so_far,
-                       bpe_codes=None, separator='@@', use_unk_class=False):
+    # Type 'text' functions
+    def preprocessText(self,
+                       annotations_list,
+                       data_id,
+                       set_name,
+                       tokenization,
+                       build_vocabulary,
+                       max_text_len,
+                       max_words,
+                       offset,
+                       fill,
+                       min_occ,
+                       pad_on_batch,
+                       words_so_far,
+                       bpe_codes=None,
+                       separator='@@',
+                       use_unk_class=False):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
@@ -1715,7 +1958,8 @@ class Dataset(object):
                 logger.info('\tReusing vocabulary from dictionary for data with data_id "' + data_id + '".')
 
         elif build_vocabulary:
-            self.build_vocabulary(sentences, data_id,
+            self.build_vocabulary(sentences,
+                                  data_id,
                                   max_text_len != 0,
                                   min_occ=min_occ,
                                   n_words=max_words,
@@ -1735,9 +1979,22 @@ class Dataset(object):
 
         return sentences
 
-    def preprocessTextFeatures(self, annotations_list, data_id, set_name, tokenization, build_vocabulary, max_text_len,
-                               max_words, offset, fill, min_occ, pad_on_batch, words_so_far, bpe_codes=None,
-                               separator='@@', use_unk_class=False):
+    def preprocessTextFeatures(self,
+                               annotations_list,
+                               data_id,
+                               set_name,
+                               tokenization,
+                               build_vocabulary,
+                               max_text_len,
+                               max_words,
+                               offset,
+                               fill,
+                               min_occ,
+                               pad_on_batch,
+                               words_so_far,
+                               bpe_codes=None,
+                               separator='@@',
+                               use_unk_class=False):
         """
         Preprocess 'text' data type: Builds vocabulary (if necessary) and preprocesses the sentences.
         Also sets Dataset parameters.
@@ -1794,7 +2051,9 @@ class Dataset(object):
 
         # Build vocabulary
         if build_vocabulary:
-            self.build_vocabulary(sentences, data_id, max_text_len != 0,
+            self.build_vocabulary(sentences,
+                                  data_id,
+                                  max_text_len != 0,
                                   min_occ=min_occ,
                                   n_words=max_words,
                                   use_extra_words=(max_text_len != 0),
@@ -1863,8 +2122,16 @@ class Dataset(object):
                                                             sentence_features[sentence_idx, :-offset])
         return sentence_features
 
-    def build_vocabulary(self, captions, data_id, do_split=True, min_occ=0, n_words=0, split_symbol=' ',
-                         use_extra_words=True, use_unk_class=False, is_val=False):
+    def build_vocabulary(self,
+                         captions,
+                         data_id,
+                         do_split=True,
+                         min_occ=0,
+                         n_words=0,
+                         split_symbol=' ',
+                         use_extra_words=True,
+                         use_unk_class=False,
+                         is_val=False):
         """
         Vocabulary builder for data of type 'text'
 
@@ -1898,7 +2165,8 @@ class Dataset(object):
 
         counters.append(counter)
         sentence_counts.append(sentence_count)
-        combined_counter = reduce(add, counters)
+        combined_counter = reduce(add,
+                                  counters)
         if not self.silence:
             logger.info("\t Total: %d unique words in %d sentences with a total of %d words." %
                         (len(combined_counter), sum(sentence_counts), sum(list(combined_counter.values()))))
@@ -1979,14 +2247,16 @@ class Dataset(object):
                 logger.info('Appending ' + str(added) + ' words to dictionary with data_id "' + data_id + '".')
                 logger.info('\tThe new total is ' + str(self.vocabulary_len[data_id]) + '.')
 
-    def merge_vocabularies(self, ids):
+    def merge_vocabularies(self,
+                           ids):
         """
         Merges the vocabularies from a set of text inputs/outputs into a single one.
 
         :param ids: identifiers of the inputs/outputs whose vocabularies will be merged
         :return: None
         """
-        if not isinstance(ids, list):
+        if not isinstance(ids,
+                          list):
             raise AssertionError('ids must be a list of inputs/outputs identifiers of type text')
         if not self.silence:
             logger.info('Merging vocabularies of the following ids: ' + str(ids))
@@ -2019,7 +2289,12 @@ class Dataset(object):
         if not self.silence:
             logger.info('\tThe new total is ' + str(self.vocabulary_len[ids[0]]) + '.')
 
-    def build_bpe(self, codes, merges=-1, separator=u'@@', vocabulary=None, glossaries=None):
+    def build_bpe(self,
+                  codes,
+                  merges=-1,
+                  separator=u'@@',
+                  vocabulary=None,
+                  glossaries=None):
         """
         Constructs a BPE encoder instance. Currently, vocabulary and glossaries options are not implemented.
         :param codes: File with BPE codes (created by learn_bpe.py)
@@ -2040,7 +2315,8 @@ class Dataset(object):
         self.BPE_separator = separator
         self.BPE_built = True
 
-    def build_moses_tokenizer(self, language='en'):
+    def build_moses_tokenizer(self,
+                              language='en'):
         """
         Constructs a Moses tokenizer instance.
         :param language: Tokenizer language.
@@ -2050,7 +2326,8 @@ class Dataset(object):
         self.moses_tokenizer = MosesTokenizer(lang=language)
         self.moses_tokenizer_built = True
 
-    def build_moses_detokenizer(self, language='en'):
+    def build_moses_detokenizer(self,
+                                language='en'):
         """
         Constructs a Moses detokenizer instance.
         :param language: Tokenizer language.
@@ -2060,7 +2337,11 @@ class Dataset(object):
         self.moses_detokenizer = MosesDetokenizer(lang=language)
         self.moses_detokenizer_built = True
 
-    def apply_label_smoothing(self, y, discount, vocabulary_len, discount_type='uniform'):
+    def apply_label_smoothing(self,
+                              y,
+                              discount,
+                              vocabulary_len,
+                              discount_type='uniform'):
         """
         Applies label smoothing to a one-hot codified vector.
         :param y: Input to smooth
@@ -2074,8 +2355,1184 @@ class Dataset(object):
         y = ((1 - discount) * y + (discount / vocabulary_len))
         return y
 
+    def loadText(self,
+                 X,
+                 vocabularies,
+                 max_len,
+                 offset,
+                 fill,
+                 pad_on_batch,
+                 words_so_far,
+                 loading_X=False):
+        """
+        Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
+
+        :param X: Text to encode.
+        :param vocabularies: Mapping word -> index
+        :param max_len: Maximum length of the text.
+        :param offset: Shifts the text to the right, adding null symbol at the start
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning.
+                     'end': it will be filled with 0s at the end.
+                     'center': the vector will be surrounded by 0s, both at beginning and end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
+                             sentences with a fixed (max_text_length) length.
+        :param words_so_far: Experimental feature. Use with caution.
+        :param loading_X: Whether we are loading an input or an output of the model
+        :return: Text as sequence of number. Mask for each sentence.
+        """
+        vocab = vocabularies['words2idx']
+        n_batch = len(X)
+
+        # Max values per uint type:
+        # uint8.max: 255
+        # uint16.max: 65535
+        # uint32.max: 4294967295
+        vocabulary_size = len(list(vocab))
+
+        if vocabulary_size < 255:
+            dtype_text = 'uint8'
+        elif vocabulary_size < 65535:
+            dtype_text = 'uint16'
+        else:
+            dtype_text = 'uint32'
+
+        if max_len == 0:  # use whole sentence as class
+            X_out = np.zeros(n_batch).astype(dtype_text)
+            for sentence_idx in range(n_batch):
+                word = X[sentence_idx]
+                if self.unk_symbol in vocab:
+                    X_out[sentence_idx] = vocab.get(word, vocab[self.unk_symbol])
+                else:
+                    X_out[sentence_idx] = vocab[word]
+            if loading_X:
+                X_out = (X_out, None)  # This None simulates a mask
+        else:  # process text as a sequence of words
+            if pad_on_batch:
+                max_len_batch = min(max([len(words.split(' ')) for words in X]) + 1, max_len)
+            else:
+                max_len_batch = max_len
+
+            if words_so_far:
+                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype(dtype_text) * self.extra_words[
+                    self.pad_symbol]
+                X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
+                null_row = np.ones((1, max_len_batch)).astype(dtype_text) * self.extra_words[self.pad_symbol]
+                zero_row = np.zeros((1, max_len_batch)).astype('int8')
+                if offset > 0:
+                    null_row[0] = np.append([vocab[self.null_symbol]] * offset, null_row[0, :-offset])
+            else:
+                X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words[self.pad_symbol]
+                X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
+
+            max_len_batch -= 1  # always leave space for <eos> symbol
+
+            # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
+            for sentence_idx in range(n_batch):
+                words = X[sentence_idx].strip().split(' ')
+                len_j = len(words)
+                if fill == 'start':
+                    offset_j = max_len_batch - len_j - 1
+                elif fill == 'center':
+                    offset_j = (max_len_batch - len_j) / 2
+                    len_j += offset_j
+                else:
+                    offset_j = 0
+                    len_j = min(len_j, max_len_batch)
+                if offset_j < 0:
+                    len_j += offset_j
+                    offset_j = 0
+
+                if words_so_far:
+                    for word_idx, word in list(zip(range(len_j), words[:len_j])):
+                        next_w = vocab.get(word, next_w=vocab[self.unk_symbol])
+                        for k in range(word_idx, len_j):
+                            X_out[sentence_idx, k + offset_j, word_idx + offset_j] = next_w
+                            X_mask[sentence_idx, k + offset_j, word_idx + offset_j] = 1  # fill mask
+                        X_mask[
+                            sentence_idx, word_idx + offset_j, word_idx + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
+
+                else:
+                    for word_idx, word in list(zip(range(len_j), words[:len_j])):
+                        X_out[sentence_idx,
+                              word_idx + offset_j] = vocab.get(word, vocab[self.unk_symbol])
+                        X_mask[sentence_idx, word_idx + offset_j] = 1  # fill mask
+                    X_mask[sentence_idx, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
+
+                if offset > 0:  # Move the text to the right -> null symbol
+                    if words_so_far:
+                        for k in range(len_j):
+                            X_out[sentence_idx, k] = np.append([vocab[self.null_symbol]] * offset,
+                                                               X_out[sentence_idx, k, :-offset])
+                            X_mask[sentence_idx, k] = np.append([0] * offset, X_mask[sentence_idx, k, :-offset])
+                        X_out[sentence_idx] = np.append(null_row, X_out[sentence_idx, :-offset], axis=0)
+                        X_mask[sentence_idx] = np.append(zero_row, X_mask[sentence_idx, :-offset], axis=0)
+                    else:
+                        X_out[sentence_idx] = np.append([vocab[self.null_symbol]] * offset,
+                                                        X_out[sentence_idx, :-offset])
+                        X_mask[sentence_idx] = np.append([1] * offset, X_mask[sentence_idx, :-offset])
+            X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
+
+        return X_out
+
+    def loadTextOneHot(self,
+                       X,
+                       vocabularies,
+                       vocabulary_len,
+                       max_len,
+                       offset,
+                       fill,
+                       pad_on_batch,
+                       words_so_far,
+                       sample_weights=False,
+                       loading_X=False,
+                       label_smoothing=0.):
+
+        """
+        Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
+
+        :param vocabulary_len:
+        :param sample_weights:
+        :param X: Text to encode.
+        :param vocabularies: Mapping word -> index
+        :param max_len: Maximum length of the text.
+        :param offset: Shifts the text to the right, adding null symbol at the start
+        :param fill: 'start': the resulting vector will be filled with 0s at the beginning.
+                     'end': it will be filled with 0s at the end.
+                     'center': the vector will be surrounded by 0s, both at beginning and end.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of
+                             the minibatch or sentences with a fixed (max_text_length) length.
+        :param words_so_far: Experimental feature. Use with caution.
+        :param loading_X: Whether we are loading an input or an output of the model
+        :return: Text as sequence of one-hot vectors. Mask for each sentence.
+        """
+
+        y = self.loadText(X,
+                          vocabularies,
+                          max_len,
+                          offset,
+                          fill,
+                          pad_on_batch,
+                          words_so_far,
+                          loading_X=loading_X)
+        # Use whole sentence as class (classifier model)
+        if max_len == 0:
+            y_aux = to_categorical(y,
+                                   vocabulary_len).astype(np.uint8)
+        # Use words separately (generator model)
+        else:
+            if label_smoothing > 0.:
+                y_aux_type = np.float32
+            else:
+                y_aux_type = np.uint8
+            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
+            for idx in range(y[0].shape[0]):
+                y_aux[idx] = to_categorical(y[0][idx],
+                                            vocabulary_len).astype(y_aux_type)
+            if label_smoothing > 0.:
+                y_aux = self.apply_label_smoothing(y_aux,
+                                                   label_smoothing,
+                                                   vocabulary_len)
+            if sample_weights:
+                y_aux = (y_aux, y[1])  # join data and mask
+        return y_aux
+
+    def loadTextFeatures(self,
+                         X,
+                         max_len,
+                         pad_on_batch,
+                         offset):
+        """
+        Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
+
+        :param X: Encoded text.
+        :param max_len: Maximum length of the text.
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
+                             sentences with a fixed (max_text_length) length.
+        :return: Text as sequence of numbers. Mask for each sentence.
+        """
+        X_out = np.asarray(X)
+        max_len_X = max(np.sum(X_out != 0, axis=-1))
+        max_len_out = min(max_len_X + 1 - offset, max_len) if pad_on_batch else max_len
+        X_out_aux = np.zeros((X_out.shape[0], max_len_out), dtype='int64')
+        X_out_aux[:, :max_len_X] = X_out[:, :max_len_X].astype('int64')
+        # Mask all zero-values
+        X_mask = (np.ma.make_mask(X_out_aux, dtype='int') * 1).astype('int8')
+        # But we keep with the first one, as it indicates the <pad> symbol
+        X_mask = np.hstack((np.ones((X_mask.shape[0], 1)), X_mask[:, :-1]))
+        X_out = (X_out_aux, X_mask)
+        return X_out
+
+    def loadTextFeaturesOneHot(self,
+                               X,
+                               vocabulary_len,
+                               max_len,
+                               pad_on_batch,
+                               offset,
+                               sample_weights=False,
+                               label_smoothing=0.):
+
+        """
+        Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
+        :param X: Encoded text.
+        :param vocabulary_len: Length of the vocabulary (size of the one-hot vector)
+        :param sample_weights: If True, we also return the mask of the text.
+        :param max_len: Maximum length of the text.
+        :param offset: Shifts the text to the right, adding null symbol at the start
+        :param pad_on_batch: Whether we get sentences with length of the maximum length of
+                             the minibatch or sentences with a fixed (max_text_length) length.
+        :return: Text as sequence of one-hot vectors. Mask for each sentence.
+        """
+        y = self.loadTextFeatures(X,
+                                  max_len,
+                                  pad_on_batch,
+                                  offset)
+
+        # Use whole sentence as class (classifier model)
+        if max_len == 0:
+            y_aux = to_categorical(y,
+                                   vocabulary_len).astype(np.uint8)
+        # Use words separately (generator model)
+        else:
+            if label_smoothing > 0.:
+                y_aux_type = np.float32
+            else:
+                y_aux_type = np.uint8
+            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
+            for idx in range(y[0].shape[0]):
+                y_aux[idx] = to_categorical(y[0][idx],
+                                            vocabulary_len).astype(y_aux_type)
+            if label_smoothing > 0.:
+                y_aux = self.apply_label_smoothing(y_aux,
+                                                   label_smoothing,
+                                                   vocabulary_len)
+            if sample_weights:
+                y_aux = (y_aux,
+                         y[1])  # join data and mask
+        return y_aux
+
+    def loadMapping(self,
+                    path_list):
+        """
+        Loads a mapping of Source -- Target words.
+        :param path_list: Pickle object with the mapping
+        :return: None
+        """
+        if not self.silence:
+            logger.info("Loading source -- target mapping.")
+        if sys.version_info.major == 3:
+            self.mapping = pk.load(open(path_list, 'rb'), encoding='utf-8')
+        else:
+            self.mapping = pk.load(open(path_list, 'rb'))
+        if not self.silence:
+            logger.info("Source -- target mapping loaded with a total of %d words." % len(list(self.mapping)))
+
+    #       Tokenizing functions
     @staticmethod
-    def load3DLabels(bbox_list, nClasses, dataAugmentation, daRandomParams, img_size, size_crop, image_list):
+    def tokenize_basic(caption,
+                       lowercase=True):
+        """
+        Basic tokenizer for the input/output data of type 'text':
+           * Splits punctuation
+           * Optional lowercasing
+
+        :param caption: String to tokenize
+        :param lowercase: Whether to lowercase the caption or not
+        :return: Tokenized version of caption
+        """
+        return tokenize_basic(caption,
+                              lowercase=lowercase)
+
+    @staticmethod
+    def tokenize_aggressive(caption,
+                            lowercase=True):
+        """
+        Aggressive tokenizer for the input/output data of type 'text':
+        * Removes punctuation
+        * Optional lowercasing
+
+        :param caption: String to tokenize
+        :param lowercase: Whether to lowercase the caption or not
+        :return: Tokenized version of caption
+        """
+        return tokenize_aggressive(caption,
+                                   lowercase=lowercase)
+
+    @staticmethod
+    def tokenize_icann(caption):
+        """
+        Tokenization used for the icann paper:
+        * Removes some punctuation (. , ")
+        * Lowercasing
+
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
+        """
+        return tokenize_icann(caption)
+
+    @staticmethod
+    def tokenize_montreal(caption):
+        """
+        Similar to tokenize_icann
+            * Removes some punctuation
+            * Lowercase
+
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
+        """
+        return tokenize_montreal(caption)
+
+    @staticmethod
+    def tokenize_soft(caption,
+                      lowercase=True):
+        """
+        Tokenization used for the icann paper:
+            * Removes very little punctuation
+            * Lowercase
+        :param caption: String to tokenize
+        :param lowercase: Whether to lowercase the caption or not
+        :return: Tokenized version of caption
+        """
+        return tokenize_soft(caption,
+                             lowercase=lowercase)
+
+    @staticmethod
+    def tokenize_none(caption):
+        """
+        Does not tokenizes the sentences. Only performs a stripping
+
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
+        """
+        return tokenize_none(caption)
+
+    @staticmethod
+    def tokenize_none_char(caption):
+        """
+        Character-level tokenization. Respects all symbols. Separates chars. Inserts <space> sybmol for spaces.
+        If found an escaped char, "&apos;" symbol, it is converted to the original one
+        # List of escaped chars (by moses tokenizer)
+        & ->  &amp;
+        | ->  &#124;
+        < ->  &lt;
+        > ->  &gt;
+        ' ->  &apos;
+        " ->  &quot;
+        [ ->  &#91;
+        ] ->  &#93;
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
+        """
+        return tokenize_none_char(caption)
+
+    @staticmethod
+    def tokenize_CNN_sentence(caption):
+        """
+        Tokenization employed in the CNN_sentence package
+        (https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97).
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
+        """
+        return tokenize_CNN_sentence(caption)
+
+    @staticmethod
+    def tokenize_questions(caption):
+        """
+        Basic tokenizer for VQA questions:
+            * Lowercasing
+            * Splits contractions
+            * Removes punctuation
+            * Numbers to digits
+
+        :param caption: String to tokenize
+        :return: Tokenized version of caption
+        """
+        return tokenize_questions(caption)
+
+    def tokenize_bpe(self,
+                     caption):
+        """
+        Applies BPE segmentation (https://github.com/rsennrich/subword-nmt)
+        :param caption: Caption to detokenize.
+        :return: Encoded version of caption.
+        """
+        if not self.BPE_built:
+            raise Exception('Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"')
+        if isinstance(caption, str) and sys.version_info < (3, 0):
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
+        tokenized = self.BPE.segment(tokenized).strip()
+        return tokenized
+
+    @staticmethod
+    def detokenize_none(caption):
+        """
+        Dummy function: Keeps the caption as it is.
+        :param caption: String to de-tokenize.
+        :return: Same caption.
+        """
+        return detokenize_none(caption)
+
+    @staticmethod
+    def detokenize_bpe(caption,
+                       separator=u'@@'):
+        """
+        Reverts BPE segmentation (https://github.com/rsennrich/subword-nmt)
+        :param caption: Caption to detokenize.
+        :param separator: BPE separator.
+        :return: Detokenized version of caption.
+        """
+        return detokenize_bpe(caption,
+                              separator=separator)
+
+    @staticmethod
+    def detokenize_none_char(caption):
+        """
+        Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by
+        the <space> token. If found an special character is converted to the escaped char.
+        # List of escaped chars (by moses tokenizer)
+            & ->  &amp;
+            | ->  &#124;
+            < ->  &lt;
+            > ->  &gt;
+            ' ->  &apos;
+            " ->  &quot;
+            [ ->  &#91;
+            ] ->  &#93;
+        :param caption: String to de-tokenize.
+            :return: Detokenized version of caption.
+        """
+        return detokenize_none_char(caption)
+
+    def tokenize_moses(self,
+                       caption,
+                       language='en',
+                       lowercase=False,
+                       aggressive_dash_splits=False,
+                       return_str=True,
+                       escape=False):
+        """
+        Applies the Moses tokenization. Relying on sacremoses' implementation of the Moses tokenizer.
+
+        :param caption: Sentence to tokenize
+        :param language: Language (will build the tokenizer for this language)
+        :param lowercase: Whether to lowercase or not the sentence
+        :param aggressive_dash_splits: Option to trigger dash split rules .
+        :param return_str: Return string or list
+        :param escape: Escape HTML special chars
+        :return:
+        """
+        # Compatibility with old Datasets instances:
+        if not hasattr(self, 'moses_tokenizer_built'):
+            self.moses_tokenizer_built = False
+        if not self.moses_tokenizer_built:
+            self.build_moses_tokenizer(language=language)
+        if isinstance(caption, str) and sys.version_info < (3, 0):
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
+        if lowercase:
+            tokenized = tokenized.lower()
+        return self.moses_tokenizer.tokenize(tokenized,
+                                             aggressive_dash_splits=aggressive_dash_splits,
+                                             return_str=return_str,
+                                             escape=escape)
+
+    def detokenize_moses(self,
+                         caption,
+                         language='en',
+                         lowercase=False,
+                         return_str=True,
+                         unescape=True):
+        """
+        Applies the Moses detokenization. Relying on sacremoses' implementation of the Moses tokenizer.
+
+        :param caption: Sentence to tokenize
+        :param language: Language (will build the tokenizer for this language)
+        :param lowercase: Whether to lowercase or not the sentence
+        :param aggressive_dash_splits: Option to trigger dash split rules .
+        :param return_str: Return string or list
+        :param escape: Escape HTML special chars
+        :return:
+        """
+        # Compatibility with old Datasets instances:
+        if not hasattr(self, 'moses_detokenizer_built'):
+            self.moses_detokenizer_built = False
+        if not self.moses_detokenizer_built:
+            self.build_moses_detokenizer(language=language)
+        if isinstance(caption, str) and sys.version_info < (3, 0):
+            caption = caption.decode('utf-8')
+        tokenized = re.sub(u'[\n\t]+', u'', caption)
+        if lowercase:
+            tokenized = tokenized.lower()
+        return self.moses_detokenizer.detokenize(tokenized.split(),
+                                                 return_str=return_str,
+                                                 unescape=unescape)
+
+    # Type 'video' and 'video-features' functions
+    def preprocessVideos(self,
+                         path_list,
+                         data_id,
+                         set_name,
+                         max_video_len,
+                         img_size,
+                         img_size_crop):
+        """
+        Preprocess videos. Subsample and crop frames.
+        :param path_list: path to all images in all videos
+        :param data_id: Data id to be processed.
+        :param set_name: Set name to be processed.
+        :param max_video_len: Maximum number of subsampled video frames.
+        :param img_size: Size of each frame.
+        :param img_size_crop: Size of each image crop.
+        :return:
+        """
+        if isinstance(path_list, list) and len(path_list) == 2:
+            # path to all images in all videos
+            data = []
+            with open(path_list[0], 'r') as list_:
+                for line in list_:
+                    data.append(line.rstrip('\n'))
+            # frame counts
+            counts_frames = []
+            with open(path_list[1], 'r') as list_:
+                for line in list_:
+                    counts_frames.append(int(line.rstrip('\n')))
+
+            if data_id not in self.paths_frames:
+                self.paths_frames[data_id] = dict()
+            self.paths_frames[data_id][set_name] = data
+            self.max_video_len[data_id] = max_video_len
+            self.img_size[data_id] = img_size
+            self.img_size_crop[data_id] = img_size_crop
+        else:
+            raise Exception('Wrong type for "path_list". It must be a list containing two paths: '
+                            'a path to a text file with the paths to all images in all videos in '
+                            '[0] and a path to another text file with the number of frames of '
+                            'each video in each line in [1] (which will index the paths in the first file).\n'
+                            'It currently is: %s' % str(path_list))
+
+        return counts_frames
+
+    def preprocessVideoFeatures(self,
+                                path_list,
+                                data_id,
+                                set_name,
+                                max_video_len,
+                                img_size,
+                                img_size_crop,
+                                feat_len):
+        """
+        Preprocess already extracted features from video frames.
+        :param path_list: path to all features in all videos
+        :param data_id: Data id to be processed.
+        :param set_name: Set name to be processed.
+        :param max_video_len: Maximum number of subsampled video features.
+        :param img_size: Size of each frame.
+        :param img_size_crop: Size of each image crop.
+        :param feat_len: Length of each feature.
+        :return:
+        """
+        if isinstance(path_list, list) and len(path_list) == 2:
+            if isinstance(path_list[0], str):
+                # path to all images in all videos
+                paths_frames = []
+                with open(path_list[0], 'r') as list_:
+                    for line in list_:
+                        paths_frames.append(line.rstrip('\n'))
+            elif isinstance(path_list[0], list):
+                paths_frames = path_list[0]
+            else:
+                raise Exception('Wrong type for "path_frames". It must be a path to a file containing a'
+                                ' list of frames or directly a list of frames.\n'
+                                'It currently is: %s' % str(path_list[0]))
+
+            if isinstance(path_list[1], str):
+                # frame counts
+                counts_frames = []
+                with open(path_list[1], 'r') as list_:
+                    for line in list_:
+                        counts_frames.append(int(line.rstrip('\n')))
+            elif isinstance(path_list[1], list):
+                counts_frames = path_list[1]
+            else:
+                raise Exception(
+                    'Wrong type for "counts_frames".'
+                    ' It must be a path to a file containing a list of counts or directly a list of counts.\n'
+                    'It currently is: %s' % str(path_list[1]))
+
+            # video indices
+            video_indices = range(len(counts_frames))
+
+            if data_id not in self.paths_frames:
+                self.paths_frames[data_id] = dict()
+            if data_id not in self.counts_frames:
+                self.counts_frames[data_id] = dict()
+
+            self.paths_frames[data_id][set_name] = paths_frames
+            self.counts_frames[data_id][set_name] = counts_frames
+            self.max_video_len[data_id] = max_video_len
+            self.img_size[data_id] = img_size
+            self.img_size_crop[data_id] = img_size_crop
+        else:
+            raise Exception('Wrong type for "path_list". '
+                            'It must be a list containing two paths: a path to a text file with the paths to all '
+                            'images in all videos in [0] and a path to another text file with the number of frames '
+                            'of each video in each line in [1] (which will index the paths in the first file).'
+                            'It currently is: %s' % str(path_list[1]))
+
+        if feat_len is not None:
+            if not isinstance(feat_len, list):
+                feat_len = [feat_len]
+            self.features_lengths[data_id] = feat_len
+
+        return video_indices
+
+    def loadVideos(self,
+                   n_frames,
+                   data_id,
+                   last,
+                   set_name,
+                   max_len,
+                   normalization_type,
+                   normalization,
+                   meanSubstraction,
+                   dataAugmentation):
+        """
+         Loads a set of videos from disk. (Untested!)
+
+        :param n_frames: Number of frames per video
+        :param data_id: Id to load
+        :param last: Last video loaded
+        :param set_name:  'train', 'val', 'test'
+        :param max_len: Maximum length of videos
+        :param normalization_type:  Type of normalization applied
+        :param normalization: Whether we apply a 0-1 normalization to the images
+        :param meanSubstraction:  Whether we are removing the training mean
+        :param dataAugmentation:  Whether we are applying dataAugmentatino (random cropping and horizontal flip)
+        """
+
+        n_videos = len(n_frames)
+        V = np.zeros((n_videos, max_len * 3, self.img_size_crop[data_id][0], self.img_size_crop[data_id][1]))
+
+        idx = [0 for i in range(n_videos)]
+        # recover all indices from image's paths of all videos
+        for v in range(n_videos):
+            this_last = last + v
+            if this_last >= n_videos:
+                v = this_last % n_videos
+                this_last = v
+            idx[v] = int(sum(getattr(self, 'Y_' + set_name)[data_id][:this_last]))
+
+        # load images from each video
+        for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
+            paths = self.paths_frames[data_id][set_name][i:i + n]
+            daRandomParams = None
+            if dataAugmentation:
+                daRandomParams = self.getDataAugmentationRandomParams(paths, data_id)
+            # returns numpy array with dimensions (batch, channels, height, width)
+            images = self.loadImages(paths,
+                                     data_id,
+                                     normalization_type,
+                                     normalization,
+                                     meanSubstraction,
+                                     dataAugmentation,
+                                     daRandomParams)
+            # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
+            len_j = images.shape[0]
+            offset_j = max_len - len_j
+            if offset_j < 0:
+                len_j = len_j + offset_j
+                offset_j = 0
+            for j in range(len_j):
+                V[enum, (j + offset_j) * 3:(j + offset_j + 1) * 3] = images[j]
+
+        return V
+
+    def loadVideoFeatures(self,
+                          idx_videos,
+                          data_id,
+                          set_name,
+                          max_len,
+                          normalization_type,
+                          normalization,
+                          feat_len,
+                          external=False,
+                          data_augmentation=True):
+        """
+
+        :param idx_videos: indices of the videos in the complete list of the current set_name
+        :param data_id: identifier of the input/output that we are loading
+        :param set_name: 'train', 'val' or 'test'
+        :param max_len: maximum video length (number of frames)
+        :param normalization_type: type of data normalization applied
+        :param normalization: Switch on/off data normalization
+        :param feat_len: length of the features about to load
+        :param external: Switch on/off data loading from external dataset (not sharing self.path)
+        :param data_augmentation: Switch on/off data augmentation
+        :return:
+        """
+
+        n_videos = len(idx_videos)
+        if isinstance(feat_len, list):
+            feat_len = feat_len[0]
+        features = np.zeros((n_videos, max_len, feat_len))
+
+        selected_frames = self.getFramesPaths(idx_videos,
+                                              data_id,
+                                              set_name,
+                                              max_len,
+                                              data_augmentation)
+        data_augmentation_types = self.inputs_data_augmentation_types[data_id]
+
+        # load features from selected paths
+        for i, vid_paths in list(enumerate(selected_frames)):
+            for j, feat in list(enumerate(vid_paths)):
+                if not external:
+                    feat = self.path + '/' + feat
+
+                # Check if the filename includes the extension
+                feat = np.load(feat)
+
+                if data_augmentation and 'noise' in data_augmentation_types:
+                    noise_mean = 0.0
+                    noise_dev = 0.01
+                    noise = np.random.normal(noise_mean, noise_dev, feat.shape)
+                    feat += noise
+
+                if normalization:
+                    if normalization_type == 'L2':
+                        feat /= np.linalg.norm(feat, ord=2)
+
+                features[i, j] = feat
+
+        return np.array(features)
+
+    def getFramesPaths(self,
+                       idx_videos,
+                       data_id,
+                       set_name,
+                       max_len,
+                       data_augmentation):
+        """
+        Recovers the paths from the selected video frames.
+        """
+
+        # recover chosen data augmentation types
+        data_augmentation_types = self.inputs_data_augmentation_types[data_id]
+        if data_augmentation_types is None:
+            data_augmentation_types = []
+
+        n_frames = [self.counts_frames[data_id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
+
+        n_videos = len(idx_videos)
+        idx = [0 for i_nvid in range(n_videos)]
+        # recover all initial indices from image's paths of all videos
+        for v in range(n_videos):
+            last_idx = idx_videos[v]
+            idx[v] = int(sum(self.counts_frames[data_id][set_name][:last_idx]))
+
+        # select subset of max_len from n_frames[i]
+        selected_frames = [0 for i_nvid in range(n_videos)]
+        for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
+            paths = self.paths_frames[data_id][set_name][i:i + n]
+
+            if data_augmentation and 'random_selection' in data_augmentation_types:  # apply random frames selection
+                selected_idx = sorted(random.sample(range(n), min(max_len, n)))
+            else:  # apply equidistant frames selection
+                selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
+                # splits = np.array_split(range(n), min(max_len, n))
+                # selected_idx = [s[0] for s in splits]
+
+            selected_paths = [paths[int(idx)] for idx in selected_idx]
+            selected_frames[enum] = selected_paths
+
+        return selected_frames
+
+    def loadVideosByIndex(self,
+                          n_frames,
+                          data_id,
+                          indices,
+                          set_name,
+                          max_len,
+                          normalization_type,
+                          normalization,
+                          meanSubstraction,
+                          dataAugmentation):
+        """
+        Get videos by indices.
+        :param n_frames: Indices of the frames to load from each video.
+        :param data_id: Data id to be processed.
+        :param indices: Indices of the videos to load.
+        :param set_name: Set name to be processed.
+        :param max_len: Maximum length of each video.
+        :param normalization_type: Normalization type applied to the frames.
+        :param normalization: Normalization applied to the frames.
+        :param meanSubstraction: Mean subtraction applied to the frames.
+        :param dataAugmentation: Whether apply data augmentation.
+        :return:
+        """
+        n_videos = len(indices)
+        V = np.zeros((n_videos, max_len * 3, self.img_size_crop[data_id][0], self.img_size_crop[data_id][1]))
+
+        idx = [0 for i in range(n_videos)]
+        # recover all indices from image's paths of all videos
+        for v in range(n_videos):
+            idx[v] = int(sum(eval('self.X_' + set_name + '[data_id][indices[v]]')))
+
+        # load images from each video
+        for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
+            paths = self.paths_frames[data_id][set_name][i:i + n]
+            daRandomParams = None
+            if dataAugmentation:
+                daRandomParams = self.getDataAugmentationRandomParams(paths, data_id)
+            # returns numpy array with dimensions (batch, channels, height, width)
+            images = self.loadImages(paths,
+                                     data_id,
+                                     normalization_type,
+                                     normalization,
+                                     meanSubstraction,
+                                     dataAugmentation,
+                                     daRandomParams)
+            # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
+            len_j = images.shape[0]
+            offset_j = max_len - len_j
+            if offset_j < 0:
+                len_j = len_j + offset_j
+                offset_j = 0
+            for j in range(len_j):
+                V[enum, (j + offset_j) * 3:(j + offset_j + 1) * 3] = images[j]
+
+        return V
+
+    # Type 'id' functions
+    @staticmethod
+    def preprocessIDs(path_list,
+                      data_id,
+                      set_name):
+        """
+        Preprocess ID outputs: Strip and put each ID in a line.
+        """
+        logger.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
+        if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of IDs
+            data = []
+            with codecs.open(path_list, 'r', encoding='utf-8') as list_:
+                for line in list_:
+                    data.append(line.rstrip('\n'))
+        elif isinstance(path_list, list):
+            data = path_list
+        else:
+            raise Exception('Wrong type for "path_list". '
+                            'It must be a path to a text file with an data_id in each line'
+                            ' or an instance of the class list with an data_id in each position.'
+                            'It currently is: %s' % str(path_list))
+
+        return data
+
+    # ------------------------------------------------------- #
+    # Type '3DSemanticLabel' functions
+    # ------------------------------------------------------- #
+
+    def getImageFromPrediction_3DSemanticLabel(self,
+                                               img,
+                                               n_classes):
+        """
+        Get the segmented image from the prediction of the model using the semantic classes of the dataset together with their corresponding colours.
+
+        :param img: Prediction of the model.
+        :param n_classes: Number of semantic classes.
+        :return: out_img: The segmented image with the class colours.
+        """
+
+        h_crop, w_crop, d_crop = self.img_size_crop[self.id_in_3DLabel[self.ids_outputs[0]]]
+        output_id = ''.join(self.ids_outputs)
+
+        # prepare the segmented image
+        pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
+        # out_img = np.zeros((h_crop, w_crop, d_crop))
+        out_img = np.zeros((h_crop, w_crop, 3))  # predictions saved as RGB images (3 channels)
+
+        for ih in range(h_crop):
+            for iw in range(w_crop):
+                lab = np.argmax(pred_labels[ih, iw])
+                out_img[ih, iw, :] = self.semantic_classes[output_id][lab]
+
+        return out_img
+
+    def preprocess3DSemanticLabel(self,
+                                  path_list,
+                                  data_id,
+                                  associated_id_in,
+                                  num_poolings):
+        """
+        Preprocess 3D Semantic labels
+        """
+        return self.preprocess3DLabel(path_list,
+                                      data_id,
+                                      associated_id_in,
+                                      num_poolings)
+
+    def setSemanticClasses(self,
+                           path_classes,
+                           data_id):
+        """
+        Loads the list of semantic classes of the dataset together with their corresponding colours in the GT image.
+        Each line must contain a unique identifier of the class and its associated RGB colour representation
+         separated by commas.
+
+        :param path_classes: Path to a text file with the classes and their colours.
+        :param data_id: input/output id
+
+        :return: None
+        """
+        if isinstance(path_classes, str) and os.path.isfile(path_classes):
+            semantic_classes = dict()
+            with codecs.open(path_classes, 'r', encoding='utf-8') as list_:
+                for line in list_:
+                    line = line.rstrip('\n').split(',')
+                    if len(line) != 4:
+                        raise Exception('Wrong format for semantic classes.'
+                                        ' Must contain a class name followed by the '
+                                        'RGB colour values separated by commas.'
+                                        'It currently has a line of length: %s' % str(len(line)))
+
+                    class_id = self.dic_classes[data_id][line[0]]
+                    semantic_classes[int(class_id)] = [int(line[1]), int(line[2]), int(line[3])]
+            self.semantic_classes[data_id] = semantic_classes
+        else:
+            raise Exception('Wrong type for "path_classes".'
+                            ' It must be a path to a text file with the classes '
+                            'and their associated colour in the GT image.'
+                            'It currently is: %s' % str(path_classes))
+
+        if not self.silence:
+            logger.info('Loaded semantic classes list for data with data_id: ' + data_id)
+
+    def load_GT_3DSemanticLabels(self,
+                                 gt,
+                                 data_id):
+        """
+        Loads a GT list of 3DSemanticLabels in a 2D matrix and reshapes them to an Nx1 array (EVALUATION)
+
+        :param gt: list of Dataset output of type 3DSemanticLabels
+        :param data_id: id of the input/output we are processing
+        :return: out_list: containing a list of label images reshaped as an Nx1 array
+        """
+        from PIL import Image as pilimage
+        from scipy import misc
+
+        out_list = []
+
+        assoc_id_in = self.id_in_3DLabel[data_id]
+        classes_to_colour = self.semantic_classes[data_id]
+        nClasses = len(list(classes_to_colour))
+        img_size = self.img_size[assoc_id_in]
+        size_crop = self.img_size_crop[assoc_id_in]
+        num_poolings = self.num_poolings_model[data_id]
+
+        n_samples = len(gt)
+        h, w, d = img_size
+        h_crop, w_crop, d_crop = size_crop
+
+        # Modify output dimensions depending on number of poolings applied
+        if num_poolings is not None:
+            h_crop = int(np.floor(h_crop / np.power(2, num_poolings)))
+            w_crop = int(np.floor(w_crop / np.power(2, num_poolings)))
+
+        for i in range(n_samples):
+            pre_labels = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
+            # labels = np.zeros((h_crop, w_crop), dtype=np.uint8)
+            line = gt[i]
+
+            # Load labeled GT image
+            labeled_im = self.path + '/' + line
+            # Check if the filename includes the extension
+            [path, filename] = ntpath.split(labeled_im)
+            [filename, ext] = os.path.splitext(filename)
+            # If it doesn't then we find it
+            if not ext:
+                filename = fnmatch.filter(os.listdir(path), filename + '*')
+                if not filename:
+                    raise Exception('Non existent image ' + labeled_im)
+                else:
+                    labeled_im = path + '/' + filename[0]
+            # Read image
+            try:
+                logging.disable(logging.CRITICAL)
+                labeled_im = pilimage.open(labeled_im)
+                labeled_im = np.asarray(labeled_im)
+                logging.disable(logging.NOTSET)
+                labeled_im = misc.imresize(labeled_im, (h, w))
+            except Exception:
+                logger.warning("WARNING!")
+                logger.warning("Can't load image " + labeled_im)
+                labeled_im = np.zeros((h, w))
+
+            label3D = np.zeros((nClasses, h, w), dtype=np.float32)
+
+            # Insert 1s in the corresponding positions for each class
+            for class_id, colour in iteritems(classes_to_colour):
+                # indices = np.where(np.all(labeled_im == colour, axis=-1))
+                indices = np.where(labeled_im == class_id)
+                num_vals = len(indices[0])
+                if num_vals > 0:
+                    for idx_pos in range(num_vals):
+                        x, y = indices[0][idx_pos], indices[1][idx_pos]
+                        label3D[class_id, x, y] = 1.
+
+            # Resize 3DLabel to crop size.
+            for j in range(nClasses):
+                label2D = misc.imresize(label3D[j], (h_crop, w_crop))
+                maxval = np.max(label2D)
+                if maxval > 0:
+                    label2D /= maxval
+                pre_labels[j] = label2D
+
+            # Convert to single matrix with class IDs
+            labels = np.argmax(pre_labels, axis=0)
+            labels = np.reshape(labels, (w_crop * h_crop))
+
+            out_list.append(labels)
+
+        return out_list
+
+    def resize_semantic_output(self,
+                               predictions,
+                               ids_out):
+        """
+        Resize semantic output.
+        """
+        from scipy import misc
+
+        out_pred = []
+
+        for pred, id_out in list(zip(predictions, ids_out)):
+
+            assoc_id_in = self.id_in_3DLabel[id_out]
+            in_size = self.img_size_crop[assoc_id_in]
+            out_size = self.img_size[assoc_id_in]
+            n_classes = len(self.classes[id_out])
+
+            pred = np.transpose(pred, [1, 0])
+            pred = np.reshape(pred, (-1, in_size[0], in_size[1]))
+
+            new_pred = np.zeros(tuple([n_classes] + out_size[0:2]))
+            for pos, p in list(enumerate(pred)):
+                new_pred[pos] = misc.imresize(p, tuple(out_size[0:2]))
+
+            new_pred = np.reshape(new_pred, (-1, out_size[0] * out_size[1]))
+            new_pred = np.transpose(new_pred, [1, 0])
+
+            out_pred.append(new_pred)
+
+        return out_pred
+
+    # Type '3DLabel' functions
+    def preprocess3DLabel(self,
+                          path_list,
+                          label_id,
+                          associated_id_in,
+                          num_poolings):
+        if isinstance(path_list, str) and os.path.isfile(path_list):
+            path_list_3DLabel = []
+            with codecs.open(path_list, 'r', encoding='utf-8') as list_:
+                for line in list_:
+                    path_list_3DLabel.append(line.strip())
+        else:
+            raise Exception('Wrong type for "path_list". '
+                            'It must be a path to a text file with the path to 3DLabel files.'
+                            'It currently is: %s' % str(path_list))
+
+        self.num_poolings_model[label_id] = num_poolings
+        self.id_in_3DLabel[label_id] = associated_id_in
+
+        return path_list_3DLabel
+
+    def convert_3DLabels_to_bboxes(self,
+                                   predictions,
+                                   original_sizes,
+                                   threshold=0.5,
+                                   idx_3DLabel=0,
+                                   size_restriction=0.001):
+        """
+        Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.
+
+        :param idx_3DLabel:
+        :param size_restriction:
+        :param predictions: 3DLabels predicted by Model_Wrapper.
+                            If type is list it will be assumed that position 0 corresponds to 3DLabels
+        :param original_sizes: original sizes of the predicted images width and height
+        :param threshold: minimum overlapping threshold for considering a prediction valid
+        :return: predicted_bboxes, predicted_Y, predicted_scores for each image
+        """
+        from scipy import ndimage
+        out_list = []
+
+        # if type is list it will be assumed that position 0 corresponds to 3DLabels
+        if isinstance(predictions, list):
+            predict_3dLabels = predictions[idx_3DLabel]
+        else:
+            predict_3dLabels = predictions
+
+        # Reshape from (n_samples, width*height, nClasses) to (n_samples, nClasses, width, height)
+        n_samples, _, n_classes = predict_3dLabels.shape
+        w, h, _ = self.img_size_crop[self.id_in_3DLabel[self.ids_outputs[idx_3DLabel]]]
+        predict_3dLabels = np.transpose(predict_3dLabels, (0, 2, 1))
+        predict_3dLabels = np.reshape(predict_3dLabels, (n_samples, n_classes, w, h))
+
+        # list of hypotheses with the following info [predicted_bboxes, predicted_Y, predicted_scores]
+        for s in range(n_samples):
+            bboxes = []
+            Y = []
+            scores = []
+            orig_h, orig_w = original_sizes[s]
+            wratio = float(orig_w) / w
+            hratio = float(orig_h) / h
+            for c in range(n_classes):
+                map = predict_3dLabels[s][c]
+
+                # Compute binary selected region
+                binary_heat = map
+                binary_heat = np.where(binary_heat >= threshold, 255, 0)
+
+                # Get biggest connected component
+                min_size = map.shape[0] * map.shape[1] * size_restriction
+                labeled, nr_objects = ndimage.label(binary_heat)  # get connected components
+                [objects, counts] = np.unique(labeled, return_counts=True)  # count occurrences
+                # biggest_components = np.argsort(counts[1:])[::-1]
+                # selected_components = [1 if counts[i+1] >= min_size else 0
+                # for i in biggest_components] # check minimum size restriction
+                # selected_components = [1 for i in range(len(objects))]
+                # biggest_components = biggest_components[:min([np.sum(selected_components), 9999])] # get all bboxes
+
+                for obj in objects[1:]:
+                    current_obj = np.where(labeled == obj, 255, 0)  # get the biggest
+
+                    # Draw bounding box on original image
+                    box = list(bbox(current_obj))
+                    current_obj = np.nonzero(current_obj)
+                    if len(current_obj) > min_size:  # filter too small bboxes
+                        # get score of the region
+                        score = np.mean([map[point[0], point[1]] for point in current_obj])
+
+                        # convert bbox to original size
+                        box = np.array([box[0] * wratio, box[1] * hratio, box[2] * wratio, box[3] * hratio])
+                        box = box.astype(int)
+
+                        bboxes.append(box)
+                        Y.append(c)
+                        scores.append(score)
+
+            out_list.append([bboxes, Y, scores])
+
+        return out_list
+
+    @staticmethod
+    def load3DLabels(bbox_list,
+                     nClasses,
+                     dataAugmentation,
+                     daRandomParams,
+                     img_size,
+                     size_crop,
+                     image_list):
         """
         Loads a set of outputs of the type 3DLabel (used for detection)
 
@@ -2156,8 +3613,15 @@ class Dataset(object):
 
         return labels
 
-    def load3DSemanticLabels(self, labeled_images_list, nClasses, classes_to_colour, dataAugmentation, daRandomParams,
-                             img_size, size_crop, image_list):
+    def load3DSemanticLabels(self,
+                             labeled_images_list,
+                             nClasses,
+                             classes_to_colour,
+                             dataAugmentation,
+                             daRandomParams,
+                             img_size,
+                             size_crop,
+                             image_list):
         """
         Loads a set of outputs of the type 3DSemanticLabel (used for semantic segmentation TRAINING)
 
@@ -2262,1077 +3726,6 @@ class Dataset(object):
 
         return labels
 
-    def loadText(self, X, vocabularies, max_len, offset, fill, pad_on_batch, words_so_far, loading_X=False):
-        """
-        Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
-
-        :param X: Text to encode.
-        :param vocabularies: Mapping word -> index
-        :param max_len: Maximum length of the text.
-        :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning.
-                     'end': it will be filled with 0s at the end.
-                     'center': the vector will be surrounded by 0s, both at beginning and end.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
-                             sentences with a fixed (max_text_length) length.
-        :param words_so_far: Experimental feature. Use with caution.
-        :param loading_X: Whether we are loading an input or an output of the model
-        :return: Text as sequence of number. Mask for each sentence.
-        """
-        vocab = vocabularies['words2idx']
-        n_batch = len(X)
-
-        # Max values per uint type:
-        # uint8.max: 255
-        # uint16.max: 65535
-        # uint32.max: 4294967295
-        vocabulary_size = len(list(vocab))
-
-        if vocabulary_size < 255:
-            dtype_text = 'uint8'
-        elif vocabulary_size < 65535:
-            dtype_text = 'uint16'
-        else:
-            dtype_text = 'uint32'
-
-        if max_len == 0:  # use whole sentence as class
-            X_out = np.zeros(n_batch).astype(dtype_text)
-            for sentence_idx in range(n_batch):
-                word = X[sentence_idx]
-                if self.unk_symbol in vocab:
-                    X_out[sentence_idx] = vocab.get(word, vocab[self.unk_symbol])
-                else:
-                    X_out[sentence_idx] = vocab[word]
-            if loading_X:
-                X_out = (X_out, None)  # This None simulates a mask
-        else:  # process text as a sequence of words
-            if pad_on_batch:
-                max_len_batch = min(max([len(words.split(' ')) for words in X]) + 1, max_len)
-            else:
-                max_len_batch = max_len
-
-            if words_so_far:
-                X_out = np.ones((n_batch, max_len_batch, max_len_batch)).astype(dtype_text) * self.extra_words[
-                    self.pad_symbol]
-                X_mask = np.zeros((n_batch, max_len_batch, max_len_batch)).astype('int8')
-                null_row = np.ones((1, max_len_batch)).astype(dtype_text) * self.extra_words[self.pad_symbol]
-                zero_row = np.zeros((1, max_len_batch)).astype('int8')
-                if offset > 0:
-                    null_row[0] = np.append([vocab[self.null_symbol]] * offset, null_row[0, :-offset])
-            else:
-                X_out = np.ones((n_batch, max_len_batch)).astype(dtype_text) * self.extra_words[self.pad_symbol]
-                X_mask = np.zeros((n_batch, max_len_batch)).astype('int8')
-
-            max_len_batch -= 1  # always leave space for <eos> symbol
-
-            # fills text vectors with each word (fills with 0s or removes remaining words w.r.t. max_len)
-            for sentence_idx in range(n_batch):
-                words = X[sentence_idx].strip().split(' ')
-                len_j = len(words)
-                if fill == 'start':
-                    offset_j = max_len_batch - len_j - 1
-                elif fill == 'center':
-                    offset_j = (max_len_batch - len_j) / 2
-                    len_j += offset_j
-                else:
-                    offset_j = 0
-                    len_j = min(len_j, max_len_batch)
-                if offset_j < 0:
-                    len_j += offset_j
-                    offset_j = 0
-
-                if words_so_far:
-                    for word_idx, word in list(zip(range(len_j), words[:len_j])):
-                        next_w = vocab.get(word, next_w=vocab[self.unk_symbol])
-                        for k in range(word_idx, len_j):
-                            X_out[sentence_idx, k + offset_j, word_idx + offset_j] = next_w
-                            X_mask[sentence_idx, k + offset_j, word_idx + offset_j] = 1  # fill mask
-                        X_mask[
-                            sentence_idx, word_idx + offset_j, word_idx + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
-
-                else:
-                    for word_idx, word in list(zip(range(len_j), words[:len_j])):
-                        X_out[sentence_idx, word_idx + offset_j] = vocab.get(word, vocab[self.unk_symbol])
-                        X_mask[sentence_idx, word_idx + offset_j] = 1  # fill mask
-                    X_mask[sentence_idx, len_j + offset_j] = 1  # add additional 1 for the <eos> symbol
-
-                if offset > 0:  # Move the text to the right -> null symbol
-                    if words_so_far:
-                        for k in range(len_j):
-                            X_out[sentence_idx, k] = np.append([vocab[self.null_symbol]] * offset,
-                                                               X_out[sentence_idx, k, :-offset])
-                            X_mask[sentence_idx, k] = np.append([0] * offset, X_mask[sentence_idx, k, :-offset])
-                        X_out[sentence_idx] = np.append(null_row, X_out[sentence_idx, :-offset], axis=0)
-                        X_mask[sentence_idx] = np.append(zero_row, X_mask[sentence_idx, :-offset], axis=0)
-                    else:
-                        X_out[sentence_idx] = np.append([vocab[self.null_symbol]] * offset,
-                                                        X_out[sentence_idx, :-offset])
-                        X_mask[sentence_idx] = np.append([1] * offset, X_mask[sentence_idx, :-offset])
-            X_out = (np.asarray(X_out, dtype=dtype_text), np.asarray(X_mask, dtype='int8'))
-
-        return X_out
-
-    def loadTextOneHot(self,
-                       X,
-                       vocabularies,
-                       vocabulary_len,
-                       max_len,
-                       offset,
-                       fill,
-                       pad_on_batch,
-                       words_so_far,
-                       sample_weights=False,
-                       loading_X=False,
-                       label_smoothing=0.):
-
-        """
-        Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
-
-        :param vocabulary_len:
-        :param sample_weights:
-        :param X: Text to encode.
-        :param vocabularies: Mapping word -> index
-        :param max_len: Maximum length of the text.
-        :param offset: Shifts the text to the right, adding null symbol at the start
-        :param fill: 'start': the resulting vector will be filled with 0s at the beginning.
-                     'end': it will be filled with 0s at the end.
-                     'center': the vector will be surrounded by 0s, both at beginning and end.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of
-                             the minibatch or sentences with a fixed (max_text_length) length.
-        :param words_so_far: Experimental feature. Use with caution.
-        :param loading_X: Whether we are loading an input or an output of the model
-        :return: Text as sequence of one-hot vectors. Mask for each sentence.
-        """
-
-        y = self.loadText(X, vocabularies, max_len, offset, fill, pad_on_batch,
-                          words_so_far, loading_X=loading_X)
-        # Use whole sentence as class (classifier model)
-        if max_len == 0:
-            y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
-        # Use words separately (generator model)
-        else:
-            if label_smoothing > 0.:
-                y_aux_type = np.float32
-            else:
-                y_aux_type = np.uint8
-            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
-            for idx in range(y[0].shape[0]):
-                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(y_aux_type)
-            if label_smoothing > 0.:
-                y_aux = self.apply_label_smoothing(y_aux, label_smoothing, vocabulary_len)
-            if sample_weights:
-                y_aux = (y_aux, y[1])  # join data and mask
-        return y_aux
-
-    def loadTextFeatures(self, X, max_len, pad_on_batch, offset):
-        """
-        Text encoder: Transforms samples from a text representation into a numerical one. It also masks the text.
-
-        :param X: Encoded text.
-        :param max_len: Maximum length of the text.
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of the minibatch or
-                             sentences with a fixed (max_text_length) length.
-        :return: Text as sequence of numbers. Mask for each sentence.
-        """
-        X_out = np.asarray(X)
-        max_len_X = max(np.sum(X_out != 0, axis=-1))
-        max_len_out = min(max_len_X + 1 - offset, max_len) if pad_on_batch else max_len
-        X_out_aux = np.zeros((X_out.shape[0], max_len_out), dtype='int64')
-        X_out_aux[:, :max_len_X] = X_out[:, :max_len_X].astype('int64')
-        # Mask all zero-values
-        X_mask = (np.ma.make_mask(X_out_aux, dtype='int') * 1).astype('int8')
-        # But we keep with the first one, as it indicates the <pad> symbol
-        X_mask = np.hstack((np.ones((X_mask.shape[0], 1)), X_mask[:, :-1]))
-        X_out = (X_out_aux, X_mask)
-        return X_out
-
-    def loadTextFeaturesOneHot(self,
-                               X,
-                               vocabulary_len,
-                               max_len,
-                               pad_on_batch,
-                               offset,
-                               sample_weights=False,
-                               label_smoothing=0.):
-
-        """
-        Text encoder: Transforms samples from a text representation into a one-hot. It also masks the text.
-        :param X: Encoded text.
-        :param vocabulary_len: Length of the vocabulary (size of the one-hot vector)
-        :param sample_weights: If True, we also return the mask of the text.
-        :param max_len: Maximum length of the text.
-        :param offset: Shifts the text to the right, adding null symbol at the start
-        :param pad_on_batch: Whether we get sentences with length of the maximum length of
-                             the minibatch or sentences with a fixed (max_text_length) length.
-        :return: Text as sequence of one-hot vectors. Mask for each sentence.
-        """
-        y = self.loadTextFeatures(X, max_len, pad_on_batch, offset)
-
-        # Use whole sentence as class (classifier model)
-        if max_len == 0:
-            y_aux = to_categorical(y, vocabulary_len).astype(np.uint8)
-        # Use words separately (generator model)
-        else:
-            if label_smoothing > 0.:
-                y_aux_type = np.float32
-            else:
-                y_aux_type = np.uint8
-            y_aux = np.zeros(list(y[0].shape) + [vocabulary_len]).astype(y_aux_type)
-            for idx in range(y[0].shape[0]):
-                y_aux[idx] = to_categorical(y[0][idx], vocabulary_len).astype(y_aux_type)
-            if label_smoothing > 0.:
-                y_aux = self.apply_label_smoothing(y_aux, label_smoothing, vocabulary_len)
-            if sample_weights:
-                y_aux = (y_aux, y[1])  # join data and mask
-        return y_aux
-
-    def loadMapping(self, path_list):
-        """
-        Loads a mapping of Source -- Target words.
-        :param path_list: Pickle object with the mapping
-        :return: None
-        """
-        if not self.silence:
-            logger.info("Loading source -- target mapping.")
-        if sys.version_info.major == 3:
-            self.mapping = pk.load(open(path_list, 'rb'), encoding='utf-8')
-        else:
-            self.mapping = pk.load(open(path_list, 'rb'))
-        if not self.silence:
-            logger.info("Source -- target mapping loaded with a total of %d words." % len(list(self.mapping)))
-
-    # ------------------------------------------------------- #
-    #       Tokenizing functions
-    # ------------------------------------------------------- #
-
-    @staticmethod
-    def tokenize_basic(caption, lowercase=True):
-        """
-        Basic tokenizer for the input/output data of type 'text':
-           * Splits punctuation
-           * Optional lowercasing
-
-        :param caption: String to tokenize
-        :param lowercase: Whether to lowercase the caption or not
-        :return: Tokenized version of caption
-        """
-        return tokenize_basic(caption, lowercase=lowercase)
-
-    @staticmethod
-    def tokenize_aggressive(caption, lowercase=True):
-        """
-        Aggressive tokenizer for the input/output data of type 'text':
-        * Removes punctuation
-        * Optional lowercasing
-
-        :param caption: String to tokenize
-        :param lowercase: Whether to lowercase the caption or not
-        :return: Tokenized version of caption
-        """
-        return tokenize_aggressive(caption, lowercase=lowercase)
-
-    @staticmethod
-    def tokenize_icann(caption):
-        """
-        Tokenization used for the icann paper:
-        * Removes some punctuation (. , ")
-        * Lowercasing
-
-        :param caption: String to tokenize
-        :return: Tokenized version of caption
-        """
-        return tokenize_icann(caption)
-
-    @staticmethod
-    def tokenize_montreal(caption):
-        """
-        Similar to tokenize_icann
-            * Removes some punctuation
-            * Lowercase
-
-        :param caption: String to tokenize
-        :return: Tokenized version of caption
-        """
-        return tokenize_montreal(caption)
-
-    @staticmethod
-    def tokenize_soft(caption, lowercase=True):
-        """
-        Tokenization used for the icann paper:
-            * Removes very little punctuation
-            * Lowercase
-        :param caption: String to tokenize
-        :param lowercase: Whether to lowercase the caption or not
-        :return: Tokenized version of caption
-        """
-        return tokenize_soft(caption, lowercase=lowercase)
-
-    @staticmethod
-    def tokenize_none(caption):
-        """
-        Does not tokenizes the sentences. Only performs a stripping
-
-        :param caption: String to tokenize
-        :return: Tokenized version of caption
-        """
-        return tokenize_none(caption)
-
-    @staticmethod
-    def tokenize_none_char(caption):
-        """
-        Character-level tokenization. Respects all symbols. Separates chars. Inserts <space> sybmol for spaces.
-        If found an escaped char, "&apos;" symbol, it is converted to the original one
-        # List of escaped chars (by moses tokenizer)
-        & ->  &amp;
-        | ->  &#124;
-        < ->  &lt;
-        > ->  &gt;
-        ' ->  &apos;
-        " ->  &quot;
-        [ ->  &#91;
-        ] ->  &#93;
-        :param caption: String to tokenize
-        :return: Tokenized version of caption
-        """
-        return tokenize_none_char(caption)
-
-    @staticmethod
-    def tokenize_CNN_sentence(caption):
-        """
-        Tokenization employed in the CNN_sentence package
-        (https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py#L97).
-        :param caption: String to tokenize
-        :return: Tokenized version of caption
-        """
-        return tokenize_CNN_sentence(caption)
-
-    @staticmethod
-    def tokenize_questions(caption):
-        """
-        Basic tokenizer for VQA questions:
-            * Lowercasing
-            * Splits contractions
-            * Removes punctuation
-            * Numbers to digits
-
-        :param caption: String to tokenize
-        :return: Tokenized version of caption
-        """
-        return tokenize_questions(caption)
-
-    def tokenize_bpe(self, caption):
-        """
-        Applies BPE segmentation (https://github.com/rsennrich/subword-nmt)
-        :param caption: Caption to detokenize.
-        :return: Encoded version of caption.
-        """
-        if not self.BPE_built:
-            raise Exception('Prior to use the "tokenize_bpe" method, you should invoke "build_BPE"')
-        if isinstance(caption, str) and sys.version_info < (3, 0):
-            caption = caption.decode('utf-8')
-        tokenized = re.sub(u'[\n\t]+', u'', caption)
-        tokenized = self.BPE.segment(tokenized).strip()
-        return tokenized
-
-    @staticmethod
-    def detokenize_none(caption):
-        """
-        Dummy function: Keeps the caption as it is.
-        :param caption: String to de-tokenize.
-        :return: Same caption.
-        """
-        return detokenize_none(caption)
-
-    @staticmethod
-    def detokenize_bpe(caption, separator=u'@@'):
-        """
-        Reverts BPE segmentation (https://github.com/rsennrich/subword-nmt)
-        :param caption: Caption to detokenize.
-        :param separator: BPE separator.
-        :return: Detokenized version of caption.
-        """
-        return detokenize_bpe(caption, separator=separator)
-
-    @staticmethod
-    def detokenize_none_char(caption):
-        """
-        Character-level detokenization. Respects all symbols. Joins chars into words. Words are delimited by
-        the <space> token. If found an special character is converted to the escaped char.
-        # List of escaped chars (by moses tokenizer)
-            & ->  &amp;
-            | ->  &#124;
-            < ->  &lt;
-            > ->  &gt;
-            ' ->  &apos;
-            " ->  &quot;
-            [ ->  &#91;
-            ] ->  &#93;
-        :param caption: String to de-tokenize.
-            :return: Detokenized version of caption.
-        """
-        return detokenize_none_char(caption)
-
-    def tokenize_moses(self,
-                       caption,
-                       language='en',
-                       lowercase=False,
-                       aggressive_dash_splits=False,
-                       return_str=True,
-                       escape=False):
-        """
-        Applies the Moses tokenization. Relying on sacremoses' implementation of the Moses tokenizer.
-
-        :param caption: Sentence to tokenize
-        :param language: Language (will build the tokenizer for this language)
-        :param lowercase: Whether to lowercase or not the sentence
-        :param aggressive_dash_splits: Option to trigger dash split rules .
-        :param return_str: Return string or list
-        :param escape: Escape HTML special chars
-        :return:
-        """
-        # Compatibility with old Datasets instances:
-        if not hasattr(self, 'moses_tokenizer_built'):
-            self.moses_tokenizer_built = False
-        if not self.moses_tokenizer_built:
-            self.build_moses_tokenizer(language=language)
-        if isinstance(caption, str) and sys.version_info < (3, 0):
-            caption = caption.decode('utf-8')
-        tokenized = re.sub(u'[\n\t]+', u'', caption)
-        if lowercase:
-            tokenized = tokenized.lower()
-        return self.moses_tokenizer.tokenize(tokenized, aggressive_dash_splits=aggressive_dash_splits,
-                                             return_str=return_str, escape=escape)
-
-    def detokenize_moses(self,
-                         caption,
-                         language='en',
-                         lowercase=False,
-                         return_str=True,
-                         unescape=True):
-        """
-        Applies the Moses detokenization. Relying on sacremoses' implementation of the Moses tokenizer.
-
-        :param caption: Sentence to tokenize
-        :param language: Language (will build the tokenizer for this language)
-        :param lowercase: Whether to lowercase or not the sentence
-        :param aggressive_dash_splits: Option to trigger dash split rules .
-        :param return_str: Return string or list
-        :param escape: Escape HTML special chars
-        :return:
-        """
-        # Compatibility with old Datasets instances:
-        if not hasattr(self, 'moses_detokenizer_built'):
-            self.moses_detokenizer_built = False
-        if not self.moses_detokenizer_built:
-            self.build_moses_detokenizer(language=language)
-        if isinstance(caption, str) and sys.version_info < (3, 0):
-            caption = caption.decode('utf-8')
-        tokenized = re.sub(u'[\n\t]+', u'', caption)
-        if lowercase:
-            tokenized = tokenized.lower()
-        return self.moses_detokenizer.detokenize(tokenized.split(), return_str=return_str, unescape=unescape)
-
-    # ------------------------------------------------------- #
-    #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def preprocessVideos(self, path_list, data_id, set_name, max_video_len, img_size, img_size_crop):
-        """
-        Preprocess videos. Subsample and crop frames.
-        :param path_list: path to all images in all videos
-        :param data_id: Data id to be processed.
-        :param set_name: Set name to be processed.
-        :param max_video_len: Maximum number of subsampled video frames.
-        :param img_size: Size of each frame.
-        :param img_size_crop: Size of each image crop.
-        :return:
-        """
-        if isinstance(path_list, list) and len(path_list) == 2:
-            # path to all images in all videos
-            data = []
-            with open(path_list[0], 'r') as list_:
-                for line in list_:
-                    data.append(line.rstrip('\n'))
-            # frame counts
-            counts_frames = []
-            with open(path_list[1], 'r') as list_:
-                for line in list_:
-                    counts_frames.append(int(line.rstrip('\n')))
-
-            if data_id not in self.paths_frames:
-                self.paths_frames[data_id] = dict()
-            self.paths_frames[data_id][set_name] = data
-            self.max_video_len[data_id] = max_video_len
-            self.img_size[data_id] = img_size
-            self.img_size_crop[data_id] = img_size_crop
-        else:
-            raise Exception('Wrong type for "path_list". It must be a list containing two paths: '
-                            'a path to a text file with the paths to all images in all videos in '
-                            '[0] and a path to another text file with the number of frames of '
-                            'each video in each line in [1] (which will index the paths in the first file).\n'
-                            'It currently is: %s' % str(path_list))
-
-        return counts_frames
-
-    def preprocessVideoFeatures(self, path_list, data_id, set_name, max_video_len, img_size, img_size_crop, feat_len):
-        """
-        Preprocess already extracted features from video frames.
-        :param path_list: path to all features in all videos
-        :param data_id: Data id to be processed.
-        :param set_name: Set name to be processed.
-        :param max_video_len: Maximum number of subsampled video features.
-        :param img_size: Size of each frame.
-        :param img_size_crop: Size of each image crop.
-        :param feat_len: Length of each feature.
-        :return:
-        """
-        if isinstance(path_list, list) and len(path_list) == 2:
-            if isinstance(path_list[0], str):
-                # path to all images in all videos
-                paths_frames = []
-                with open(path_list[0], 'r') as list_:
-                    for line in list_:
-                        paths_frames.append(line.rstrip('\n'))
-            elif isinstance(path_list[0], list):
-                paths_frames = path_list[0]
-            else:
-                raise Exception('Wrong type for "path_frames". It must be a path to a file containing a'
-                                ' list of frames or directly a list of frames.\n'
-                                'It currently is: %s' % str(path_list[0]))
-
-            if isinstance(path_list[1], str):
-                # frame counts
-                counts_frames = []
-                with open(path_list[1], 'r') as list_:
-                    for line in list_:
-                        counts_frames.append(int(line.rstrip('\n')))
-            elif isinstance(path_list[1], list):
-                counts_frames = path_list[1]
-            else:
-                raise Exception(
-                    'Wrong type for "counts_frames".'
-                    ' It must be a path to a file containing a list of counts or directly a list of counts.\n'
-                    'It currently is: %s' % str(path_list[1]))
-
-            # video indices
-            video_indices = range(len(counts_frames))
-
-            if data_id not in self.paths_frames:
-                self.paths_frames[data_id] = dict()
-            if data_id not in self.counts_frames:
-                self.counts_frames[data_id] = dict()
-
-            self.paths_frames[data_id][set_name] = paths_frames
-            self.counts_frames[data_id][set_name] = counts_frames
-            self.max_video_len[data_id] = max_video_len
-            self.img_size[data_id] = img_size
-            self.img_size_crop[data_id] = img_size_crop
-        else:
-            raise Exception('Wrong type for "path_list". '
-                            'It must be a list containing two paths: a path to a text file with the paths to all '
-                            'images in all videos in [0] and a path to another text file with the number of frames '
-                            'of each video in each line in [1] (which will index the paths in the first file).'
-                            'It currently is: %s' % str(path_list[1]))
-
-        if feat_len is not None:
-            if not isinstance(feat_len, list):
-                feat_len = [feat_len]
-            self.features_lengths[data_id] = feat_len
-
-        return video_indices
-
-    def loadVideos(self, n_frames, data_id, last, set_name, max_len, normalization_type, normalization,
-                   meanSubstraction,
-                   dataAugmentation):
-        """
-         Loads a set of videos from disk. (Untested!)
-
-        :param n_frames: Number of frames per video
-        :param data_id: Id to load
-        :param last: Last video loaded
-        :param set_name:  'train', 'val', 'test'
-        :param max_len: Maximum length of videos
-        :param normalization_type:  Type of normalization applied
-        :param normalization: Whether we apply a 0-1 normalization to the images
-        :param meanSubstraction:  Whether we are removing the training mean
-        :param dataAugmentation:  Whether we are applying dataAugmentatino (random cropping and horizontal flip)
-        """
-
-        n_videos = len(n_frames)
-        V = np.zeros((n_videos, max_len * 3, self.img_size_crop[data_id][0], self.img_size_crop[data_id][1]))
-
-        idx = [0 for i in range(n_videos)]
-        # recover all indices from image's paths of all videos
-        for v in range(n_videos):
-            this_last = last + v
-            if this_last >= n_videos:
-                v = this_last % n_videos
-                this_last = v
-            idx[v] = int(sum(getattr(self, 'Y_' + set_name)[data_id][:this_last]))
-
-        # load images from each video
-        for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
-            paths = self.paths_frames[data_id][set_name][i:i + n]
-            daRandomParams = None
-            if dataAugmentation:
-                daRandomParams = self.getDataAugmentationRandomParams(paths, data_id)
-            # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, data_id, normalization_type, normalization, meanSubstraction,
-                                     dataAugmentation,
-                                     daRandomParams)
-            # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
-            len_j = images.shape[0]
-            offset_j = max_len - len_j
-            if offset_j < 0:
-                len_j = len_j + offset_j
-                offset_j = 0
-            for j in range(len_j):
-                V[enum, (j + offset_j) * 3:(j + offset_j + 1) * 3] = images[j]
-
-        return V
-
-    def loadVideoFeatures(self, idx_videos, data_id, set_name, max_len, normalization_type, normalization, feat_len,
-                          external=False, data_augmentation=True):
-        """
-
-        :param idx_videos: indices of the videos in the complete list of the current set_name
-        :param data_id: identifier of the input/output that we are loading
-        :param set_name: 'train', 'val' or 'test'
-        :param max_len: maximum video length (number of frames)
-        :param normalization_type: type of data normalization applied
-        :param normalization: Switch on/off data normalization
-        :param feat_len: length of the features about to load
-        :param external: Switch on/off data loading from external dataset (not sharing self.path)
-        :param data_augmentation: Switch on/off data augmentation
-        :return:
-        """
-
-        n_videos = len(idx_videos)
-        if isinstance(feat_len, list):
-            feat_len = feat_len[0]
-        features = np.zeros((n_videos, max_len, feat_len))
-
-        selected_frames = self.getFramesPaths(idx_videos, data_id, set_name, max_len, data_augmentation)
-        data_augmentation_types = self.inputs_data_augmentation_types[data_id]
-
-        # load features from selected paths
-        for i, vid_paths in list(enumerate(selected_frames)):
-            for j, feat in list(enumerate(vid_paths)):
-                if not external:
-                    feat = self.path + '/' + feat
-
-                # Check if the filename includes the extension
-                feat = np.load(feat)
-
-                if data_augmentation and 'noise' in data_augmentation_types:
-                    noise_mean = 0.0
-                    noise_dev = 0.01
-                    noise = np.random.normal(noise_mean, noise_dev, feat.shape)
-                    feat += noise
-
-                if normalization:
-                    if normalization_type == 'L2':
-                        feat /= np.linalg.norm(feat, ord=2)
-
-                features[i, j] = feat
-
-        return np.array(features)
-
-    def getFramesPaths(self, idx_videos, data_id, set_name, max_len, data_augmentation):
-        """
-        Recovers the paths from the selected video frames.
-        """
-
-        # recover chosen data augmentation types
-        data_augmentation_types = self.inputs_data_augmentation_types[data_id]
-        if data_augmentation_types is None:
-            data_augmentation_types = []
-
-        n_frames = [self.counts_frames[data_id][set_name][i_idx_vid] for i_idx_vid in idx_videos]
-
-        n_videos = len(idx_videos)
-        idx = [0 for i_nvid in range(n_videos)]
-        # recover all initial indices from image's paths of all videos
-        for v in range(n_videos):
-            last_idx = idx_videos[v]
-            idx[v] = int(sum(self.counts_frames[data_id][set_name][:last_idx]))
-
-        # select subset of max_len from n_frames[i]
-        selected_frames = [0 for i_nvid in range(n_videos)]
-        for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
-            paths = self.paths_frames[data_id][set_name][i:i + n]
-
-            if data_augmentation and 'random_selection' in data_augmentation_types:  # apply random frames selection
-                selected_idx = sorted(random.sample(range(n), min(max_len, n)))
-            else:  # apply equidistant frames selection
-                selected_idx = np.round(np.linspace(0, n - 1, min(max_len, n)))
-                # splits = np.array_split(range(n), min(max_len, n))
-                # selected_idx = [s[0] for s in splits]
-
-            selected_paths = [paths[int(idx)] for idx in selected_idx]
-            selected_frames[enum] = selected_paths
-
-        return selected_frames
-
-    def loadVideosByIndex(self, n_frames, data_id, indices, set_name, max_len, normalization_type, normalization,
-                          meanSubstraction, dataAugmentation):
-        """
-        Get videos by indices.
-        :param n_frames: Indices of the frames to load from each video.
-        :param data_id: Data id to be processed.
-        :param indices: Indices of the videos to load.
-        :param set_name: Set name to be processed.
-        :param max_len: Maximum length of each video.
-        :param normalization_type: Normalization type applied to the frames.
-        :param normalization: Normalization applied to the frames.
-        :param meanSubstraction: Mean subtraction applied to the frames.
-        :param dataAugmentation: Whether apply data augmentation.
-        :return:
-        """
-        n_videos = len(indices)
-        V = np.zeros((n_videos, max_len * 3, self.img_size_crop[data_id][0], self.img_size_crop[data_id][1]))
-
-        idx = [0 for i in range(n_videos)]
-        # recover all indices from image's paths of all videos
-        for v in range(n_videos):
-            idx[v] = int(sum(eval('self.X_' + set_name + '[data_id][indices[v]]')))
-
-        # load images from each video
-        for enum, (n, i) in list(enumerate(zip(n_frames, idx))):
-            paths = self.paths_frames[data_id][set_name][i:i + n]
-            daRandomParams = None
-            if dataAugmentation:
-                daRandomParams = self.getDataAugmentationRandomParams(paths, data_id)
-            # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, data_id, normalization_type, normalization, meanSubstraction,
-                                     dataAugmentation,
-                                     daRandomParams)
-            # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
-            len_j = images.shape[0]
-            offset_j = max_len - len_j
-            if offset_j < 0:
-                len_j = len_j + offset_j
-                offset_j = 0
-            for j in range(len_j):
-                V[enum, (j + offset_j) * 3:(j + offset_j + 1) * 3] = images[j]
-
-        return V
-
-    # ------------------------------------------------------- #
-    #       TYPE 'id' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    @staticmethod
-    def preprocessIDs(path_list, data_id, set_name):
-        """
-        Preprocess ID outputs: Strip and put each ID in a line.
-        """
-        logger.info('WARNING: inputs or outputs with type "id" will not be treated in any way by the dataset.')
-        if isinstance(path_list, str) and os.path.isfile(path_list):  # path to list of IDs
-            data = []
-            with codecs.open(path_list, 'r', encoding='utf-8') as list_:
-                for line in list_:
-                    data.append(line.rstrip('\n'))
-        elif isinstance(path_list, list):
-            data = path_list
-        else:
-            raise Exception('Wrong type for "path_list". '
-                            'It must be a path to a text file with an data_id in each line'
-                            ' or an instance of the class list with an data_id in each position.'
-                            'It currently is: %s' % str(path_list))
-
-        return data
-
-    # ------------------------------------------------------- #
-    #       TYPE '3DSemanticLabel' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def getImageFromPrediction_3DSemanticLabel(self, img, n_classes):
-        """
-        Get the segmented image from the prediction of the model using the semantic classes of the dataset together with their corresponding colours.
-
-        :param img: Prediction of the model.
-        :param n_classes: Number of semantic classes.
-        :return: out_img: The segmented image with the class colours.
-        """
-
-        h_crop, w_crop, d_crop = self.img_size_crop[self.id_in_3DLabel[self.ids_outputs[0]]]
-        output_id = ''.join(self.ids_outputs)
-
-        # prepare the segmented image
-        pred_labels = np.reshape(img, (h_crop, w_crop, n_classes))
-        # out_img = np.zeros((h_crop, w_crop, d_crop))
-        out_img = np.zeros((h_crop, w_crop, 3))  # predictions saved as RGB images (3 channels)
-
-        for ih in range(h_crop):
-            for iw in range(w_crop):
-                lab = np.argmax(pred_labels[ih, iw])
-                out_img[ih, iw, :] = self.semantic_classes[output_id][lab]
-
-        return out_img
-
-    def preprocess3DSemanticLabel(self, path_list, data_id, associated_id_in, num_poolings):
-        """
-        Preprocess 3D Semantic labels
-        """
-        return self.preprocess3DLabel(path_list, data_id, associated_id_in, num_poolings)
-
-    def setSemanticClasses(self, path_classes, data_id):
-        """
-        Loads the list of semantic classes of the dataset together with their corresponding colours in the GT image.
-        Each line must contain a unique identifier of the class and its associated RGB colour representation
-         separated by commas.
-
-        :param path_classes: Path to a text file with the classes and their colours.
-        :param data_id: input/output id
-
-        :return: None
-        """
-        if isinstance(path_classes, str) and os.path.isfile(path_classes):
-            semantic_classes = dict()
-            with codecs.open(path_classes, 'r', encoding='utf-8') as list_:
-                for line in list_:
-                    line = line.rstrip('\n').split(',')
-                    if len(line) != 4:
-                        raise Exception('Wrong format for semantic classes.'
-                                        ' Must contain a class name followed by the '
-                                        'RGB colour values separated by commas.'
-                                        'It currently has a line of length: %s' % str(len(line)))
-
-                    class_id = self.dic_classes[data_id][line[0]]
-                    semantic_classes[int(class_id)] = [int(line[1]), int(line[2]), int(line[3])]
-            self.semantic_classes[data_id] = semantic_classes
-        else:
-            raise Exception('Wrong type for "path_classes".'
-                            ' It must be a path to a text file with the classes '
-                            'and their associated colour in the GT image.'
-                            'It currently is: %s' % str(path_classes))
-
-        if not self.silence:
-            logger.info('Loaded semantic classes list for data with data_id: ' + data_id)
-
-    def load_GT_3DSemanticLabels(self, gt, data_id):
-        """
-        Loads a GT list of 3DSemanticLabels in a 2D matrix and reshapes them to an Nx1 array (EVALUATION)
-
-        :param gt: list of Dataset output of type 3DSemanticLabels
-        :param data_id: id of the input/output we are processing
-        :return: out_list: containing a list of label images reshaped as an Nx1 array
-        """
-        from PIL import Image as pilimage
-        from scipy import misc
-
-        out_list = []
-
-        assoc_id_in = self.id_in_3DLabel[data_id]
-        classes_to_colour = self.semantic_classes[data_id]
-        nClasses = len(list(classes_to_colour))
-        img_size = self.img_size[assoc_id_in]
-        size_crop = self.img_size_crop[assoc_id_in]
-        num_poolings = self.num_poolings_model[data_id]
-
-        n_samples = len(gt)
-        h, w, d = img_size
-        h_crop, w_crop, d_crop = size_crop
-
-        # Modify output dimensions depending on number of poolings applied
-        if num_poolings is not None:
-            h_crop = int(np.floor(h_crop / np.power(2, num_poolings)))
-            w_crop = int(np.floor(w_crop / np.power(2, num_poolings)))
-
-        for i in range(n_samples):
-            pre_labels = np.zeros((nClasses, h_crop, w_crop), dtype=np.float32)
-            # labels = np.zeros((h_crop, w_crop), dtype=np.uint8)
-            line = gt[i]
-
-            # Load labeled GT image
-            labeled_im = self.path + '/' + line
-            # Check if the filename includes the extension
-            [path, filename] = ntpath.split(labeled_im)
-            [filename, ext] = os.path.splitext(filename)
-            # If it doesn't then we find it
-            if not ext:
-                filename = fnmatch.filter(os.listdir(path), filename + '*')
-                if not filename:
-                    raise Exception('Non existent image ' + labeled_im)
-                else:
-                    labeled_im = path + '/' + filename[0]
-            # Read image
-            try:
-                logging.disable(logging.CRITICAL)
-                labeled_im = pilimage.open(labeled_im)
-                labeled_im = np.asarray(labeled_im)
-                logging.disable(logging.NOTSET)
-                labeled_im = misc.imresize(labeled_im, (h, w))
-            except Exception:
-                logger.warning("WARNING!")
-                logger.warning("Can't load image " + labeled_im)
-                labeled_im = np.zeros((h, w))
-
-            label3D = np.zeros((nClasses, h, w), dtype=np.float32)
-
-            # Insert 1s in the corresponding positions for each class
-            for class_id, colour in iteritems(classes_to_colour):
-                # indices = np.where(np.all(labeled_im == colour, axis=-1))
-                indices = np.where(labeled_im == class_id)
-                num_vals = len(indices[0])
-                if num_vals > 0:
-                    for idx_pos in range(num_vals):
-                        x, y = indices[0][idx_pos], indices[1][idx_pos]
-                        label3D[class_id, x, y] = 1.
-
-            # Resize 3DLabel to crop size.
-            for j in range(nClasses):
-                label2D = misc.imresize(label3D[j], (h_crop, w_crop))
-                maxval = np.max(label2D)
-                if maxval > 0:
-                    label2D /= maxval
-                pre_labels[j] = label2D
-
-            # Convert to single matrix with class IDs
-            labels = np.argmax(pre_labels, axis=0)
-            labels = np.reshape(labels, (w_crop * h_crop))
-
-            out_list.append(labels)
-
-        return out_list
-
-    def resize_semantic_output(self, predictions, ids_out):
-        """
-        Resize semantic output.
-        """
-        from scipy import misc
-
-        out_pred = []
-
-        for pred, id_out in list(zip(predictions, ids_out)):
-
-            assoc_id_in = self.id_in_3DLabel[id_out]
-            in_size = self.img_size_crop[assoc_id_in]
-            out_size = self.img_size[assoc_id_in]
-            n_classes = len(self.classes[id_out])
-
-            pred = np.transpose(pred, [1, 0])
-            pred = np.reshape(pred, (-1, in_size[0], in_size[1]))
-
-            new_pred = np.zeros(tuple([n_classes] + out_size[0:2]))
-            for pos, p in list(enumerate(pred)):
-                new_pred[pos] = misc.imresize(p, tuple(out_size[0:2]))
-
-            new_pred = np.reshape(new_pred, (-1, out_size[0] * out_size[1]))
-            new_pred = np.transpose(new_pred, [1, 0])
-
-            out_pred.append(new_pred)
-
-        return out_pred
-
-    # ------------------------------------------------------- #
-    #       TYPE '3DLabel' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def preprocess3DLabel(self, path_list, label_id, associated_id_in, num_poolings):
-        if isinstance(path_list, str) and os.path.isfile(path_list):
-            path_list_3DLabel = []
-            with codecs.open(path_list, 'r', encoding='utf-8') as list_:
-                for line in list_:
-                    path_list_3DLabel.append(line.strip())
-        else:
-            raise Exception('Wrong type for "path_list". '
-                            'It must be a path to a text file with the path to 3DLabel files.'
-                            'It currently is: %s' % str(path_list))
-
-        self.num_poolings_model[label_id] = num_poolings
-        self.id_in_3DLabel[label_id] = associated_id_in
-
-        return path_list_3DLabel
-
-    def convert_3DLabels_to_bboxes(self, predictions, original_sizes, threshold=0.5, idx_3DLabel=0,
-                                   size_restriction=0.001):
-        """
-        Converts a set of predictions of type 3DLabel to their corresponding bounding boxes.
-
-        :param idx_3DLabel:
-        :param size_restriction:
-        :param predictions: 3DLabels predicted by Model_Wrapper.
-                            If type is list it will be assumed that position 0 corresponds to 3DLabels
-        :param original_sizes: original sizes of the predicted images width and height
-        :param threshold: minimum overlapping threshold for considering a prediction valid
-        :return: predicted_bboxes, predicted_Y, predicted_scores for each image
-        """
-        from scipy import ndimage
-        out_list = []
-
-        # if type is list it will be assumed that position 0 corresponds to 3DLabels
-        if isinstance(predictions, list):
-            predict_3dLabels = predictions[idx_3DLabel]
-        else:
-            predict_3dLabels = predictions
-
-        # Reshape from (n_samples, width*height, nClasses) to (n_samples, nClasses, width, height)
-        n_samples, _, n_classes = predict_3dLabels.shape
-        w, h, _ = self.img_size_crop[self.id_in_3DLabel[self.ids_outputs[idx_3DLabel]]]
-        predict_3dLabels = np.transpose(predict_3dLabels, (0, 2, 1))
-        predict_3dLabels = np.reshape(predict_3dLabels, (n_samples, n_classes, w, h))
-
-        # list of hypotheses with the following info [predicted_bboxes, predicted_Y, predicted_scores]
-        for s in range(n_samples):
-            bboxes = []
-            Y = []
-            scores = []
-            orig_h, orig_w = original_sizes[s]
-            wratio = float(orig_w) / w
-            hratio = float(orig_h) / h
-            for c in range(n_classes):
-                map = predict_3dLabels[s][c]
-
-                # Compute binary selected region
-                binary_heat = map
-                binary_heat = np.where(binary_heat >= threshold, 255, 0)
-
-                # Get biggest connected component
-                min_size = map.shape[0] * map.shape[1] * size_restriction
-                labeled, nr_objects = ndimage.label(binary_heat)  # get connected components
-                [objects, counts] = np.unique(labeled, return_counts=True)  # count occurrences
-                # biggest_components = np.argsort(counts[1:])[::-1]
-                # selected_components = [1 if counts[i+1] >= min_size else 0
-                # for i in biggest_components] # check minimum size restriction
-                # selected_components = [1 for i in range(len(objects))]
-                # biggest_components = biggest_components[:min([np.sum(selected_components), 9999])] # get all bboxes
-
-                for obj in objects[1:]:
-                    current_obj = np.where(labeled == obj, 255, 0)  # get the biggest
-
-                    # Draw bounding box on original image
-                    box = list(bbox(current_obj))
-                    current_obj = np.nonzero(current_obj)
-                    if len(current_obj) > min_size:  # filter too small bboxes
-
-                        # expand box before final detection
-                        # x_exp = box[2]# * box_expansion
-                        # y_exp = box[3]# * box_expansion
-                        # box[0] = max([0, box[0]-x_exp/2])
-                        # box[1] = max([0, box[1]-y_exp/2])
-                        # change width and height by xmax and ymax
-                        # box[2] += box[0]
-                        # box[3] += box[1]
-                        # box[2] = min([new_reshape_size[1]-1, box[2] + x_exp])
-                        # box[3] = min([new_reshape_size[0]-1, box[3] + y_exp])
-
-                        # get score of the region
-                        score = np.mean([map[point[0], point[1]] for point in current_obj])
-
-                        # convert bbox to original size
-                        box = np.array([box[0] * wratio, box[1] * hratio, box[2] * wratio, box[3] * hratio])
-                        box = box.astype(int)
-
-                        bboxes.append(box)
-                        Y.append(c)
-                        scores.append(score)
-
-            out_list.append([bboxes, Y, scores])
-
-        return out_list
-
     @staticmethod
     def convert_GT_3DLabels_to_bboxes(gt):
         """
@@ -3370,11 +3763,14 @@ class Dataset(object):
 
         return [out_list, original_sizes]
 
-    # ------------------------------------------------------- #
-    #       TYPE 'raw-image' SPECIFIC FUNCTIONS
-    # ------------------------------------------------------- #
-
-    def preprocessImages(self, path_list, data_id, set_name, img_size, img_size_crop, use_RGB):
+    # Type 'raw-image' functions
+    def preprocessImages(self,
+                         path_list,
+                         data_id,
+                         set_name,
+                         img_size,
+                         img_size_crop,
+                         use_RGB):
         """
         Image preprocessing function.
         :param path_list: Path to the images.
@@ -3411,7 +3807,10 @@ class Dataset(object):
 
         return data
 
-    def setTrainMean(self, mean_image, data_id, normalization=False):
+    def setTrainMean(self,
+                     mean_image,
+                     data_id,
+                     normalization=False):
         """
             Loads a pre-calculated training mean image, 'mean_image' can either be:
 
@@ -3458,7 +3857,8 @@ class Dataset(object):
                     "Change the images size with setImageSize(size) or "
                     "recalculate the training mean with calculateTrainMean().")
 
-    def calculateTrainMean(self, data_id):
+    def calculateTrainMean(self,
+                           data_id):
         """
             Calculates the mean of the data belonging to the training set split in each channel.
         """
@@ -3518,14 +3918,20 @@ class Dataset(object):
         # Return the mean
         return self.train_mean[data_id]
 
-    def loadImages(self, images, data_id, normalization_type='(-1)-1',
-                   normalization=False, meanSubstraction=False,
-                   dataAugmentation=False, daRandomParams=None,
+    def loadImages(self,
+                   images,
+                   data_id,
+                   normalization_type='(-1)-1',
+                   normalization=False,
+                   meanSubstraction=False,
+                   dataAugmentation=False,
+                   daRandomParams=None,
                    wo_da_patch_type='whole',
                    da_patch_type='resize_and_rndcrop',
                    da_enhance_list=None,
                    useBGR=False,
-                   external=False, loaded=False):
+                   external=False,
+                   loaded=False):
         """
         Loads a set of images from disk.
 
@@ -3792,7 +4198,9 @@ class Dataset(object):
 
         return I
 
-    def getResizeImageWODistorsion(self, image, data_id):
+    def getResizeImageWODistorsion(self,
+                                   image,
+                                   data_id):
         w, h = np.shape(image)[0:2]
         if w < h and (w < self.img_size_crop[data_id][0] or h > self.img_size[data_id][1]):
             w_size = self.img_size_crop[data_id][0]
@@ -3822,7 +4230,11 @@ class Dataset(object):
         img = img.resize((h_size, w_size))
         return img
 
-    def getDataAugmentationRandomParams(self, images, data_id, prob_flip_horizontal=0.5, prob_flip_vertical=0.0):
+    def getDataAugmentationRandomParams(self,
+                                        images,
+                                        data_id,
+                                        prob_flip_horizontal=0.5,
+                                        prob_flip_vertical=0.0):
         daRandomParams = dict()
         for i, image in enumerate(images):
             # Random crop
@@ -3853,21 +4265,26 @@ class Dataset(object):
 
         return daRandomParams
 
-    def getClassID(self, class_name, data_id):
+    def getClassID(self,
+                   class_name,
+                   data_id):
         """
             :return: the class data_id (int) for a given class string.
         """
         return self.dic_classes[data_id][class_name]
 
-    # ------------------------------------------------------- #
-    #       GETTERS
-    #           [X,Y] pairs or X only
-    # ------------------------------------------------------- #
-
-    def getX(self, set_name, init, final, normalization_type='(-1)-1',
-             normalization=False, meanSubstraction=False,
+    #  GETTERS:  [X,Y] pairs or X, Y only
+    def getX(self,
+             set_name,
+             init,
+             final,
+             normalization_type='(-1)-1',
+             normalization=False,
+             meanSubstraction=False,
              dataAugmentation=False,
-             wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
+             wo_da_patch_type='whole',
+             da_patch_type='resize_and_rndcrop',
+             da_enhance_list=None,
              get_only_ids=False):
         """
         Gets all the data samples stored between the positions init to final
@@ -3942,7 +4359,8 @@ class Dataset(object):
                 elif type_in == 'raw-image':
                     daRandomParams = None
                     if dataAugmentation:
-                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                        daRandomParams = self.getDataAugmentationRandomParams(x,
+                                                                              id_in)
                     x = self.loadImages(x,
                                         id_in,
                                         normalization_type,
@@ -3984,7 +4402,12 @@ class Dataset(object):
 
         return X
 
-    def getY(self, set_name, init, final, dataAugmentation=False, get_only_ids=False):
+    def getY(self,
+             set_name,
+             init,
+             final,
+             dataAugmentation=False,
+             get_only_ids=False):
         """
         Gets the [Y] samples for the FULL dataset
         :param set_name: 'train', 'val' or 'test' set
@@ -4008,20 +4431,24 @@ class Dataset(object):
         for id_out in list(self.ids_outputs):
             types_index = self.ids_outputs.index(id_out)
             type_out = self.types_outputs[set_name][types_index]
-            y = getattr(self, 'Y_' + set_name)[id_out][init:final]
+            y = getattr(self,
+                        'Y_' + set_name)[id_out][init:final]
             # Pre-process outputs
             if not get_only_ids:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    y = self.loadCategorical(y, nClasses)
+                    y = self.loadCategorical(y,
+                                             nClasses)
                 elif type_out == 'binary':
-                    y = self.loadBinary(y, id_out)
+                    y = self.loadBinary(y,
+                                        id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
                 elif type_out == '3DLabel':
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
+                    imlist = getattr(self,
+                                     'Y_' + set_name)[assoc_id_in][init:final]
 
                     y = self.load3DLabels(y,
                                           nClasses,
@@ -4034,7 +4461,8 @@ class Dataset(object):
                     nClasses = len(self.classes[id_out])
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = getattr(self, 'Y_' + set_name)[assoc_id_in][init:final]
+                    imlist = getattr(self,
+                                     'Y_' + set_name)[assoc_id_in][init:final]
                     y = self.load3DSemanticLabels(y,
                                                   nClasses,
                                                   classes_to_colour,
@@ -4080,10 +4508,16 @@ class Dataset(object):
 
         return Y
 
-    def getXY(self, set_name, k, normalization_type='(-1)-1',
-              normalization=False, meanSubstraction=False,
+    def getXY(self,
+              set_name,
+              k,
+              normalization_type='(-1)-1',
+              normalization=False,
+              meanSubstraction=False,
               dataAugmentation=False,
-              wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
+              wo_da_patch_type='whole',
+              da_patch_type='resize_and_rndcrop',
+              da_enhance_list=None,
               get_only_ids=False):
         """
         Gets the [X,Y] pairs for the next 'k' samples in the desired set.
@@ -4120,17 +4554,23 @@ class Dataset(object):
             if id_in in self.optional_inputs:
                 try:
                     if surpassed:
-                        x = getattr(self, 'X_' + set_name)[id_in][last:] + \
-                            getattr(self, 'X_' + set_name)[id_in][0:new_last]
+                        x = getattr(self,
+                                    'X_' + set_name)[id_in][last:] + \
+                            getattr(self,
+                                    'X_' + set_name)[id_in][0:new_last]
                     else:
-                        x = getattr(self, 'X_' + set_name)[id_in][last:new_last]
+                        x = getattr(self,
+                                    'X_' + set_name)[id_in][last:new_last]
                 except Exception:
                     x = []
             else:
                 if surpassed:
-                    x = getattr(self, 'X_' + set_name)[id_in][last:] + getattr(self, 'X_' + set_name)[id_in][0:new_last]
+                    x = getattr(self,
+                                'X_' + set_name)[id_in][last:] + getattr(self,
+                                                                         'X_' + set_name)[id_in][0:new_last]
                 else:
-                    x = getattr(self, 'X_' + set_name)[id_in][last:new_last]
+                    x = getattr(self,
+                                'X_' + set_name)[id_in][last:new_last]
 
             # Pre-process inputs
             if not get_only_ids:
@@ -4167,7 +4607,8 @@ class Dataset(object):
                 elif type_in == 'raw-image':
                     daRandomParams = None
                     if dataAugmentation:
-                        daRandomParams = self.getDataAugmentationRandomParams(x, id_in)
+                        daRandomParams = self.getDataAugmentationRandomParams(x,
+                                                                              id_in)
                     x = self.loadImages(x,
                                         id_in,
                                         normalization_type,
@@ -4196,7 +4637,8 @@ class Dataset(object):
                 elif type_in == 'categorical_raw':
                     x = np.array(x)
                 elif type_in == 'binary':
-                    x = self.loadBinary(x, id_in)
+                    x = self.loadBinary(x,
+                                        id_in)
             X.append(x)
 
         # Recover output samples
@@ -4205,10 +4647,13 @@ class Dataset(object):
             types_index = self.ids_outputs.index(id_out)
             type_out = self.types_outputs[set_name][types_index]
             if surpassed:
-                y = getattr(self, 'Y_' + set_name)[id_out][last:] + getattr(self, 'Y_' + set_name)[id_out][0:new_last]
+                y = getattr(self,
+                            'Y_' + set_name)[id_out][last:] + getattr(self,
+                                                                      'Y_' + set_name)[id_out][0:new_last]
 
             else:
-                y = getattr(self, 'Y_' + set_name)[id_out][last:new_last]
+                y = getattr(self,
+                            'Y_' + set_name)[id_out][last:new_last]
 
             # Pre-process outputs
             if not get_only_ids:
@@ -4229,7 +4674,8 @@ class Dataset(object):
                         imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:] + getattr(self, 'X_' + set_name)[assoc_id_in][0:new_last]
 
                     else:
-                        imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:new_last]
+                        imlist = getattr(self,
+                                         'X_' + set_name)[assoc_id_in][last:new_last]
 
                     y = self.load3DLabels(y,
                                           nClasses,
@@ -4245,7 +4691,8 @@ class Dataset(object):
                     if surpassed:
                         imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:] + getattr(self, 'X_' + set_name)[assoc_id_in][0:new_last]
                     else:
-                        imlist = getattr(self, 'X_' + set_name)[assoc_id_in][last:new_last]
+                        imlist = getattr(self,
+                                         'X_' + set_name)[assoc_id_in][last:new_last]
 
                     y = self.load3DSemanticLabels(y,
                                                   nClasses,
@@ -4298,10 +4745,16 @@ class Dataset(object):
 
         return [X, Y]
 
-    def getXY_FromIndices(self, set_name, k, normalization_type='(-1)-1',
-                          normalization=False, meanSubstraction=False,
+    def getXY_FromIndices(self,
+                          set_name,
+                          k,
+                          normalization_type='(-1)-1',
+                          normalization=False,
+                          meanSubstraction=False,
                           dataAugmentation=False,
-                          wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
+                          wo_da_patch_type='whole',
+                          da_patch_type='resize_and_rndcrop',
+                          da_enhance_list=None,
                           get_only_ids=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -4488,10 +4941,16 @@ class Dataset(object):
 
         return [X, Y]
 
-    def getX_FromIndices(self, set_name, k, normalization_type='(-1)-1',
-                         normalization=False, meanSubstraction=False,
+    def getX_FromIndices(self,
+                         set_name,
+                         k,
+                         normalization_type='(-1)-1',
+                         normalization=False,
+                         meanSubstraction=False,
                          dataAugmentation=False,
-                         wo_da_patch_type='whole', da_patch_type='resize_and_rndcrop', da_enhance_list=None,
+                         wo_da_patch_type='whole',
+                         da_patch_type='resize_and_rndcrop',
+                         da_enhance_list=None,
                          get_only_ids=False):
         """
         Gets the [X,Y] pairs for the samples in positions 'k' in the desired set.
@@ -4632,21 +5091,25 @@ class Dataset(object):
             types_index = self.ids_outputs.index(id_out)
             type_out = self.types_outputs[set_name][types_index]
 
-            y = [getattr(self, 'Y_' + set_name)[id_out][index] for index in k]
+            y = [getattr(self,
+                         'Y_' + set_name)[id_out][index] for index in k]
 
             # Pre-process outputs
             if not get_only_ids:
                 if type_out == 'categorical':
                     nClasses = len(self.dic_classes[id_out])
-                    y = self.loadCategorical(y, nClasses)
+                    y = self.loadCategorical(y,
+                                             nClasses)
                 elif type_out == 'binary':
-                    y = self.loadBinary(y, id_out)
+                    y = self.loadBinary(y,
+                                        id_out)
                 elif type_out == 'real':
                     y = np.array(y).astype(np.float32)
                 elif type_out == '3DLabel':
                     nClasses = len(self.classes[id_out])
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = [getattr(self, 'X_' + set_name)[assoc_id_in][index] for index in k]
+                    imlist = [getattr(self,
+                                      'X_' + set_name)[assoc_id_in][index] for index in k]
 
                     y = self.load3DLabels(y,
                                           nClasses,
@@ -4659,7 +5122,8 @@ class Dataset(object):
                     nClasses = len(self.classes[id_out])
                     classes_to_colour = self.semantic_classes[id_out]
                     assoc_id_in = self.id_in_3DLabel[id_out]
-                    imlist = [getattr(self, 'X_' + set_name)[assoc_id_in][index] for index in k]
+                    imlist = [getattr(self,
+                                      'X_' + set_name)[assoc_id_in][index] for index in k]
                     y = self.load3DSemanticLabels(y,
                                                   nClasses,
                                                   classes_to_colour,
@@ -4711,47 +5175,18 @@ class Dataset(object):
             Y.append(y)
         return Y
 
-    # ------------------------------------------------------- #
     #       AUXILIARY FUNCTIONS
-    #
-    # ------------------------------------------------------- #
-
-    def __str__(self):
-        """
-        Prints the basic input-output information of the Dataset instance.
-
-        :return: String representation of the Dataset.
-        """
-
-        str_ = '---------------------------------------------\n'
-        str_ += '\tDataset ' + self.name + '\n'
-        str_ += '---------------------------------------------\n'
-        str_ += 'store path: ' + self.path + '\n'
-        str_ += 'data length: ' + '\n'
-        str_ += '\ttrain - ' + str(self.len_train) + '\n'
-        str_ += '\tval   - ' + str(self.len_val) + '\n'
-        str_ += '\ttest  - ' + str(self.len_test) + '\n'
-
-        str_ += '\n'
-        str_ += '[ INPUTS ]\n'
-        for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
-            str_ += type_in + ': ' + id_in + '\n'
-
-        str_ += '\n'
-        str_ += '[ OUTPUTS ]\n'
-        for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
-            str_ += type_out + ': ' + id_out + '\n'
-        str_ += '---------------------------------------------\n'
-        return str_
-
-    def __isLoaded(self, set_name, pos):
+    def __isLoaded(self,
+                   set_name,
+                   pos):
         """
         Checks if the data from set_name at pos is already loaded
         :param set_name:
         :param pos:
         :return:
         """
-        if not getattr(self, 'loaded_' + set_name)[pos]:
+        if not getattr(self,
+                       'loaded_' + set_name)[pos]:
             if pos == 0:
                 raise Exception('Set ' + set_name + ' samples are not loaded yet.')
             elif pos == 1:
@@ -4771,13 +5206,15 @@ class Dataset(object):
                 'Incorrect set_name specified "' + set_name + '"\nOnly "train", "val" or "test" are valid set names.')
         return
 
-    def __checkLengthSet(self, set_name):
+    def __checkLengthSet(self,
+                         set_name):
         """
         Check that the length of the inputs and outputs match. Only checked if the input is not optional.
         :param set_name:
         :return:
         """
-        if getattr(self, 'loaded_' + set_name)[0] and getattr(self, 'loaded_' + set_name)[1]:
+        if getattr(self,
+                   'loaded_' + set_name)[0] and getattr(self, 'loaded_' + set_name)[1]:
             lengths = []
             plot_ids_in = []
             for id_in in self.ids_inputs:
@@ -4793,60 +5230,71 @@ class Dataset(object):
                                 set_name + '" set do not match.\n \t Inputs:' +
                                 str(plot_ids_in) + '\t Outputs:' + str(self.ids_outputs))
 
-    def __getNextSamples(self, k, set_name):
+    def __getNextSamples(self,
+                         k,
+                         set_name):
         """
             Gets the indices to the next K samples we are going to read.
         """
-        new_last = getattr(self, 'last_' + set_name) + k
-        last = getattr(self, 'last_' + set_name)
-        length = getattr(self, 'len_' + set_name)
+        new_last = getattr(self,
+                           'last_' + set_name) + k
+        last = getattr(self,
+                       'last_' + set_name)
+        length = getattr(self,
+                         'len_' + set_name)
         if new_last > length:
             new_last = new_last - length
             surpassed = True
         else:
             surpassed = False
-        setattr(self, 'last_' + set_name, new_last)
-
-        # self.__lock_read.release()  # UNLOCK
+        setattr(self,
+                'last_' + set_name,
+                new_last)
 
         return [new_last, last, surpassed]
 
-    def __getstate__(self):
-        """
-            Behaviour applied when pickling a Dataset instance.
-        """
-        obj_dict = self.__dict__.copy()
-        # del obj_dict['_Dataset__lock_read']
-        return obj_dict
-
-    def __setstate__(self, new_state):
-        """
-            Behaviour applied when unpickling a Dataset instance.
-        """
-        # dict['_Dataset__lock_read'] = threading.Lock()
-        self.__dict__ = new_state
-
     # Deprecated methods. Maintained for backwards compatibility
-
-    def setListGeneral(self, path_list, split=None, shuffle=True, type='raw-image', id='image'):
+    def setListGeneral(self,
+                       path_list,
+                       split=None,
+                       shuffle=True,
+                       type='raw-image',
+                       id='image'):
         """
         Deprecated
         """
         if split is None:
             split = [0.8, 0.1, 0.1]
         logger.info("WARNING: The method setListGeneral() is deprecated, consider using setInput() instead.")
-        self.setInput(path_list, split, type=type, id=id)
+        self.setInput(path_list,
+                      split,
+                      type=type,
+                      id=id)
 
-    def setList(self, path_list, set_name, type='raw-image', id='image'):
+    def setList(self,
+                path_list,
+                set_name,
+                type='raw-image',
+                id='image'):
         """
         DEPRECATED
         """
         logger.info("WARNING: The method setList() is deprecated, consider using setInput() instead.")
-        self.setInput(path_list, set_name, type, id)
+        self.setInput(path_list,
+                      set_name,
+                      type,
+                      id)
 
-    def setLabels(self, labels_list, set_name, type='categorical', id='label'):
+    def setLabels(self,
+                  labels_list,
+                  set_name,
+                  type='categorical',
+                  id='label'):
         """
             DEPRECATED
         """
         logger.info("WARNING: The method setLabels() is deprecated, consider using setOutput() instead.")
-        self.setOutput(labels_list, set_name, type=type, id=id)
+        self.setOutput(labels_list,
+                       set_name,
+                       type=type,
+                       id=id)

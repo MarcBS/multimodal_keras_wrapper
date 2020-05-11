@@ -4,13 +4,7 @@ import copy
 import numpy as np
 
 
-################################################################################
-#
 #    Utility functions for performing object localization.
-#
-################################################################################
-
-
 def prepareCAM(snet):
     """ Prepares the network for generating Class Activation Mappings """
 

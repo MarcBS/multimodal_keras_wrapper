@@ -14,7 +14,11 @@ logger = logging.getLogger(__name__)
 
 # Evaluation function selection
 
-def get_sacrebleu_score(pred_list, verbose, extra_vars, split, **kwargs):
+def get_sacrebleu_score(pred_list,
+                        verbose,
+                        extra_vars,
+                        split,
+                        **kwargs):
     """
     SacreBLEU! metrics
     :param pred_list: dictionary of hypothesis sentences (id, sentence)
@@ -72,7 +76,11 @@ def get_sacrebleu_score(pred_list, verbose, extra_vars, split, **kwargs):
     return final_scores
 
 
-def get_coco_score(pred_list, verbose, extra_vars, split, **kwargs):
+def get_coco_score(pred_list,
+                   verbose,
+                   extra_vars,
+                   split,
+                   **kwargs):
     """
     COCO challenge metrics
     :param pred_list: dictionary of hypothesis sentences (id, sentence)
@@ -136,7 +144,8 @@ def get_coco_score(pred_list, verbose, extra_vars, split, **kwargs):
     return final_scores
 
 
-def get_perplexity(*args, **kwargs):
+def get_perplexity(*args,
+                   **kwargs):
     """
     Get perplexity
     """
@@ -146,7 +155,11 @@ def get_perplexity(*args, **kwargs):
     return {metric: ppl}
 
 
-def eval_vqa(pred_list, verbose, extra_vars, split, **kwargs):
+def eval_vqa(pred_list,
+             verbose,
+             extra_vars,
+             split,
+             **kwargs):
     """
     VQA challenge metrics
     :param pred_list: dictionary of hypothesis sentences (id, sentence)
@@ -195,7 +208,11 @@ def eval_vqa(pred_list, verbose, extra_vars, split, **kwargs):
             'other accuracy': acc_other}
 
 
-def multilabel_metrics(pred_list, verbose, extra_vars, split, **kwargs):
+def multilabel_metrics(pred_list,
+                       verbose,
+                       extra_vars,
+                       split,
+                       **kwargs):
     """
     Multiclass classification metrics. see multilabel ranking metrics in sklearn library for more info:
         http://scikit-learn.org/stable/modules/model_evaluation.html#multilabel-ranking-metrics
@@ -276,7 +293,11 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split, **kwargs):
             'f1': f1}
 
 
-def multiclass_metrics(pred_list, verbose, extra_vars, split, **kwargs):
+def multiclass_metrics(pred_list,
+                       verbose,
+                       extra_vars,
+                       split,
+                       **kwargs):
     """
     Multiclass classification metrics. See multilabel ranking metrics in sklearn library for more info:
         http://scikit-learn.org/stable/modules/model_evaluation.html#multilabel-ranking-metrics
@@ -363,7 +384,11 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split, **kwargs):
             'top5_fps': list(top5_fps)}
 
 
-def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split, **kwargs):
+def semantic_segmentation_accuracy(pred_list,
+                                   verbose,
+                                   extra_vars,
+                                   split,
+                                   **kwargs):
     """
     Semantic Segmentation Accuracy metric
 
@@ -384,7 +409,8 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split, **kwar
 
     pred_class_list = []
     for sample_score in pred_list:
-        pred_class_list += list(np.argmax(sample_score, axis=1))
+        pred_class_list += list(np.argmax(sample_score,
+                                          axis=1))
     n_samples = len(pred_class_list)
 
     values_gt = []
@@ -392,8 +418,10 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split, **kwar
         values_gt += list(gt)
 
     # Create ground truth and prediction matrices
-    y_gt = np.zeros((n_samples, n_classes))
-    y_pred = np.zeros((n_samples, n_classes))
+    y_gt = np.zeros((n_samples,
+                     n_classes))
+    y_pred = np.zeros((n_samples,
+                       n_classes))
 
     ind_i = 0
     for _, (gt_class, pred_class) in list(enumerate(zip(values_gt, pred_class_list))):
@@ -415,7 +443,11 @@ def semantic_segmentation_accuracy(pred_list, verbose, extra_vars, split, **kwar
     return {'semantic global accuracy': accuracy}
 
 
-def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split, **kwargs):
+def semantic_segmentation_meaniou(pred_list,
+                                  verbose,
+                                  extra_vars,
+                                  split,
+                                  **kwargs):
     """
     Semantic Segmentation Mean IoU metric
 
@@ -436,7 +468,8 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split, **kwarg
 
     pred_class_list = []
     for sample_score in pred_list:
-        pred_class_list += list(np.argmax(sample_score, axis=1))
+        pred_class_list += list(np.argmax(sample_score,
+                                          axis=1))
     n_samples = len(pred_class_list)
 
     values_gt = []
@@ -486,7 +519,11 @@ def semantic_segmentation_meaniou(pred_list, verbose, extra_vars, split, **kwarg
     return {'mean IoU': mean_iou, 'semantic global accuracy': acc}
 
 
-def averagePrecision(pred_list, verbose, extra_vars, split, **kwargs):
+def averagePrecision(pred_list,
+                     verbose,
+                     extra_vars,
+                     split,
+                     **kwargs):
     """
     Computes a Precision-Recall curve and its associated mAP score given a set of precalculated reports.
     The parameter "report_all" must include the following information for each sample:
@@ -608,8 +645,15 @@ def averagePrecision(pred_list, verbose, extra_vars, split, **kwargs):
                 accuracy_classes[c] = float(TP) / (FP + FN + TP)
 
         # store results
-        general_measures[thres] = [precision, recall, accuracy, total_GT, total_pred]
-        class_measures[thres] = [precision_classes, recall_classes, accuracy_classes, total_GT_classes,
+        general_measures[thres] = [precision,
+                                   recall,
+                                   accuracy,
+                                   total_GT,
+                                   total_pred]
+        class_measures[thres] = [precision_classes,
+                                 recall_classes,
+                                 accuracy_classes,
+                                 total_GT_classes,
                                  total_pred_classes]
 
     # Compute average precision (AP) (adapted from PASCAL VOC evaluation code VOCap.m)
@@ -652,7 +696,8 @@ def averagePrecision(pred_list, verbose, extra_vars, split, **kwargs):
     return return_dict
 
 
-def _computeAP(prec, rec):
+def _computeAP(prec,
+               rec):
     AP = 0.0
     n_thresholds = len(prec)
     prec = [0] + prec + [0]
@@ -666,7 +711,13 @@ def _computeAP(prec, rec):
     return AP
 
 
-def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_scores, GT_bboxes, GT_Y):
+def _computeMeasures(IoU,
+                     n_classes,
+                     predicted_bboxes,
+                     predicted_Y,
+                     predicted_scores,
+                     GT_bboxes,
+                     GT_Y):
     """
     Computes TP, FP, and FN given a set of GT and Prediction BBoxes
 
@@ -770,7 +821,10 @@ def _computeMeasures(IoU, n_classes, predicted_bboxes, predicted_Y, predicted_sc
 
 
 # AUXILIARY FUNCTIONS
-def vqa_store(question_id_list, answer_list, path, **kwargs):
+def vqa_store(question_id_list,
+              answer_list,
+              path,
+              **kwargs):
     """
     Saves the answers on question_id_list in the VQA-like format.
 
@@ -788,7 +842,8 @@ def vqa_store(question_id_list, answer_list, path, **kwargs):
         json.dump(question_answer_pairs, f)
 
 
-def caption_store(samples, path):
+def caption_store(samples,
+                  path):
     """
     Save the samples into a file.
     :param samples: Samples generated.

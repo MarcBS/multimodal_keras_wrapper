@@ -13,7 +13,9 @@ if sys.version_info.major == 2:
     from itertools import imap as map
 
 
-def checkParameters(input_params, default_params, hard_check=False):
+def checkParameters(input_params,
+                    default_params,
+                    hard_check=False):
     """Validates a set of input parameters and uses the default ones if not specified.
 
     :param input_params: Input parameters.
@@ -48,7 +50,9 @@ class MultiprocessQueue():
         https://docs.python.org/2/library/multiprocessing.html#multiprocessing-examples
     """
 
-    def __init__(self, manager, multiprocess_type='Queue'):
+    def __init__(self,
+                 manager,
+                 multiprocess_type='Queue'):
         if multiprocess_type != 'Queue' and multiprocess_type != 'Pipe':
             raise NotImplementedError(
                 'Not valid multiprocessing queue of type ' + multiprocess_type)
@@ -59,7 +63,8 @@ class MultiprocessQueue():
         else:
             self.queue = eval(multiprocess_type + '()')
 
-    def put(self, elem):
+    def put(self,
+            elem):
         if self.type == 'Queue':
             self.queue.put(elem)
         elif self.type == 'Pipe':
@@ -84,7 +89,8 @@ class MultiprocessQueue():
             return not self.queue[0].poll()
 
 
-def bbox(img, mode='max'):
+def bbox(img,
+         mode='max'):
     """
     Returns a bounding box covering all the non-zero area in the image.
 
@@ -103,7 +109,9 @@ def bbox(img, mode='max'):
         return x, y, xmax, ymax
 
 
-def simplifyDataset(ds, id_classes, n_classes=50):
+def simplifyDataset(ds,
+                    id_classes,
+                    n_classes=50):
     """
 
     :param ds:
@@ -124,7 +132,6 @@ def simplifyDataset(ds, id_classes, n_classes=50):
         for i, y in list(enumerate(labels_set)):
             if y < n_classes:
                 for id_out in ds.ids_outputs:
-                    # exec ('sample = ds.Y_' + s + '[id_out][i]')
                     y_split = getattr(ds, 'Y_' + s)
                     sample = y_split[id_out][i]
                     try:
@@ -141,16 +148,16 @@ def simplifyDataset(ds, id_classes, n_classes=50):
                     except Exception:
                         kept_X[id_in] = []
                         kept_X[id_in].append(sample)
-        # exec ('ds.X_' + s + ' = copy.copy(kept_X)')
-        # exec ('ds.Y_' + s + ' = copy.copy(kept_Y)')
-        # exec ('ds.len_' + s + ' = len(kept_Y[id_labels])')
         setattr(ds, 'X_' + s, copy.copy(kept_X))
         setattr(ds, 'Y_' + s, copy.copy(kept_Y))
         setattr(ds, 'len_' + s, len(kept_Y[id_labels]))
 
 
-def average_models(models, output_model, weights=None, custom_objects=None):
-    from keras_wrapper.cnn_model import loadModel, saveModel
+def average_models(models,
+                   output_model,
+                   weights=None,
+                   custom_objects=None):
+    from keras_wrapper.saving import loadModel, saveModel
     if not isinstance(models, list):
         raise AssertionError('You must give a list of models to average.')
     if len(models) == 0:
@@ -162,7 +169,10 @@ def average_models(models, output_model, weights=None, custom_objects=None):
     if len(model_weights) != len(models):
         raise AssertionError(
             'You must give a list of weights of the same size than the list of models.')
-    loaded_models = [loadModel(m, -1, full_path=True, custom_objects=custom_objects) for m in models]
+    loaded_models = [loadModel(m,
+                               -1,
+                               full_path=True,
+                               custom_objects=custom_objects) for m in models]
 
     # Check that all models are compatible
     if not all([hasattr(loaded_model, 'model') for loaded_model in loaded_models]):
@@ -241,7 +251,9 @@ def average_models(models, output_model, weights=None, custom_objects=None):
 
 
 # Text-related utils
-def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
+def one_hot_2_indices(preds,
+                      pad_sequences=True,
+                      verbose=0):
     """
     Converts a one-hot codification into a index-based one
     :param preds: Predictions codified as one-hot vectors.
@@ -257,13 +269,15 @@ def one_hot_2_indices(preds, pad_sequences=True, verbose=0):
     return preds
 
 
-def indices_2_one_hot(indices, n):
+def indices_2_one_hot(indices,
+                      n):
     """
     Converts a list of indices into one hot codification
 
     :param indices: list of indices
     :param n: integer. Size of the vocabulary
-    :return: numpy array with shape (len(indices), n)
+    :return: numpy array with shape (len(indices),
+n)
     """
     one_hot = np.zeros((len(indices), n), dtype=np.int8)
     for i in range(len(indices)):
@@ -275,7 +289,8 @@ def indices_2_one_hot(indices, n):
 
 
 # From keras.utils.np_utils
-def to_categorical(y, num_classes=None):
+def to_categorical(y,
+                   num_classes=None):
     """Converts a class vector (integers) to binary class matrix.
 
     E.g. for use with categorical_crossentropy.
@@ -288,7 +303,8 @@ def to_categorical(y, num_classes=None):
     # Returns
         A binary matrix representation of the input.
     """
-    y = np.array(y, dtype='int')
+    y = np.array(y,
+                 dtype='int')
     input_shape = y.shape
     if input_shape and input_shape[-1] == 1 and len(input_shape) > 1:
         input_shape = tuple(input_shape[:-1])
@@ -296,7 +312,8 @@ def to_categorical(y, num_classes=None):
     if not num_classes:
         num_classes = np.max(y) + 1
     n = y.shape[0]
-    categorical = np.zeros((n, num_classes))
+    categorical = np.zeros((n,
+                            num_classes))
     categorical[np.arange(n), y] = 1
     output_shape = input_shape + (num_classes,)
     categorical = np.reshape(categorical, output_shape)
@@ -304,7 +321,8 @@ def to_categorical(y, num_classes=None):
 
 
 def categorical_probas_to_classes(p):
-    return np.argmax(p, axis=1)
+    return np.argmax(p,
+                     axis=1)
 
 
 # ------------------------------------------------------- #
@@ -312,7 +330,10 @@ def categorical_probas_to_classes(p):
 #           Functions for decoding predictions
 # ------------------------------------------------------- #
 
-def decode_predictions_one_hot(preds, index2word, pad_sequences=True, verbose=0):
+def decode_predictions_one_hot(preds,
+                               index2word,
+                               pad_sequences=True,
+                               verbose=0):
     """
     Decodes predictions following a one-hot codification.
     :param preds: Predictions codified as one-hot vectors.
@@ -340,7 +361,11 @@ def decode_predictions_one_hot(preds, index2word, pad_sequences=True, verbose=0)
     return answer_pred
 
 
-def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0):
+def decode_predictions(preds,
+                       temperature,
+                       index2word,
+                       sampling_type,
+                       verbose=0):
     """
     Decodes predictions
     :param preds: Predictions codified as the output of a softmax activation function.
@@ -377,7 +402,9 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     return answer_pred
 
 
-def decode_categorical(preds, index2word, verbose=0):
+def decode_categorical(preds,
+                       index2word,
+                       verbose=0):
     """
     Decodes predictions
     :param preds: Predictions codified as the output of a softmax activation function.
@@ -392,7 +419,11 @@ def decode_categorical(preds, index2word, verbose=0):
     return [index2word.get(word) for word in word_indices]
 
 
-def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0):
+def decode_multilabel(preds,
+                      index2word,
+                      min_val=0.5,
+                      get_probs=False,
+                      verbose=0):
     """
     Decodes predictions
     :param preds: Predictions codified as the output of a softmax activation function.
@@ -550,7 +581,9 @@ def decode_predictions_beam_search(preds,
     return final_predictions
 
 
-def sampling(scores, sampling_type='max_likelihood', temperature=1.0):
+def sampling(scores,
+             sampling_type='max_likelihood',
+             temperature=1.):
     """
     Sampling words (each sample is drawn from a categorical distribution).
     Or picks up words that maximize the likelihood.

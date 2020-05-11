@@ -14,17 +14,68 @@ else:
     import cPickle as pk
 
 from keras.models import model_from_json, load_model
+from keras_wrapper.extra.read_write import create_dir_if_not_exists
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
 logger = logging.getLogger(__name__)
 
 
-# ------------------------------------------------------- #
-#       SAVE/LOAD
-#           External functions for saving and loading Model_Wrapper instances
-# ------------------------------------------------------- #
+# Save and load Dataset instances
+def saveDataset(dataset,
+                store_path):
+    """
+    Saves a backup of the current Dataset object.
 
-def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=False):
+    :param dataset: Dataset object to save
+    :param store_path: Saving path
+    :return: None
+    """
+    create_dir_if_not_exists(store_path)
+    store_path = os.path.join(store_path,
+                              'Dataset_' + dataset.name + '.pkl')
+    if not dataset.silence:
+        logger.info("<<< Saving Dataset instance to " + store_path + " ... >>>")
+
+    pk.dump(dataset,
+            open(store_path, 'wb'),
+            protocol=-1)
+
+    if not dataset.silence:
+        logger.info("<<< Dataset instance saved >>>")
+
+
+def loadDataset(dataset_path):
+    """
+    Loads a previously saved Dataset object.
+
+    :param dataset_path: Path to the stored Dataset to load
+    :return: Loaded Dataset object
+    """
+
+    logger.info("<<< Loading Dataset instance from " + dataset_path + " ... >>>")
+    if sys.version_info.major == 3:
+        dataset = pk.load(open(dataset_path, 'rb'),
+                          encoding='utf-8')
+    else:
+        dataset = pk.load(open(dataset_path, 'rb'))
+
+    if not hasattr(dataset, 'pad_symbol'):
+        dataset.pad_symbol = '<pad>'
+    if not hasattr(dataset, 'unk_symbol'):
+        dataset.unk_symbol = '<unk>'
+    if not hasattr(dataset, 'null_symbol'):
+        dataset.null_symbol = '<null>'
+
+    logger.info("<<< Dataset instance loaded >>>")
+    return dataset
+
+
+# Save and load Model_Wrapper instances
+def saveModel(model_wrapper,
+              update_num,
+              path=None,
+              full_path=False,
+              store_iter=False):
     """
     Saves a backup of the current Model_Wrapper object after being trained for 'update_num' iterations/updates/epochs.
 
@@ -47,9 +98,11 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
             model_name = path
     else:
         if store_iter:
-            model_name = os.path.join(path, 'update_' + iteration)
+            model_name = os.path.join(path,
+                                      'update_' + iteration)
         else:
-            model_name = os.path.join(path, 'epoch_' + iteration)
+            model_name = os.path.join(path,
+                                      'epoch_' + iteration)
 
     if not model_wrapper.silence:
         logger.info("<<< Saving model to " + model_name + " ... >>>")
@@ -67,7 +120,8 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         json_string = model_wrapper.model.to_json()
         open(model_name + '_structure.json', 'w').write(json_string)
         # Save model weights
-        model_wrapper.model.save_weights(model_name + '_weights.h5', overwrite=True)
+        model_wrapper.model.save_weights(model_name + '_weights.h5',
+                                         overwrite=True)
 
     # Save auxiliary models for optimized search
     if model_wrapper.model_init is not None:
@@ -80,7 +134,8 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
             json_string = model_wrapper.model_init.to_json()
             open(model_name + '_structure_init.json', 'w').write(json_string)
             # Save model weights
-            model_wrapper.model_init.save_weights(model_name + '_weights_init.h5', overwrite=True)
+            model_wrapper.model_init.save_weights(model_name + '_weights_init.h5',
+                                                  overwrite=True)
 
     if model_wrapper.model_next is not None:
         try:  # Try to save model at one time
@@ -92,7 +147,8 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
             json_string = model_wrapper.model_next.to_json()
             open(model_name + '_structure_next.json', 'w').write(json_string)
             # Save model weights
-            model_wrapper.model_next.save_weights(model_name + '_weights_next.h5', overwrite=True)
+            model_wrapper.model_next.save_weights(model_name + '_weights_next.h5',
+                                                  overwrite=True)
 
     # Save additional information
     backup_multi_gpu_model = None
@@ -113,7 +169,12 @@ def saveModel(model_wrapper, update_num, path=None, full_path=False, store_iter=
         logger.info("<<< Model saved >>>")
 
 
-def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, full_path=False, compile_model=False):
+def loadModel(model_path,
+              update_num,
+              reload_epoch=True,
+              custom_objects=None,
+              full_path=False,
+              compile_model=False):
     """
     Loads a previously saved Model_Wrapper object.
 
@@ -134,19 +195,24 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         model_name = model_path
     else:
         if reload_epoch:
-            model_name = os.path.join(model_path, "epoch_" + iteration)
+            model_name = os.path.join(model_path,
+                                      "epoch_" + iteration)
         else:
-            model_name = os.path.join(model_path, "update_" + iteration)
+            model_name = os.path.join(model_path,
+                                      "update_" + iteration)
 
     logger.info("<<< Loading model from " + model_name + "_Model_Wrapper.pkl ... >>>")
     try:
         logger.info("<<< Loading model from " + model_name + ".h5 ... >>>")
-        model = load_model(model_name + '.h5', custom_objects=custom_objects, compile=compile_model)
+        model = load_model(model_name + '.h5',
+                           custom_objects=custom_objects,
+                           compile=compile_model)
     except Exception as e:
         logger.info(str(e))
         # Load model structure
         logger.info("<<< Loading model from " + model_name + "_structure.json' ... >>>")
-        model = model_from_json(open(model_name + '_structure.json').read(), custom_objects=custom_objects)
+        model = model_from_json(open(model_name + '_structure.json').read(),
+                                custom_objects=custom_objects)
         # Load model weights
         model.load_weights(model_name + '_weights.h5')
 
@@ -162,8 +228,12 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
 
     if loading_optimized == 1:
         logger.info("<<< Loading optimized model... >>>")
-        model_init = load_model(model_name + '_init.h5', custom_objects=custom_objects, compile=False)
-        model_next = load_model(model_name + '_next.h5', custom_objects=custom_objects, compile=False)
+        model_init = load_model(model_name + '_init.h5',
+                                custom_objects=custom_objects,
+                                compile=False)
+        model_next = load_model(model_name + '_next.h5',
+                                custom_objects=custom_objects,
+                                compile=False)
 
     elif loading_optimized == 2:
         # Load model structure
@@ -174,7 +244,8 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
         model_init.load_weights(model_name + '_weights_init.h5')
         # Load model structure
         logger.info("\t <<< Loading model_next from " + model_name + "_structure_next.json ... >>>")
-        model_next = model_from_json(open(model_name + '_structure_next.json').read(), custom_objects=custom_objects)
+        model_next = model_from_json(open(model_name + '_structure_next.json').read(),
+                                     custom_objects=custom_objects)
         # Load model weights
         model_next.load_weights(model_name + '_weights_next.h5')
 
@@ -209,7 +280,12 @@ def loadModel(model_path, update_num, reload_epoch=True, custom_objects=None, fu
     return model_wrapper
 
 
-def updateModel(model, model_path, update_num, reload_epoch=True, full_path=False, compile_model=False):
+def updateModel(model,
+                model_path,
+                update_num,
+                reload_epoch=True,
+                full_path=False,
+                compile_model=False):
     """
     Loads a the weights from files to a Model_Wrapper object.
 
@@ -226,15 +302,18 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
 
     if not full_path:
         if reload_epoch:
-            model_name = os.path.join(model_path, "epoch_" + iteration)
+            model_name = os.path.join(model_path,
+                                      "epoch_" + iteration)
         else:
-            model_name = os.path.join(model_path, "update_" + iteration)
+            model_name = os.path.join(model_path,
+                                      "update_" + iteration)
 
     logger.info("<<< Updating model " + model_name + " from " + model_path + " ... >>>")
 
     try:
         logger.info("<<< Updating model from " + model_name + ".h5 ... >>>")
-        model.model.set_weights(load_model(model_name + '.h5', compile=False).get_weights())
+        model.model.set_weights(load_model(model_name + '.h5',
+                                           compile=False).get_weights())
 
     except Exception as e:
         logger.info(str(e))
@@ -255,9 +334,11 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
         logger.info("<<< Updating optimized model... >>>")
         if loading_optimized == 1:
             logger.info("\t <<< Updating model_init from " + model_name + "_init.h5 ... >>>")
-            model.model_init.set_weights(load_model(model_name + '_init.h5', compile=False).get_weights())
+            model.model_init.set_weights(load_model(model_name + '_init.h5',
+                                                    compile=False).get_weights())
             logger.info("\t <<< Updating model_next from " + model_name + "_next.h5 ... >>>")
-            model.model_next.set_weights(load_model(model_name + '_next.h5', compile=False).get_weights())
+            model.model_next.set_weights(load_model(model_name + '_next.h5',
+                                                    compile=False).get_weights())
         elif loading_optimized == 2:
             logger.info("\t <<< Updating model_init from " + model_name + "_structure_init.json ... >>>")
             model.model_init.load_weights(model_name + '_weights_init.h5')
@@ -270,7 +351,9 @@ def updateModel(model, model_path, update_num, reload_epoch=True, full_path=Fals
     return model
 
 
-def transferWeights(old_model, new_model, layers_mapping):
+def transferWeights(old_model,
+                    new_model,
+                    layers_mapping):
     """
     Transfers all existent layers' weights from an old model to a new model.
 
