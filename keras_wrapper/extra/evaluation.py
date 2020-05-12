@@ -208,9 +208,12 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
         http://scikit-learn.org/stable/modules/model_evaluation.html#multilabel-ranking-metrics
     :param pred_list: list of predictions
     :param verbose: if greater than 0 the metric measures are printed out
-    :param extra_vars: dictionary extra variables. Must contain:
+    :param extra_vars: dictionary extra variables. 
+            Must contain:
                 - ['n_classes'] with the total number of existent classes
                 - [split]['references'] with the GT values corresponding to each sample of the current data split
+            Optional:
+                - ['words_as_classes'] as True if our output is of type text and each word in the sentence is a label for a video frame
     :param split: split of the data where we are applying the evaluation
     :return: dictionary of multiclass metrics
     """
@@ -220,29 +223,64 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
     
     n_samples = len(pred_list)
     logging.info("---# of samples: "+str(n_samples))
+    
     gt_list = extra_vars[split]['references']
-    pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
-    # Create prediction matrix
-    y_pred = np.zeros((n_samples, n_classes))
-    y_gt = np.zeros((n_samples, n_classes))
-    for i_s, pred_class in enumerate(pred_class_list):
-        y_pred[i_s, pred_class] = 1
     try:
         values_gt = gt_list.values()
     except:
         values_gt = gt_list
 
-    counts_per_class = np.zeros((n_classes,))
-    for i_s, gt_class in enumerate(values_gt):
-        y_gt[i_s, gt_class] = 1
-        counts_per_class[gt_class] += 1
+    # Extra case added. For text output when each word is the label/class of each corresponding video frame.
+    if extra_vars.get('words_as_classes', False):
 
-    # Apply balanced accuracy per class
-    inverse_counts_per_class = [sum(counts_per_class) - c_i for c_i in counts_per_class]
-    weights_per_class = [float(c_i) / sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
-    sample_weights = np.zeros((n_samples,))
-    for i_s, gt_class in enumerate(values_gt):
-        sample_weights[i_s] = weights_per_class[gt_class]
+        # Create flat list for ground truth and predictions values
+        flat_gt = []
+        flat_pred = []
+
+        for i in range(n_samples):
+            line_gt = values_gt[i].split()  # List of ground truth values
+
+            for j, value in enumerate(line_gt):  # Only iterate until number of ground truth classes, as we want to ignore '<pad>' for the metrics
+                flat_gt.append(int(value)) 
+                pred = pred_list[i][j]
+                try:
+                    flat_pred.append(int(pred))
+                except:
+                    #print "Exception. '<pad>' value received. Set to value n_classes-1." 
+                    flat_pred.append(n_classes-1)
+        
+        # Create prediction matrix
+        y_pred = np.zeros((len(flat_gt), n_classes))
+        y_gt = np.zeros((len(flat_gt), n_classes))
+        counts_per_class = np.zeros((n_classes,))
+
+        for i in range(len(flat_gt)):
+            y_pred[i, flat_pred[i]] = 1
+            y_gt[i, flat_gt[i]] = 1
+            counts_per_class[flat_gt[i]] += 1
+
+    else:
+
+        # Create prediction matrix
+        y_pred = np.zeros((n_samples, n_classes))
+        y_gt = np.zeros((n_samples, n_classes))
+        counts_per_class = np.zeros((n_classes,))
+
+        pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
+
+        for i_s, pred_class in enumerate(pred_class_list):
+            y_pred[i_s, pred_class] = 1
+
+        for i_s, gt_class in enumerate(values_gt):
+            y_gt[i_s, gt_class] = 1
+            counts_per_class[gt_class] += 1
+
+        # Apply balanced accuracy per class
+        inverse_counts_per_class = [sum(counts_per_class) - c_i for c_i in counts_per_class]
+        weights_per_class = [float(c_i) / sum(inverse_counts_per_class) for c_i in inverse_counts_per_class]
+        sample_weights = np.zeros((n_samples,))
+        for i_s, gt_class in enumerate(values_gt):
+            sample_weights[i_s] = weights_per_class[gt_class]
 
     # Compute accuracy
     top_n_accuracies = [3, 5]

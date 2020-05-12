@@ -6,7 +6,7 @@ import evaluation
 from keras import backend as K
 from keras.callbacks import Callback as KerasCallback
 from keras_wrapper.utils import decode_predictions_one_hot, decode_predictions_beam_search, decode_predictions, \
-    decode_multilabel
+    decode_multilabel, decode_predictions_words_as_classes
 from read_write import *
 import copy
 
@@ -387,6 +387,14 @@ class EvalPerformance(KerasCallback):
                                                                      heuristic=heuristic,
                                                                      mapping=self.extra_vars.get('mapping', None),
                                                                      verbose=self.verbose)
+                                                                     
+                    elif self.extra_vars[gt_pos].get('words_as_classes', False):
+                        predictions = decode_predictions_words_as_classes(predictions,
+                                                                     1,   # always set temperature to 1
+                                                                     self.index2word_y,
+                                                                     self.sampling_type,
+                                                                     verbose=self.verbose)
+                        
                     else:
                         probs = predictions
                         predictions = decode_predictions(predictions,
@@ -703,6 +711,12 @@ class Sample(KerasCallback):
                                                                      x_text=sources,
                                                                      heuristic=heuristic,
                                                                      mapping=self.extra_vars.get('mapping', None),
+                                                                     verbose=self.verbose)                                          
+                    elif self.extra_vars.get('words_as_classes', False):
+                        predictions = decode_predictions_words_as_classes(predictions,
+                                                                     1,
+                                                                     self.index2word_y,
+                                                                     self.sampling_type,
                                                                      verbose=self.verbose)
                     else:
                         predictions = decode_predictions(samples,

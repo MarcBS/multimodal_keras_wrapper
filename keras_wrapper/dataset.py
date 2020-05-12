@@ -746,6 +746,12 @@ class Dataset(object):
         for id in self.Y_train.keys():
             self.Y_train[id] = [self.Y_train[id][s] for s in shuffled_order]
 
+        if 'video' in self.types_inputs:
+            ind = self.types_inputs.index('video')
+            id = self.ids_inputs[ind]
+            if id in self.counts_frames.keys():
+                self.counts_frames[id]['train'] = [self.counts_frames[id]['train'][s] for s in shuffled_order]
+
         if not self.silence:
             logging.info("Shuffling training done.")
 
@@ -963,7 +969,7 @@ class Dataset(object):
         if type == 'raw-image':
             data = self.preprocessImages(path_list, id, set_name, img_size, img_size_crop, use_RGB)
         elif type == 'video':
-            data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop)
+            data = self.preprocessVideos(path_list, id, set_name, max_video_len, img_size, img_size_crop, use_RGB)
         elif type == 'text' or type == 'dense_text':
             if self.max_text_len.get(id) is None:
                 self.max_text_len[id] = dict()
@@ -2025,6 +2031,7 @@ class Dataset(object):
                 else:
                     offset_j = 0
                     len_j = min(len_j, max_len_batch)
+
                 if offset_j < 0:
                     len_j += offset_j
                     offset_j = 0
@@ -2036,7 +2043,6 @@ class Dataset(object):
                             X_out[i, k + offset_j, j + offset_j] = next_w
                             X_mask[i, k + offset_j, j + offset_j] = 1  # fill mask
                         X_mask[i, j + offset_j, j + 1 + offset_j] = 1  # add additional 1 for the <eos> symbol
-
                 else:
                     for j, w in zip(range(len_j), x[:len_j]):
                         X_out[i, j + offset_j] = vocab.get(w, vocab['<unk>'])
@@ -2331,34 +2337,45 @@ class Dataset(object):
     #       TYPE 'video' and 'video-features' SPECIFIC FUNCTIONS
     # ------------------------------------------------------- #
 
-    def preprocessVideos(self, path_list, id, set_name, max_video_len, img_size, img_size_crop):
+    def preprocessVideos(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, use_RGB):
 
-        if isinstance(path_list, list) and len(path_list) == 2:
+        if isinstance(path_list, list) and len(path_list) == 3:
             # path to all images in all videos
             data = []
             with open(path_list[0], 'r') as list_:
                 for line in list_:
                     data.append(line.rstrip('\n'))
+            
             # frame counts
             counts_frames = []
             with open(path_list[1], 'r') as list_:
                 for line in list_:
                     counts_frames.append(int(line.rstrip('\n')))
+            
+            video_indices =[]
+            with open(path_list[2], 'r') as list_:
+                for line in list_:
+                    video_indices.append(int(line.rstrip('\n')))
 
             if id not in self.paths_frames:
                 self.paths_frames[id] = dict()
+            if id not in self.counts_frames:
+                self.counts_frames[id] = dict()
             self.paths_frames[id][set_name] = data
+            self.counts_frames[id][set_name] = counts_frames
             self.max_video_len[id] = max_video_len
             self.img_size[id] = img_size
             self.img_size_crop[id] = img_size_crop
+            self.use_RGB[id] = use_RGB
         else:
-            raise Exception('Wrong type for "path_list". It must be a list containing two paths: '
+            raise Exception('Wrong type for "path_list". It must be a list containing three paths: '
                             'a path to a text file with the paths to all images in all videos in '
-                            '[0] and a path to another text file with the number of frames of '
-                            'each video in each line in [1] (which will index the paths in the first file).\n'
+                            '[0], a path to a text file with the number of frames of '
+                            'each video in each line in [1] and a path to another text file with ' 
+                            'the index of the first image from the first file in [2].\n'
                             'It currently is: %s' % str(path_list))
 
-        return counts_frames
+        return video_indices
 
     def preprocessVideoFeatures(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len):
 
@@ -2417,12 +2434,12 @@ class Dataset(object):
 
         return video_indices
 
-    def loadVideos(self, n_frames, id, last, set_name, max_len, normalization_type, normalization, meanSubstraction,
+    def loadVideos(self, indices, id, last, set_name, max_len, normalization_type, normalization, meanSubstraction,
                    dataAugmentation):
         """
-         Loads a set of videos from disk. (Untested!)
+         Loads a set of videos from disk.
 
-        :param n_frames: Number of frames per video
+        :param indices: Indices of videos to load
         :param id: Id to load
         :param last: Last video loaded
         :param set_name:  'train', 'val', 'test'
@@ -2433,27 +2450,21 @@ class Dataset(object):
         :param dataAugmentation:  Whether we are applying dataAugmentatino (random cropping and horizontal flip)
         """
 
-        n_videos = len(n_frames)
-        V = np.zeros((n_videos, max_len * 3, self.img_size_crop[id][0], self.img_size_crop[id][1]))
-
-        idx = [0 for i in range(n_videos)]
-        # recover all indices from image's paths of all videos
-        for v in range(n_videos):
-            this_last = last + v
-            if this_last >= n_videos:
-                v = this_last % n_videos
-                this_last = v
-            idx[v] = int(sum(eval('self.X_' + set_name + '[id][:this_last]')))
+        n_videos = len(indices)
+        n_frames = [self.counts_frames[id][set_name][last+i] for i in range(n_videos)]
+        
+        V = np.zeros((n_videos, max_len, self.img_size_crop[id][0], self.img_size_crop[id][1], self.img_size_crop[id][2]))
 
         # load images from each video
-        for enum, (n, i) in enumerate(zip(n_frames, idx)):
+        for enum, (n, i) in enumerate(zip(n_frames, indices)):
             paths = self.paths_frames[id][set_name][i:i + n]
             daRandomParams = None
             if dataAugmentation:
                 daRandomParams = self.getDataAugmentationRandomParams(paths, id)
-            # returns numpy array with dimensions (batch, channels, height, width)
-            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation,
-                                     daRandomParams)
+
+            # returns numpy array with dimensions (batch, height, width, channels)
+            images = self.loadImages(paths, id, normalization_type, normalization, meanSubstraction, dataAugmentation, daRandomParams)
+
             # fills video matrix with each frame (fills with 0s or removes remaining frames w.r.t. max_len)
             len_j = images.shape[0]
             offset_j = max_len - len_j
@@ -2461,7 +2472,7 @@ class Dataset(object):
                 len_j = len_j + offset_j
                 offset_j = 0
             for j in range(len_j):
-                V[enum, (j + offset_j) * 3:(j + offset_j + 1) * 3] = images[j]
+                V[enum, j] = images[j]
 
         return V
 
@@ -3341,7 +3352,7 @@ class Dataset(object):
                     x = self.loadImages(x, id_in, normalization_type, normalization, meanSubstraction, dataAugmentation,
                                         daRandomParams)
                 elif type_in == 'video':
-                    x = self.loadVideos(x, id_in, final, set_name, self.max_video_len[id_in],
+                    x = self.loadVideos(x, id_in, init, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
                 elif type_in == 'text' or type_in == 'dense_text':
                     x = self.loadText(x, self.vocabulary[id_in],

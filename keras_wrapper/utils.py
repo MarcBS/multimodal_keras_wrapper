@@ -750,6 +750,42 @@ def decode_predictions(preds, temperature, index2word, sampling_type, verbose=0)
     return answer_pred
 
 
+def decode_predictions_words_as_classes(preds, temperature, index2word, sampling_type, verbose=0):
+    """
+    Decodes predictions
+    :param preds: Predictions codified as the output of a softmax activation function.
+    :param temperature: Temperature for sampling.
+    :param index2word: Mapping from word indices into word labels.
+    :param sampling_type: 'max_likelihood' or 'multinomial'.
+    :param verbose: Verbosity level, by default 0.
+    :return: List of decoded predictions.
+    """
+
+    if verbose > 0:
+        logging.info('Decoding prediction ...')
+
+    samples = sampling(scores=preds, sampling_type=sampling_type, temperature)
+
+    vfunc = np.vectorize(lambda index: index2word[index])
+    answer_pred = vfunc(samples)
+
+    results = []
+    EOS = '<eos>'
+    PAD = '<pad>'
+
+    for a_no in answer_pred:
+        if len(a_no.shape) > 1:  # only process word by word if our prediction has more than one output
+            init_token_pos = 0
+            end_token_pos = [j for j, x in enumerate(a_no) if x == EOS or x == PAD]
+            end_token_pos = None if len(end_token_pos) == 0 else end_token_pos[0]
+            tmp = ' '.join(a_no[init_token_pos:end_token_pos])
+        else:
+            tmp = a_no
+        results.append(tmp)
+
+    return results
+
+
 def decode_multilabel(preds, index2word, min_val=0.5, get_probs=False, verbose=0):
     """
     Decodes predictions

@@ -2941,10 +2941,11 @@ class Model_Wrapper(object):
         return data
 
     def _prepareSequentialData(self, X, Y=None, sample_weights=False):
-
+        
         # Format input data
         if len(self.inputsMapping.keys()) == 1:  # single input
-            X = X[self.inputsMapping[0]]
+            for in_model, in_ds in self.inputsMapping.iteritems():
+                X = X[in_ds]
         else:
             X_new = [0 for _ in range(len(self.inputsMapping.keys()))]  # multiple inputs
             for in_model, in_ds in self.inputsMapping.iteritems():
@@ -2955,11 +2956,12 @@ class Model_Wrapper(object):
         Y_sample_weights = None
         if Y is not None:
             if len(self.outputsMapping.keys()) == 1:  # single output
-                if isinstance(Y[self.outputsMapping[0]], tuple):
-                    Y = Y[self.outputsMapping[0]][0]
-                    Y_sample_weights = Y[self.outputsMapping[0]][1]
-                else:
-                    Y = Y[self.outputsMapping[0]]
+                for out_model, out_ds in self.outputsMapping.iteritems():
+                    if isinstance(Y[out_ds], tuple):
+                        Y = Y[out_ds][0]
+                        Y_sample_weights = Y[out_ds][1]
+                    else:
+                        Y = Y[out_ds]
             else:
                 Y_new = [0 for _ in range(len(self.outputsMapping.keys()))]  # multiple outputs
                 Y_sample_weights = [None for _ in range(len(self.outputsMapping.keys()))]
