@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
 import copy
 import fnmatch
 import logging
@@ -841,19 +840,23 @@ class Dataset(object):
         str_ += '---------------------------------------------\n'
         str_ += 'store path: ' + self.path + '\n'
         str_ += 'data length: ' + '\n'
-        str_ += '\ttrain - ' + str(self.len_train) + '\n'
-        str_ += '\tval   - ' + str(self.len_val) + '\n'
-        str_ += '\ttest  - ' + str(self.len_test) + '\n'
+        str_ += '\ttrain - ' + str(self.len_train) + ' samples. \n'
+        str_ += '\tval   - ' + str(self.len_val) + ' samples. \n'
+        str_ += '\ttest  - ' + str(self.len_test) + ' samples. \n'
 
-        str_ += '\n'
-        str_ += '[ INPUTS ]\n'
-        for id_in, type_in in list(zip(self.ids_inputs, self.types_inputs)):
-            str_ += type_in + ': ' + id_in + '\n'
+        str_ += 'data types: ' + '\n'
 
-        str_ += '\n'
-        str_ += '[ OUTPUTS ]\n'
-        for id_out, type_out in list(zip(self.ids_outputs, self.types_outputs)):
-            str_ += type_out + ': ' + id_out + '\n'
+        str_ += '\t\t [ INPUTS ] \n'
+        for split, types_in in iteritems(self.types_inputs):
+            str_ += str(split) + ':\n'
+            for id_in, type_in in zip(self.ids_inputs, types_in):
+                str_ += '\t' + id_in + ': ' + type_in + '\n'
+
+        str_ += '\t\t[ OUTPUTS ] \n'
+        for split, types_out in iteritems(self.types_outputs):
+            str_ += str(split) + ':\n'
+            for id_out, type_out in zip(self.ids_outputs, types_out):
+                str_ += '\t' + id_out + ': ' + type_out + '\n'
         str_ += '---------------------------------------------\n'
         return str_
 
@@ -991,7 +994,9 @@ class Dataset(object):
 
         # Insert type and id of input data
         keys_X_set = list(getattr(self, 'X_raw_' + set_name))
-        if id not in self.ids_inputs or overwrite_split:
+        updating_input = id in keys_X_set
+
+        if id not in self.ids_inputs:
             self.ids_inputs.append(id)
             if id not in self.optional_inputs:
                 self.optional_inputs.append(id)  # This is always optional
@@ -1005,8 +1010,12 @@ class Dataset(object):
 
         if self.types_inputs.get(set_name) is None:
             self.types_inputs[set_name] = [type]
+        elif updating_input:
+            input_idx = self.ids_inputs.index(id)
+            self.types_inputs[set_name][input_idx] = type
         else:
             self.types_inputs[set_name].append(type)
+
         aux_dict = getattr(self, 'X_raw_' + set_name)
         aux_dict[id] = path_list
         setattr(self, 'X_raw_' + set_name, aux_dict)
@@ -1114,27 +1123,31 @@ class Dataset(object):
                               (only applicable if the input data is of type 'video' or video-features').
         """
         self.__checkSetName(set_name)
-        if img_size is None:
-            img_size = [256, 256, 3]
+        img_size = img_size or [256, 256, 3]
+        img_size_crop = img_size_crop or [227, 227, 3]
 
-        if img_size_crop is None:
-            img_size_crop = [227, 227, 3]
         # Insert type and id of input data
         keys_X_set = list(getattr(self, 'X_' + set_name))
+
+        updating_input = id in keys_X_set
+
         if id not in self.ids_inputs:
             self.ids_inputs.append(id)
+            if not required and id not in self.optional_inputs:
+                self.optional_inputs.append(id)
         elif id in keys_X_set and not overwrite_split and not add_additional:
             raise Exception('An input with id "' + id + '" is already loaded into the Dataset.')
-
-        if not required and id not in self.optional_inputs:
-            self.optional_inputs.append(id)
 
         if type not in self.__accepted_types_inputs:
             raise NotImplementedError('The input type "' + type +
                                       '" is not implemented. '
                                       'The list of valid types are the following: ' + str(self.__accepted_types_inputs))
+
         if self.types_inputs.get(set_name) is None:
             self.types_inputs[set_name] = [type]
+        elif updating_input:
+            input_idx = self.ids_inputs.index(id)
+            self.types_inputs[set_name][input_idx] = type
         else:
             self.types_inputs[set_name].append(type)
 
@@ -1332,32 +1345,34 @@ class Dataset(object):
         :param path_list: can either be a path to a text file containing the paths to
                               the images or a python list of paths
         :param set_name: identifier of the set split loaded ('train', 'val' or 'test')
-        :param type: identifier of the type of input we are loading
-                         (accepted types can be seen in self.__accepted_types_inputs)
-        :param id: identifier of the input data loaded
+        :param type: identifier of the type of output we are loading
+                         (accepted types can be seen in self.__accepted_types_outputs)
+        :param id: identifier of the output data loaded
         """
         self.__checkSetName(set_name)
 
-        # Insert type and id of input data
+        # Insert type and id of output data
         keys_Y_set = list(getattr(self,
                                   'Y_raw_' + set_name))
-        if id not in self.ids_inputs:
-            self.ids_inputs.append(id)
-            if id not in self.optional_inputs:
-                self.optional_inputs.append(id)  # This is always optional
+        updating_output = id in keys_Y_set
+        if id not in self.ids_outputs:
+            self.ids_outputs.append(id)
 
         elif id in keys_Y_set and not overwrite_split and not add_additional:
-            raise Exception('An input with id "' + id + '" is already loaded into the Dataset.')
+            raise Exception('An output with id "' + id + '" is already loaded into the Dataset.')
 
-        if type not in self.__accepted_types_inputs:
+        if type not in self.__accepted_types_outputs:
             raise NotImplementedError(
-                'The input type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
-                    self.__accepted_types_inputs))
+                'The output type "' + type + '" is not implemented. The list of valid types are the following: ' + str(
+                    self.__accepted_types_outputs))
 
-        if self.types_inputs.get(set_name) is None:
-            self.types_inputs[set_name] = [type]
+        if self.types_outputs.get(set_name) is None:
+            self.types_outputs[set_name] = [type]
+        elif updating_output:
+            output_idx = self.ids_outputs.index(id)
+            self.types_outputs[set_name][output_idx] = type
         else:
-            self.types_inputs[set_name].append(type)
+            self.types_outputs[set_name].append(type)
 
         aux_dict = getattr(self, 'Y_raw_' + set_name)
         aux_dict[id] = path_list
@@ -1370,7 +1385,7 @@ class Dataset(object):
         del aux_list
 
         if not self.silence:
-            logger.info('Loaded "' + set_name + '" set inputs of type "' + type + '" with id "' + id + '".')
+            logger.info('Loaded "' + set_name + '" set outputs of type "' + type + '" with id "' + id + '".')
 
     def setOutput(self,
                   path_list,
@@ -1453,18 +1468,22 @@ class Dataset(object):
 
         # Insert type and id of output data
         keys_Y_set = list(getattr(self, 'Y_' + set_name))
+        updating_output = id in keys_Y_set
         if id not in self.ids_outputs:
             self.ids_outputs.append(id)
         elif id in keys_Y_set and not overwrite_split and not add_additional:
             raise Exception('An output with id "' + id + '" is already loaded into the Dataset.')
-
         if type not in self.__accepted_types_outputs:
             raise NotImplementedError('The output type "' + type +
                                       '" is not implemented. '
                                       'The list of valid types are the following: ' +
                                       str(self.__accepted_types_outputs))
+
         if self.types_outputs.get(set_name) is None:
             self.types_outputs[set_name] = [type]
+        elif updating_output:
+            output_idx = self.ids_outputs.index(id)
+            self.types_outputs[set_name][output_idx] = type
         else:
             self.types_outputs[set_name].append(type)
 
@@ -4611,12 +4630,10 @@ class Dataset(object):
         self.__isLoaded(set_name, 0)
         self.__isLoaded(set_name, 1)
         da_enhance_list = da_enhance_list or []
-
         [new_last, last, surpassed] = self.__getNextSamples(k, set_name)
 
         # Recover input samples
         X = []
-
         for id_in in list(self.ids_inputs):
             types_index = self.ids_inputs.index(id_in)
             type_in = self.types_inputs[set_name][types_index]
@@ -4640,7 +4657,6 @@ class Dataset(object):
                 else:
                     x = getattr(self,
                                 'X_' + set_name)[id_in][last:new_last]
-
             # Pre-process inputs
             if not get_only_ids:
                 x = self.preprocess_inputs(x,
@@ -4692,7 +4708,6 @@ class Dataset(object):
                                             dataAugmentation=False,
                                             )
             Y.append(y)
-
         return [X, Y]
 
     def getXY_FromIndices(self,
@@ -4840,7 +4855,6 @@ class Dataset(object):
                     ghost_x = True
             else:
                 x = [getattr(self, 'X_' + set_name)[id_in][index] for index in k]
-
             # Pre-process inputs
             if not get_only_ids and not ghost_x:
                 x = self.preprocess_inputs(x,
