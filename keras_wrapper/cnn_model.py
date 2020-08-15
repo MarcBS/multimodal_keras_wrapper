@@ -560,7 +560,7 @@ class Model_Wrapper(object):
                 optimizer = SGD(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, momentum=momentum,
                                 nesterov=nesterov)
             elif optimizer.lower() == 'adam':
-                optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+                optimizer = Adam(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon, amsgrad=True)
             elif optimizer.lower() == 'adagrad':
                 optimizer = Adagrad(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
             elif optimizer.lower() == 'rmsprop':
@@ -570,7 +570,7 @@ class Model_Wrapper(object):
             elif optimizer.lower() == 'adamax':
                 optimizer = Adamax(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
             elif optimizer.lower() == 'adadelta':
-                optimizer = Adadelta(lr=lr, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
+                optimizer = Adadelta(lr=lr, rho=0.95, clipnorm=clipnorm, clipvalue=clipvalue, decay=decay, epsilon=epsilon)
             else:
                 raise Exception('\tThe chosen optimizer is not implemented.')
 

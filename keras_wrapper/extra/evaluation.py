@@ -1,6 +1,10 @@
 import json
 import logging
+import codecs
+import numpy as np
+import pandas as pd
 
+from keras_wrapper.extra.read_write import list2file
 from localization_utilities import *
 
 
@@ -135,7 +139,7 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     """
     from sklearn import metrics as sklearn_metrics
 
-    word2idx = extra_vars[split]['word2idx']
+    word2idx = extra_vars[split]['words2idx']
 
     # check if an additional dictionary matching raw to basic and general labels is provided
     # in that case a more general evaluation will be considered
@@ -164,7 +168,11 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
     gt_list = extra_vars[split]['references']
 
     if raw2basic is None:
-        y_gt = np.array(gt_list)
+        #y_gt = np.array(gt_list)
+        y_gt = np.zeros((n_samples, n_classes))
+        for i_s, sample in enumerate(gt_list):
+            for word in sample.split():
+                y_gt[i_s, word2idx[word]] = 1
     else:
         idx2word = {v: k for k, v in word2idx.iteritems()}
         y_gt = np.zeros((n_samples, n_classes))
@@ -200,7 +208,284 @@ def multilabel_metrics(pred_list, verbose, extra_vars, split):
             'f1': f1}
 
 
-import numpy as np
+def multilabel_metrics_custom(pred_list, extra_vars, split, verbose=1):
+    """
+    Multiclass classification metrics. See multilabel ranking metrics in sklearn library for more info:
+        http://scikit-learn.org/stable/modules/model_evaluation.html#multilabel-ranking-metrics
+    :param pred_list: list of predictions
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: dictionary extra variables. 
+            Must contain:
+                - ['n_classes'] with the total number of existent classes
+                - [split]['references'] with the GT values corresponding to each sample of the current data split
+            Optional:
+                - ['words_as_classes'] as True if our output is of type text and each word in the sentence is a label for a video frame
+                - ['save_classes_report'] as True if we want to ave a classification report for each class
+                - ['save_path'] as the path to save a classification report for each class
+                - ['target_names'] as the classes names for the classification report
+    :param split: split of the data where we are applying the evaluation
+    :return: dictionary of multiclass metrics
+    """
+    from sklearn import metrics as sklearn_metrics
+
+    n_classes = extra_vars['n_classes']
+    
+    n_samples = len(pred_list)
+    logging.info("---# of samples: "+str(n_samples))
+    
+    gt_list = extra_vars[split]['references']
+    try:
+        values_gt = gt_list.values()
+    except:
+        values_gt = gt_list
+
+    # Extra case added. For text output when each word is the label/class of each corresponding video frame.
+    if extra_vars.get('words_as_classes', False):
+
+        # Create prediction matrix
+        y_pred = np.zeros((n_samples, n_classes))
+        y_gt = np.zeros((n_samples, n_classes))
+
+        for i in range(n_samples):
+            if i==0:
+                print values_gt[i]
+                print pred_list[i]
+            
+            line_gt = values_gt[i].split()  # List of ground truth values
+            for j, value in enumerate(line_gt):
+                value = int(value)
+                y_gt[i, value] = 1
+
+            for j, value in enumerate(pred_list[i]):
+                try:
+                    value = int(value)
+                    y_pred[i, value] = 1 
+                except:
+                    if value=='':
+                        y_pred[i, 0] = 1 
+                
+
+    # Compute Precision, Recall and F1 score
+    precision, recall, f1, support = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='samples')
+
+    if False:
+        df = pd.DataFrame({"precision": precision, "recall": recall, "f1 score": f1_classes, "support": support}, index=extra_vars['target_names'])
+
+        # Don't use background for metrics computation
+        support = support[1:]
+        precision = precision[1:]
+        recall = recall[1:]
+
+        #print "F1 score computed with average precision and recalls"
+        #precision_ = np.mean(np.take(precision, np.nonzero(support)))
+        #recall_ = np.mean(np.take(recall, np.nonzero(support)))
+        #f1_ = 2*precision_*recall_ / (precision_+recall_)
+        #print f1_
+        #print
+        
+        # Precision and recall arrays, only of elements with non zero support
+        precision_ = np.nan_to_num(np.take(precision, np.nonzero(support))[0])
+        recall_ = np.nan_to_num(np.take(recall, np.nonzero(support))[0])
+
+        # F1-score per class
+        f1_ = 2*precision_*recall_ / (precision_+recall_)
+        f1_ = np.nan_to_num(f1_)  # It is possible to divide by 0 and get nan values. So we set those to 0.0
+
+        # Get mean metrics between all classes
+        precision = np.mean(precision_)
+        recall = np.mean(recall_)
+        f1 = np.mean(f1_)
+
+        accuracy_balanced = recall  # In this case these metrics are the same
+
+        if extra_vars.get('save_classes_report', False):
+            save_path = extra_vars['save_path']
+
+            df.to_csv(save_path + "/classification_report.csv", index = True, sep=',', encoding='utf-8')
+
+            report = sklearn_metrics.classification_report(y_gt, y_pred, target_names=extra_vars['target_names'])
+            with codecs.open(save_path + "/classification_report_real.txt",'w','utf-8') as f:
+                f.write(report)
+                f.close()
+
+            with open(save_path + "/f1-score_classes_real.txt", 'w') as f:
+                for v in f1_classes:
+                    f.write(str(v)+'\n')
+                f.close()
+
+    if verbose > 0:
+        logging.info('Precision: %f' % precision)
+        logging.info('Recall: %f' % recall)
+        logging.info('F1 score: %f' % f1)
+
+    dic_metrics = {
+        'precision': precision,
+        'recall': recall,
+        'f1': f1
+    }
+
+    return dic_metrics
+
+
+def multiclass_metrics_custom(pred_list, extra_vars, split, verbose=1):
+    """
+    Multiclass classification metrics. See multilabel ranking metrics in sklearn library for more info:
+        http://scikit-learn.org/stable/modules/model_evaluation.html#multilabel-ranking-metrics
+    :param pred_list: list of predictions
+    :param verbose: if greater than 0 the metric measures are printed out
+    :param extra_vars: dictionary extra variables. 
+            Must contain:
+                - ['n_classes'] with the total number of existent classes
+                - [split]['references'] with the GT values corresponding to each sample of the current data split
+            Optional:
+                - ['words_as_classes'] as True if our output is of type text and each word in the sentence is a label for a video frame
+                - ['save_classes_report'] as True if we want to ave a classification report for each class
+                - ['save_path'] as the path to save a classification report for each class
+                - ['target_names'] as the classes names for the classification report
+    :param split: split of the data where we are applying the evaluation
+    :return: dictionary of multiclass metrics
+    """
+    from sklearn import metrics as sklearn_metrics
+
+    n_classes = extra_vars['n_classes']
+    
+    n_samples = len(pred_list)
+    logging.info("---# of samples: "+str(n_samples))
+    
+    gt_list = extra_vars[split]['references']
+    try:
+        values_gt = gt_list.values()
+    except:
+        values_gt = gt_list
+
+    # Extra case added. For text output when each word is the label/class of each corresponding video frame.
+    if extra_vars.get('words_as_classes', False):
+
+        n_classes += 3
+
+        # Create flat list for ground truth and predictions values
+        flat_gt = []
+        flat_pred = []
+
+        for i in range(n_samples):
+            line_gt = values_gt[i].split()  # List of ground truth values
+
+            for j, value in enumerate(line_gt):  # Only iterate until number of ground truth classes, as we want to ignore '<pad>' for the metrics
+                flat_gt.append(int(value)) 
+                pred = pred_list[i][j]
+                try:
+                    flat_pred.append(int(pred))
+                except:
+                    if pred == '<pad>':
+                        flat_pred.append(n_classes-3)  # n_classes-3
+                    elif pred == '<unk>':
+                        flat_pred.append(n_classes-2)  # n_classes-2
+                    elif pred == '<null>':
+                        flat_pred.append(n_classes-1)  # n_classes-1
+        
+        # Create prediction matrix
+        y_pred = np.zeros((len(flat_gt), n_classes))
+        y_gt = np.zeros((len(flat_gt), n_classes))
+        counts_per_class = np.zeros((n_classes,))
+
+        for i in range(len(flat_gt)):
+            y_pred[i, flat_pred[i]] = 1
+            y_gt[i, flat_gt[i]] = 1
+            counts_per_class[flat_gt[i]] += 1
+
+    else:
+
+        # Create prediction matrix
+        y_pred = np.zeros((n_samples, n_classes))
+        y_gt = np.zeros((n_samples, n_classes))
+        counts_per_class = np.zeros((n_classes,))
+
+        pred_class_list = [np.argmax(sample_score) for sample_score in pred_list]
+
+        for i_s, pred_class in enumerate(pred_class_list):
+            y_pred[i_s, pred_class] = 1
+
+        for i_s, gt_class in enumerate(values_gt):
+            y_gt[i_s, gt_class] = 1
+            counts_per_class[gt_class] += 1
+
+
+    # Compute accuracy
+    top_n_accuracies = [3, 5]
+    accuracy = sklearn_metrics.accuracy_score(y_gt, y_pred)
+    acc_top_n = {}
+    for topn in top_n_accuracies:
+        acc_top_n[topn] = __top_k_accuracy(y_gt, y_pred, topn)
+
+    # Compute Precision, Recall and F1 score
+    precision, recall, f1_classes, support = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average=None)
+
+    if extra_vars.get('save_classes_report', False):
+        df = pd.DataFrame({"precision": precision, "recall": recall, "f1 score": f1_classes, "support": support}, index=extra_vars['target_names'])
+
+    # Don't use background for metrics computation
+    support = support[1:]
+    precision = precision[1:]
+    recall = recall[1:]
+
+    #print "F1 score computed with average precision and recalls"
+    #precision_ = np.mean(np.take(precision, np.nonzero(support)))
+    #recall_ = np.mean(np.take(recall, np.nonzero(support)))
+    #f1_ = 2*precision_*recall_ / (precision_+recall_)
+    #print f1_
+    #print
+    
+    # Precision and recall arrays, only of elements with non zero support
+    precision_ = np.nan_to_num(np.take(precision, np.nonzero(support))[0])
+    recall_ = np.nan_to_num(np.take(recall, np.nonzero(support))[0])
+
+    # F1-score per class
+    f1_ = 2*precision_*recall_ / (precision_+recall_)
+    f1_ = np.nan_to_num(f1_)  # It is possible to divide by 0 and get nan values. So we set those to 0.0
+
+    # Get mean metrics between all classes
+    precision = np.mean(precision_)
+    recall = np.mean(recall_)
+    f1 = np.mean(f1_)
+
+    accuracy_balanced = recall  # In this case these metrics are the same
+
+    if extra_vars.get('save_classes_report', False):
+        save_path = extra_vars['save_path']
+
+        df.to_csv(save_path + "/classification_report.csv", index = True, sep=',', encoding='utf-8')
+
+        report = sklearn_metrics.classification_report(y_gt, y_pred, target_names=extra_vars['target_names'])
+        with codecs.open(save_path + "/classification_report.txt",'w','utf-8') as f:
+            f.write(report)
+            f.close()
+
+        with open(save_path + "/f1-score_classes.txt", 'w') as f:
+            for v in f1_classes:
+                f.write(str(v)+'\n')
+            f.close()
+    
+
+    if verbose > 0:
+        logging.info('Accuracy: %f' % accuracy)
+        for topn in top_n_accuracies:
+            logging.info('Accuracy top-%d: %f' % (topn, acc_top_n[topn]))
+        logging.info('Balanced Accuracy: %f' % accuracy_balanced)
+        logging.info('Precision: %f' % precision)
+        logging.info('Recall: %f' % recall)
+        logging.info('F1 score: %f' % f1)
+
+    dic_metrics = {'accuracy': accuracy,
+            'accuracy_balanced': accuracy_balanced,
+            'precision': precision,
+            'recall': recall,
+            'f1': f1}
+
+    for topn in top_n_accuracies:
+        dic_metrics['accuracy_top_'+str(topn)] = acc_top_n[topn]
+
+    return dic_metrics
+
 
 def multiclass_metrics(pred_list, verbose, extra_vars, split):
     """
@@ -214,6 +499,9 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
                 - [split]['references'] with the GT values corresponding to each sample of the current data split
             Optional:
                 - ['words_as_classes'] as True if our output is of type text and each word in the sentence is a label for a video frame
+                - ['save_classes_report'] as True if we want to ave a classification report for each class
+                - ['save_path'] as the path to save a classification report for each class
+                - ['target_names'] as the classes names for the classification report
     :param split: split of the data where we are applying the evaluation
     :return: dictionary of multiclass metrics
     """
@@ -292,11 +580,18 @@ def multiclass_metrics(pred_list, verbose, extra_vars, split):
 
     # The following two lines should both provide the same measure (balanced accuracy)
     _, accuracy_balanced, _, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='macro')
-    # accuracy_balanced = sklearn_metrics.balanced_accuracy_score(y_gt, y_pred)
+    #accuracy_balanced = sklearn_metrics.balanced_accuracy_score(y_gt, y_pred)
 
     # Compute Precision, Recall and F1 score
     precision, recall, f1, _ = sklearn_metrics.precision_recall_fscore_support(y_gt, y_pred, average='micro')
-
+    
+    if extra_vars.get('save_classes_report', False):
+        save_path = extra_vars['save_path']
+        report = sklearn_metrics.classification_report(y_gt, y_pred, target_names=extra_vars['target_names'])
+        with codecs.open(save_path + "/classification_report_last_epoch.txt",'w','utf-8') as f:
+        #with open(save_path + "/classification_report_last_epoch.txt", 'w') as f:
+            f.write(report)
+    
     if verbose > 0:
         logging.info('Accuracy: %f' % accuracy)
         for topn in top_n_accuracies:
@@ -810,6 +1105,8 @@ selectMetric = {
     'sem_seg_acc': semantic_segmentation_accuracy,
     'sem_seg_iou': semantic_segmentation_meaniou,
     'ppl': compute_perplexity,
+    'multiclass_metrics_custom': multiclass_metrics_custom,
+    'multilabel_metrics_custom': multilabel_metrics_custom,
 }
 
 select = selectMetric

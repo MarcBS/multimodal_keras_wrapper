@@ -686,6 +686,27 @@ def to_categorical(y, num_classes=None):
     return categorical
 
 
+def to_multilabel(y, mask, num_classes=None):
+    """Converts a class vector (integers) to binary class matrix.
+
+    E.g. for use with categorical_crossentropy.
+
+    # Arguments
+        y: class vector to be converted into a matrix
+            (integers from 0 to num_classes).
+        num_classes: total number of classes.
+
+    # Returns
+        A binary matrix representation of the input.
+    """
+    y = y[y > 0]
+    if not num_classes:
+        num_classes = np.max(y) + 1
+    multilabel = np.zeros(num_classes)
+    for i in y:
+        multilabel[i] = 1
+    return multilabel
+
 # ------------------------------------------------------- #
 #       DECODING FUNCTIONS
 #           Functions for decoding predictions
@@ -764,7 +785,7 @@ def decode_predictions_words_as_classes(preds, temperature, index2word, sampling
     if verbose > 0:
         logging.info('Decoding prediction ...')
 
-    samples = sampling(scores=preds, sampling_type=sampling_type, temperature)
+    samples = sampling(scores=preds, sampling_type=sampling_type, temperature=temperature)
 
     vfunc = np.vectorize(lambda index: index2word[index])
     answer_pred = vfunc(samples)

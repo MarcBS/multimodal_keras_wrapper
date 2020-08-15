@@ -14,7 +14,7 @@ from operator import add
 import numpy as np
 from extra.read_write import create_dir_if_not_exists
 from extra.tokenizers import *
-from .utils import bbox, to_categorical
+from .utils import bbox, to_categorical, to_multilabel
 
 from .utils import MultiprocessQueue
 import multiprocessing
@@ -687,6 +687,7 @@ class Dataset(object):
         # Parameters used for inputs of type 'video' or 'video-features'
         self.counts_frames = dict()
         self.paths_frames = dict()
+        self.shuffled_frames = dict()
         self.max_video_len = dict()
         #################################################
 
@@ -745,15 +746,63 @@ class Dataset(object):
         # Process each output sample
         for id in self.Y_train.keys():
             self.Y_train[id] = [self.Y_train[id][s] for s in shuffled_order]
+            
+            #if id == 'output_real':
+            #    for n in range(len(self.Y_train[id])):
+            #        gt_str = self.Y_train[id][n]
+            #        lbls_list = gt_str.strip('\n').split()
+            #        shuffled_order_inside = random.sample([i for i in range(len(lbls_list))], len(lbls_list))
+            #        lbls_list = [lbls_list[s] for s in shuffled_order_inside]
+            #        gt_str = ""
+            #        for l in lbls_list:
+            #            gt_str += str(l) + " "
+            #        self.Y_train[id][n] = gt_str[:-1]
 
-        if 'video' in self.types_inputs:
-            ind = self.types_inputs.index('video')
-            id = self.ids_inputs[ind]
-            if id in self.counts_frames.keys():
-                self.counts_frames[id]['train'] = [self.counts_frames[id]['train'][s] for s in shuffled_order]
+
+        if 'video-features' in self.types_inputs and 'text' in self.types_outputs:
+            ind = self.types_inputs.index('video-features')
+            feat_id = self.ids_inputs[ind]
+
+            id_out = 'output'
+
+            n_videos = len(self.X_train[feat_id])
+            idx = [0 for i_nvid in range(n_videos)]
+            # recover all initial indices from image's paths of all videos
+            for v in range(n_videos):
+                last_idx = self.X_train[feat_id][v]
+                idx[v] = int(sum(self.counts_frames[feat_id]['train'][:last_idx]))
+
+            self.shuffled_frames[feat_id]['train'] = [self.shuffled_frames[feat_id]['train'][s] for s in shuffled_order]
+
+            for n, frame in enumerate(self.shuffled_frames[feat_id]['train']):
+                ind = idx[n]
+                shuffled_order = random.sample([i for i in range(frame)], frame)
+                shuffled_paths = [self.paths_frames[feat_id]['train'][ind+s] for s in shuffled_order]
+                self.paths_frames[feat_id]['train'][ind:ind+frame] = shuffled_paths
+                
+                for i, text_in_id in enumerate(self.ids_inputs):
+                    if self.types_inputs[i] == 'text':
+                        pred_str = self.X_train[text_in_id][n]
+                        lbls_list = pred_str.strip('\n').split()
+                        lbls_list = [lbls_list[s] for s in shuffled_order]
+                        pred_str = ""
+                        for l in lbls_list:
+                            pred_str += str(l) + " "
+                        self.X_train[text_in_id][n] = pred_str[:-1]
+
+                for i, text_out_id in enumerate(self.ids_outputs):
+                    if text_out_id in self.Y_train.keys() and self.types_outputs[i] == 'text':
+                        gt_str = self.Y_train[text_out_id][n]
+                        lbls_list = gt_str.strip('\n').split()
+                        lbls_list = [lbls_list[s] for s in shuffled_order]
+                        gt_str = ""
+                        for l in lbls_list:
+                            gt_str += str(l) + " "
+                        self.Y_train[text_out_id][n] = gt_str[:-1]
 
         if not self.silence:
             logging.info("Shuffling training done.")
+
 
     def keepTopOutputs(self, set_name, id_out, n_top):
         self.__checkSetName(set_name)
@@ -878,7 +927,7 @@ class Dataset(object):
                  bpe_codes=None, separator='@@',  # 'text'
                  feat_len=1024,  # 'image-features' / 'video-features'
                  max_video_len=26,  # 'video'
-                sparse = False,  # 'binary'
+                 sparse = False,  # 'binary'
                  ):
         """
         Loads a list which can contain all samples from either the 'train', 'val', or
@@ -2352,7 +2401,7 @@ class Dataset(object):
                 for line in list_:
                     counts_frames.append(int(line.rstrip('\n')))
             
-            video_indices =[]
+            video_indices = []
             with open(path_list[2], 'r') as list_:
                 for line in list_:
                     video_indices.append(int(line.rstrip('\n')))
@@ -2379,7 +2428,7 @@ class Dataset(object):
 
     def preprocessVideoFeatures(self, path_list, id, set_name, max_video_len, img_size, img_size_crop, feat_len):
 
-        if isinstance(path_list, list) and len(path_list) == 2:
+        if isinstance(path_list, list) and len(path_list) == 3:
             if isinstance(path_list[0], str):
                 # path to all images in all videos
                 paths_frames = []
@@ -2407,16 +2456,18 @@ class Dataset(object):
                     ' It must be a path to a file containing a list of counts or directly a list of counts.\n'
                     'It currently is: %s' % str(path_list[1]))
 
-            # video indices
             video_indices = range(len(counts_frames))
 
             if id not in self.paths_frames:
                 self.paths_frames[id] = dict()
             if id not in self.counts_frames:
                 self.counts_frames[id] = dict()
+            if id not in self.shuffled_frames:
+                self.shuffled_frames[id] = dict()
 
             self.paths_frames[id][set_name] = paths_frames
             self.counts_frames[id][set_name] = counts_frames
+            self.shuffled_frames[id][set_name] = counts_frames
             self.max_video_len[id] = max_video_len
             self.img_size[id] = img_size
             self.img_size_crop[id] = img_size_crop
@@ -3375,7 +3426,6 @@ class Dataset(object):
                 elif type_in == 'binary':
                     x = self.loadBinary(x, id_in)
             X.append(x)
-
         return X
 
     def getXY(self, set_name, k, normalization_type='(-1)-1',
@@ -3437,7 +3487,7 @@ class Dataset(object):
                 elif type_in == 'video':
                     x = self.loadVideos(x, id_in, last, set_name, self.max_video_len[id_in],
                                         normalization_type, normalization, meanSubstraction, dataAugmentation)
-                elif type_in == 'text' or type_in == 'dense_text':
+                elif type_in == 'text' or type_in == 'dense_text':                  
                     x = self.loadText(x, self.vocabulary[id_in],
                                       self.max_text_len[id_in][set_name], self.text_offset[id_in],
                                       fill=self.fill_text[id_in], pad_on_batch=self.pad_on_batch[id_in],
@@ -3529,7 +3579,10 @@ class Dataset(object):
                             y_aux_type = np.uint8
                         y_aux = np.zeros(list(y[0].shape) + [self.vocabulary_len[id_out]]).astype(y_aux_type)
                         for idx in range(y[0].shape[0]):
-                            y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(y_aux_type)
+                            if id_out == "output_real":
+                                y_aux[idx] = to_multilabel(y[0][idx], y[1][idx], self.vocabulary_len[id_out]).astype(y_aux_type)
+                            else:
+                                y_aux[idx] = to_categorical(y[0][idx], self.vocabulary_len[id_out]).astype(y_aux_type)
                             if hasattr(self, 'label_smoothing') and self.label_smoothing[id_out][set_name] > 0.:
                                 y_aux[idx] = ((1.-self.label_smoothing[id_out][set_name]) * y_aux[idx] + (self.label_smoothing[id_out][set_name] / self.vocabulary_len[id_out]))
                         if self.sample_weights[id_out][set_name]:

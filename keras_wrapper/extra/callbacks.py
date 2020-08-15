@@ -376,8 +376,10 @@ class EvalPerformance(KerasCallback):
                         alphas = None
                         heuristic = None
                         sources = None
+
                     if self.out_pred_idx is not None:
                         samples = samples[self.out_pred_idx]
+
                     # Convert predictions into sentences
                     if self.beam_search:
                         predictions = decode_predictions_beam_search(samples,
@@ -389,7 +391,13 @@ class EvalPerformance(KerasCallback):
                                                                      verbose=self.verbose)
                                                                      
                     elif self.extra_vars[gt_pos].get('words_as_classes', False):
-                        predictions = decode_predictions_words_as_classes(predictions,
+                        if self.extra_vars[gt_pos].get('multilabel', False):
+                            predictions = decode_multilabel(predictions,
+                                                                     self.index2word_y,
+                                                                     min_val=self.min_pred_multilabel[gt_pos],
+                                                                     verbose=self.verbose)
+                        else:
+                            predictions = decode_predictions_words_as_classes(predictions,
                                                                      1,   # always set temperature to 1
                                                                      self.index2word_y,
                                                                      self.sampling_type,
@@ -474,6 +482,9 @@ class EvalPerformance(KerasCallback):
                     else:
                         raise NotImplementedError(
                             'The store type "' + self.write_type + '" is not implemented.')
+
+                if self.extra_vars[gt_pos].get('save_classes_report', False):
+                    self.extra_vars[gt_pos]['save_path'] = self.save_path
 
                 # Evaluate on each metric
                 for metric in these_metrics:
@@ -713,11 +724,17 @@ class Sample(KerasCallback):
                                                                      mapping=self.extra_vars.get('mapping', None),
                                                                      verbose=self.verbose)                                          
                     elif self.extra_vars.get('words_as_classes', False):
-                        predictions = decode_predictions_words_as_classes(predictions,
-                                                                     1,
-                                                                     self.index2word_y,
-                                                                     self.sampling_type,
-                                                                     verbose=self.verbose)
+                        if self.extra_vars[gt_pos].get('multilabel', False):
+                            predictions = decode_multilabel(predictions,
+                                                            self.index2word_y,
+                                                            min_val=self.min_pred_multilabel[gt_pos],
+                                                            verbose=self.verbose)
+                        else:
+                            predictions = decode_predictions_words_as_classes(predictions,
+                                                                                1,   # always set temperature to 1
+                                                                                self.index2word_y,
+                                                                                self.sampling_type,
+                                                                                verbose=self.verbose)
                     else:
                         predictions = decode_predictions(samples,
                                                          1,
@@ -926,12 +943,9 @@ class LearningRateReducer(KerasCallback):
         new_rate = self.reduce_rate if self.reduction_function == 'linear' else \
             np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
         if K.backend() == 'tensorflow':
-            print('WARNING: learning rate decay is deactivated when using TensorFlow') 
-            """
-            lr = self.model.optimizer.optimizer.get_lr()
+            lr = self.model.optimizer.get_lr()
             self.new_lr = np.float32(lr * new_rate)
-            self.model.optimizer.optimizer.set_lr(self.new_lr)
-            """
+            self.model.optimizer.set_lr(self.new_lr)
         else:
             lr = self.model.optimizer.lr.get_value()
             self.new_lr = np.float32(lr * new_rate)
