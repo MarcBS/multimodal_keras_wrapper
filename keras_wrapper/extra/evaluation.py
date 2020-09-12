@@ -361,8 +361,6 @@ def multiclass_metrics_custom(pred_list, extra_vars, split, verbose=1):
     # Extra case added. For text output when each word is the label/class of each corresponding video frame.
     if extra_vars.get('words_as_classes', False):
 
-        n_classes += 3
-
         # Create flat list for ground truth and predictions values
         flat_gt = []
         flat_pred = []
@@ -377,11 +375,11 @@ def multiclass_metrics_custom(pred_list, extra_vars, split, verbose=1):
                     flat_pred.append(int(pred))
                 except:
                     if pred == '<pad>':
-                        flat_pred.append(n_classes-3)  # n_classes-3
+                        flat_pred.append(0)  # n_classes-3
                     elif pred == '<unk>':
-                        flat_pred.append(n_classes-2)  # n_classes-2
+                        flat_pred.append(0)  # n_classes-2
                     elif pred == '<null>':
-                        flat_pred.append(n_classes-1)  # n_classes-1
+                        flat_pred.append(0)  # n_classes-1
         
         # Create prediction matrix
         y_pred = np.zeros((len(flat_gt), n_classes))
@@ -428,13 +426,6 @@ def multiclass_metrics_custom(pred_list, extra_vars, split, verbose=1):
     precision = precision[1:]
     recall = recall[1:]
 
-    #print "F1 score computed with average precision and recalls"
-    #precision_ = np.mean(np.take(precision, np.nonzero(support)))
-    #recall_ = np.mean(np.take(recall, np.nonzero(support)))
-    #f1_ = 2*precision_*recall_ / (precision_+recall_)
-    #print f1_
-    #print
-    
     # Precision and recall arrays, only of elements with non zero support
     precision_ = np.nan_to_num(np.take(precision, np.nonzero(support))[0])
     recall_ = np.nan_to_num(np.take(recall, np.nonzero(support))[0])
@@ -465,7 +456,6 @@ def multiclass_metrics_custom(pred_list, extra_vars, split, verbose=1):
                 f.write(str(v)+'\n')
             f.close()
     
-
     if verbose > 0:
         logging.info('Accuracy: %f' % accuracy)
         for topn in top_n_accuracies:

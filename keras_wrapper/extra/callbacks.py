@@ -912,7 +912,7 @@ class LearningRateReducer(KerasCallback):
         self.epsilon = epsilon
         self.epoch = 0
         self.new_lr = None
-        assert self.reduction_function in ['linear', 'exponential'], 'Reduction function "%s" unimplemented!' % \
+        assert self.reduction_function in ['linear', 'exponential', 'step'], 'Reduction function "%s" unimplemented!' % \
                                                                      str(self.reduction_function)
 
     def on_epoch_end(self, epoch, logs={}):
@@ -940,8 +940,19 @@ class LearningRateReducer(KerasCallback):
         self.reduce_lr(self.current_update_nb)
 
     def reduce_lr(self, current_nb):
-        new_rate = self.reduce_rate if self.reduction_function == 'linear' else \
-            np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
+
+        if self.reduction_function == 'linear':
+            new_rate = self.reduce_rate 
+        elif self.reduction_function == 'exponential':    
+            new_rate = np.power(self.exp_base, current_nb / self.half_life) * self.reduce_rate
+        elif self.reduction_function == 'step': 
+            if current_nb == 25 or current_nb == 40:
+                new_rate = 0.5
+            elif current_nb == 30 or current_nb == 45:
+                new_rate = 0.75
+            else:
+                new_rate = 1.
+        
         if K.backend() == 'tensorflow':
             lr = self.model.optimizer.get_lr()
             self.new_lr = np.float32(lr * new_rate)

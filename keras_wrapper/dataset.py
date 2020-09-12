@@ -743,27 +743,14 @@ class Dataset(object):
         # Process each input sample
         for id in self.X_train.keys():
             self.X_train[id] = [self.X_train[id][s] for s in shuffled_order]
+
         # Process each output sample
         for id in self.Y_train.keys():
             self.Y_train[id] = [self.Y_train[id][s] for s in shuffled_order]
-            
-            #if id == 'output_real':
-            #    for n in range(len(self.Y_train[id])):
-            #        gt_str = self.Y_train[id][n]
-            #        lbls_list = gt_str.strip('\n').split()
-            #        shuffled_order_inside = random.sample([i for i in range(len(lbls_list))], len(lbls_list))
-            #        lbls_list = [lbls_list[s] for s in shuffled_order_inside]
-            #        gt_str = ""
-            #        for l in lbls_list:
-            #            gt_str += str(l) + " "
-            #        self.Y_train[id][n] = gt_str[:-1]
-
 
         if 'video-features' in self.types_inputs and 'text' in self.types_outputs:
             ind = self.types_inputs.index('video-features')
             feat_id = self.ids_inputs[ind]
-
-            id_out = 'output'
 
             n_videos = len(self.X_train[feat_id])
             idx = [0 for i_nvid in range(n_videos)]
